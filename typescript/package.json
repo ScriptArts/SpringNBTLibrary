@@ -10,6 +10,18 @@
     ".": {
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
+    },
+    "./nbt": {
+      "types": "./dist/src/nbt/index.d.ts",
+      "default": "./dist/src/nbt/index.js"
+    },
+    "./anvil": {
+      "types": "./dist/src/anvil/index.d.ts",
+      "default": "./dist/src/anvil/index.js"
+    },
+    "./world": {
+      "types": "./dist/src/world/index.d.ts",
+      "default": "./dist/src/world/index.js"
     }
   },
   "files": [

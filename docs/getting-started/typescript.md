@@ -14,6 +14,18 @@ npm install ./spring-nbt-library-0.1.0.tgz
 これで `node_modules` へ入り、通常のパッケージと同じように import できる。
 型定義（`.d.ts`）も含まれているので補完が効く。
 
+取り込み方は 2 通りある。どちらでもよい。
+
+```ts
+// まとめて取る
+import { NbtCompound, RegionFile, BlockState } from "spring-nbt-library";
+
+// レイヤごとに取る（他言語のモジュール構成に対応する）
+import { NbtCompound } from "spring-nbt-library/nbt";
+import { RegionFile } from "spring-nbt-library/anvil";
+import { BlockState } from "spring-nbt-library/world";
+```
+
 `package.json` には次のように記録される。
 
 ```json

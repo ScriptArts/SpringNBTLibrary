@@ -57,7 +57,7 @@ Rust            read_file(path, &NbtReadOptions::default())
 |---|---|
 | C# | `using SpringNBTLibrary.Nbt;` / `.Anvil` / `.World` |
 | Java | `import io.github.scriptarts.springnbt.nbt.*;` / `.anvil` / `.world` |
-| TypeScript | `import { ... } from "spring-nbt-library";` |
+| TypeScript | `import { ... } from "spring-nbt-library";`（`/nbt` `/anvil` `/world` のサブパスも可） |
 | Python | `from spring_nbt_library.nbt import ...` |
 | Rust | `use spring_nbt_library::nbt::*;` |
 
