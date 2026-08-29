@@ -4,11 +4,26 @@
 
 ## 導入
 
-まだ crates.io へは公開していない。パスかリポジトリで参照する。
+crates.io へは公開していない。**git 参照が手軽**である。
 
 ```toml
 [dependencies]
-spring-nbt-library = { path = "../SpringNBTLibrary/rust" }
+spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v0.1.0" }
+```
+
+Cargo が自分で取得するので、ファイルを落とす必要はない。
+
+ネットワークに繋がらない環境では、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) の
+`spring-nbt-library-<版>.crate` を落として展開し、パスで参照する。
+`.crate` は拡張子が違うだけの tar.gz である。
+
+```bash
+tar xzf spring-nbt-library-0.1.0.crate
+```
+
+```toml
+[dependencies]
+spring-nbt-library = { path = "spring-nbt-library-0.1.0" }
 ```
 
 ## 例外ではなく `Result`

@@ -4,11 +4,19 @@
 
 ## 導入
 
-まだ PyPI へは公開していない。リポジトリを取得して入れる。
+PyPI へは公開していない。[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
+`spring_nbt_library-<版>-py3-none-any.whl` を落として入れる。
 
 ```bash
-git clone https://github.com/scriptarts/SpringNBTLibrary.git
-pip install -e SpringNBTLibrary/python
+pip install spring_nbt_library-0.1.0-py3-none-any.whl
+```
+
+wheel なのでビルドは要らない。依存パッケージも無い。
+
+ソースから入れたい場合は `spring_nbt_library-<版>.tar.gz` でもよい。
+
+```bash
+pip install spring_nbt_library-0.1.0.tar.gz
 ```
 
 ## NBT ファイルを読む

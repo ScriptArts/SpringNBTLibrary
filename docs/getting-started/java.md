@@ -4,11 +4,25 @@
 
 ## 導入
 
-まだ Maven Central へは公開していない。ローカルへインストールして使う。
+Maven Central へは公開していない。[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
+`spring-nbt-library-<版>.jar` を落として組み込む。
+
+**Gradle の場合** — jar を `libs/` へ置いて、まとめて読み込む。
+
+```groovy
+dependencies {
+    implementation files("libs/spring-nbt-library-0.1.0.jar")
+}
+```
+
+**Maven の場合** — ローカルリポジトリへ入れてから依存に書く。
 
 ```bash
-git clone https://github.com/scriptarts/SpringNBTLibrary.git
-cd SpringNBTLibrary/java && mvn install
+mvn install:install-file \
+  -Dfile=spring-nbt-library-0.1.0.jar \
+  -DgroupId=io.github.scriptarts \
+  -DartifactId=spring-nbt-library \
+  -Dversion=0.1.0 -Dpackaging=jar
 ```
 
 ```xml
@@ -17,6 +31,12 @@ cd SpringNBTLibrary/java && mvn install
   <artifactId>spring-nbt-library</artifactId>
   <version>0.1.0</version>
 </dependency>
+```
+
+**クラスパスへ直接置く場合**
+
+```bash
+java -cp spring-nbt-library-0.1.0.jar:. YourApp
 ```
 
 ## NBT ファイルを読む

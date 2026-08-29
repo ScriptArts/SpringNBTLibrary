@@ -7,16 +7,33 @@ C# は本ライブラリの[基準実装](../adr/0002-idiomatic-naming.md)なの
 
 ## 導入
 
-まだ NuGet へは公開していない。リポジトリを取得して参照する。
+NuGet へは公開していない。[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
+`SpringNBTLibrary-<版>-dotnet8.zip` を落として組み込む。
 
-```bash
-git clone https://github.com/scriptarts/SpringNBTLibrary.git
-```
+1. zip を展開する。中身は次のとおり
+
+   ```
+   SpringNBTLibrary.dll   ライブラリ本体
+   SpringNBTLibrary.xml   ドキュメント（IDE の補完に出る）
+   LICENSE / README.md
+   ```
+
+2. プロジェクトの適当な場所（`lib/` など）へ **dll と xml を隣り合わせで**置く。
+   xml が無いと補完に説明が出ない
+3. `.csproj` から参照する
+
+   ```xml
+   <ItemGroup>
+     <Reference Include="SpringNBTLibrary">
+       <HintPath>lib/SpringNBTLibrary.dll</HintPath>
+     </Reference>
+   </ItemGroup>
+   ```
+
+ソースから使いたい場合は、リポジトリを取得して `ProjectReference` で参照してもよい。
 
 ```xml
-<ItemGroup>
-  <ProjectReference Include="../SpringNBTLibrary/csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj" />
-</ItemGroup>
+<ProjectReference Include="../SpringNBTLibrary/csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj" />
 ```
 
 ## NBT ファイルを読む

@@ -18,12 +18,13 @@ SpringNBTLibrary は複数の言語へ、同じ設計者が**同一の概念・�
 
 ## 導入
 
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `spring-nbt-library-<版>.tgz` を落として入れます。
+
 ```bash
-npm install spring-nbt-library
+npm install ./spring-nbt-library-0.1.0.tgz
 ```
 
-> npm へはまだ公開していない。現時点ではリポジトリを取得し、
-> `npm install && npm run build` してからパス参照する。
+型定義（`.d.ts`）も含まれています。
 
 ## 使い方
 

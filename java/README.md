@@ -18,16 +18,14 @@ SpringNBTLibrary は複数の言語へ、同じ設計者が**同一の概念・�
 
 ## 導入
 
-```xml
-<dependency>
-  <groupId>io.github.scriptarts</groupId>
-  <artifactId>spring-nbt-library</artifactId>
-  <version>0.1.0</version>
-</dependency>
-```
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `spring-nbt-library-<版>.jar` を落として、
+クラスパスへ追加します。
 
-> Maven Central へはまだ公開していない。現時点では
-> `cd java && mvn install` でローカルへ入れる。
+```groovy
+dependencies {
+    implementation files("libs/spring-nbt-library-0.1.0.jar")
+}
+```
 
 ## 使い方
 

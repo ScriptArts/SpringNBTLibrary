@@ -18,12 +18,13 @@ SpringNBTLibrary は複数の言語へ、同じ設計者が**同一の概念・�
 
 ## 導入
 
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から wheel を落として入れます。
+
 ```bash
-pip install spring-nbt-library
+pip install spring_nbt_library-0.1.0-py3-none-any.whl
 ```
 
-> PyPI へはまだ公開していない。現時点では
-> `pip install -e python` でリポジトリから入れる。
+依存パッケージはありません。
 
 ## 使い方
 

@@ -18,12 +18,15 @@ SpringNBTLibrary は複数の言語へ、同じ設計者が**同一の概念・�
 
 ## 導入
 
+crates.io へは公開していないので、git 参照で使います。
+
 ```toml
 [dependencies]
-spring-nbt-library = "0.1"
+spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v0.1.0" }
 ```
 
-> crates.io へはまだ公開していない。現時点ではパス参照する。
+ネットワークに繋がらない環境向けに、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) へ
+`.crate`（ソースの tar.gz）も置いています。
 
 ## 使い方
 

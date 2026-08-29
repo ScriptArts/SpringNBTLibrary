@@ -4,17 +4,22 @@
 
 ## 導入
 
-まだ npm へは公開していない。リポジトリを取得してビルドする。
+npm へは公開していない。[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
+`spring-nbt-library-<版>.tgz` を落として組み込む。
 
 ```bash
-git clone https://github.com/scriptarts/SpringNBTLibrary.git
-cd SpringNBTLibrary/typescript && npm install && npm run build
+npm install ./spring-nbt-library-0.1.0.tgz
 ```
+
+これで `node_modules` へ入り、通常のパッケージと同じように import できる。
+型定義（`.d.ts`）も含まれているので補完が効く。
+
+`package.json` には次のように記録される。
 
 ```json
 {
   "dependencies": {
-    "spring-nbt-library": "file:../SpringNBTLibrary/typescript"
+    "spring-nbt-library": "file:spring-nbt-library-0.1.0.tgz"
   }
 }
 ```

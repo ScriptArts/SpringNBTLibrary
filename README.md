@@ -23,6 +23,23 @@ Minecraft **Java版 26.2**（DataVersion `4903`）のワールドデータ・NBT
 新しい言語を足す手順は [移植ガイド](docs/contributing/porting-guide.md) にまとめてある。
 言語が増えても、仕様書とテストベクタは共通のものを使う。
 
+## 入手
+
+パッケージレジストリへは公開していない。
+**[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
+ビルド済みの成果物を落として、自分のプロジェクトへ組み込む。**
+
+| 言語 | ファイル | 組み込み方 |
+|---|---|---|
+| C# | `SpringNBTLibrary-<版>-dotnet8.zip` | 展開して `.dll` を参照に追加 |
+| Java | `spring-nbt-library-<版>.jar` | クラスパスへ追加 |
+| TypeScript | `spring-nbt-library-<版>.tgz` | `npm install ./<ファイル>` |
+| Python | `spring_nbt_library-<版>-py3-none-any.whl` | `pip install <ファイル>` |
+| Rust | — | `Cargo.toml` で git 参照（`.crate` も置いてある） |
+
+同梱の `SHA256SUMS.txt` で、落としたファイルが壊れていないか確かめられる。
+言語ごとの詳しい手順は上の表の「はじめに」を参照。
+
 ## このライブラリの立ち位置
 
 NBT や Anvil を扱うライブラリは各言語に既に存在する。

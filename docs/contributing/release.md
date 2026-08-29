@@ -94,24 +94,53 @@ python3 spec/tools/scan_world.py "<ワールドのパス>"
 
 ## 5. 公開
 
-| 言語 | 公開先 |
-|---|---|
-| C# | NuGet |
-| Java | Maven Central |
-| TypeScript | npm |
-| Python | PyPI |
-| Rust | crates.io |
+**パッケージレジストリ（NuGet / Maven Central / npm / PyPI / crates.io）へは公開しない。**
+GitHub Releases へビルド済みの成果物を置き、利用者はそれを落として
+自分のプロジェクトへ組み込む。
 
-**5 つすべてが揃ってからリリースとする。**
-一部だけ新しい状態は、利用者にとって最も困る形である。
+レジストリごとにアカウントと公開手順を抱えると、対応言語が増えるほど
+維持できなくなる。1 か所に置くだけなら、言語が増えても同じ手順で済む。
 
-各パッケージには `LICENSE`（MIT）を同梱する。
-
----
-
-## 6. タグを打つ
+### 5.1 タグを打つと自動で公開される
 
 ```bash
 git tag -a v0.1.0 -m "v0.1.0"
 git push origin v0.1.0
 ```
+
+`v` で始まるタグを push すると
+[`release` ワークフロー](../../.github/workflows/release.yml)が動き、次を行う。
+
+1. 全対応言語のテストと[適合性検証](../spec/90-conformance.md)を通す
+   （**落ちたら公開しない**。壊れたものを配らないため）
+2. 言語ごとの成果物を組み立てる
+3. `SHA256SUMS.txt` を作る
+4. Releases を作って成果物を添付する
+
+### 5.2 成果物
+
+| 言語 | ファイル | 中身 |
+|---|---|---|
+| C# | `SpringNBTLibrary-<版>-dotnet8.zip` | `.dll` と `.xml`（補完用）、LICENSE、README |
+| Java | `spring-nbt-library-<版>.jar` | |
+| TypeScript | `spring-nbt-library-<版>.tgz` | ビルド済み JS と型定義 |
+| Python | `spring_nbt_library-<版>-py3-none-any.whl` / `.tar.gz` | wheel と sdist |
+| Rust | `spring-nbt-library-<版>.crate` | ソースの tar.gz |
+
+**Rust は git 参照が主な使い方になる。** Cargo は git リポジトリを直接
+依存にできるので、ファイルを落とす必要がない。`.crate` は
+ネットワークに繋がらない環境向けの控えである。
+
+### 5.3 タグを打つ前に試す
+
+`release` ワークフローは手動でも起動できる。
+Actions の画面から `Run workflow` を選ぶと、
+成果物の組み立てまでを行い、Releases は作らずに artifacts として残す。
+
+中身を確かめてからタグを打てる。
+
+### 5.4 リリースノート
+
+[`.github/release-notes.md`](../../.github/release-notes.md) が
+そのまま本文になる。版ごとの変更点を載せたい場合は、
+Releases の画面で後から追記する。

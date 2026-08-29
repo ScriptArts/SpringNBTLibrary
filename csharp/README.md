@@ -18,12 +18,16 @@ SpringNBTLibrary は複数の言語へ、同じ設計者が**同一の概念・�
 
 ## 導入
 
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `SpringNBTLibrary-<版>-dotnet8.zip` を落として、
+中の `.dll` を参照に追加します。
+
 ```xml
-<PackageReference Include="SpringNBTLibrary" Version="0.1.0" />
+<Reference Include="SpringNBTLibrary">
+  <HintPath>lib/SpringNBTLibrary.dll</HintPath>
+</Reference>
 ```
 
-> NuGet へはまだ公開していない。現時点ではリポジトリを取得して
-> `ProjectReference` で参照する。
+同梱の `.xml` を dll と同じ場所に置くと、IDE の補完に説明が出ます。
 
 ## 使い方
 

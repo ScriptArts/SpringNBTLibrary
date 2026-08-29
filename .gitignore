@@ -17,6 +17,8 @@
 # --- TypeScript / Node ---
 node_modules/
 /typescript/dist/
+# npm pack が作る配布用の tarball
+/typescript/*.tgz
 
 # --- Python ---
 __pycache__/
@@ -30,3 +32,6 @@ __pycache__/
 
 # --- 適合性テストの実行結果（生成物） ---
 /spec/out/
+
+# --- リリース用に組み立てた成果物 ---
+/artifacts/

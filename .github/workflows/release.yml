@@ -1,0 +1,131 @@
+name: release
+
+# タグを打つとビルドして GitHub Releases へ成果物を添付する。
+#
+# パッケージレジストリ（NuGet / Maven Central / npm / PyPI / crates.io）へは公開せず、
+# ここに置いたファイルを利用者が自分のプロジェクトへ組み込む形をとる。
+on:
+  push:
+    tags: ["v*"]
+  # タグを打つ前に組み立てだけ試せるようにしておく
+  workflow_dispatch:
+
+# gh release create で成果物を上げるために要る
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 成果物を組み立てて公開する
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # タグ名から版を取る。手動実行のときは Cargo.toml の版を使う
+      - name: 版を決める
+        id: version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version=$(grep '^version' rust/Cargo.toml | head -1 | cut -d'"' -f2)
+          fi
+          echo "value=${version}" >> "$GITHUB_OUTPUT"
+          echo "組み立てる版: ${version}"
+
+      # 壊れたものを配らないよう、公開前に必ず全部通す
+      - name: 全言語のテスト
+        run: |
+          (cd csharp && dotnet test --configuration Release)
+          (cd java && mvn --batch-mode test)
+          (cd typescript && npm ci && npm test)
+          (cd python && pip install pytest && python -m pytest tests)
+          (cd rust && cargo test --all-features)
+
+      - name: 全言語の挙動が一致することの検証
+        run: ./spec/run-conformance.sh
+
+      - name: C# (dll)
+        run: |
+          dotnet build csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj \
+            --configuration Release
+          mkdir -p artifacts/csharp
+          cp csharp/src/SpringNBTLibrary/bin/Release/net8.0/SpringNBTLibrary.dll artifacts/csharp/
+          cp csharp/src/SpringNBTLibrary/bin/Release/net8.0/SpringNBTLibrary.xml artifacts/csharp/
+          cp LICENSE artifacts/csharp/
+          cp csharp/README.md artifacts/csharp/
+          (cd artifacts/csharp && zip -q -r \
+            "../SpringNBTLibrary-${{ steps.version.outputs.value }}-dotnet8.zip" .)
+
+      - name: Java (jar)
+        run: |
+          (cd java && mvn --batch-mode -DskipTests package)
+          mkdir -p artifacts
+          cp java/target/spring-nbt-library-*.jar artifacts/
+
+      - name: TypeScript (tgz)
+        run: |
+          (cd typescript && npm run build && npm pack)
+          mkdir -p artifacts
+          cp typescript/spring-nbt-library-*.tgz artifacts/
+
+      - name: Python (wheel / sdist)
+        run: |
+          pip install build
+          (cd python && python -m build)
+          mkdir -p artifacts
+          cp python/dist/*.whl python/dist/*.tar.gz artifacts/
+
+      - name: Rust (crate)
+        run: |
+          (cd rust && cargo package --no-verify)
+          mkdir -p artifacts
+          cp rust/target/package/spring-nbt-library-*.crate artifacts/
+
+      # 落としたファイルが壊れていないか、利用者が確かめられるようにする
+      - name: チェックサムを作る
+        run: |
+          rm -rf artifacts/csharp
+          (cd artifacts && sha256sum * > SHA256SUMS.txt)
+          ls -la artifacts
+
+      - name: Releases へ上げる
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" artifacts/* \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file .github/release-notes.md \
+            --verify-tag
+
+      # 手動実行では中身を確認できるように残すだけにする
+      - name: 成果物を保存する
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts
+          path: artifacts/
