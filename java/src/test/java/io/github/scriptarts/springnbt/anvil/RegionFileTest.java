@@ -83,6 +83,35 @@ class RegionFileTest {
         return chunk;
     }
 
+    @Test
+    void キャッシュ上限を超えると古いリージョンから閉じる() {
+        // 上限 2 で 4 リージョンへ書く。古いものは閉じられるが内容は失われない
+        try (RegionFolder folder = RegionFolder.open(work, RegionFileMode.READ_WRITE, 2)) {
+            for (int region = 0; region < 4; region++) {
+                folder.writeChunk(region * 32, 0, sampleChunk(region * 32, 0));
+                assertTrue(folder.cachedRegionCount() <= 2);
+            }
+
+            folder.flush();
+        }
+
+        // 追い出されたリージョンも、書き出されてから閉じられている
+        try (RegionFolder reopened = RegionFolder.open(work)) {
+            assertEquals(4, reopened.regionPositions().size());
+
+            for (int region = 0; region < 4; region++) {
+                assertEquals(region * 32, reopened.readChunk(region * 32, 0).getInt("xPos"));
+            }
+        }
+    }
+
+    @Test
+    void キャッシュ上限が0以下ならINVALID_ARGUMENT() {
+        SpringNbtException error = assertThrows(SpringNbtException.class,
+                () -> RegionFolder.open(work, RegionFileMode.READ_ONLY, 0));
+        assertEquals(ErrorCode.INVALID_ARGUMENT, error.code());
+    }
+
     /** 圧縮しても縮まないバイト列を作る。サイズの制御が効くようにするため。 */
     private static byte[] incompressible(int length) {
         byte[] result = new byte[length];

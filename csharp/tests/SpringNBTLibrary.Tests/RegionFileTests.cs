@@ -447,6 +447,40 @@ public class RegionFileTests : IDisposable
         Assert.False(reopened.HasChunk(100, 100));
     }
 
+    [Fact]
+    public void FolderKeepsCachedRegionsUnderTheLimit()
+    {
+        // 上限 2 で 4 リージョンへ書く。古いものは閉じられるが内容は失われない
+        using (RegionFolder folder = RegionFolder.Open(
+            workDirectory, RegionFileMode.ReadWrite, maxCachedRegions: 2))
+        {
+            for (int region = 0; region < 4; region++)
+            {
+                folder.WriteChunk(region * 32, 0, SampleChunk(region * 32, 0));
+                Assert.True(folder.CachedRegionCount <= 2);
+            }
+
+            folder.Flush();
+        }
+
+        // 追い出されたリージョンも、書き出されてから閉じられている
+        using RegionFolder reopened = RegionFolder.Open(workDirectory);
+        Assert.Equal(4, reopened.RegionPositions().Count());
+
+        for (int region = 0; region < 4; region++)
+        {
+            Assert.Equal(region * 32, reopened.ReadChunk(region * 32, 0)!.GetInt("xPos"));
+        }
+    }
+
+    [Fact]
+    public void FolderRejectsInvalidCacheLimit()
+    {
+        SpringNbtException error = Assert.Throws<SpringNbtException>(
+            () => RegionFolder.Open(workDirectory, RegionFileMode.ReadOnly, maxCachedRegions: 0));
+        Assert.Equal(ErrorCode.InvalidArgument, error.Code);
+    }
+
     /// <summary>圧縮しても縮まないバイト列を作る。サイズの制御が効くようにするため。</summary>
     private static sbyte[] BuildIncompressibleBytes(int length)
     {

@@ -159,6 +159,7 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `chunk_compression_from_id` | — | — | `chunkCompressionFromId()` | — | — |  |
 | `decode` | `Decode()` | `decode()` | `decode()` | `decode()` | — | MUTF-8 バイト列を文字列へ復号する。 |
 | `decode_to_utf16` | — | — | — | — | `decode_to_utf16()` |  |
+| `default_max_cached_regions` | `DefaultMaxCachedRegions` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` |  |
 | `detect_compression` | `DetectCompression()` | `detectCompression()` | `detectCompression()` | `detect_compression()` | `detect_compression()` | 先頭バイトから圧縮方式を判定する。 |
 | `encode` | `Encode()` | `encode()` | `encode()` | `encode()` | — | 文字列を MUTF-8 バイト列へ符号化する。 |
 | `encode_from_utf16` | — | — | — | — | `encode_from_utf16()` |  |

@@ -20,6 +20,28 @@ pub const BLOCKS_PER_SECTION: usize = 4096;
 /// セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）。
 pub const BIOMES_PER_SECTION: usize = 64;
 
+/// ブロックに紐づく付随データのキー。ブロックを置き換えたら整合が崩れる。
+const BLOCK_DATA_KEYS: [&str; 3] = ["block_entities", "block_ticks", "fluid_ticks"];
+
+/// 付随データの要素が、指定の絶対座標を指しているか。
+fn matches_position(entry: &NbtCompound, x: i32, y: i32, z: i32) -> bool {
+    // 座標を持たない要素は、対象かどうか判断できないので触らない
+    let entry_x = match entry.opt_int("x") {
+        Ok(Some(value)) => value,
+        _ => return false,
+    };
+    let entry_y = match entry.opt_int("y") {
+        Ok(Some(value)) => value,
+        _ => return false,
+    };
+    let entry_z = match entry.opt_int("z") {
+        Ok(Some(value)) => value,
+        _ => return false,
+    };
+
+    entry_x == x && entry_y == y && entry_z == z
+}
+
 /// DataVersion が対象と違ったときの動作。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VersionMismatchAction {
@@ -365,6 +387,14 @@ impl Chunk {
         let section_y = y >> 4;
         let index = block_index(x, y, z);
 
+        // 同じ状態を置き直すだけなら、付随データを触る理由がない。
+        // プロパティの並び順に左右されないよう、NBT ではなく BlockState として比べる
+        if let Some(current) = self.get_block(x, y, z)? {
+            if &current == state {
+                return Ok(());
+            }
+        }
+
         let section = match self.sections.get_mut(&section_y) {
             Some(section) if section.has_block_states() => section,
             _ => {
@@ -381,7 +411,56 @@ impl Chunk {
         section
             .block_states_mut()
             .unwrap()
-            .set(index, NbtTag::Compound(state.to_nbt()))
+            .set(index, NbtTag::Compound(state.to_nbt()))?;
+
+        self.remove_block_data(x, y, z)
+    }
+
+    /// その座標を指す付随データを取り除く。
+    ///
+    /// `block_entities` / `block_ticks` / `fluid_ticks` の要素は
+    /// いずれも `x` `y` `z` を**絶対座標**で持つ。
+    fn remove_block_data(&mut self, x: i32, y: i32, z: i32) -> Result<()> {
+        let absolute_x = (self.x()? * 16) + x;
+        let absolute_z = (self.z()? * 16) + z;
+
+        // 3 つのリストは形が同じなので、まとめて同じ処理をかける
+        for key in BLOCK_DATA_KEYS {
+            let filtered = match self.raw.opt_list(key)? {
+                Some(list) if !list.is_empty() => {
+                    // 全要素を消しても要素型が変わらないよう、元の型で作り直す
+                    let mut kept = NbtList::with_element_type(list.element_type());
+
+                    for entry in list.iter() {
+                        let keep = match entry {
+                            NbtTag::Compound(compound) => {
+                                !matches_position(compound, absolute_x, y, absolute_z)
+                            }
+                            // 座標を持たない要素は、対象か判断できないので触らない
+                            _ => true,
+                        };
+
+                        if keep {
+                            kept.push(entry.clone())?;
+                        }
+                    }
+
+                    // 何も減っていないなら書き戻す必要がない
+                    if kept.len() == list.len() {
+                        None
+                    } else {
+                        Some(kept)
+                    }
+                }
+                _ => None,
+            };
+
+            if let Some(kept) = filtered {
+                self.raw.set(key, NbtTag::List(kept));
+            }
+        }
+
+        Ok(())
     }
 
     /// バイオームを取得する。4×4×4 の単位なので、座標は自動的に丸められる。

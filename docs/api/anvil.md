@@ -27,12 +27,16 @@
 | `write_chunk` | `WriteChunk()` | `writeChunk()` | `writeChunk()` | `write_chunk()` | `write_chunk()` | チャンクを NBT として書き込む。 |
 | `write_chunk_raw` | `WriteChunkRaw()` | `writeChunkRaw()` | `writeChunkRaw()` | `write_chunk_raw()` | `write_chunk_raw()` | 圧縮済みのチャンクをそのまま書き込む。 |
 | **RegionFolder** | `RegionFolder` | `RegionFolder` | `RegionFolder` | `RegionFolder` | `RegionFolder` | リージョンファイルが並ぶディレクトリ 1 つ分（region/、entities/、poi/ のいずれか）。 |
+| `cached_region_count` | `CachedRegionCount` | `cachedRegionCount()` | `cachedRegionCount()` | `cached_region_count` | `cached_region_count()` | いま開いているリージョンファイル数。 |
 | `chunk_positions` | `ChunkPositions()` | `chunkPositions()` | `chunkPositions()` | `chunk_positions()` | `chunk_positions()` | このフォルダに存在する全チャンクの座標を列挙する。 |
+| `default_max_cached_regions` | `DefaultMaxCachedRegions` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` | 同時に開いておくリージョンファイル数の既定の上限。 |
 | `delete_chunk` | `DeleteChunk()` | `deleteChunk()` | `deleteChunk()` | `delete_chunk()` | `delete_chunk()` | チャンクを削除する。 |
 | `directory` | `Directory` | `directory()` | `directory` | `directory` | `directory()` | このフォルダのパス。 |
 | `flush` | `Flush()` | `flush()` | `flush()` | `flush()` | `flush()` | 開いている全リージョンの変更を書き出す。 |
 | `has_chunk` | `HasChunk()` | `hasChunk()` | `hasChunk()` | `has_chunk()` | `has_chunk()` | チャンクが存在するか。 |
+| `max_cached_regions` | `MaxCachedRegions` | `maxCachedRegions()` | `maxCachedRegions` | `max_cached_regions` | `max_cached_regions()` | 同時に開いておくリージョンファイル数の上限。 |
 | `open` | `Open()` | `open()` | `open()` | `open()` | `open()` | リージョンフォルダを開く。 |
+| `open_with_limit` | — | — | — | — | `open_with_limit()` |  |
 | `read_chunk` | `ReadChunk()` | `readChunk()` | `readChunk()` | `read_chunk()` | `read_chunk()` | チャンクを NBT として読む。 |
 | `region` | `Region` | `region()` | `region()` | `region()` | `region()` | リージョンファイルを取得する。 |
 | `region_positions` | `RegionPositions()` | `regionPositions()` | `regionPositions()` | `region_positions()` | `region_positions()` | このフォルダに存在するリージョンの座標を列挙する。 |

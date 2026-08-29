@@ -459,6 +459,70 @@ fn 無変更で書き戻すと元と同じnbtになる() {
 }
 
 #[test]
+fn ブロックを置き換えると同じ座標の付随データが消える() {
+    let mut chunk = load_chunk("block_entities");
+    assert_eq!(3, chunk.raw().get_list("block_entities").unwrap().len());
+    assert_eq!(2, chunk.raw().get_list("block_ticks").unwrap().len());
+    assert_eq!(1, chunk.raw().get_list("fluid_ticks").unwrap().len());
+
+    // (0,-64,0) には chest と block_tick、(1,-64,1) には furnace と fluid_tick がある
+    let stone = BlockState::parse("minecraft:stone").unwrap();
+    chunk.set_block(0, -64, 0, &stone).unwrap();
+    chunk.set_block(1, -64, 1, &stone).unwrap();
+
+    let entities = chunk.raw().get_list("block_entities").unwrap();
+
+    // 触っていない (15,-50,15) の barrel だけが残る
+    assert_eq!(1, entities.len());
+
+    match entities.get(0).unwrap() {
+        NbtTag::Compound(entry) => {
+            assert_eq!("minecraft:barrel", entry.get_string("id").unwrap());
+        }
+        other => panic!("compound でない: {other:?}"),
+    }
+
+    let ticks = chunk.raw().get_list("block_ticks").unwrap();
+    assert_eq!(1, ticks.len());
+
+    match ticks.get(0).unwrap() {
+        NbtTag::Compound(entry) => assert_eq!(15, entry.get_int("x").unwrap()),
+        other => panic!("compound でない: {other:?}"),
+    }
+
+    assert_eq!(0, chunk.raw().get_list("fluid_ticks").unwrap().len());
+}
+
+#[test]
+fn 同じブロックを置き直しても付随データは消えない() {
+    let mut chunk = load_chunk("block_entities");
+    let current = chunk.get_block(0, -64, 0).unwrap().expect("ブロックが無い");
+
+    // 変化が無いなら付随データを触る理由がない
+    chunk.set_block(0, -64, 0, &current).unwrap();
+
+    assert_eq!(3, chunk.raw().get_list("block_entities").unwrap().len());
+    assert_eq!(2, chunk.raw().get_list("block_ticks").unwrap().len());
+}
+
+#[test]
+fn 別のチャンクの同じ相対座標は消さない() {
+    // 付随データは絶対座標で持つので、チャンク座標を取り違えると
+    // 無関係な要素を消してしまう
+    let named = read_file(vector_path("block_entities"), &NbtReadOptions::default()).unwrap();
+    let mut root = named.tag;
+    root.set("xPos", NbtTag::Int(1));
+    root.set("zPos", NbtTag::Int(1));
+
+    let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+    let stone = BlockState::parse("minecraft:stone").unwrap();
+    chunk.set_block(0, -64, 0, &stone).unwrap();
+
+    // このチャンクの (0,-64,0) は絶対座標 (16,-64,16)。どれとも一致しない
+    assert_eq!(3, chunk.raw().get_list("block_entities").unwrap().len());
+}
+
+#[test]
 fn 高さマップと光源を無効化できる() {
     let mut chunk = load_chunk("palette_1");
     chunk.clear_heightmaps();

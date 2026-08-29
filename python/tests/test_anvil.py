@@ -375,3 +375,28 @@ def test_folder_resolves_chunks_across_regions(work):
         assert reopened.read_chunk(-1, -1).get_int("xPos") == -1
         assert reopened.read_chunk(100, 100) is None
         assert not reopened.has_chunk(100, 100)
+
+
+def test_キャッシュ上限を超えると古いリージョンから閉じる(work):
+    """RegionFile はファイル全体をメモリへ載せるので、上限が要る。"""
+    # 上限 2 で 4 リージョンへ書く。古いものは閉じられるが内容は失われない
+    with RegionFolder.open(work, RegionFileMode.READ_WRITE, max_cached_regions=2) as folder:
+        for region in range(4):
+            folder.write_chunk(region * 32, 0, sample_chunk(region * 32, 0))
+            assert folder.cached_region_count <= 2
+
+        folder.flush()
+
+    # 追い出されたリージョンも、書き出されてから閉じられている
+    with RegionFolder.open(work) as reopened:
+        assert len(reopened.region_positions()) == 4
+
+        for region in range(4):
+            assert reopened.read_chunk(region * 32, 0).get_int("xPos") == region * 32
+
+
+def test_キャッシュ上限が0以下ならINVALID_ARGUMENT(work):
+    with pytest.raises(SpringNbtError) as error:
+        RegionFolder.open(work, RegionFileMode.READ_ONLY, max_cached_regions=0)
+
+    assert error.value.code == ErrorCode.INVALID_ARGUMENT

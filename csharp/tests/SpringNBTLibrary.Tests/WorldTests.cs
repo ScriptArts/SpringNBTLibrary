@@ -439,6 +439,64 @@ public class WorldTests
         }
 
         [Fact]
+        public void ブロックを置き換えると同じ座標の付随データが消える()
+        {
+            Chunk chunk = LoadChunk("block_entities");
+            NbtCompound before = chunk.Raw;
+            Assert.Equal(3, before.GetList("block_entities").Count);
+            Assert.Equal(2, before.GetList("block_ticks").Count);
+            Assert.Single(before.GetList("fluid_ticks"));
+
+            // (0,-64,0) には chest と block_tick、(1,-64,1) には furnace と fluid_tick がある
+            chunk.SetBlock(0, -64, 0, BlockState.Parse("minecraft:stone"));
+            chunk.SetBlock(1, -64, 1, BlockState.Parse("minecraft:stone"));
+
+            NbtCompound after = chunk.Raw;
+            NbtList entities = after.GetList("block_entities");
+
+            // 触っていない (15,-50,15) の barrel だけが残る
+            Assert.Single(entities);
+            Assert.Equal("minecraft:barrel", ((NbtCompound)entities[0]).GetString("id"));
+
+            // block_ticks も同様に、対象の座標のものだけ消える
+            NbtList ticks = after.GetList("block_ticks");
+            Assert.Single(ticks);
+            Assert.Equal(15, ((NbtCompound)ticks[0]).GetInt("x"));
+
+            Assert.Empty(after.GetList("fluid_ticks"));
+        }
+
+        [Fact]
+        public void 同じブロックを置き直しても付随データは消えない()
+        {
+            Chunk chunk = LoadChunk("block_entities");
+            BlockState current = chunk.GetBlock(0, -64, 0)!;
+
+            // 変化が無いなら付随データを触る理由がない
+            chunk.SetBlock(0, -64, 0, current);
+
+            Assert.Equal(3, chunk.Raw.GetList("block_entities").Count);
+            Assert.Equal(2, chunk.Raw.GetList("block_ticks").Count);
+        }
+
+        [Fact]
+        public void 別のチャンクの同じ相対座標は消さない()
+        {
+            // 付随データは絶対座標で持つので、チャンク座標を取り違えると
+            // 無関係な要素を消してしまう
+            NamedTag named = NbtIo.ReadFile(VectorPath("block_entities"));
+            NbtCompound root = (NbtCompound)named.Tag;
+            root.Set("xPos", new NbtInt(1));
+            root.Set("zPos", new NbtInt(1));
+
+            Chunk chunk = Chunk.FromNbt(root);
+            chunk.SetBlock(0, -64, 0, BlockState.Parse("minecraft:stone"));
+
+            // このチャンクの (0,-64,0) は絶対座標 (16,-64,16)。どれとも一致しない
+            Assert.Equal(3, chunk.Raw.GetList("block_entities").Count);
+        }
+
+        [Fact]
         public void 高さマップと光源を無効化できる()
         {
             Chunk chunk = LoadChunk("palette_1");

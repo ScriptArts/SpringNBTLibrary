@@ -550,3 +550,48 @@ fn folder_resolves_chunks_across_regions() {
     assert!(reopened.read_chunk(100, 100).unwrap().is_none());
     assert!(!reopened.has_chunk(100, 100).unwrap());
 }
+
+#[test]
+fn キャッシュ上限を超えると古いリージョンから閉じる() {
+    let work = WorkDir::new("lru");
+
+    // 上限 2 で 4 リージョンへ書く。古いものは閉じられるが内容は失われない
+    {
+        let mut folder =
+            RegionFolder::open_with_limit(&work.path, RegionFileMode::ReadWrite, 2).unwrap();
+
+        for region in 0..4i32 {
+            folder
+                .write_chunk(
+                    region * 32,
+                    0,
+                    &sample_chunk(region * 32, 0),
+                    ChunkCompression::Zlib,
+                )
+                .unwrap();
+            assert!(folder.cached_region_count() <= 2);
+        }
+
+        folder.flush().unwrap();
+        folder.close().unwrap();
+    }
+
+    // 追い出されたリージョンも、書き出されてから閉じられている
+    let mut reopened = RegionFolder::open(&work.path, RegionFileMode::ReadOnly).unwrap();
+    assert_eq!(4, reopened.region_positions().unwrap().len());
+
+    for region in 0..4i32 {
+        let chunk = reopened.read_chunk(region * 32, 0).unwrap().expect("チャンクが無い");
+        assert_eq!(region * 32, chunk.get_int("xPos").unwrap());
+    }
+}
+
+#[test]
+fn キャッシュ上限が0ならinvalid_argument() {
+    let work = WorkDir::new("lru-limit");
+
+    match RegionFolder::open_with_limit(&work.path, RegionFileMode::ReadOnly, 0) {
+        Ok(_) => panic!("開けてしまった"),
+        Err(error) => assert_eq!(ErrorCode::InvalidArgument, error.code()),
+    }
+}

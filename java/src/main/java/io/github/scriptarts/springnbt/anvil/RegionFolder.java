@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedList;
 import java.util.Objects;
 
 /**
@@ -21,18 +22,58 @@ import java.util.Objects;
  * <p>開いたリージョンファイルはキャッシュし、{@link #close()} でまとめて閉じる。
  * チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい。
  *
+ * <p>{@link RegionFile} はファイル全体をメモリへ載せるため、キャッシュには
+ * {@link #maxCachedRegions()} 件の上限がある。上限を超えると、最も長く使われていない
+ * ものから書き出して閉じる。大きなワールドを端から走査してもメモリを使い切らない。
+ *
+ * <p>このため {@link #region(int, int)} が返した参照は、
+ * <b>別のリージョンへアクセスすると閉じられている場合がある</b>。
+ * 参照を保持せず、必要なたびに取得すること。
+ *
  * <p>仕様: {@code docs/spec/20-anvil-region.md} 5章
  */
 public final class RegionFolder implements AutoCloseable {
 
+    /**
+     * 同時に開いておくリージョンファイル数の既定の上限。
+     *
+     * <p>1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる。
+     * 実データでは数 MB から数十 MB 程度。8 件なら通常のワールドで数百 MB に収まる。
+     */
+    public static final int DEFAULT_MAX_CACHED_REGIONS = 8;
+
     private final Map<RegionPos, RegionFile> cache = new HashMap<>();
+
+    /** 最近使った順のリージョン座標。末尾がいちばん新しい。 */
+    private final LinkedList<RegionPos> recentlyUsed = new LinkedList<>();
+
     private final Path directory;
     private final RegionFileMode mode;
+    private final int maxCachedRegions;
     private boolean closed;
 
-    private RegionFolder(Path directory, RegionFileMode mode) {
+    private RegionFolder(Path directory, RegionFileMode mode, int maxCachedRegions) {
         this.directory = directory;
         this.mode = mode;
+        this.maxCachedRegions = maxCachedRegions;
+    }
+
+    /**
+     * 同時に開いておくリージョンファイル数の上限。
+     *
+     * @return 上限
+     */
+    public int maxCachedRegions() {
+        return maxCachedRegions;
+    }
+
+    /**
+     * いま開いているリージョンファイル数。
+     *
+     * @return 件数
+     */
+    public int cachedRegionCount() {
+        return cache.size();
     }
 
     /**
@@ -53,14 +94,33 @@ public final class RegionFolder implements AutoCloseable {
      * @throws SpringNbtException 読み取り専用でディレクトリが存在しない場合
      */
     public static RegionFolder open(Path directory, RegionFileMode mode) {
+        return open(directory, mode, DEFAULT_MAX_CACHED_REGIONS);
+    }
+
+    /**
+     * 上限を指定してリージョンフォルダを開く。
+     *
+     * @param directory        ディレクトリ
+     * @param mode             読み取り専用か読み書きか
+     * @param maxCachedRegions 同時に開いておくリージョンファイル数の上限
+     * @return 開いたフォルダ
+     * @throws SpringNbtException 読み取り専用でディレクトリが存在しない場合、
+     *                            または上限が 1 未満の場合
+     */
+    public static RegionFolder open(Path directory, RegionFileMode mode, int maxCachedRegions) {
         Objects.requireNonNull(directory, "directory");
+
+        if (maxCachedRegions < 1) {
+            throw SpringNbtException.invalidArgument(
+                    "maxCachedRegions は 1 以上でなければならない: " + maxCachedRegions);
+        }
 
         if (!Files.isDirectory(directory) && mode == RegionFileMode.READ_ONLY) {
             throw new SpringNbtException(
                     ErrorCode.IO, "リージョンフォルダが存在しない: " + directory);
         }
 
-        return new RegionFolder(directory, mode);
+        return new RegionFolder(directory, mode, maxCachedRegions);
     }
 
     /**
@@ -118,6 +178,7 @@ public final class RegionFolder implements AutoCloseable {
         RegionFile cached = cache.get(position);
 
         if (cached != null) {
+            touch(position);
             return cached;
         }
 
@@ -128,9 +189,33 @@ public final class RegionFolder implements AutoCloseable {
             return null;
         }
 
+        // 開く前に空きを作る。開いてからだと一瞬だけ上限を超える
+        evictUntilBelowLimit();
+
         RegionFile opened = RegionFile.open(path, mode);
         cache.put(position, opened);
+        touch(position);
         return opened;
+    }
+
+    /** 使ったリージョンを、最近使った列の末尾へ移す。 */
+    private void touch(RegionPos position) {
+        recentlyUsed.remove(position);
+        recentlyUsed.addLast(position);
+    }
+
+    /** 新しく 1 件開けるよう、上限を下回るまで古いものを閉じる。 */
+    private void evictUntilBelowLimit() {
+        // 上限に達している間、いちばん長く使っていないものから閉じる
+        while (cache.size() >= maxCachedRegions && !recentlyUsed.isEmpty()) {
+            RegionPos oldest = recentlyUsed.removeFirst();
+            RegionFile file = cache.remove(oldest);
+
+            if (file != null) {
+                // 閉じる前に必ず書き出す。捨てると変更が失われる
+                file.close();
+            }
+        }
     }
 
     /**
@@ -245,6 +330,7 @@ public final class RegionFolder implements AutoCloseable {
         }
 
         cache.clear();
+        recentlyUsed.clear();
         closed = true;
     }
 

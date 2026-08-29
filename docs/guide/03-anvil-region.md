@@ -144,7 +144,35 @@ foreach (ChunkPos pos in folder.ChunkPositions())
 
 ---
 
-## 8. 壊れたファイルの検出
+## 8. 開いたリージョンはいくつまでか
+
+`RegionFile` は**ファイル全体をメモリへ載せる**。
+無変更で書き戻したときにバイト単位で一致させるための設計だが、
+そのぶん開いたまま貯めるとメモリを食う。
+
+`RegionFolder` は開いたリージョンの数に上限を持ち（**既定 8 件**）、
+超えたら最も長く使っていないものを**書き出してから**閉じる。
+数千リージョンあるワールドを端から走査しても破綻しない。
+
+```csharp
+// 上限を変えたい場合
+using RegionFolder folder = RegionFolder.Open(path, RegionFileMode.ReadWrite,
+                                              maxCachedRegions: 32);
+```
+
+このため `Region()` が返した参照は、
+**別のリージョンへアクセスすると閉じられている場合がある**。
+
+```csharp
+RegionFile? a = folder.Region(0, 0);
+folder.ReadChunk(9999, 9999);   // 別のリージョンを開く
+// a はもう閉じられているかもしれない
+```
+
+参照を保持せず、必要なたびに取得すること。
+`ReadChunk` / `WriteChunk` 経由で使うぶんには意識しなくてよい。
+
+## 9. 壊れたファイルの検出
 
 開いた時点で次を検査し、問題があれば `MALFORMED_DATA` にする。
 
@@ -157,7 +185,7 @@ foreach (ChunkPos pos in folder.ChunkPositions())
 
 ---
 
-## 9. 次に読むもの
+## 10. 次に読むもの
 
 - [04. ワールドと level.dat](04-world-and-level-dat.md)
 - [仕様 20: Anvil リージョン形式](../spec/20-anvil-region.md)

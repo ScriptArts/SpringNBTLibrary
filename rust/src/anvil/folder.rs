@@ -4,9 +4,18 @@
 //! 開いたリージョンファイルはキャッシュし、[`RegionFolder::close`] でまとめて閉じる。
 //! チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい。
 //!
+//! [`RegionFile`] はファイル全体をメモリへ載せるため、キャッシュには
+//! [`RegionFolder::max_cached_regions`] 件の上限がある。上限を超えると、
+//! 最も長く使われていないものから書き出して閉じる。
+//! 大きなワールドを端から走査してもメモリを使い切らない。
+//!
+//! このため [`RegionFolder::region`] が返した参照は、
+//! **別のリージョンへアクセスすると閉じられている場合がある**。
+//! 参照を保持せず、必要なたびに取得すること。
+//!
 //! 仕様: `docs/spec/20-anvil-region.md` 5章
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 
 use crate::error::{Error, ErrorCode, Result};
@@ -14,18 +23,43 @@ use crate::nbt::tag::NbtCompound;
 
 use super::region::{ChunkPos, RegionFile, RegionFileMode, RegionPos};
 
+/// 同時に開いておくリージョンファイル数の既定の上限。
+///
+/// 1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる。
+/// 実データでは数 MB から数十 MB 程度。8 件なら通常のワールドで数百 MB に収まる。
+pub const DEFAULT_MAX_CACHED_REGIONS: usize = 8;
+
 /// リージョンフォルダ 1 つ分。
 pub struct RegionFolder {
     directory: PathBuf,
     mode: RegionFileMode,
     cache: HashMap<RegionPos, RegionFile>,
+    /// 最近使った順のリージョン座標。末尾がいちばん新しい。
+    recently_used: VecDeque<RegionPos>,
+    max_cached_regions: usize,
     closed: bool,
 }
 
 impl RegionFolder {
     /// リージョンフォルダを開く。
     pub fn open(directory: impl AsRef<Path>, mode: RegionFileMode) -> Result<RegionFolder> {
+        RegionFolder::open_with_limit(directory, mode, DEFAULT_MAX_CACHED_REGIONS)
+    }
+
+    /// 上限を指定してリージョンフォルダを開く。
+    pub fn open_with_limit(
+        directory: impl AsRef<Path>,
+        mode: RegionFileMode,
+        max_cached_regions: usize,
+    ) -> Result<RegionFolder> {
         let directory = directory.as_ref().to_path_buf();
+
+        if max_cached_regions < 1 {
+            return Err(Error::new(
+                ErrorCode::InvalidArgument,
+                "max_cached_regions は 1 以上でなければならない",
+            ));
+        }
 
         if !directory.is_dir() && mode == RegionFileMode::ReadOnly {
             return Err(Error::new(
@@ -34,7 +68,24 @@ impl RegionFolder {
             ));
         }
 
-        Ok(RegionFolder { directory, mode, cache: HashMap::new(), closed: false })
+        Ok(RegionFolder {
+            directory,
+            mode,
+            cache: HashMap::new(),
+            recently_used: VecDeque::new(),
+            max_cached_regions,
+            closed: false,
+        })
+    }
+
+    /// 同時に開いておくリージョンファイル数の上限。
+    pub fn max_cached_regions(&self) -> usize {
+        self.max_cached_regions
+    }
+
+    /// いま開いているリージョンファイル数。
+    pub fn cached_region_count(&self) -> usize {
+        self.cache.len()
     }
 
     /// このフォルダのパス。
@@ -90,11 +141,43 @@ impl RegionFolder {
                 return Ok(None);
             }
 
+            // 開く前に空きを作る。開いてからだと一瞬だけ上限を超える
+            self.evict_until_below_limit()?;
+
             let opened = RegionFile::open(&path, self.mode)?;
             self.cache.insert(position, opened);
         }
 
+        self.touch(position);
         Ok(self.cache.get_mut(&position))
+    }
+
+    /// 使ったリージョンを、最近使った列の末尾へ移す。
+    fn touch(&mut self, position: RegionPos) {
+        // 同じ座標が列に残っていたら、先に取り除いてから末尾へ積む
+        if let Some(index) = self.recently_used.iter().position(|item| *item == position) {
+            self.recently_used.remove(index);
+        }
+
+        self.recently_used.push_back(position);
+    }
+
+    /// 新しく 1 件開けるよう、上限を下回るまで古いものを閉じる。
+    fn evict_until_below_limit(&mut self) -> Result<()> {
+        // 上限に達している間、いちばん長く使っていないものから閉じる
+        while self.cache.len() >= self.max_cached_regions {
+            let oldest = match self.recently_used.pop_front() {
+                Some(position) => position,
+                None => break,
+            };
+
+            if let Some(mut file) = self.cache.remove(&oldest) {
+                // 閉じる前に必ず書き出す。捨てると変更が失われる
+                file.close()?;
+            }
+        }
+
+        Ok(())
     }
 
     /// チャンクが存在するか。
@@ -196,6 +279,7 @@ impl RegionFolder {
         }
 
         self.cache.clear();
+        self.recently_used.clear();
         self.closed = true;
         Ok(())
     }

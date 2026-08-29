@@ -331,6 +331,51 @@ class TestChunk:
 
         assert after == before
 
+    def test_ブロックを置き換えると同じ座標の付随データが消える(self):
+        chunk = load_chunk("block_entities")
+        assert len(chunk.raw.get_list("block_entities")) == 3
+        assert len(chunk.raw.get_list("block_ticks")) == 2
+        assert len(chunk.raw.get_list("fluid_ticks")) == 1
+
+        # (0,-64,0) には chest と block_tick、(1,-64,1) には furnace と fluid_tick がある
+        chunk.set_block(0, -64, 0, BlockState.parse("minecraft:stone"))
+        chunk.set_block(1, -64, 1, BlockState.parse("minecraft:stone"))
+
+        entities = chunk.raw.get_list("block_entities")
+
+        # 触っていない (15,-50,15) の barrel だけが残る
+        assert len(entities) == 1
+        assert entities[0].get_string("id") == "minecraft:barrel"
+
+        ticks = chunk.raw.get_list("block_ticks")
+        assert len(ticks) == 1
+        assert ticks[0].get_int("x") == 15
+
+        assert len(chunk.raw.get_list("fluid_ticks")) == 0
+
+    def test_同じブロックを置き直しても付随データは消えない(self):
+        chunk = load_chunk("block_entities")
+        current = chunk.get_block(0, -64, 0)
+
+        # 変化が無いなら付随データを触る理由がない
+        chunk.set_block(0, -64, 0, current)
+
+        assert len(chunk.raw.get_list("block_entities")) == 3
+        assert len(chunk.raw.get_list("block_ticks")) == 2
+
+    def test_別のチャンクの同じ相対座標は消さない(self):
+        # 付随データは絶対座標で持つので、チャンク座標を取り違えると
+        # 無関係な要素を消してしまう
+        root = read_file(vector_path("block_entities")).tag
+        root.set("xPos", NbtInt(1))
+        root.set("zPos", NbtInt(1))
+
+        chunk = Chunk.from_nbt(root)
+        chunk.set_block(0, -64, 0, BlockState.parse("minecraft:stone"))
+
+        # このチャンクの (0,-64,0) は絶対座標 (16,-64,16)。どれとも一致しない
+        assert len(chunk.raw.get_list("block_entities")) == 3
+
     def test_高さマップと光源を無効化できる(self):
         chunk = load_chunk("palette_1")
         chunk.clear_heightmaps()

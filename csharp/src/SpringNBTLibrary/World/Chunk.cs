@@ -70,6 +70,12 @@ public sealed class Chunk
     /// <summary>セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）。</summary>
     public const int BiomesPerSection = 64;
 
+    /// <summary>
+    /// ブロックに紐づく付随データのキー。ブロックを置き換えたら整合が崩れる。
+    /// </summary>
+    private static readonly string[] BlockDataKeys =
+        new[] { "block_entities", "block_ticks", "fluid_ticks" };
+
     private readonly NbtCompound root;
     private readonly SortedDictionary<int, ChunkSection> sections =
         new SortedDictionary<int, ChunkSection>();
@@ -267,6 +273,13 @@ public sealed class Chunk
     /// <summary>
     /// ブロックを設定する。
     /// </summary>
+    /// <remarks>
+    /// 置き換えによって不整合になる付随データ（<c>block_entities</c> /
+    /// <c>block_ticks</c> / <c>fluid_ticks</c> のうち、その座標を指すもの）は
+    /// 同時に取り除く。残すとブロックと中身が食い違い、
+    /// Minecraft 側で予期しない挙動になるため。
+    /// 仕様: <c>docs/spec/30-chunk-format.md</c> 2.4章
+    /// </remarks>
     /// <exception cref="SpringNbtException">
     /// 対象のセクションが無い、または block_states を持たない場合
     /// （<see cref="ErrorCode.InvalidArgument"/>）。
@@ -288,7 +301,67 @@ public sealed class Chunk
                 message + "。本ライブラリはセクションを新規生成しない");
         }
 
+        // 同じ状態を置き直すだけなら、付随データを触る理由がない。
+        // プロパティの並び順に左右されないよう、NBT ではなく BlockState として比べる
+        BlockState? current = GetBlock(x, y, z);
+
+        if (current is not null && current.Equals(state))
+        {
+            return;
+        }
+
         section.BlockStates!.Set(BlockIndex(x, y, z), state.ToNbt());
+        RemoveBlockData(x, y, z);
+    }
+
+    /// <summary>
+    /// その座標を指す付随データを取り除く。
+    /// </summary>
+    /// <remarks>
+    /// <c>block_entities</c> / <c>block_ticks</c> / <c>fluid_ticks</c> の要素は
+    /// いずれも <c>x</c> <c>y</c> <c>z</c> を**絶対座標**で持つ。
+    /// </remarks>
+    private void RemoveBlockData(int x, int y, int z)
+    {
+        int absoluteX = (X * 16) + x;
+        int absoluteZ = (Z * 16) + z;
+
+        // 3 つのリストは形が同じなので、まとめて同じ処理をかける
+        foreach (string key in BlockDataKeys)
+        {
+            NbtList? list = root.OptList(key);
+
+            if (list is null || list.Count == 0)
+            {
+                continue;
+            }
+
+            // 後ろから削ると、削除しても残りの添字がずれない
+            for (int position = list.Count - 1; position >= 0; position--)
+            {
+                if (list[position] is NbtCompound entry
+                    && MatchesPosition(entry, absoluteX, y, absoluteZ))
+                {
+                    list.RemoveAt(position);
+                }
+            }
+        }
+    }
+
+    /// <summary>付随データの要素が、指定の絶対座標を指しているか。</summary>
+    private static bool MatchesPosition(NbtCompound entry, int x, int y, int z)
+    {
+        int? entryX = entry.OptInt("x");
+        int? entryY = entry.OptInt("y");
+        int? entryZ = entry.OptInt("z");
+
+        // 座標を持たない要素は、対象かどうか判断できないので触らない
+        if (entryX is null || entryY is null || entryZ is null)
+        {
+            return false;
+        }
+
+        return entryX.Value == x && entryY.Value == y && entryZ.Value == z;
     }
 
     /// <summary>

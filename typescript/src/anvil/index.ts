@@ -12,4 +12,4 @@ export {
   chunkCompressionFromId,
 } from "./compression.js";
 export { RegionFile, RegionFileMode, SECTOR_SIZE } from "./regionFile.js";
-export { RegionFolder } from "./regionFolder.js";
+export { DEFAULT_MAX_CACHED_REGIONS, RegionFolder } from "./regionFolder.js";

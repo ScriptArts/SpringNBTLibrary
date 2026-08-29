@@ -462,3 +462,52 @@ test("フォルダは複数リージョンへチャンクを振り分ける", ()
     rmSync(work, { recursive: true, force: true });
   }
 });
+
+test("RegionFolder: キャッシュ上限を超えると古いリージョンから閉じる", () => {
+  const work = mkdtempSync(join(tmpdir(), "springnbt-lru-"));
+
+  try {
+    // 上限 2 で 4 リージョンへ書く。古いものは閉じられるが内容は失われない
+    const folder = RegionFolder.open(work, RegionFileMode.ReadWrite, 2);
+
+    for (let region = 0; region < 4; region++) {
+      folder.writeChunk(region * 32, 0, sampleChunk(region * 32, 0));
+      assert.ok(folder.cachedRegionCount <= 2);
+    }
+
+    folder.flush();
+    folder.close();
+
+    // 追い出されたリージョンも、書き出されてから閉じられている
+    const reopened = RegionFolder.open(work);
+
+    try {
+      assert.equal(reopened.regionPositions().length, 4);
+
+      for (let region = 0; region < 4; region++) {
+        assert.equal(reopened.readChunk(region * 32, 0)?.getInt("xPos"), region * 32);
+      }
+    } finally {
+      reopened.close();
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test("RegionFolder: キャッシュ上限が 0 以下なら INVALID_ARGUMENT", () => {
+  const work = mkdtempSync(join(tmpdir(), "springnbt-lru-"));
+
+  try {
+    assert.throws(
+      () => RegionFolder.open(work, RegionFileMode.ReadOnly, 0),
+      (error: unknown) => {
+        assert.ok(error instanceof SpringNbtError);
+        assert.equal(error.code, ErrorCode.InvalidArgument);
+        return true;
+      },
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});

@@ -10,22 +10,53 @@ namespace SpringNBTLibrary.Anvil;
 /// 開いたリージョンファイルはキャッシュし、<see cref="Close"/> でまとめて閉じる。
 /// チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい。
 /// </para>
+/// <para>
+/// <see cref="RegionFile"/> はファイル全体をメモリへ載せるため、キャッシュには
+/// <see cref="MaxCachedRegions"/> 件の上限がある。上限を超えると、最も長く使われていない
+/// ものから書き出して閉じる。大きなワールドを端から走査してもメモリを使い切らない。
+/// </para>
+/// <para>
+/// このため <see cref="Region(int, int)"/> が返した参照は、
+/// **別のリージョンへアクセスすると閉じられている場合がある**。
+/// 参照を保持せず、必要なたびに取得すること。
+/// </para>
 /// <para>仕様: <c>docs/spec/20-anvil-region.md</c> 5章</para>
 /// </remarks>
 public sealed class RegionFolder : IDisposable
 {
+    /// <summary>同時に開いておくリージョンファイル数の既定の上限。</summary>
+    /// <remarks>
+    /// 1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる。
+    /// 実データでは数 MB から数十 MB 程度。8 件なら通常のワールドで数百 MB に収まる。
+    /// </remarks>
+    public const int DefaultMaxCachedRegions = 8;
+
     private readonly Dictionary<RegionPos, RegionFile> cache = new Dictionary<RegionPos, RegionFile>();
+
+    /// <summary>最近使った順のリージョン座標。末尾がいちばん新しい。</summary>
+    private readonly LinkedList<RegionPos> recentlyUsed = new LinkedList<RegionPos>();
+
+    private readonly Dictionary<RegionPos, LinkedListNode<RegionPos>> recentlyUsedNodes =
+        new Dictionary<RegionPos, LinkedListNode<RegionPos>>();
+
     private readonly RegionFileMode mode;
     private bool closed;
 
-    private RegionFolder(string directory, RegionFileMode mode)
+    private RegionFolder(string directory, RegionFileMode mode, int maxCachedRegions)
     {
         Directory = directory;
         this.mode = mode;
+        MaxCachedRegions = maxCachedRegions;
     }
 
     /// <summary>このフォルダのパス。</summary>
     public string Directory { get; }
+
+    /// <summary>同時に開いておくリージョンファイル数の上限。</summary>
+    public int MaxCachedRegions { get; }
+
+    /// <summary>いま開いているリージョンファイル数。</summary>
+    public int CachedRegionCount => cache.Count;
 
     /// <summary>
     /// リージョンフォルダを開く。
@@ -33,9 +64,24 @@ public sealed class RegionFolder : IDisposable
     /// <exception cref="SpringNbtException">
     /// 読み取り専用でディレクトリが存在しない場合（<see cref="ErrorCode.Io"/>）。
     /// </exception>
-    public static RegionFolder Open(string directory, RegionFileMode mode = RegionFileMode.ReadOnly)
+    /// <param name="directory">リージョンファイルが並ぶディレクトリ。</param>
+    /// <param name="mode">読み取り専用か、読み書きか。</param>
+    /// <param name="maxCachedRegions">
+    /// 同時に開いておくリージョンファイル数の上限。
+    /// 既定は <see cref="DefaultMaxCachedRegions"/>。
+    /// </param>
+    public static RegionFolder Open(
+        string directory,
+        RegionFileMode mode = RegionFileMode.ReadOnly,
+        int maxCachedRegions = DefaultMaxCachedRegions)
     {
         ArgumentNullException.ThrowIfNull(directory);
+
+        if (maxCachedRegions < 1)
+        {
+            throw SpringNbtException.InvalidArgument(
+                $"maxCachedRegions は 1 以上でなければならない: {maxCachedRegions}");
+        }
 
         if (!System.IO.Directory.Exists(directory) && mode == RegionFileMode.ReadOnly)
         {
@@ -43,7 +89,7 @@ public sealed class RegionFolder : IDisposable
                 ErrorCode.Io, $"リージョンフォルダが存在しない: {directory}");
         }
 
-        return new RegionFolder(directory, mode);
+        return new RegionFolder(directory, mode, maxCachedRegions);
     }
 
     /// <summary>このフォルダに存在するリージョンの座標を列挙する。</summary>
@@ -98,6 +144,7 @@ public sealed class RegionFolder : IDisposable
 
         if (cache.TryGetValue(position, out RegionFile? cached))
         {
+            Touch(position);
             return cached;
         }
 
@@ -109,9 +156,45 @@ public sealed class RegionFolder : IDisposable
             return null;
         }
 
+        // 開く前に空きを作る。開いてからだと一瞬だけ上限を超える
+        EvictUntilBelowLimit();
+
         RegionFile opened = RegionFile.Open(path, mode);
         cache[position] = opened;
+        Touch(position);
         return opened;
+    }
+
+    /// <summary>使ったリージョンを、最近使った列の末尾へ移す。</summary>
+    private void Touch(RegionPos position)
+    {
+        if (recentlyUsedNodes.TryGetValue(position, out LinkedListNode<RegionPos>? node))
+        {
+            recentlyUsed.Remove(node);
+            recentlyUsed.AddLast(node);
+            return;
+        }
+
+        recentlyUsedNodes[position] = recentlyUsed.AddLast(position);
+    }
+
+    /// <summary>新しく 1 件開けるよう、上限を下回るまで古いものを閉じる。</summary>
+    private void EvictUntilBelowLimit()
+    {
+        // 上限に達している間、いちばん長く使っていないものから閉じる
+        while (cache.Count >= MaxCachedRegions && recentlyUsed.First is not null)
+        {
+            RegionPos oldest = recentlyUsed.First.Value;
+            recentlyUsed.RemoveFirst();
+            recentlyUsedNodes.Remove(oldest);
+
+            if (cache.TryGetValue(oldest, out RegionFile? file))
+            {
+                // 閉じる前に必ず書き出す。捨てると変更が失われる
+                file.Close();
+                cache.Remove(oldest);
+            }
+        }
     }
 
     /// <summary>チャンクが存在するか。</summary>
@@ -216,6 +299,8 @@ public sealed class RegionFolder : IDisposable
         }
 
         cache.Clear();
+        recentlyUsed.Clear();
+        recentlyUsedNodes.Clear();
         closed = true;
     }
 

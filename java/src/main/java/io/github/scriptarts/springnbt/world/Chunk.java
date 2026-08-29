@@ -32,6 +32,9 @@ public final class Chunk {
     /** セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）。 */
     public static final int BIOMES_PER_SECTION = 64;
 
+    /** ブロックに紐づく付随データのキー。ブロックを置き換えたら整合が崩れる。 */
+    private static final String[] BLOCK_DATA_KEYS = {"block_entities", "block_ticks", "fluid_ticks"};
+
     private final NbtCompound root;
     private final SortedMap<Integer, ChunkSection> sections = new TreeMap<>();
 
@@ -271,7 +274,60 @@ public final class Chunk {
                     + "）が無いか、ブロックを持たない。本ライブラリはセクションを新規生成しない");
         }
 
+        // 同じ状態を置き直すだけなら、付随データを触る理由がない。
+        // プロパティの並び順に左右されないよう、NBT ではなく BlockState として比べる
+        BlockState current = getBlock(x, y, z);
+
+        if (current != null && current.equals(state)) {
+            return;
+        }
+
         section.blockStates().set(blockIndex(x, y, z), state.toNbt());
+        removeBlockData(x, y, z);
+    }
+
+    /**
+     * その座標を指す付随データを取り除く。
+     *
+     * <p>{@code block_entities} / {@code block_ticks} / {@code fluid_ticks} の要素は
+     * いずれも {@code x} {@code y} {@code z} を<b>絶対座標</b>で持つ。
+     */
+    private void removeBlockData(int x, int y, int z) {
+        int absoluteX = (x() * 16) + x;
+        int absoluteZ = (z() * 16) + z;
+
+        // 3 つのリストは形が同じなので、まとめて同じ処理をかける
+        for (String key : BLOCK_DATA_KEYS) {
+            NbtList list = root.optList(key);
+
+            if (list == null || list.size() == 0) {
+                continue;
+            }
+
+            // 後ろから削ると、削除しても残りの添字がずれない
+            for (int position = list.size() - 1; position >= 0; position--) {
+                NbtTag element = list.get(position);
+
+                if (element instanceof NbtCompound entry
+                        && matchesPosition(entry, absoluteX, y, absoluteZ)) {
+                    list.removeAt(position);
+                }
+            }
+        }
+    }
+
+    /** 付随データの要素が、指定の絶対座標を指しているか。 */
+    private static boolean matchesPosition(NbtCompound entry, int x, int y, int z) {
+        Integer entryX = entry.optInt("x");
+        Integer entryY = entry.optInt("y");
+        Integer entryZ = entry.optInt("z");
+
+        // 座標を持たない要素は、対象かどうか判断できないので触らない
+        if (entryX == null || entryY == null || entryZ == null) {
+            return false;
+        }
+
+        return entryX == x && entryY == y && entryZ == z;
     }
 
     /**

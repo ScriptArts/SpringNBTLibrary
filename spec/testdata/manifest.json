@@ -372,6 +372,16 @@
       "roundtrip": true
     },
     {
+      "id": "world/block_entities",
+      "kind": "world",
+      "input": "world/block_entities.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "block_entities / block_ticks / fluid_ticks を持つチャンク",
+      "expect": "expect/world/block_entities.json",
+      "roundtrip": true
+    },
+    {
       "id": "world/proto_chunk",
       "kind": "world",
       "input": "world/proto_chunk.nbt",

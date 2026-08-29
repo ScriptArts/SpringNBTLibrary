@@ -15,6 +15,7 @@ import io.github.scriptarts.springnbt.nbt.Compression;
 import io.github.scriptarts.springnbt.nbt.NamedTag;
 import io.github.scriptarts.springnbt.nbt.NbtCompound;
 import io.github.scriptarts.springnbt.nbt.NbtInt;
+import io.github.scriptarts.springnbt.nbt.NbtList;
 import io.github.scriptarts.springnbt.nbt.NbtIo;
 import io.github.scriptarts.springnbt.nbt.NbtString;
 import io.github.scriptarts.springnbt.nbt.NbtWriteOptions;
@@ -396,6 +397,58 @@ class WorldTest {
                     new NamedTag(named.name(), chunk.toNbt(ChunkWriteOptions.defaults())), options);
 
             assertArrayEquals(before, after);
+        }
+
+        @Test
+        void ブロックを置き換えると同じ座標の付随データが消える() {
+            Chunk chunk = loadChunk("block_entities");
+            assertEquals(3, chunk.raw().getList("block_entities").size());
+            assertEquals(2, chunk.raw().getList("block_ticks").size());
+            assertEquals(1, chunk.raw().getList("fluid_ticks").size());
+
+            // (0,-64,0) には chest と block_tick、(1,-64,1) には furnace と fluid_tick がある
+            chunk.setBlock(0, -64, 0, BlockState.parse("minecraft:stone"));
+            chunk.setBlock(1, -64, 1, BlockState.parse("minecraft:stone"));
+
+            NbtList entities = chunk.raw().getList("block_entities");
+
+            // 触っていない (15,-50,15) の barrel だけが残る
+            assertEquals(1, entities.size());
+            assertEquals("minecraft:barrel", ((NbtCompound) entities.get(0)).getString("id"));
+
+            NbtList ticks = chunk.raw().getList("block_ticks");
+            assertEquals(1, ticks.size());
+            assertEquals(15, ((NbtCompound) ticks.get(0)).getInt("x"));
+
+            assertEquals(0, chunk.raw().getList("fluid_ticks").size());
+        }
+
+        @Test
+        void 同じブロックを置き直しても付随データは消えない() {
+            Chunk chunk = loadChunk("block_entities");
+            BlockState current = chunk.getBlock(0, -64, 0);
+
+            // 変化が無いなら付随データを触る理由がない
+            chunk.setBlock(0, -64, 0, current);
+
+            assertEquals(3, chunk.raw().getList("block_entities").size());
+            assertEquals(2, chunk.raw().getList("block_ticks").size());
+        }
+
+        @Test
+        void 別のチャンクの同じ相対座標は消さない() {
+            // 付随データは絶対座標で持つので、チャンク座標を取り違えると
+            // 無関係な要素を消してしまう
+            NamedTag named = NbtIo.readFile(vectorPath("block_entities"), null);
+            NbtCompound root = (NbtCompound) named.tag();
+            root.set("xPos", new NbtInt(1));
+            root.set("zPos", new NbtInt(1));
+
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+            chunk.setBlock(0, -64, 0, BlockState.parse("minecraft:stone"));
+
+            // このチャンクの (0,-64,0) は絶対座標 (16,-64,16)。どれとも一致しない
+            assertEquals(3, chunk.raw().getList("block_entities").size());
         }
 
         @Test

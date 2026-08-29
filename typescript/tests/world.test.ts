@@ -365,6 +365,55 @@ test("Chunk: 無変更で書き戻すと元と同じ NBT になる", () => {
   assert.deepEqual(after, before);
 });
 
+test("Chunk: ブロックを置き換えると同じ座標の付随データが消える", () => {
+  const chunk = loadChunk("block_entities");
+  assert.equal(chunk.raw.getList("block_entities").size, 3);
+  assert.equal(chunk.raw.getList("block_ticks").size, 2);
+  assert.equal(chunk.raw.getList("fluid_ticks").size, 1);
+
+  // (0,-64,0) には chest と block_tick、(1,-64,1) には furnace と fluid_tick がある
+  chunk.setBlock(0, -64, 0, BlockState.parse("minecraft:stone"));
+  chunk.setBlock(1, -64, 1, BlockState.parse("minecraft:stone"));
+
+  const entities = chunk.raw.getList("block_entities");
+
+  // 触っていない (15,-50,15) の barrel だけが残る
+  assert.equal(entities.size, 1);
+  assert.equal((entities.get(0) as NbtCompound).getString("id"), "minecraft:barrel");
+
+  const ticks = chunk.raw.getList("block_ticks");
+  assert.equal(ticks.size, 1);
+  assert.equal((ticks.get(0) as NbtCompound).getInt("x"), 15);
+
+  assert.equal(chunk.raw.getList("fluid_ticks").size, 0);
+});
+
+test("Chunk: 同じブロックを置き直しても付随データは消えない", () => {
+  const chunk = loadChunk("block_entities");
+  const current = chunk.getBlock(0, -64, 0);
+  assert.ok(current !== undefined);
+
+  // 変化が無いなら付随データを触る理由がない
+  chunk.setBlock(0, -64, 0, current);
+
+  assert.equal(chunk.raw.getList("block_entities").size, 3);
+  assert.equal(chunk.raw.getList("block_ticks").size, 2);
+});
+
+test("Chunk: 別のチャンクの同じ相対座標は消さない", () => {
+  // 付随データは絶対座標で持つので、チャンク座標を取り違えると
+  // 無関係な要素を消してしまう
+  const root = readFile(vectorPath("block_entities")).tag;
+  root.set("xPos", new NbtInt(1));
+  root.set("zPos", new NbtInt(1));
+
+  const chunk = Chunk.fromNbt(root);
+  chunk.setBlock(0, -64, 0, BlockState.parse("minecraft:stone"));
+
+  // このチャンクの (0,-64,0) は絶対座標 (16,-64,16)。どれとも一致しない
+  assert.equal(chunk.raw.getList("block_entities").size, 3);
+});
+
 test("Chunk: 高さマップと光源を無効化できる", () => {
   const chunk = loadChunk("palette_1");
   chunk.clearHeightmaps();

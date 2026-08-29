@@ -758,9 +758,32 @@ def make_section(y, block_palette, block_indices, biome_palette, biome_indices):
     ])
 
 
-def make_chunk(x, z, sections, status="minecraft:full"):
+def block_entity(entity_id, x, y, z):
+    """ブロックエンティティ 1 件。座標は絶対座標で持つ（実データと同じ）。"""
+    return t_compound([
+        ("id", t_string(entity_id)),
+        ("x", t_int(x)),
+        ("y", t_int(y)),
+        ("z", t_int(z)),
+    ])
+
+
+def block_tick(block_id, x, y, z):
+    """ブロックのティック予約 1 件。実データのキー名をなぞる。"""
+    return t_compound([
+        ("i", t_string(block_id)),
+        ("p", t_int(0)),
+        ("t", t_int(0)),
+        ("x", t_int(x)),
+        ("y", t_int(y)),
+        ("z", t_int(z)),
+    ])
+
+
+def make_chunk(x, z, sections, status="minecraft:full",
+               block_entities=None, block_ticks=None, fluid_ticks=None):
     """チャンクの NBT を組み立てる。実データの構造をなぞる。"""
-    return to_java_file("", t_compound([
+    entries = [
         ("DataVersion", t_int(4903)),
         ("xPos", t_int(x)),
         ("zPos", t_int(z)),
@@ -772,9 +795,20 @@ def make_chunk(x, z, sections, status="minecraft:full"):
         ("Heightmaps", t_compound([
             ("WORLD_SURFACE", t_long_array([0] * 37)),
         ])),
-        ("block_entities", t_list(TAG_END, [])),
-        ("sections", t_list(TAG_COMPOUND, sections)),
-    ]))
+    ]
+
+    # 付随データは、空なら要素型 End の空リストになる（実データと同じ）
+    for key, values in (("block_entities", block_entities),
+                        ("block_ticks", block_ticks),
+                        ("fluid_ticks", fluid_ticks)):
+        if values is None or len(values) == 0:
+            if key == "block_entities":
+                entries.append((key, t_list(TAG_END, [])))
+        else:
+            entries.append((key, t_list(TAG_COMPOUND, values)))
+
+    entries.append(("sections", t_list(TAG_COMPOUND, sections)))
+    return to_java_file("", t_compound(entries))
 
 
 AIR = block_palette_entry("minecraft:air")
@@ -836,6 +870,30 @@ def build_world():
         make_chunk(0, 0, [make_section(-4, palette_unused, indices_unused,
                                        [PLAINS], [0] * 64)]),
         "参照されていないパレット要素が 2 つある。compact() で減る")
+
+    # ブロックに紐づく付随データを持つチャンク。
+    # ブロックを置き換えたとき、同じ座標の要素が取り除かれるかを見る。
+    # チャンク (0,0) なので、絶対座標は x,z がそのまま。y は min_section_y*16 = -64 から
+    add_vector(
+        "world/block_entities", "world/block_entities.nbt",
+        make_chunk(
+            0, 0,
+            [make_section(-4, palette5, indices5, [PLAINS], [0] * 64)],
+            block_entities=[
+                # chunk_edit が置き換える座標にあるもの（消えるはず）
+                block_entity("minecraft:chest", 0, -64, 0),
+                block_entity("minecraft:furnace", 1, -64, 1),
+                # 触らない座標にあるもの（残るはず）
+                block_entity("minecraft:barrel", 15, -50, 15),
+            ],
+            block_ticks=[
+                block_tick("minecraft:water", 0, -64, 0),
+                block_tick("minecraft:lava", 15, -50, 15),
+            ],
+            fluid_ticks=[
+                block_tick("minecraft:water", 1, -64, 1),
+            ]),
+        "block_entities / block_ticks / fluid_ticks を持つチャンク")
 
     # 生成途中のチャンク
     add_vector(

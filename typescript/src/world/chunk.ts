@@ -27,6 +27,23 @@ export const BLOCKS_PER_SECTION = 4096;
 /** セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）。 */
 export const BIOMES_PER_SECTION = 64;
 
+/** ブロックに紐づく付随データのキー。ブロックを置き換えたら整合が崩れる。 */
+const BLOCK_DATA_KEYS = ["block_entities", "block_ticks", "fluid_ticks"] as const;
+
+/** 付随データの要素が、指定の絶対座標を指しているか。 */
+function matchesPosition(entry: NbtCompound, x: number, y: number, z: number): boolean {
+  const entryX = entry.optInt("x");
+  const entryY = entry.optInt("y");
+  const entryZ = entry.optInt("z");
+
+  // 座標を持たない要素は、対象かどうか判断できないので触らない
+  if (entryX === undefined || entryY === undefined || entryZ === undefined) {
+    return false;
+  }
+
+  return entryX === x && entryY === y && entryZ === z;
+}
+
 /** DataVersion が対象と違ったときの動作。 */
 export enum VersionMismatchAction {
   /** 警告コールバックを呼んで続行する。既定。 */
@@ -322,7 +339,44 @@ export class Chunk {
       );
     }
 
+    // 同じ状態を置き直すだけなら、付随データを触る理由がない
+    const current = this.getBlock(x, y, z);
+
+    if (current !== undefined && current.equals(state)) {
+      return;
+    }
+
     section.blockStates!.set(blockIndex(x, y, z), state.toNbt());
+    this.#removeBlockData(x, y, z);
+  }
+
+  /**
+   * その座標を指す付随データを取り除く。
+   *
+   * `block_entities` / `block_ticks` / `fluid_ticks` の要素は
+   * いずれも `x` `y` `z` を**絶対座標**で持つ。
+   */
+  #removeBlockData(x: number, y: number, z: number): void {
+    const absoluteX = this.x * 16 + x;
+    const absoluteZ = this.z * 16 + z;
+
+    // 3 つのリストは形が同じなので、まとめて同じ処理をかける
+    for (const key of BLOCK_DATA_KEYS) {
+      const list = this.raw.optList(key);
+
+      if (list === undefined || list.size === 0) {
+        continue;
+      }
+
+      // 後ろから削ると、削除しても残りの添字がずれない
+      for (let position = list.size - 1; position >= 0; position--) {
+        const element = list.get(position);
+
+        if (element instanceof NbtCompound && matchesPosition(element, absoluteX, y, absoluteZ)) {
+          list.removeAt(position);
+        }
+      }
+    }
   }
 
   /** バイオームを取得する。4×4×4 の単位なので、座標は自動的に丸められる。 */

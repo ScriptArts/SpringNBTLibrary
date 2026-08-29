@@ -69,6 +69,7 @@ SpringNBTLibrary が提供する機能と、各言語の対応状況。
 | セクタ重複・不正オフセットの検出 | ✅ | ✅ | ✅ | ✅ | ✅ | [20](spec/20-anvil-region.md#21-ロケーションテーブル) | 開いた時点で弾く |
 | ファイル長のセクタ整列検査 | ✅ | ✅ | ✅ | ✅ | ✅ | [20](spec/20-anvil-region.md#2-ファイル構造) | |
 | `region/` `entities/` `poi/` の横断アクセス | ✅ | ✅ | ✅ | ✅ | ✅ | [20](spec/20-anvil-region.md#5-論理api) | `RegionFolder` |
+| 開いたリージョンの上限管理 | ✅ | ✅ | ✅ | ✅ | ✅ | [20](spec/20-anvil-region.md#51-開いたリージョンの上限) | 既定 8 件。溢れたら書き出して閉じる |
 
 ## レイヤ3: World / Block
 
@@ -80,6 +81,7 @@ SpringNBTLibrary が提供する機能と、各言語の対応状況。
 | 標準3次元 + カスタム次元の解決 | ✅ | ✅ | ✅ | ✅ | ✅ | [40](spec/40-world-layout.md#1-ディレクトリ構成) | |
 | チャンクの解釈（未知キーの保持つき） | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#1-ルート要素) | 読んだ要素をすべて残す |
 | ブロックの取得・設定 | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#22-座標とエントリ添字) | 絶対座標／チャンク相対の両方 |
+| 置き換え時の付随データの掃除 | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#24-ブロックを置き換えたときの掃除) | `block_entities` / `block_ticks` / `fluid_ticks` から同じ座標の要素を取り除く |
 | バイオームの取得・設定（4×4×4） | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#22-座標とエントリ添字) | |
 | `BlockState` の文字列表現 | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#21-ブロック状態のパレット要素) | `minecraft:oak_stairs[facing=north]` |
 | パレット自動拡張とビット幅の再計算 | ✅ | ✅ | ✅ | ✅ | ✅ | [31](spec/31-paletted-container.md#4-書き込み時のビット幅再計算) | |

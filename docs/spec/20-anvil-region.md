@@ -77,10 +77,47 @@ u8   compression     -- 圧縮方式
 | 1 | GZip (RFC 1952) | 読み書き対応 |
 | 2 | Zlib (RFC 1950) | 読み書き対応。**書き込みの既定** |
 | 3 | 無圧縮 | 読み書き対応 |
-| 4 | LZ4 (ブロック形式、フレーム無し) | v0.1.0 では未実装。`UNSUPPORTED_FEATURE`（生バイトAPIでのみ取得可） |
+| 4 | LZ4（lz4-java のブロックストリーム形式） | v0.1.0 では未実装。`UNSUPPORTED_FEATURE`（生バイトAPIでのみ取得可） |
 | 127 | サードパーティ製サーバのカスタム方式 | 読み込み時 `UNSUPPORTED_FEATURE`。生バイト API でのみ取得可 |
 
 上記以外のIDは `MALFORMED_DATA`。
+
+### 3.1.1 圧縮ID 4 の中身
+
+**素の LZ4 ブロックでも LZ4 フレーム形式でもない。**
+Minecraft は [lz4-java](https://github.com/lz4/lz4-java) の
+`LZ4BlockOutputStream` が出す独自形式をそのまま使う。
+これを知らずに LZ4 のデコーダへ直接渡しても読めない。
+
+データは**ブロックの連結**で、各ブロックは 21 バイトのヘッダから始まる。
+
+```
++0   8 バイト   マジック "LZ4Block" (0x4C 5A 34 42 6C 6F 63 6B)
++8   1 バイト   トークン
+                 上位 4 ビット: 0x10 = 無圧縮、0x20 = LZ4 圧縮
+                 下位 4 ビット: ブロックサイズの指標（展開には使わない）
++9   4 バイト   圧縮後の長さ   i32 **リトルエンディアン**
++13  4 バイト   展開後の長さ   i32 **リトルエンディアン**
++17  4 バイト   チェックサム   i32 リトルエンディアン（xxhash32。検証は任意）
++21  ...        ブロック本体（圧縮後の長さぶん）
+```
+
+**この形式だけリトルエンディアンである。** NBT 本体と Anvil のヘッダは
+すべてビッグエンディアンなので、ここだけ例外になる。
+
+読み込みの手順:
+
+1. 先頭 21 バイトを読み、マジックが `LZ4Block` でなければ `MALFORMED_DATA`
+2. トークンの上位 4 ビットで分岐する
+   - `0x10`: 本体をそのまま出力へ足す。
+     このとき圧縮後の長さと展開後の長さが**一致していなければ** `MALFORMED_DATA`
+   - `0x20`: 本体を LZ4 ブロック展開し、展開後の長さと一致するか確かめる
+   - それ以外: `MALFORMED_DATA`
+3. 次のブロックへ進む。入力を使い切るまで繰り返す
+
+長さの検証（どちらかが負、または片方だけが 0）に反したら `MALFORMED_DATA`。
+
+出典: [`LZ4BlockInputStream`](https://github.com/lz4/lz4-java/blob/master/src/java/net/jpountz/lz4/LZ4BlockInputStream.java)
 
 ### 3.2 外部ファイルへの退避 (`.mcc`)
 
@@ -154,12 +191,40 @@ RawChunk { compression: Compression, external: bool, data: bytes }
 
 ```
 RegionFolder
-    open(dir)                            -> RegionFolder
+    open(dir, mode, max_cached_regions)  -> RegionFolder
     region_positions()                   -> Iterator<RegionPos>
     region(region_x, region_z)           -> Option<RegionFile>
     read_chunk(chunk_x, chunk_z)         -> Option<NbtCompound>
     write_chunk(chunk_x, chunk_z, nbt)
+    max_cached_regions()                 -> usize
+    cached_region_count()                -> usize
 ```
+
+### 5.1 開いたリージョンの上限
+
+`RegionFile` は**ファイル全体をメモリへ載せる**。
+無変更で書き戻したときにバイト単位で一致させるには、
+セクタの配置を丸ごと保持している必要があるためである。
+
+その代わり、開いたまま貯め続けるとメモリを使い切る。
+1 リージョンは理論上 1GiB（255 セクタ × 1024 チャンク）になりうるし、
+実データでも数 MB から数十 MB ある。数千リージョンあるワールドを
+端から走査すれば破綻する。
+
+そこで `RegionFolder` は開いたリージョンの数に上限を持つ。
+
+| 項目 | 値 |
+|---|---|
+| 既定の上限 | **8 件** |
+| 上限に達したとき | 最も長く使われていないものを**書き出してから**閉じる |
+| 上限が 1 未満 | `INVALID_ARGUMENT` |
+
+**追い出す前に必ず書き出す。** 捨てると変更が失われる。
+
+この結果、`region()` が返した参照は
+**別のリージョンへアクセスすると閉じられている場合がある**。
+参照を保持せず、必要なたびに取得すること。
+`read_chunk` / `write_chunk` 経由で使うぶんには意識しなくてよい。
 
 `RegionFolder` は `region/` `entities/` `poi/` のいずれか1つのディレクトリを表す。
 開いたリージョンファイルはキャッシュし、`close()` でまとめて閉じる。

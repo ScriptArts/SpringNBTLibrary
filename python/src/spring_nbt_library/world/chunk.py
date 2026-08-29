@@ -35,6 +35,22 @@ BLOCKS_PER_SECTION = 4096
 #: セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）。
 BIOMES_PER_SECTION = 64
 
+#: ブロックに紐づく付随データのキー。ブロックを置き換えたら整合が崩れる。
+_BLOCK_DATA_KEYS = ("block_entities", "block_ticks", "fluid_ticks")
+
+
+def _matches_position(entry: NbtCompound, x: int, y: int, z: int) -> bool:
+    """付随データの要素が、指定の絶対座標を指しているか。"""
+    entry_x = entry.opt_int("x")
+    entry_y = entry.opt_int("y")
+    entry_z = entry.opt_int("z")
+
+    # 座標を持たない要素は、対象かどうか判断できないので触らない
+    if entry_x is None or entry_y is None or entry_z is None:
+        return False
+
+    return entry_x == x and entry_y == y and entry_z == z
+
 
 class VersionMismatchAction(enum.Enum):
     """DataVersion が対象と違ったときの動作。"""
@@ -299,6 +315,13 @@ class Chunk:
     def set_block(self, x: int, y: int, z: int, state: BlockState) -> None:
         """ブロックを設定する。
 
+        置き換えによって不整合になる付随データ（``block_entities`` /
+        ``block_ticks`` / ``fluid_ticks`` のうち、その座標を指すもの）は
+        同時に取り除く。残すとブロックと中身が食い違い、
+        Minecraft 側で予期しない挙動になるため。
+
+        仕様: ``docs/spec/30-chunk-format.md`` 2.4章
+
         :raises SpringNbtError: 対象のセクションが無い、または block_states を持たない場合。
         """
         _check_local_coordinates(x, z)
@@ -310,7 +333,39 @@ class Chunk:
                 "Y=%d を含むセクション（Y=%d）が無いか、ブロックを持たない。"
                 "本ライブラリはセクションを新規生成しない" % (y, section_y))
 
+        # 同じ状態を置き直すだけなら、付随データを触る理由がない。
+        # プロパティの並び順に左右されないよう、NBT ではなく BlockState として比べる
+        current = self.get_block(x, y, z)
+
+        if current is not None and current == state:
+            return
+
         section.block_states.set(block_index(x, y, z), state.to_nbt())
+        self._remove_block_data(x, y, z)
+
+    def _remove_block_data(self, x: int, y: int, z: int) -> None:
+        """その座標を指す付随データを取り除く。
+
+        ``block_entities`` / ``block_ticks`` / ``fluid_ticks`` の要素は
+        いずれも ``x`` ``y`` ``z`` を**絶対座標**で持つ。
+        """
+        absolute_x = (self.x * 16) + x
+        absolute_z = (self.z * 16) + z
+
+        # 3 つのリストは形が同じなので、まとめて同じ処理をかける
+        for key in _BLOCK_DATA_KEYS:
+            values = self.raw.opt_list(key)
+
+            if values is None or len(values) == 0:
+                continue
+
+            # 後ろから削ると、削除しても残りの添字がずれない
+            for position in range(len(values) - 1, -1, -1):
+                entry = values[position]
+
+                if isinstance(entry, NbtCompound) and _matches_position(
+                        entry, absolute_x, y, absolute_z):
+                    del values[position]
 
     def get_biome(self, x: int, y: int, z: int) -> Optional[str]:
         """バイオームを取得する。4×4×4 の単位なので、座標は自動的に丸められる。"""
