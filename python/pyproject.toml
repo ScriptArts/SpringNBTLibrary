@@ -14,7 +14,6 @@ keywords = ["minecraft", "nbt", "anvil", "mca"]
 dependencies = []
 
 [project.optional-dependencies]
-lz4 = ["lz4>=4.0"]
 dev = ["pytest>=8.0"]
 
 [project.urls]

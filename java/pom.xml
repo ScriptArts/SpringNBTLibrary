@@ -27,13 +27,8 @@
     </properties>
 
     <dependencies>
-        <!-- LZ4 (圧縮ID=4) は任意依存。未導入なら UNSUPPORTED_FEATURE を送出する -->
-        <dependency>
-            <groupId>org.lz4</groupId>
-            <artifactId>lz4-java</artifactId>
-            <version>1.8.0</version>
-            <optional>true</optional>
-        </dependency>
+        <!-- LZ4 (圧縮ID=4) は v0.1.0 では未実装。生バイトでのみ取り出せる。
+             実装するときに lz4-java を任意依存として足す（docs/features.md） -->
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>

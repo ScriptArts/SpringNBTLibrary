@@ -191,13 +191,110 @@ TESTDATA = os.path.join(REPO_ROOT, "spec", "testdata")
 VECTORS = []
 
 
+def write_if_changed(path, data):
+    """内容が変わるときだけ書き出す。
+
+    Gzip / Zlib の出力バイト列は zlib の実装とバージョンで変わる。
+    毎回書き出すと、同じ内容なのに環境ごとに差分が出てしまい、
+    「テストベクタが生成器から再現できる」ことを CI で確かめられなくなる。
+
+    そこで**展開後の中身が同じなら書き換えない**。
+    圧縮方式そのものを変えたときはバイト列も中身も変わるので、ちゃんと更新される。
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    if os.path.exists(path):
+        with open(path, "rb") as handle:
+            existing = handle.read()
+
+        # 中身が同じなら触らない
+        if existing == data:
+            return
+
+        if same_after_decompression(existing, data):
+            return
+
+    with open(path, "wb") as handle:
+        handle.write(data)
+
+
+def same_after_decompression(existing, data):
+    """2 つのバイト列が、展開すると同じ内容になるか。
+
+    どちらかが展開できない形式なら「違う」とみなす。
+    """
+    try:
+        return decompress_for_compare(existing) == decompress_for_compare(data)
+    except Exception:
+        # 展開できない以上、同じとは言い切れない
+        return False
+
+
+def decompress_for_compare(data):
+    """先頭バイトから方式を判定して展開する。判定できなければそのまま返す。"""
+    if len(data) >= 2 and data[0] == 0x1F and data[1] == 0x8B:
+        return gzip.decompress(data)
+
+    if len(data) >= 2 and (data[0] & 0x0F) == 0x08 and (((data[0] << 8) | data[1]) % 31) == 0:
+        return zlib.decompress(data)
+
+    # リージョンファイルは中に複数のチャンクを抱えるので、構造を解いて比べる
+    if looks_like_region(data):
+        return region_contents(data)
+
+    return data
+
+
+def looks_like_region(data):
+    """リージョンファイルらしい形をしているか。"""
+    return len(data) >= 2 * SECTOR and len(data) % SECTOR == 0
+
+
+def region_contents(data):
+    """リージョンファイルを、圧縮に依存しない「論理的な中身」へ均す。
+
+    位置表・タイムスタンプ表と、各チャンクの (圧縮方式ID, 展開後のバイト列) を並べる。
+    圧縮結果そのものは zlib の実装で変わるため、比較には使わない。
+    """
+    parts = [data[:2 * SECTOR]]
+
+    # 位置表の 1024 エントリを順に見て、存在するチャンクを取り出す
+    for index in range(1024):
+        offset, sectors = struct.unpack_from(">I", data, index * 4)[0] >> 8, data[index * 4 + 3]
+
+        if offset == 0 or sectors == 0:
+            continue
+
+        start = offset * SECTOR
+
+        if start + 5 > len(data):
+            raise ValueError("位置表がファイルの外を指している")
+
+        length = struct.unpack_from(">i", data, start)[0]
+        scheme = data[start + 4]
+        payload = data[start + 5:start + 4 + length]
+
+        # 外部ファイルへ退避されている場合、本体はここに無い
+        if (scheme & 0x80) != 0:
+            parts.append(bytes([index & 0xFF, scheme]))
+            continue
+
+        if scheme == 1:
+            plain = gzip.decompress(payload)
+        elif scheme == 2:
+            plain = zlib.decompress(payload)
+        else:
+            plain = payload
+
+        parts.append(bytes([index & 0xFF, scheme]) + plain)
+
+    return b"\x00".join(parts)
+
+
 def add_vector(vector_id, filename, data, description,
                fmt="java", compression="none", roundtrip=True, expect_error=None):
     """ベクタを 1 件登録し、ファイルへ書き出す。"""
-    path = os.path.join(TESTDATA, filename)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "wb") as handle:
-        handle.write(data)
+    write_if_changed(os.path.join(TESTDATA, filename), data)
 
     entry = {
         "id": vector_id,
