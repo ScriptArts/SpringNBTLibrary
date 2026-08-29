@@ -1,5 +1,9 @@
 # SpringNBTLibrary
 
+[![CI](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/ci.yml/badge.svg)](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/ci.yml)
+[![docs-sync](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/docs-sync.yml/badge.svg)](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/docs-sync.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Minecraft **Java版 26.2**（DataVersion `4903`）のワールドデータ・NBTファイルを読み書きするライブラリ。
 
 **C# / Java / TypeScript / Python / Rust の5言語**で、同じ概念モデルと同じ挙動のものを提供する。
