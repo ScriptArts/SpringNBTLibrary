@@ -1,10 +1,11 @@
 package io.github.scriptarts.springnbt;
 
 /**
- * 本ライブラリが送出する例外。分類は {@link #code()} で判別する。
+ * 本ライブラリが送出する例外
+ * 分類は {@link #code()} で判別する
  *
- * <p>検査例外にしていないのは、4言語でメソッドのシグネチャを揃えるため。
- * 入出力エラーも {@link ErrorCode#IO} でラップして送出する。
+ * <p>検査例外にしていないのは、4言語でメソッドのシグネチャを揃えるため
+ * 入出力エラーも {@link ErrorCode#IO} でラップして送出する
  *
  * <p>仕様: {@code docs/spec/00-conventions.md} 4章 / {@code docs/adr/0005-unified-error-model.md}
  */
@@ -15,7 +16,7 @@ public final class SpringNbtException extends RuntimeException {
     private final ErrorCode code;
 
     /**
-     * 分類とメッセージから例外を作る。
+     * 分類とメッセージから例外を作る
      *
      * @param code    エラーの分類
      * @param message 説明
@@ -26,7 +27,7 @@ public final class SpringNbtException extends RuntimeException {
     }
 
     /**
-     * 原因となった下位の例外を保持して例外を作る。
+     * 原因となった下位の例外を保持して例外を作る
      *
      * @param code    エラーの分類
      * @param message 説明
@@ -38,7 +39,7 @@ public final class SpringNbtException extends RuntimeException {
     }
 
     /**
-     * エラーの分類。
+     * エラーの分類
      *
      * @return 分類
      */
@@ -52,7 +53,7 @@ public final class SpringNbtException extends RuntimeException {
     }
 
     /**
-     * {@link ErrorCode#MALFORMED_DATA} の例外を作る。
+     * {@link ErrorCode#MALFORMED_DATA} の例外を作る
      *
      * @param message 説明
      * @return 例外
@@ -62,7 +63,7 @@ public final class SpringNbtException extends RuntimeException {
     }
 
     /**
-     * {@link ErrorCode#INVALID_ARGUMENT} の例外を作る。
+     * {@link ErrorCode#INVALID_ARGUMENT} の例外を作る
      *
      * @param message 説明
      * @return 例外
@@ -72,7 +73,7 @@ public final class SpringNbtException extends RuntimeException {
     }
 
     /**
-     * {@link ErrorCode#UNEXPECTED_TAG_TYPE} の例外を作る。
+     * {@link ErrorCode#UNEXPECTED_TAG_TYPE} の例外を作る
      *
      * @param message 説明
      * @return 例外
@@ -82,7 +83,7 @@ public final class SpringNbtException extends RuntimeException {
     }
 
     /**
-     * {@link ErrorCode#LIMIT_EXCEEDED} の例外を作る。
+     * {@link ErrorCode#LIMIT_EXCEEDED} の例外を作る
      *
      * @param message 説明
      * @return 例外
@@ -92,7 +93,7 @@ public final class SpringNbtException extends RuntimeException {
     }
 
     /**
-     * {@link ErrorCode#UNSUPPORTED_FEATURE} の例外を作る。
+     * {@link ErrorCode#UNSUPPORTED_FEATURE} の例外を作る
      *
      * @param message 説明
      * @return 例外

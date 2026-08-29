@@ -11,11 +11,12 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * パレットとビットストレージの組。セクション内のブロック状態やバイオームを格納する。
+ * パレットとビットストレージの組
+ * セクション内のブロック状態やバイオームを格納する
  *
- * <p>パレットの要素は<strong>生の {@link NbtTag} のまま</strong>持つ。
+ * <p>パレットの要素は<strong>生の {@link NbtTag} のまま</strong>持つ
  * こうすると、触っていないブロックについては Minecraft が書き出したときの
- * プロパティの並び順まで含めてそのまま書き戻せる。
+ * プロパティの並び順まで含めてそのまま書き戻せる
  *
  * <p>仕様: {@code docs/spec/31-paletted-container.md}
  */
@@ -33,7 +34,8 @@ public final class PalettedContainer {
     }
 
     /**
-     * エントリ数。ブロックなら 4096、バイオームなら 64。
+     * エントリ数
+     * ブロックなら 4096、バイオームなら 64
      *
      * @return エントリ数
      */
@@ -42,7 +44,8 @@ public final class PalettedContainer {
     }
 
     /**
-     * ビット幅の下限。ブロックなら 4、バイオームなら 1。
+     * ビット幅の下限
+     * ブロックなら 4、バイオームなら 1
      *
      * @return 下限
      */
@@ -51,7 +54,8 @@ public final class PalettedContainer {
     }
 
     /**
-     * パレット。読み取り専用。
+     * パレット
+     * 読み取り専用
      *
      * @return パレット
      */
@@ -60,7 +64,8 @@ public final class PalettedContainer {
     }
 
     /**
-     * 現在のビット幅。パレットが 1 要素なら 0（記憶域を持たない）。
+     * 現在のビット幅
+     * パレットが 1 要素なら 0（記憶域を持たない）
      *
      * @return ビット幅
      */
@@ -73,7 +78,7 @@ public final class PalettedContainer {
     }
 
     /**
-     * 単一の値で埋めたコンテナを作る。
+     * 単一の値で埋めたコンテナを作る
      *
      * @param value      値
      * @param entryCount エントリ数
@@ -88,7 +93,7 @@ public final class PalettedContainer {
     }
 
     /**
-     * NBT から読み込む。
+     * NBT から読み込む
      *
      * @param nbt                 コンテナの NBT
      * @param entryCount          エントリ数
@@ -107,7 +112,8 @@ public final class PalettedContainer {
             throw SpringNbtException.malformed("palette が無いか空");
         }
 
-        // パレットの要素は生の NbtTag のまま持つ。並び順まで元どおりに書き戻すため
+        // パレットの要素は生の NbtTag のまま持つ
+        // 並び順まで元どおりに書き戻すため
         for (NbtTag entry : paletteTag) {
             result.palette.add(entry);
         }
@@ -127,7 +133,7 @@ public final class PalettedContainer {
         int bits = Math.max(minBits, ceilLog2(result.palette.size()));
         result.storage = BitStorage.fromLongs(data, bits, entryCount, lenientBitStorage);
 
-        // 取り出した添字がパレットの範囲に収まっているか確かめる。
+        // 取り出した添字がパレットの範囲に収まっているか確かめる
         // 黙って 0 番目で代替すると、壊れたデータをそうと分からない形で書き戻してしまう
         for (int index = 0; index < entryCount; index++) {
             int value = result.storage.get(index);
@@ -142,7 +148,7 @@ public final class PalettedContainer {
     }
 
     /**
-     * NBT へ変換する。
+     * NBT へ変換する
      *
      * @return NBT
      */
@@ -155,7 +161,8 @@ public final class PalettedContainer {
             paletteTag.add(entry);
         }
 
-        // パレットが 1 要素なら data は書かない。Minecraft と同じ振る舞い
+        // パレットが 1 要素なら data は書かない
+        // Minecraft と同じ振る舞い
         if (storage != null && palette.size() > 1) {
             result.set("data", new NbtLongArray(storage.toLongs()));
         }
@@ -165,7 +172,7 @@ public final class PalettedContainer {
     }
 
     /**
-     * 添字の値を取り出す。
+     * 添字の値を取り出す
      *
      * @param index 添字
      * @return 値
@@ -182,7 +189,8 @@ public final class PalettedContainer {
     }
 
     /**
-     * 添字の値を書き換える。パレットに無ければ追加する。
+     * 添字の値を書き換える
+     * パレットに無ければ追加する
      *
      * @param index 添字
      * @param value 値
@@ -203,7 +211,8 @@ public final class PalettedContainer {
     }
 
     /**
-     * 全エントリを 1 つの値で埋める。パレットもその 1 要素だけにする。
+     * 全エントリを 1 つの値で埋める
+     * パレットもその 1 要素だけにする
      *
      * @param value 値
      */
@@ -215,9 +224,9 @@ public final class PalettedContainer {
     }
 
     /**
-     * どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す。
+     * どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す
      *
-     * <p>大量の {@code set} を行う用途で遅くならないよう、明示的に呼んだときだけ実行する。
+     * <p>大量の {@code set} を行う用途で遅くならないよう、明示的に呼んだときだけ実行する
      */
     public void compact() {
         if (storage == null) {
@@ -268,7 +277,9 @@ public final class PalettedContainer {
         }
     }
 
-    /** パレット内の位置を返す。無ければ末尾へ追加する。 */
+    /** パレット内の位置を返す
+    /** 無ければ末尾へ追加する
+    /** */
     private int indexOfOrAdd(NbtTag value) {
         // パレットは高々 4096 要素なので線形探索で足りる
         for (int index = 0; index < palette.size(); index++) {
@@ -281,7 +292,8 @@ public final class PalettedContainer {
         return palette.size() - 1;
     }
 
-    /** 現在のパレット長に合うビット幅の記憶域を用意する。 */
+    /** 現在のパレット長に合うビット幅の記憶域を用意する
+    /** */
     private void ensureStorage() {
         int required = Math.max(minBits, ceilLog2(palette.size()));
 
@@ -307,7 +319,8 @@ public final class PalettedContainer {
     }
 
     /**
-     * {@code count} 個の値を表すのに必要な最小ビット数。1 なら 0。
+     * {@code count} 個の値を表すのに必要な最小ビット数
+     * 1 なら 0
      *
      * @param count 値の個数
      * @return ビット数

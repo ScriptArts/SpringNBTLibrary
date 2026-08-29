@@ -3,12 +3,13 @@ using System.Collections;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// TAG_Compound。挿入順を保持する、名前付きタグのマップ。
+/// TAG_Compound
+/// 挿入順を保持する、名前付きタグのマップ
 /// </summary>
 /// <remarks>
 /// <para>
-/// 既存キーへの再設定は位置を維持したまま値だけを置き換える。
-/// これにより読み込んだ順序が書き出しでも保たれ、ラウンドトリップが成立する。
+/// 既存キーへの再設定は位置を維持したまま値だけを置き換える
+/// これにより読み込んだ順序が書き出しでも保たれ、ラウンドトリップが成立する
 /// </para>
 /// <para>仕様: <c>docs/spec/10-nbt-binary.md</c> 7.1章</para>
 /// </remarks>
@@ -17,7 +18,7 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
     private readonly List<KeyValuePair<string, NbtTag>> entries = new List<KeyValuePair<string, NbtTag>>();
     private readonly Dictionary<string, int> index = new Dictionary<string, int>(StringComparer.Ordinal);
 
-    /// <summary>空の Compound を作る。</summary>
+    /// <summary>空の Compound を作る</summary>
     public NbtCompound()
     {
     }
@@ -25,10 +26,10 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
     /// <inheritdoc/>
     public override TagType Type => TagType.Compound;
 
-    /// <summary>要素数。</summary>
+    /// <summary>要素数</summary>
     public int Count => entries.Count;
 
-    /// <summary>挿入順のキー一覧。</summary>
+    /// <summary>挿入順のキー一覧</summary>
     public IEnumerable<string> Keys
     {
         get
@@ -41,9 +42,9 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
         }
     }
 
-    /// <summary>キーで値を取得・設定する。</summary>
+    /// <summary>キーで値を取得・設定する</summary>
     /// <exception cref="SpringNbtException">
-    /// 取得時にキーが存在しない場合（<see cref="ErrorCode.InvalidArgument"/>）。
+    /// 取得時にキーが存在しない場合（<see cref="ErrorCode.InvalidArgument"/>）
     /// </exception>
     public NbtTag this[string key]
     {
@@ -61,7 +62,7 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
         set => Set(key, value);
     }
 
-    /// <summary>キーが存在するか。</summary>
+    /// <summary>キーが存在するか</summary>
     public bool ContainsKey(string key)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -69,7 +70,8 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
     }
 
     /// <summary>
-    /// 値を設定する。既存キーなら位置を維持して値だけ置き換える。
+    /// 値を設定する
+    /// 既存キーなら位置を維持して値だけ置き換える
     /// </summary>
     public void Set(string key, NbtTag value)
     {
@@ -94,7 +96,8 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
         }
     }
 
-    /// <summary>キーを削除する。削除できたら true。</summary>
+    /// <summary>キーを削除する
+    /// 削除できたら true</summary>
     public bool Remove(string key)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -116,14 +119,15 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
         return true;
     }
 
-    /// <summary>全要素を削除する。</summary>
+    /// <summary>全要素を削除する</summary>
     public void Clear()
     {
         entries.Clear();
         index.Clear();
     }
 
-    /// <summary>キーに対応するタグを返す。存在しなければ null。</summary>
+    /// <summary>キーに対応するタグを返す
+    /// 存在しなければ null</summary>
     public NbtTag? Opt(string key)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -136,9 +140,10 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
         return null;
     }
 
-    /// <summary>キーに対応するタグを返す。存在しなければ例外。</summary>
+    /// <summary>キーに対応するタグを返す
+    /// 存在しなければ例外</summary>
     /// <exception cref="SpringNbtException">
-    /// キーが存在しない場合（<see cref="ErrorCode.InvalidArgument"/>）。
+    /// キーが存在しない場合（<see cref="ErrorCode.InvalidArgument"/>）
     /// </exception>
     public NbtTag Get(string key) => this[key];
 

@@ -1,6 +1,6 @@
-//! Modified UTF-8 (MUTF-8) の符号化・復号。
+//! Modified UTF-8 (MUTF-8) の符号化・復号
 //!
-//! 標準 UTF-8 との違いは 2 点だけ。
+//! 標準 UTF-8 との違いは 2 点だけ
 //!  - `U+0000` を `C0 80` の 2 バイトで表す
 //!  - `U+10000` 以上をサロゲートペアへ分解し、3 バイト × 2 で表す (CESU-8)
 //!
@@ -8,10 +8,10 @@
 
 use crate::error::{Error, ErrorCode, Result};
 
-/// Rust の `char` へ写せない値も表せるよう、復号結果は UTF-16 コード単位の列で返す。
+/// Rust の `char` へ写せない値も表せるよう、復号結果は UTF-16 コード単位の列で返す
 ///
 /// 孤立サロゲートを含む文字列は `String` にできないため、
-/// 呼び出し側が `NbtString` としてどう保持するかを決められるようにしている。
+/// 呼び出し側が `NbtString` としてどう保持するかを決められるようにしている
 pub fn decode_to_utf16(bytes: &[u8]) -> Result<Vec<u16>> {
     let mut units: Vec<u16> = Vec::with_capacity(bytes.len());
     let mut i = 0usize;
@@ -41,7 +41,8 @@ pub fn decode_to_utf16(bytes: &[u8]) -> Result<Vec<u16>> {
                 return Err(Error::new(ErrorCode::MalformedData, "MUTF-8: 2バイト形式の継続バイトが不正"));
             }
             let value = (((b0 & 0x1F) as u32) << 6) | ((b1 & 0x3F) as u32);
-            // C0 80 (U+0000) だけは正当。それ以外の 0x80 未満は冗長符号化
+            // C0 80 (U+0000) だけは正当
+            // それ以外の 0x80 未満は冗長符号化
             if value < 0x80 && !(b0 == 0xC0 && b1 == 0x80) {
                 return Err(Error::new(ErrorCode::MalformedData, "MUTF-8: 冗長な2バイト符号化"));
             }
@@ -76,16 +77,17 @@ pub fn decode_to_utf16(bytes: &[u8]) -> Result<Vec<u16>> {
     Ok(units)
 }
 
-/// UTF-16 コード単位の列を MUTF-8 バイト列へ符号化する。
+/// UTF-16 コード単位の列を MUTF-8 バイト列へ符号化する
 ///
 /// サロゲートは対になっているかどうかに関わらず 1 つずつ 3 バイトで符号化されるため、
-/// 孤立サロゲートもそのまま往復できる。
+/// 孤立サロゲートもそのまま往復できる
 pub fn encode_from_utf16(units: &[u16]) -> Vec<u8> {
     let mut out: Vec<u8> = Vec::with_capacity(units.len() + units.len() / 2);
 
     // コード単位ごとに 1〜3 バイトへ展開する
     for &unit in units {
-        // U+0001..U+007F だけが 1 バイト。U+0000 は 2 バイトになる
+        // U+0001..U+007F だけが 1 バイト
+        // U+0000 は 2 バイトになる
         if unit >= 0x0001 && unit <= 0x007F {
             out.push(unit as u8);
         } else if unit == 0x0000 || unit <= 0x07FF {
@@ -102,13 +104,14 @@ pub fn encode_from_utf16(units: &[u16]) -> Vec<u8> {
     out
 }
 
-/// Rust の `str` を MUTF-8 バイト列へ符号化する。
+/// Rust の `str` を MUTF-8 バイト列へ符号化する
 pub fn encode_str(text: &str) -> Vec<u8> {
     let units: Vec<u16> = text.encode_utf16().collect();
     encode_from_utf16(&units)
 }
 
-/// UTF-16 コード単位の列を `String` へ変換する。孤立サロゲートがあれば `None`。
+/// UTF-16 コード単位の列を `String` へ変換する
+/// 孤立サロゲートがあれば `None`
 pub fn utf16_to_string(units: &[u16]) -> Option<String> {
     match String::from_utf16(units) {
         Ok(text) => Some(text),
@@ -138,7 +141,8 @@ mod tests {
 
     #[test]
     fn supplementary_char_is_cesu8() {
-        // U+1F600 は UTF-16 では D83D DE00。MUTF-8 では 3 バイト × 2 になる
+        // U+1F600 は UTF-16 では D83D DE00
+        // MUTF-8 では 3 バイト × 2 になる
         let bytes = encode_str("\u{1F600}");
         assert_eq!(bytes, vec![0xED, 0xA0, 0xBD, 0xED, 0xB8, 0x80]);
         let units = decode_to_utf16(&bytes).unwrap();
@@ -147,7 +151,8 @@ mod tests {
 
     #[test]
     fn lone_surrogate_survives_roundtrip() {
-        // 孤立した上位サロゲート D83D。String にはできないが往復はできる
+        // 孤立した上位サロゲート D83D
+        // String にはできないが往復はできる
         let original: Vec<u16> = vec![0xD83D];
         let bytes = encode_from_utf16(&original);
         assert_eq!(bytes, vec![0xED, 0xA0, 0xBD]);

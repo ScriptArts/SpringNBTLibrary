@@ -1,12 +1,13 @@
 namespace SpringNBTLibrary.World;
 
 /// <summary>
-/// 添字を 64bit 整数の配列へ詰めた表現。1.16 以降の**跨ぎなし**パッキング。
+/// 添字を 64bit 整数の配列へ詰めた表現
+/// 1.16 以降の**跨ぎなし**パッキング
 /// </summary>
 /// <remarks>
 /// <para>
 /// 1 つの <c>i64</c> に入りきらない分は、その <c>i64</c> の残りビットを未使用のまま捨て、
-/// 次の <c>i64</c> の最下位ビットから始める。
+/// 次の <c>i64</c> の最下位ビットから始める
 /// </para>
 /// <para>仕様: <c>docs/spec/31-paletted-container.md</c> 2章</para>
 /// </remarks>
@@ -21,16 +22,17 @@ public sealed class BitStorage
         EntryCount = entryCount;
     }
 
-    /// <summary>1 エントリあたりのビット数。</summary>
+    /// <summary>1 エントリあたりのビット数</summary>
     public int BitsPerEntry { get; }
 
-    /// <summary>エントリ数。ブロックなら 4096、バイオームなら 64。</summary>
+    /// <summary>エントリ数
+    /// ブロックなら 4096、バイオームなら 64</summary>
     public int EntryCount { get; }
 
-    /// <summary>1 つの <c>i64</c> に入るエントリ数。</summary>
+    /// <summary>1 つの <c>i64</c> に入るエントリ数</summary>
     public int ValuesPerLong => 64 / BitsPerEntry;
 
-    /// <summary>すべてゼロで初期化した記憶域を作る。</summary>
+    /// <summary>すべてゼロで初期化した記憶域を作る</summary>
     public static BitStorage Create(int bitsPerEntry, int entryCount)
     {
         if (bitsPerEntry < 1 || bitsPerEntry > 32)
@@ -42,17 +44,17 @@ public sealed class BitStorage
     }
 
     /// <summary>
-    /// 既存の <c>i64</c> 配列から作る。
+    /// 既存の <c>i64</c> 配列から作る
     /// </summary>
-    /// <param name="data">packed な配列。</param>
-    /// <param name="bitsPerEntry">パレット長から求めたビット幅。</param>
-    /// <param name="entryCount">エントリ数。</param>
+    /// <param name="data">packed な配列</param>
+    /// <param name="bitsPerEntry">パレット長から求めたビット幅</param>
+    /// <param name="entryCount">エントリ数</param>
     /// <param name="lenient">
-    /// true なら、配列長が期待値と違う場合に配列長からビット幅を逆算して読む。
-    /// 第三者ツールが書いたデータの救済用。
+    /// true なら、配列長が期待値と違う場合に配列長からビット幅を逆算して読む
+    /// 第三者ツールが書いたデータの救済用
     /// </param>
     /// <exception cref="SpringNbtException">
-    /// 配列長が期待値と一致しない場合（<see cref="ErrorCode.MalformedData"/>）。
+    /// 配列長が期待値と一致しない場合（<see cref="ErrorCode.MalformedData"/>）
     /// </exception>
     public static BitStorage FromLongs(long[] data, int bitsPerEntry, int entryCount, bool lenient = false)
     {
@@ -70,7 +72,8 @@ public sealed class BitStorage
                 $"bits={bitsPerEntry} なら data は {expected} long のはずだが {data.Length} long");
         }
 
-        // 配列長からビット幅を逆算する。合致する幅が無ければ諦める
+        // 配列長からビット幅を逆算する
+        // 合致する幅が無ければ諦める
         for (int candidate = 1; candidate <= 32; candidate++)
         {
             if (LongCount(candidate, entryCount) == data.Length)
@@ -83,14 +86,14 @@ public sealed class BitStorage
             $"data の長さ {data.Length} long に合うビット幅が無い（エントリ数 {entryCount}）");
     }
 
-    /// <summary>必要な <c>i64</c> の個数を求める。</summary>
+    /// <summary>必要な <c>i64</c> の個数を求める</summary>
     public static int LongCount(int bitsPerEntry, int entryCount)
     {
         int valuesPerLong = 64 / bitsPerEntry;
         return (entryCount + valuesPerLong - 1) / valuesPerLong;
     }
 
-    /// <summary>添字の値を取り出す。</summary>
+    /// <summary>添字の値を取り出す</summary>
     public int Get(int index)
     {
         if (index < 0 || index >= EntryCount)
@@ -107,7 +110,7 @@ public sealed class BitStorage
         return (int)(((ulong)data[longIndex] >> bitOffset) & (ulong)mask);
     }
 
-    /// <summary>添字の値を書き換える。</summary>
+    /// <summary>添字の値を書き換える</summary>
     public void Set(int index, int value)
     {
         if (index < 0 || index >= EntryCount)
@@ -131,11 +134,12 @@ public sealed class BitStorage
         data[longIndex] = (data[longIndex] & ~mask) | ((long)value << bitOffset & mask);
     }
 
-    /// <summary>packed な配列を返す。内部の配列をそのまま返す（コピーしない）。</summary>
+    /// <summary>packed な配列を返す
+    /// 内部の配列をそのまま返す（コピーしない）</summary>
     public long[] ToLongs() => data;
 
     /// <summary>
-    /// 別のビット幅へ詰め直した新しい記憶域を返す。
+    /// 別のビット幅へ詰め直した新しい記憶域を返す
     /// </summary>
     public BitStorage Resize(int newBitsPerEntry)
     {

@@ -30,29 +30,37 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 
 /**
- * Anvil のリージョンファイル ({@code r.X.Z.mca})。32×32 チャンクを格納する。
+ * Anvil のリージョンファイル ({@code r.X.Z.mca})
+ * 32×32 チャンクを格納する
  *
- * <p>ファイル全体をメモリに読み込んで扱う。実データのリージョンは数 MB 程度で、
- * この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい。
- * 開いて何も変えずに {@link #flush()} すると、バイト単位で元と同じファイルになる。
+ * <p>ファイル全体をメモリに読み込んで扱う
+ * 実データのリージョンは数 MB 程度で、
+ * この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
+ * 開いて何も変えずに {@link #flush()} すると、バイト単位で元と同じファイルになる
  *
  * <p>仕様: {@code docs/spec/20-anvil-region.md}
  */
 public final class RegionFile implements AutoCloseable {
 
-    /** セクタ長。 */
+    /** セクタ長
+    /** */
     public static final int SECTOR_SIZE = 4096;
 
-    /** ロケーションテーブルとタイムスタンプテーブルが占めるセクタ数。 */
+    /** ロケーションテーブルとタイムスタンプテーブルが占めるセクタ数
+    /** */
     private static final int HEADER_SECTORS = 2;
 
-    /** 1リージョンに入るチャンク数。 */
+    /** 1リージョンに入るチャンク数
+    /** */
     private static final int CHUNK_COUNT = 1024;
 
-    /** 1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため）。 */
+    /** 1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため）
+    /** */
     private static final int MAX_SECTORS = 255;
 
-    /** リージョン内に収められるペイロードの上限。超えると外部ファイルへ退避する。 */
+    /** リージョン内に収められるペイロードの上限
+    /** 超えると外部ファイルへ退避する
+    /** */
     private static final int MAX_INLINE_PAYLOAD = (MAX_SECTORS * SECTOR_SIZE) - 5;
 
     private final Path path;
@@ -86,7 +94,7 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * このリージョンのX座標。
+     * このリージョンのX座標
      *
      * @return 座標
      */
@@ -95,7 +103,7 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * このリージョンのZ座標。
+     * このリージョンのZ座標
      *
      * @return 座標
      */
@@ -104,9 +112,10 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * リージョンファイルを開く。
+     * リージョンファイルを開く
      *
-     * @param path {@code r.X.Z.mca} という名前のファイル。座標はファイル名から読み取る
+     * @param path {@code r.X.Z.mca} という名前のファイル
+     * 座標はファイル名から読み取る
      * @param mode 読み取り専用か読み書きか
      * @return 開いたリージョン
      * @throws SpringNbtException ファイル名から座標を読み取れない、または読み込みに失敗した場合
@@ -140,7 +149,7 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * 読み取り専用でリージョンファイルを開く。
+     * 読み取り専用でリージョンファイルを開く
      *
      * @param path ファイルパス
      * @return 開いたリージョン
@@ -149,7 +158,8 @@ public final class RegionFile implements AutoCloseable {
         return open(path, RegionFileMode.READ_ONLY);
     }
 
-    /** ヘッダを解析し、ロケーションとタイムスタンプを取り込む。 */
+    /** ヘッダを解析し、ロケーションとタイムスタンプを取り込む
+    /** */
     private void parseHeader() {
         // 空ファイルは「チャンクが 1 つも無いリージョン」として受け入れる
         if (data.length == 0) {
@@ -212,7 +222,8 @@ public final class RegionFile implements AutoCloseable {
         }
     }
 
-    /** 指定した座標がこのリージョンの担当範囲にあるか確認し、添字を返す。 */
+    /** 指定した座標がこのリージョンの担当範囲にあるか確認し、添字を返す
+    /** */
     private int indexOf(int chunkX, int chunkZ) {
         ChunkPos position = new ChunkPos(chunkX, chunkZ);
         RegionPos region = position.region();
@@ -238,7 +249,7 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクが存在するか。
+     * チャンクが存在するか
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -250,7 +261,7 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * 存在するチャンクの座標を、ロケーションテーブルの並び順で返す。
+     * 存在するチャンクの座標を、ロケーションテーブルの並び順で返す
      *
      * @return チャンク座標の一覧
      */
@@ -273,7 +284,8 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクの最終更新時刻（Unix 秒）。存在しなければ 0。
+     * チャンクの最終更新時刻（Unix 秒）
+     * 存在しなければ 0
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -285,7 +297,7 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクの最終更新時刻を設定する。
+     * チャンクの最終更新時刻を設定する
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -299,11 +311,12 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクを圧縮されたまま取り出す。
+     * チャンクを圧縮されたまま取り出す
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
-     * @return チャンク。存在しなければ null
+     * @return チャンク
+     * 存在しなければ null
      */
     public RawChunk readChunkRaw(int chunkX, int chunkZ) {
         ensureOpen();
@@ -340,11 +353,12 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクを NBT として読む。
+     * チャンクを NBT として読む
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
-     * @return チャンク。存在しなければ null
+     * @return チャンク
+     * 存在しなければ null
      */
     public NbtCompound readChunk(int chunkX, int chunkZ) {
         RawChunk raw = readChunkRaw(chunkX, chunkZ);
@@ -359,7 +373,8 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクを NBT として書き込む。圧縮方式は Zlib。
+     * チャンクを NBT として書き込む
+     * 圧縮方式は Zlib
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -370,7 +385,7 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクを NBT として、圧縮方式を指定して書き込む。
+     * チャンクを NBT として、圧縮方式を指定して書き込む
      *
      * @param chunkX      絶対チャンクX座標
      * @param chunkZ      絶対チャンクZ座標
@@ -386,7 +401,7 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * 圧縮済みのチャンクをそのまま書き込む。
+     * 圧縮済みのチャンクをそのまま書き込む
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -439,7 +454,7 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクを削除する。
+     * チャンクを削除する
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -464,13 +479,14 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * 必要なセクタ数を確保し、開始セクタ番号を返す。
+     * 必要なセクタ数を確保し、開始セクタ番号を返す
      *
      * <p>既存の割り当てがちょうど同じ大きさならその場を使い、
-     * そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する。
+     * そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する
      */
     private int allocateSectors(int index, int needed) {
-        // 大きさが変わらないなら動かさない。触っていないチャンクの配置を保つため
+        // 大きさが変わらないなら動かさない
+        // 触っていないチャンクの配置を保つため
         if (sectorCounts[index] == needed) {
             return offsets[index];
         }
@@ -493,13 +509,16 @@ public final class RegionFile implements AutoCloseable {
             }
         }
 
-        // 見つからなければ末尾へ追加する。末尾の空きは再利用できる
+        // 見つからなければ末尾へ追加する
+        // 末尾の空きは再利用できる
         int start = totalSectors - run;
         data = Arrays.copyOf(data, (start + needed) * SECTOR_SIZE);
         return start;
     }
 
-    /** セクタの使用状況を作る。{@code ignoreIndex} のチャンクは空きとして扱う。 */
+    /** セクタの使用状況を作る
+    /** {@code ignoreIndex} のチャンクは空きとして扱う
+    /** */
     private boolean[] buildSectorUsage(int ignoreIndex) {
         int totalSectors = data.length / SECTOR_SIZE;
         boolean[] used = new boolean[totalSectors];
@@ -526,7 +545,9 @@ public final class RegionFile implements AutoCloseable {
         return used;
     }
 
-    /** 全チャンクを隙間なく詰め直す。断片化したファイルを縮めたいときに使う。 */
+    /** 全チャンクを隙間なく詰め直す
+    /** 断片化したファイルを縮めたいときに使う
+    /** */
     public void optimize() {
         ensureOpen();
         ensureWritable();
@@ -591,7 +612,8 @@ public final class RegionFile implements AutoCloseable {
         dirty = true;
     }
 
-    /** 変更をファイルへ書き出す。 */
+    /** 変更をファイルへ書き出す
+    /** */
     public void flush() {
         ensureOpen();
 
@@ -611,7 +633,8 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * 現在の内容をバイト列として組み立てる。ファイルには書かない。
+     * 現在の内容をバイト列として組み立てる
+     * ファイルには書かない
      *
      * @return バイト列
      */
@@ -621,7 +644,8 @@ public final class RegionFile implements AutoCloseable {
         return data.clone();
     }
 
-    /** ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す。 */
+    /** ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す
+    /** */
     private void writeHeader() {
         // 位置表とタイムスタンプ表を、添字順に組み立て直す
         for (int index = 0; index < CHUNK_COUNT; index++) {
@@ -631,7 +655,8 @@ public final class RegionFile implements AutoCloseable {
         }
     }
 
-    /** 変更があれば書き出してから閉じる。 */
+    /** 変更があれば書き出してから閉じる
+    /** */
     @Override
     public void close() {
         if (closed) {
@@ -647,7 +672,8 @@ public final class RegionFile implements AutoCloseable {
 
     // -- バイト操作 ---------------------------------------------------------
 
-    /** 指定位置からビッグエンディアンで読む。 */
+    /** 指定位置からビッグエンディアンで読む
+    /** */
     private long readUnsigned(int position, int count) {
         long value = 0;
 
@@ -659,7 +685,8 @@ public final class RegionFile implements AutoCloseable {
         return value;
     }
 
-    /** 指定位置へビッグエンディアンで書く。 */
+    /** 指定位置へビッグエンディアンで書く
+    /** */
     private void writeUnsigned(int position, long value, int count) {
         // 上位バイトから順に取り出す
         for (int offset = 0; offset < count; offset++) {
@@ -711,14 +738,16 @@ public final class RegionFile implements AutoCloseable {
     }
 }
 
-/** チャンクのペイロードを圧縮方式IDに従って展開・圧縮する。 */
+/** チャンクのペイロードを圧縮方式IDに従って展開・圧縮する
+/** */
 final class ChunkCodec {
 
     private ChunkCodec() {
         // ユーティリティクラス
     }
 
-    /** 圧縮済みペイロードを展開する。 */
+    /** 圧縮済みペイロードを展開する
+    /** */
     static byte[] decompress(RawChunk raw) {
         return switch (raw.compression()) {
             case NONE -> raw.data();
@@ -730,7 +759,8 @@ final class ChunkCodec {
         };
     }
 
-    /** ペイロードを指定の方式で圧縮する。 */
+    /** ペイロードを指定の方式で圧縮する
+    /** */
     static byte[] compress(byte[] plain, ChunkCompression compression) {
         if (compression == ChunkCompression.NONE) {
             return plain;

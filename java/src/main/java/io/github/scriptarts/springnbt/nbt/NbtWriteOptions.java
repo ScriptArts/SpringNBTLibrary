@@ -1,7 +1,7 @@
 package io.github.scriptarts.springnbt.nbt;
 
 /**
- * NBT 書き込みのオプション。
+ * NBT 書き込みのオプション
  *
  * <p>仕様: {@code docs/spec/10-nbt-binary.md} 6章
  */
@@ -11,7 +11,7 @@ public final class NbtWriteOptions {
     private Compression compression = Compression.GZIP;
 
     /**
-     * 既定のオプションを作る。
+     * 既定のオプションを作る
      *
      * @return 既定のオプション
      */
@@ -20,7 +20,7 @@ public final class NbtWriteOptions {
     }
 
     /**
-     * 無圧縮で書き出すオプションを作る。
+     * 無圧縮で書き出すオプションを作る
      *
      * @return オプション
      */
@@ -29,7 +29,7 @@ public final class NbtWriteOptions {
     }
 
     /**
-     * ルートタグの並び方。
+     * ルートタグの並び方
      *
      * @return 並び方
      */
@@ -38,7 +38,7 @@ public final class NbtWriteOptions {
     }
 
     /**
-     * ルートタグの並び方を設定する。
+     * ルートタグの並び方を設定する
      *
      * @param value 並び方
      * @return このオブジェクト
@@ -49,7 +49,8 @@ public final class NbtWriteOptions {
     }
 
     /**
-     * 圧縮方式。既定は {@link Compression#GZIP}。
+     * 圧縮方式
+     * 既定は {@link Compression#GZIP}
      *
      * @return 圧縮方式
      */
@@ -58,7 +59,7 @@ public final class NbtWriteOptions {
     }
 
     /**
-     * 圧縮方式を設定する。
+     * 圧縮方式を設定する
      *
      * @param value 圧縮方式
      * @return このオブジェクト

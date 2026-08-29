@@ -1,4 +1,4 @@
-"""NBT のタグ型と値モデル。
+"""NBT のタグ型と値モデル
 
 仕様: ``docs/spec/10-nbt-binary.md`` 1章・7章
 """
@@ -31,7 +31,9 @@ __all__ = [
 
 
 class TagType(enum.Enum):
-    """NBT のタグ型。値は仕様が定めるタグIDと一致する。"""
+    """NBT のタグ型
+    値は仕様が定めるタグIDと一致する
+    """
 
     END = 0
     BYTE = 1
@@ -48,14 +50,14 @@ class TagType(enum.Enum):
     LONG_ARRAY = 12
 
     def as_string(self) -> str:
-        """適合性テストで言語間比較に使う識別子。"""
+        """適合性テストで言語間比較に使う識別子"""
         return _TYPE_NAMES[self]
 
     @staticmethod
     def from_id(tag_id: int) -> "TagType":
-        """タグIDから :class:`TagType` を得る。
+        """タグIDから :class:`TagType` を得る
 
-        :raises SpringNbtError: 未知のタグIDの場合。
+        :raises SpringNbtError: 未知のタグIDの場合
         """
         # 0..12 の範囲外はすべて不正なタグID
         if tag_id < 0 or tag_id > TagType.LONG_ARRAY.value:
@@ -82,7 +84,7 @@ _TYPE_NAMES = {
 
 
 def _check_range(value: int, minimum: int, maximum: int, type_name: str) -> int:
-    """Python の int には幅が無いため、構築時に範囲を検査する。"""
+    """Python の int には幅が無いため、構築時に範囲を検査する"""
     if not isinstance(value, int) or isinstance(value, bool):
         raise SpringNbtError.invalid_argument("%s には整数を渡すこと: %r" % (type_name, value))
 
@@ -94,18 +96,21 @@ def _check_range(value: int, minimum: int, maximum: int, type_name: str) -> int:
 
 
 class NbtTag:
-    """NBT のタグ。具象型は :class:`NbtByte` などの派生クラス。"""
+    """NBT のタグ
+    具象型は :class:`NbtByte` などの派生クラス
+    """
 
-    #: このタグの型。派生クラスが上書きする。
+    #: このタグの型
+    # 派生クラスが上書きする
     type: TagType = TagType.END
 
     def clone(self) -> "NbtTag":
-        """このタグの深いコピーを作る。"""
+        """このタグの深いコピーを作る"""
         raise NotImplementedError
 
 
 class _ScalarTag(NbtTag):
-    """単一の値を持つタグの共通部分。"""
+    """単一の値を持つタグの共通部分"""
 
     __slots__ = ("_value",)
 
@@ -114,19 +119,21 @@ class _ScalarTag(NbtTag):
 
     @property
     def value(self):
-        """保持している値。"""
+        """保持している値"""
         return self._value
 
     @value.setter
     def value(self, new_value) -> None:
-        """値を差し替える。範囲外なら INVALID_ARGUMENT。"""
+        """値を差し替える
+        範囲外なら INVALID_ARGUMENT
+        """
         self._value = self._validate(new_value)
 
     def _validate(self, value):
         raise NotImplementedError
 
     def clone(self) -> "NbtTag":
-        """同じ値を持つ新しいタグを作る。"""
+        """同じ値を持つ新しいタグを作る"""
         return type(self)(self._value)
 
     def __eq__(self, other) -> bool:
@@ -143,7 +150,9 @@ class _ScalarTag(NbtTag):
 
 
 class NbtByte(_ScalarTag):
-    """TAG_Byte。8bit 符号付き整数。"""
+    """TAG_Byte
+    8bit 符号付き整数
+    """
 
     type = TagType.BYTE
 
@@ -152,7 +161,9 @@ class NbtByte(_ScalarTag):
 
 
 class NbtShort(_ScalarTag):
-    """TAG_Short。16bit 符号付き整数。"""
+    """TAG_Short
+    16bit 符号付き整数
+    """
 
     type = TagType.SHORT
 
@@ -161,7 +172,9 @@ class NbtShort(_ScalarTag):
 
 
 class NbtInt(_ScalarTag):
-    """TAG_Int。32bit 符号付き整数。"""
+    """TAG_Int
+    32bit 符号付き整数
+    """
 
     type = TagType.INT
 
@@ -170,7 +183,9 @@ class NbtInt(_ScalarTag):
 
 
 class NbtLong(_ScalarTag):
-    """TAG_Long。64bit 符号付き整数。"""
+    """TAG_Long
+    64bit 符号付き整数
+    """
 
     type = TagType.LONG
 
@@ -179,7 +194,9 @@ class NbtLong(_ScalarTag):
 
 
 class NbtFloat(_ScalarTag):
-    """TAG_Float。IEEE 754 binary32。"""
+    """TAG_Float
+    IEEE 754 binary32
+    """
 
     type = TagType.FLOAT
 
@@ -202,7 +219,9 @@ class NbtFloat(_ScalarTag):
 
 
 class NbtDouble(_ScalarTag):
-    """TAG_Double。IEEE 754 binary64。"""
+    """TAG_Double
+    IEEE 754 binary64
+    """
 
     type = TagType.DOUBLE
 
@@ -224,7 +243,9 @@ class NbtDouble(_ScalarTag):
 
 
 class NbtString(_ScalarTag):
-    """TAG_String。MUTF-8 で符号化される文字列。"""
+    """TAG_String
+    MUTF-8 で符号化される文字列
+    """
 
     type = TagType.STRING
 
@@ -234,7 +255,8 @@ class NbtString(_ScalarTag):
 
         length = mutf8.byte_length(value)
 
-        # 長さフィールドは u16。65535 を超えると書き出せない
+        # 長さフィールドは u16
+        # 65535 を超えると書き出せない
         if length > mutf8.MAX_BYTE_LENGTH:
             raise SpringNbtError.invalid_argument(
                 "文字列が長すぎる: MUTF-8 で %d バイト (上限 %d)" % (length, mutf8.MAX_BYTE_LENGTH))
@@ -243,11 +265,12 @@ class NbtString(_ScalarTag):
 
 
 class _ArrayTag(NbtTag):
-    """整数配列を持つタグの共通部分。"""
+    """整数配列を持つタグの共通部分"""
 
     __slots__ = ("_value",)
 
-    #: 要素が取りうる範囲。派生クラスが上書きする。
+    #: 要素が取りうる範囲
+    # 派生クラスが上書きする
     _minimum = 0
     _maximum = 0
     _element_name = ""
@@ -257,12 +280,14 @@ class _ArrayTag(NbtTag):
 
     @property
     def value(self) -> List[int]:
-        """保持している配列。"""
+        """保持している配列"""
         return self._value
 
     @value.setter
     def value(self, new_value) -> None:
-        """値を差し替える。範囲外なら INVALID_ARGUMENT。"""
+        """値を差し替える
+        範囲外なら INVALID_ARGUMENT
+        """
         self._value = self._validate(new_value)
 
     def _validate(self, value) -> List[int]:
@@ -275,7 +300,7 @@ class _ArrayTag(NbtTag):
         return result
 
     def clone(self) -> "NbtTag":
-        """同じ値を持つ新しいタグを作る。"""
+        """同じ値を持つ新しいタグを作る"""
         return type(self)(list(self._value))
 
     def __eq__(self, other) -> bool:
@@ -292,7 +317,9 @@ class _ArrayTag(NbtTag):
 
 
 class NbtByteArray(_ArrayTag):
-    """TAG_Byte_Array。8bit 符号付き整数の配列。"""
+    """TAG_Byte_Array
+    8bit 符号付き整数の配列
+    """
 
     type = TagType.BYTE_ARRAY
     _minimum = -128
@@ -301,7 +328,9 @@ class NbtByteArray(_ArrayTag):
 
 
 class NbtIntArray(_ArrayTag):
-    """TAG_Int_Array。32bit 符号付き整数の配列。"""
+    """TAG_Int_Array
+    32bit 符号付き整数の配列
+    """
 
     type = TagType.INT_ARRAY
     _minimum = -2147483648
@@ -310,7 +339,9 @@ class NbtIntArray(_ArrayTag):
 
 
 class NbtLongArray(_ArrayTag):
-    """TAG_Long_Array。64bit 符号付き整数の配列。"""
+    """TAG_Long_Array
+    64bit 符号付き整数の配列
+    """
 
     type = TagType.LONG_ARRAY
     _minimum = -9223372036854775808
@@ -319,10 +350,12 @@ class NbtLongArray(_ArrayTag):
 
 
 class NbtList(NbtTag):
-    """TAG_List。要素型が 1 つに固定されたタグの列。
+    """TAG_List
+    要素型が 1 つに固定されたタグの列
 
-    空リストの要素型は :attr:`TagType.END`。最初の要素を追加した時点で型が確定する。
-    全要素を削除しても確定済みの要素型は維持される。
+    空リストの要素型は :attr:`TagType.END`
+    最初の要素を追加した時点で型が確定する
+    全要素を削除しても確定済みの要素型は維持される
     """
 
     type = TagType.LIST
@@ -339,28 +372,32 @@ class NbtList(NbtTag):
 
     @property
     def element_type(self) -> TagType:
-        """要素の型。空で未確定なら :attr:`TagType.END`。"""
+        """要素の型
+        空で未確定なら :attr:`TagType.END`
+        """
         return self._element_type
 
     def append(self, item: NbtTag) -> None:
-        """末尾に追加する。
+        """末尾に追加する
 
-        :raises SpringNbtError: 要素型と一致しない場合。
+        :raises SpringNbtError: 要素型と一致しない場合
         """
         self._ensure_element_type(item)
         self._items.append(item)
 
     def insert(self, index: int, item: NbtTag) -> None:
-        """指定位置に挿入する。"""
+        """指定位置に挿入する"""
         self._ensure_element_type(item)
         self._items.insert(index, item)
 
     def clear(self) -> None:
-        """全要素を削除する。確定済みの要素型は維持する。"""
+        """全要素を削除する
+        確定済みの要素型は維持する
+        """
         self._items.clear()
 
     def clone(self) -> "NbtTag":
-        """同じ値を持つ新しいタグを作る。"""
+        """同じ値を持つ新しいタグを作る"""
         copy = NbtList(self._element_type)
 
         # 要素も深くコピーする
@@ -370,7 +407,7 @@ class NbtList(NbtTag):
         return copy
 
     def _ensure_element_type(self, item: NbtTag) -> None:
-        """追加しようとしているタグが要素型と一致するか調べる。"""
+        """追加しようとしているタグが要素型と一致するか調べる"""
         # TAG_End はリストの要素になれない
         if item.type == TagType.END:
             raise SpringNbtError.unexpected_tag_type("TAG_End はリストの要素にできない")
@@ -413,9 +450,10 @@ class NbtList(NbtTag):
 
 
 class NbtCompound(NbtTag):
-    """TAG_Compound。挿入順を保持する、名前付きタグのマップ。
+    """TAG_Compound
+    挿入順を保持する、名前付きタグのマップ
 
-    既存キーへの再設定は位置を維持したまま値だけを置き換える。
+    既存キーへの再設定は位置を維持したまま値だけを置き換える
     """
 
     type = TagType.COMPOUND
@@ -431,7 +469,9 @@ class NbtCompound(NbtTag):
                 self.set(key, value)
 
     def set(self, key: str, value: NbtTag) -> None:
-        """値を設定する。既存キーなら位置を維持して値だけ置き換える。"""
+        """値を設定する
+        既存キーなら位置を維持して値だけ置き換える
+        """
         if not isinstance(key, str):
             raise SpringNbtError.invalid_argument("キーには str を渡すこと: %r" % (key,))
 
@@ -442,11 +482,15 @@ class NbtCompound(NbtTag):
         self._entries[key] = value
 
     def opt(self, key: str) -> Optional[NbtTag]:
-        """キーに対応するタグを返す。存在しなければ None。"""
+        """キーに対応するタグを返す
+        存在しなければ None
+        """
         return self._entries.get(key)
 
     def get(self, key: str) -> NbtTag:
-        """キーに対応するタグを返す。存在しなければ例外。"""
+        """キーに対応するタグを返す
+        存在しなければ例外
+        """
         found = self._entries.get(key)
 
         if found is None:
@@ -455,7 +499,9 @@ class NbtCompound(NbtTag):
         return found
 
     def remove(self, key: str) -> bool:
-        """キーを削除する。削除できたら True。"""
+        """キーを削除する
+        削除できたら True
+        """
         if key in self._entries:
             del self._entries[key]
             return True
@@ -463,23 +509,23 @@ class NbtCompound(NbtTag):
         return False
 
     def clear(self) -> None:
-        """全要素を削除する。"""
+        """全要素を削除する"""
         self._entries.clear()
 
     def contains_key(self, key: str) -> bool:
-        """キーが存在するか。"""
+        """キーが存在するか"""
         return key in self._entries
 
     def keys(self):
-        """挿入順のキー一覧。"""
+        """挿入順のキー一覧"""
         return self._entries.keys()
 
     def items(self) -> Iterator[Tuple[str, NbtTag]]:
-        """挿入順の (キー, タグ) の並び。"""
+        """挿入順の (キー, タグ) の並び"""
         return iter(self._entries.items())
 
     def clone(self) -> "NbtTag":
-        """同じ値を持つ新しいタグを作る。"""
+        """同じ値を持つ新しいタグを作る"""
         copy = NbtCompound()
 
         # 挿入順のまま深くコピーする
@@ -521,12 +567,14 @@ class NbtCompound(NbtTag):
 
     # -- 型付き取得子 -------------------------------------------------------
     #
-    # 「キーが無い」と「型が違う」は区別する。
-    # opt_* はキーが無ければ None を返し、get_* は例外を送出する。
-    # どちらも型が違えば必ず UNEXPECTED_TAG_TYPE の例外になる。
+    # 「キーが無い」と「型が違う」は区別する
+    # opt_* はキーが無ければ None を返し、get_* は例外を送出する
+    # どちらも型が違えば必ず UNEXPECTED_TAG_TYPE の例外になる
 
     def _cast(self, key: str, expected):
-        """キーに対応するタグを目的の型として取り出す。キーが無ければ None。"""
+        """キーに対応するタグを目的の型として取り出す
+        キーが無ければ None
+        """
         tag = self._entries.get(key)
 
         if tag is None:
@@ -540,7 +588,9 @@ class NbtCompound(NbtTag):
             % (key, tag.type.as_string(), expected.__name__))
 
     def _require(self, key: str, expected):
-        """キーに対応するタグを目的の型として取り出す。キーが無くても例外。"""
+        """キーに対応するタグを目的の型として取り出す
+        キーが無くても例外
+        """
         tag = self._cast(key, expected)
 
         if tag is None:
@@ -549,7 +599,9 @@ class NbtCompound(NbtTag):
         return tag
 
     def opt_byte(self, key: str) -> Optional[int]:
-        """TAG_Byte を取得する。キーが無ければ None。"""
+        """TAG_Byte を取得する
+        キーが無ければ None
+        """
         tag = self._cast(key, NbtByte)
 
         if tag is None:
@@ -558,11 +610,15 @@ class NbtCompound(NbtTag):
         return tag.value
 
     def get_byte(self, key: str) -> int:
-        """TAG_Byte を取得する。キーが無ければ例外。"""
+        """TAG_Byte を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtByte).value
 
     def opt_short(self, key: str) -> Optional[int]:
-        """TAG_Short を取得する。キーが無ければ None。"""
+        """TAG_Short を取得する
+        キーが無ければ None
+        """
         tag = self._cast(key, NbtShort)
 
         if tag is None:
@@ -571,11 +627,15 @@ class NbtCompound(NbtTag):
         return tag.value
 
     def get_short(self, key: str) -> int:
-        """TAG_Short を取得する。キーが無ければ例外。"""
+        """TAG_Short を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtShort).value
 
     def opt_int(self, key: str) -> Optional[int]:
-        """TAG_Int を取得する。キーが無ければ None。"""
+        """TAG_Int を取得する
+        キーが無ければ None
+        """
         tag = self._cast(key, NbtInt)
 
         if tag is None:
@@ -584,11 +644,15 @@ class NbtCompound(NbtTag):
         return tag.value
 
     def get_int(self, key: str) -> int:
-        """TAG_Int を取得する。キーが無ければ例外。"""
+        """TAG_Int を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtInt).value
 
     def opt_long(self, key: str) -> Optional[int]:
-        """TAG_Long を取得する。キーが無ければ None。"""
+        """TAG_Long を取得する
+        キーが無ければ None
+        """
         tag = self._cast(key, NbtLong)
 
         if tag is None:
@@ -597,11 +661,15 @@ class NbtCompound(NbtTag):
         return tag.value
 
     def get_long(self, key: str) -> int:
-        """TAG_Long を取得する。キーが無ければ例外。"""
+        """TAG_Long を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtLong).value
 
     def opt_float(self, key: str) -> Optional[float]:
-        """TAG_Float を取得する。キーが無ければ None。"""
+        """TAG_Float を取得する
+        キーが無ければ None
+        """
         tag = self._cast(key, NbtFloat)
 
         if tag is None:
@@ -610,11 +678,15 @@ class NbtCompound(NbtTag):
         return tag.value
 
     def get_float(self, key: str) -> float:
-        """TAG_Float を取得する。キーが無ければ例外。"""
+        """TAG_Float を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtFloat).value
 
     def opt_double(self, key: str) -> Optional[float]:
-        """TAG_Double を取得する。キーが無ければ None。"""
+        """TAG_Double を取得する
+        キーが無ければ None
+        """
         tag = self._cast(key, NbtDouble)
 
         if tag is None:
@@ -623,11 +695,16 @@ class NbtCompound(NbtTag):
         return tag.value
 
     def get_double(self, key: str) -> float:
-        """TAG_Double を取得する。キーが無ければ例外。"""
+        """TAG_Double を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtDouble).value
 
     def opt_bool(self, key: str) -> Optional[bool]:
-        """TAG_Byte を真偽値として取得する。0 以外が True。キーが無ければ None。"""
+        """TAG_Byte を真偽値として取得する
+        0 以外が True
+        キーが無ければ None
+        """
         raw = self.opt_byte(key)
 
         if raw is None:
@@ -636,11 +713,16 @@ class NbtCompound(NbtTag):
         return raw != 0
 
     def get_bool(self, key: str) -> bool:
-        """TAG_Byte を真偽値として取得する。0 以外が True。キーが無ければ例外。"""
+        """TAG_Byte を真偽値として取得する
+        0 以外が True
+        キーが無ければ例外
+        """
         return self.get_byte(key) != 0
 
     def opt_string(self, key: str) -> Optional[str]:
-        """TAG_String を取得する。キーが無ければ None。"""
+        """TAG_String を取得する
+        キーが無ければ None
+        """
         tag = self._cast(key, NbtString)
 
         if tag is None:
@@ -649,11 +731,15 @@ class NbtCompound(NbtTag):
         return tag.value
 
     def get_string(self, key: str) -> str:
-        """TAG_String を取得する。キーが無ければ例外。"""
+        """TAG_String を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtString).value
 
     def opt_byte_array(self, key: str) -> Optional[List[int]]:
-        """TAG_Byte_Array を取得する。キーが無ければ None。"""
+        """TAG_Byte_Array を取得する
+        キーが無ければ None
+        """
         tag = self._cast(key, NbtByteArray)
 
         if tag is None:
@@ -662,11 +748,15 @@ class NbtCompound(NbtTag):
         return tag.value
 
     def get_byte_array(self, key: str) -> List[int]:
-        """TAG_Byte_Array を取得する。キーが無ければ例外。"""
+        """TAG_Byte_Array を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtByteArray).value
 
     def opt_int_array(self, key: str) -> Optional[List[int]]:
-        """TAG_Int_Array を取得する。キーが無ければ None。"""
+        """TAG_Int_Array を取得する
+        キーが無ければ None
+        """
         tag = self._cast(key, NbtIntArray)
 
         if tag is None:
@@ -675,11 +765,15 @@ class NbtCompound(NbtTag):
         return tag.value
 
     def get_int_array(self, key: str) -> List[int]:
-        """TAG_Int_Array を取得する。キーが無ければ例外。"""
+        """TAG_Int_Array を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtIntArray).value
 
     def opt_long_array(self, key: str) -> Optional[List[int]]:
-        """TAG_Long_Array を取得する。キーが無ければ None。"""
+        """TAG_Long_Array を取得する
+        キーが無ければ None
+        """
         tag = self._cast(key, NbtLongArray)
 
         if tag is None:
@@ -688,21 +782,31 @@ class NbtCompound(NbtTag):
         return tag.value
 
     def get_long_array(self, key: str) -> List[int]:
-        """TAG_Long_Array を取得する。キーが無ければ例外。"""
+        """TAG_Long_Array を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtLongArray).value
 
     def opt_list(self, key: str) -> Optional[NbtList]:
-        """TAG_List を取得する。キーが無ければ None。"""
+        """TAG_List を取得する
+        キーが無ければ None
+        """
         return self._cast(key, NbtList)
 
     def get_list(self, key: str) -> NbtList:
-        """TAG_List を取得する。キーが無ければ例外。"""
+        """TAG_List を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtList)
 
     def opt_compound(self, key: str) -> Optional["NbtCompound"]:
-        """TAG_Compound を取得する。キーが無ければ None。"""
+        """TAG_Compound を取得する
+        キーが無ければ None
+        """
         return self._cast(key, NbtCompound)
 
     def get_compound(self, key: str) -> "NbtCompound":
-        """TAG_Compound を取得する。キーが無ければ例外。"""
+        """TAG_Compound を取得する
+        キーが無ければ例外
+        """
         return self._require(key, NbtCompound)

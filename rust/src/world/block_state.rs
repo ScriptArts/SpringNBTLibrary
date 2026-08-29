@@ -1,9 +1,12 @@
-//! ブロックの状態。名前と、任意のプロパティの組。
+//! ブロックの状態
+//! 名前と、任意のプロパティの組
 //!
-//! プロパティは**常に名前の昇順で保持する**。こうしておくと文字列表現が一意になり、
-//! 全言語で同じ出力になる。Minecraft が書き出した並び順は
+//! プロパティは**常に名前の昇順で保持する**
+//! こうしておくと文字列表現が一意になり、
+//! 全言語で同じ出力になる
+//! Minecraft が書き出した並び順は
 //! [`super::PalettedContainer`] がパレットを生の NBT のまま持つことで守られるので、
-//! 触っていないブロックの並びが崩れることはない。
+//! 触っていないブロックの並びが崩れることはない
 //!
 //! 仕様: `docs/spec/30-chunk-format.md` 2.1章
 
@@ -13,7 +16,7 @@ use std::fmt;
 use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::tag::{NbtCompound, NbtString, NbtTag};
 
-/// ブロックの状態。
+/// ブロックの状態
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockState {
     name: String,
@@ -21,41 +24,43 @@ pub struct BlockState {
 }
 
 impl BlockState {
-    /// 名前とプロパティを指定して作る。
+    /// 名前とプロパティを指定して作る
     ///
-    /// 名前空間が省略されていたら `minecraft:` を補う。
+    /// 名前空間が省略されていたら `minecraft:` を補う
     pub fn new(name: impl AsRef<str>, properties: BTreeMap<String, String>) -> BlockState {
         BlockState { name: normalize(name.as_ref()), properties }
     }
 
-    /// プロパティを持たない状態を作る。
+    /// プロパティを持たない状態を作る
     pub fn of(name: impl AsRef<str>) -> BlockState {
         BlockState::new(name, BTreeMap::new())
     }
 
-    /// ブロックID（名前空間つき）。
+    /// ブロックID（名前空間つき）
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// プロパティ。名前の昇順。
+    /// プロパティ
+    /// 名前の昇順
     pub fn properties(&self) -> &BTreeMap<String, String> {
         &self.properties
     }
 
-    /// プロパティを取得する。無ければ `None`。
+    /// プロパティを取得する
+    /// 無ければ `None`
     pub fn property(&self, key: &str) -> Option<&str> {
         self.properties.get(key).map(|value| value.as_str())
     }
 
-    /// プロパティを 1 つ差し替えた新しい状態を返す。
+    /// プロパティを 1 つ差し替えた新しい状態を返す
     pub fn with(&self, key: impl Into<String>, value: impl Into<String>) -> BlockState {
         let mut result = self.clone();
         result.properties.insert(key.into(), value.into());
         result
     }
 
-    /// `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列から作る。
+    /// `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列から作る
     pub fn parse(text: &str) -> Result<BlockState> {
         let bracket = match text.find('[') {
             Some(position) => position,
@@ -115,7 +120,7 @@ impl BlockState {
         Ok(BlockState::new(&text[..bracket], properties))
     }
 
-    /// パレット要素の NBT から作る。
+    /// パレット要素の NBT から作る
     pub fn from_nbt(nbt: &NbtCompound) -> Result<BlockState> {
         let name = nbt.get_string("Name")?.to_string();
         let mut properties = BTreeMap::new();
@@ -151,9 +156,10 @@ impl BlockState {
         Ok(BlockState::new(name, properties))
     }
 
-    /// パレット要素の NBT へ変換する。
+    /// パレット要素の NBT へ変換する
     ///
-    /// プロパティが空なら `Properties` キー自体を出力しない。Minecraft と同じ振る舞い。
+    /// プロパティが空なら `Properties` キー自体を出力しない
+    /// Minecraft と同じ振る舞い
     pub fn to_nbt(&self) -> NbtCompound {
         let mut result = NbtCompound::new();
         result.set("Name", NbtTag::String(NbtString::new(self.name.clone())));
@@ -175,7 +181,7 @@ impl BlockState {
 }
 
 impl fmt::Display for BlockState {
-    /// `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列を返す。
+    /// `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列を返す
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.name)?;
 
@@ -201,7 +207,7 @@ impl fmt::Display for BlockState {
     }
 }
 
-/// 名前空間が省略されていたら `minecraft:` を補う。
+/// 名前空間が省略されていたら `minecraft:` を補う
 fn normalize(name: &str) -> String {
     if name.contains(':') {
         return name.to_string();

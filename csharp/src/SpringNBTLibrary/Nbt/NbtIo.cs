@@ -3,13 +3,13 @@ using System.IO.Compression;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// NBT のファイル・バイト列・ストリームからの読み書き。
+/// NBT のファイル・バイト列・ストリームからの読み書き
 /// </summary>
 /// <remarks>仕様: <c>docs/spec/10-nbt-binary.md</c> 3章・4章</remarks>
 public static class NbtIo
 {
-    /// <summary>ファイルから NBT を読む。</summary>
-    /// <exception cref="SpringNbtException">読み込みに失敗した場合。</exception>
+    /// <summary>ファイルから NBT を読む</summary>
+    /// <exception cref="SpringNbtException">読み込みに失敗した場合</exception>
     public static NamedTag ReadFile(string path, NbtReadOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -32,8 +32,8 @@ public static class NbtIo
         return ReadBytes(raw, options);
     }
 
-    /// <summary>バイト列から NBT を読む。</summary>
-    /// <exception cref="SpringNbtException">読み込みに失敗した場合。</exception>
+    /// <summary>バイト列から NBT を読む</summary>
+    /// <exception cref="SpringNbtException">読み込みに失敗した場合</exception>
     public static NamedTag ReadBytes(byte[] bytes, NbtReadOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(bytes);
@@ -54,8 +54,9 @@ public static class NbtIo
         return reader.ReadRoot(effective.Format);
     }
 
-    /// <summary>ストリームから NBT を読む。ストリームは最後まで読み切る。</summary>
-    /// <exception cref="SpringNbtException">読み込みに失敗した場合。</exception>
+    /// <summary>ストリームから NBT を読む
+    /// ストリームは最後まで読み切る</summary>
+    /// <exception cref="SpringNbtException">読み込みに失敗した場合</exception>
     public static NamedTag ReadStream(Stream stream, NbtReadOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -73,8 +74,8 @@ public static class NbtIo
         return ReadBytes(memory.ToArray(), options);
     }
 
-    /// <summary>NBT をファイルへ書き出す。</summary>
-    /// <exception cref="SpringNbtException">書き込みに失敗した場合。</exception>
+    /// <summary>NBT をファイルへ書き出す</summary>
+    /// <exception cref="SpringNbtException">書き込みに失敗した場合</exception>
     public static void WriteFile(string path, NamedTag tag, NbtWriteOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -95,8 +96,8 @@ public static class NbtIo
         }
     }
 
-    /// <summary>NBT をバイト列へ書き出す。</summary>
-    /// <exception cref="SpringNbtException">書き込みに失敗した場合。</exception>
+    /// <summary>NBT をバイト列へ書き出す</summary>
+    /// <exception cref="SpringNbtException">書き込みに失敗した場合</exception>
     public static byte[] WriteBytes(NamedTag tag, NbtWriteOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(tag);
@@ -123,8 +124,8 @@ public static class NbtIo
         return Compress(plain, effective.Compression);
     }
 
-    /// <summary>NBT をストリームへ書き出す。</summary>
-    /// <exception cref="SpringNbtException">書き込みに失敗した場合。</exception>
+    /// <summary>NBT をストリームへ書き出す</summary>
+    /// <exception cref="SpringNbtException">書き込みに失敗した場合</exception>
     public static void WriteStream(Stream stream, NamedTag tag, NbtWriteOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -142,10 +143,10 @@ public static class NbtIo
     }
 
     /// <summary>
-    /// 先頭バイトから圧縮方式を判定する。
+    /// 先頭バイトから圧縮方式を判定する
     /// </summary>
     /// <exception cref="SpringNbtException">
-    /// どの方式とも判定できない場合（<see cref="ErrorCode.MalformedData"/>）。
+    /// どの方式とも判定できない場合（<see cref="ErrorCode.MalformedData"/>）
     /// </exception>
     public static Compression DetectCompression(byte[] bytes)
     {
@@ -182,7 +183,7 @@ public static class NbtIo
         throw SpringNbtException.Malformed($"圧縮方式を判定できない (先頭バイト 0x{bytes[0]:X2})");
     }
 
-    /// <summary>指定された方式で展開する。</summary>
+    /// <summary>指定された方式で展開する</summary>
     private static byte[] Decompress(byte[] bytes, NbtReadOptions options)
     {
         Compression method;
@@ -217,7 +218,7 @@ public static class NbtIo
         return destination.ToArray();
     }
 
-    /// <summary>指定された方式で圧縮する。</summary>
+    /// <summary>指定された方式で圧縮する</summary>
     private static byte[] Compress(byte[] plain, Compression method)
     {
         if (method == Compression.None)
@@ -266,7 +267,7 @@ public static class NbtIo
         throw SpringNbtException.InvalidArgument($"圧縮できない方式: {method}");
     }
 
-    /// <summary>展開後のサイズ上限を見ながらコピーする。</summary>
+    /// <summary>展開後のサイズ上限を見ながらコピーする</summary>
     private static void CopyWithLimit(Stream source, Stream destination, long maxSize)
     {
         byte[] chunk = new byte[81920];

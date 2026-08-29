@@ -1,7 +1,7 @@
-//! Minecraft Java版のセーブデータ 1 つ分と、その中の次元。
+//! Minecraft Java版のセーブデータ 1 つ分と、その中の次元
 //!
 //! 26.x では構成が大きく変わっており、標準の3次元も
-//! `dimensions/<名前空間>/<パス>/` の下に並ぶ。
+//! `dimensions/<名前空間>/<パス>/` の下に並ぶ
 //!
 //! 仕様: `docs/spec/40-world-layout.md`
 
@@ -16,30 +16,32 @@ use crate::nbt::{read_file, write_file, NamedTag, NbtReadOptions, NbtWriteOption
 use super::block_state::BlockState;
 use super::chunk::{Chunk, ChunkReadOptions, ChunkWriteOptions};
 
-/// ワールドを開くときの動作。
+/// ワールドを開くときの動作
 #[derive(Debug, Default)]
 pub struct WorldOpenOptions {
-    /// 読み書きで開くか。既定は読み取り専用。
+    /// 読み書きで開くか
+    /// 既定は読み取り専用
     pub writable: bool,
-    /// `session.lock` の確認を飛ばすか。
+    /// `session.lock` の確認を飛ばすか
     ///
-    /// **Rust 版はこの確認を行わない。** 標準ライブラリだけでは
-    /// ファイルの排他ロックを扱えないため（`docs/adr/0008-session-lock.md`）。
-    /// 他言語版との API を揃えるためにフィールドだけ用意してある。
+    /// **Rust 版はこの確認を行わない
+    /// ** 標準ライブラリだけでは
+    /// ファイルの排他ロックを扱えないため（`docs/adr/0008-session-lock.md`）
+    /// 他言語版との API を揃えるためにフィールドだけ用意してある
     ///
     /// Minecraft が起動中のワールドへ書き込むとデータが壊れるので、
-    /// 起動していないことは呼び出し側で担保すること。
+    /// 起動していないことは呼び出し側で担保すること
     pub ignore_session_lock: bool,
-    /// チャンク読み込みのオプション。
+    /// チャンク読み込みのオプション
     pub chunk_read: ChunkReadOptions,
-    /// チャンク書き込みのオプション。
+    /// チャンク書き込みのオプション
     pub chunk_write: ChunkWriteOptions,
 }
 
-/// `level.dat` の内容。
+/// `level.dat` の内容
 ///
 /// 26.x では大幅に軽量化されており、ゲームルールやワールド生成設定は
-/// `data/minecraft/` 配下の個別ファイルへ分離されている。
+/// `data/minecraft/` 配下の個別ファイルへ分離されている
 ///
 /// 仕様: `docs/spec/40-world-layout.md` 2章
 #[derive(Debug, Clone)]
@@ -49,75 +51,79 @@ pub struct LevelData {
 }
 
 impl LevelData {
-    /// ルートの NBT。`Data` を含む。
+    /// ルートの NBT
+    /// `Data` を含む
     pub fn raw(&self) -> &NbtCompound {
         &self.raw
     }
 
-    /// `Data` の中身。実際の設定はここに入っている。
+    /// `Data` の中身
+    /// 実際の設定はここに入っている
     pub fn data(&self) -> Result<&NbtCompound> {
         self.raw.get_compound("Data")
     }
 
-    /// チャンク構造のバージョン。
+    /// チャンク構造のバージョン
     pub fn data_version(&self) -> Result<i32> {
         self.data()?.get_int("DataVersion")
     }
 
-    /// ワールド名。
+    /// ワールド名
     pub fn level_name(&self) -> Result<&str> {
         self.data()?.get_string("LevelName")
     }
 
-    /// ワールドの経過時間（tick）。
+    /// ワールドの経過時間（tick）
     pub fn time(&self) -> Result<i64> {
         self.data()?.get_long("Time")
     }
 
-    /// ゲームモード。0=サバイバル 1=クリエイティブ 2=アドベンチャー 3=スペクテイター。
+    /// ゲームモード
+    /// 0=サバイバル 1=クリエイティブ 2=アドベンチャー 3=スペクテイター
     pub fn game_type(&self) -> Result<i32> {
         self.data()?.get_int("GameType")
     }
 
-    /// スポーン地点の `[x, y, z]`。
+    /// スポーン地点の `[x, y, z]`
     pub fn spawn_pos(&self) -> Result<&[i32]> {
         self.data()?.get_compound("spawn")?.get_int_array("pos")
     }
 
-    /// スポーン地点の次元ID。
+    /// スポーン地点の次元ID
     pub fn spawn_dimension(&self) -> Result<&str> {
         self.data()?.get_compound("spawn")?.get_string("dimension")
     }
 
-    /// 難易度（`normal` など）。
+    /// 難易度（`normal` など）
     pub fn difficulty(&self) -> Result<&str> {
         self.data()?
             .get_compound("difficulty_settings")?
             .get_string("difficulty")
     }
 
-    /// ハードコアか。
+    /// ハードコアか
     pub fn is_hardcore(&self) -> Result<bool> {
         self.data()?
             .get_compound("difficulty_settings")?
             .get_bool("hardcore")
     }
 
-    /// バージョン名（`26.2` など）。
+    /// バージョン名（`26.2` など）
     pub fn version_name(&self) -> Result<&str> {
         self.data()?.get_compound("Version")?.get_string("Name")
     }
 
-    /// 書き出し用の [`NamedTag`] を作る。
+    /// 書き出し用の [`NamedTag`] を作る
     pub fn to_named_tag(&self) -> NamedTag {
         NamedTag::new(self.root_name.clone(), self.raw.clone())
     }
 }
 
-/// ワールド内の次元 1 つ分。`region/` `entities/` `poi/` をまとめて扱う。
+/// ワールド内の次元 1 つ分
+/// `region/` `entities/` `poi/` をまとめて扱う
 ///
 /// ブロックの取得・設定は**絶対ワールド座標**で行い、
-/// リージョン・チャンク・セクションの解決は内部で済ませる。
+/// リージョン・チャンク・セクションの解決は内部で済ませる
 ///
 /// 仕様: `docs/spec/40-world-layout.md` 4章
 pub struct Dimension {
@@ -155,17 +161,18 @@ impl Dimension {
         }
     }
 
-    /// 次元ID（`minecraft:overworld` など）。
+    /// 次元ID（`minecraft:overworld` など）
     pub fn id(&self) -> &str {
         &self.id
     }
 
-    /// この次元のディレクトリ。
+    /// この次元のディレクトリ
     pub fn directory(&self) -> &Path {
         &self.directory
     }
 
-    /// 地形のリージョンフォルダ。無ければ `None`。
+    /// 地形のリージョンフォルダ
+    /// 無ければ `None`
     pub fn region_folder(&mut self) -> Result<Option<&mut RegionFolder>> {
         self.ensure_open()?;
 
@@ -176,7 +183,8 @@ impl Dimension {
         Ok(self.regions.as_mut())
     }
 
-    /// エンティティのリージョンフォルダ。無ければ `None`。
+    /// エンティティのリージョンフォルダ
+    /// 無ければ `None`
     pub fn entity_folder(&mut self) -> Result<Option<&mut RegionFolder>> {
         self.ensure_open()?;
 
@@ -187,7 +195,8 @@ impl Dimension {
         Ok(self.entities.as_mut())
     }
 
-    /// POI のリージョンフォルダ。無ければ `None`。
+    /// POI のリージョンフォルダ
+    /// 無ければ `None`
     pub fn poi_folder(&mut self) -> Result<Option<&mut RegionFolder>> {
         self.ensure_open()?;
 
@@ -198,7 +207,8 @@ impl Dimension {
         Ok(self.poi.as_mut())
     }
 
-    /// `data/minecraft/<name>.dat` を読む。存在しなければ `None`。
+    /// `data/minecraft/<name>.dat` を読む
+    /// 存在しなければ `None`
     pub fn data_file(&self, name: &str) -> Result<Option<NbtCompound>> {
         let path = self
             .directory
@@ -213,7 +223,7 @@ impl Dimension {
         Ok(Some(read_file(&path, &NbtReadOptions::default())?.tag))
     }
 
-    /// この次元に存在する全チャンクの座標を返す。
+    /// この次元に存在する全チャンクの座標を返す
     pub fn chunk_positions(&mut self) -> Result<Vec<ChunkPos>> {
         match self.region_folder()? {
             Some(folder) => folder.chunk_positions(),
@@ -221,7 +231,8 @@ impl Dimension {
         }
     }
 
-    /// チャンクを読む。読み込んだチャンクはキャッシュされる。
+    /// チャンクを読む
+    /// 読み込んだチャンクはキャッシュされる
     pub fn chunk(&mut self, chunk_x: i32, chunk_z: i32) -> Result<Option<&Chunk>> {
         self.ensure_open()?;
         let key = (chunk_x, chunk_z);
@@ -248,18 +259,21 @@ impl Dimension {
         Ok(self.chunk_cache.get(&key))
     }
 
-    /// チャンクへの可変参照を得る。変更したら [`Dimension::mark_modified`] を呼ぶこと。
+    /// チャンクへの可変参照を得る
+    /// 変更したら [`Dimension::mark_modified`] を呼ぶこと
     pub fn chunk_mut(&mut self, chunk_x: i32, chunk_z: i32) -> Result<Option<&mut Chunk>> {
         self.chunk(chunk_x, chunk_z)?;
         Ok(self.chunk_cache.get_mut(&(chunk_x, chunk_z)))
     }
 
-    /// チャンクを「変更あり」として記録する。次の `flush` で書き戻される。
+    /// チャンクを「変更あり」として記録する
+    /// 次の `flush` で書き戻される
     pub fn mark_modified(&mut self, chunk_x: i32, chunk_z: i32) {
         self.modified.insert((chunk_x, chunk_z));
     }
 
-    /// 絶対座標でブロックを取得する。チャンクが無ければ `None`。
+    /// 絶対座標でブロックを取得する
+    /// チャンクが無ければ `None`
     pub fn get_block(&mut self, x: i32, y: i32, z: i32) -> Result<Option<BlockState>> {
         match self.chunk(x >> 4, z >> 4)? {
             Some(chunk) => chunk.get_block(x & 15, y, z & 15),
@@ -267,10 +281,10 @@ impl Dimension {
         }
     }
 
-    /// 絶対座標でブロックを設定する。
+    /// 絶対座標でブロックを設定する
     ///
-    /// 変更したチャンクは記録され、[`Dimension::flush`] でまとめて書き戻される。
-    /// 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる。
+    /// 変更したチャンクは記録され、[`Dimension::flush`] でまとめて書き戻される
+    /// 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
     pub fn set_block(&mut self, x: i32, y: i32, z: i32, state: &BlockState) -> Result<()> {
         self.ensure_writable()?;
         let chunk_x = x >> 4;
@@ -293,7 +307,8 @@ impl Dimension {
         Ok(())
     }
 
-    /// 絶対座標でバイオームを取得する。4×4×4 の単位。
+    /// 絶対座標でバイオームを取得する
+    /// 4×4×4 の単位
     pub fn get_biome(&mut self, x: i32, y: i32, z: i32) -> Result<Option<String>> {
         match self.chunk(x >> 4, z >> 4)? {
             Some(chunk) => chunk.get_biome(x & 15, y, z & 15),
@@ -301,7 +316,8 @@ impl Dimension {
         }
     }
 
-    /// 絶対座標でバイオームを設定する。4×4×4 の単位。
+    /// 絶対座標でバイオームを設定する
+    /// 4×4×4 の単位
     pub fn set_biome(&mut self, x: i32, y: i32, z: i32, biome: &str) -> Result<()> {
         self.ensure_writable()?;
         let chunk_x = x >> 4;
@@ -324,7 +340,7 @@ impl Dimension {
         Ok(())
     }
 
-    /// 変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する。
+    /// 変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する
     pub fn flush(&mut self) -> Result<()> {
         self.ensure_open()?;
 
@@ -365,7 +381,7 @@ impl Dimension {
         Ok(())
     }
 
-    /// 変更を書き戻してから閉じる。
+    /// 変更を書き戻してから閉じる
     pub fn close(&mut self) -> Result<()> {
         if self.closed {
             return Ok(());
@@ -389,7 +405,8 @@ impl Dimension {
         Ok(())
     }
 
-    /// フォルダを開く。存在しなければ `None`。
+    /// フォルダを開く
+    /// 存在しなければ `None`
     fn open_folder(&self, name: &str) -> Result<Option<RegionFolder>> {
         let path = self.directory.join(name);
 
@@ -427,7 +444,7 @@ impl Dimension {
     }
 }
 
-/// Minecraft Java版のセーブデータ 1 つ分。
+/// Minecraft Java版のセーブデータ 1 つ分
 pub struct MinecraftWorld {
     directory: PathBuf,
     options: WorldOpenOptions,
@@ -437,7 +454,7 @@ pub struct MinecraftWorld {
 }
 
 impl MinecraftWorld {
-    /// ワールドを開く。
+    /// ワールドを開く
     pub fn open(directory: impl AsRef<Path>, options: WorldOpenOptions) -> Result<MinecraftWorld> {
         let directory = directory.as_ref().to_path_buf();
 
@@ -468,20 +485,21 @@ impl MinecraftWorld {
         })
     }
 
-    /// ワールドディレクトリのパス。
+    /// ワールドディレクトリのパス
     pub fn directory(&self) -> &Path {
         &self.directory
     }
 
-    /// `level.dat` の内容。
+    /// `level.dat` の内容
     pub fn level(&self) -> &LevelData {
         &self.level
     }
 
-    /// `data/minecraft/<name>.dat` を読む。存在しなければ `None`。
+    /// `data/minecraft/<name>.dat` を読む
+    /// 存在しなければ `None`
     ///
     /// 26.x では `game_rules` / `weather` / `world_gen_settings` などが
-    /// この形で `level.dat` から分離されている。
+    /// この形で `level.dat` から分離されている
     pub fn data_file(&self, name: &str) -> Result<Option<NbtCompound>> {
         let path = self
             .directory
@@ -496,7 +514,7 @@ impl MinecraftWorld {
         Ok(Some(read_file(&path, &NbtReadOptions::default())?.tag))
     }
 
-    /// 存在する次元のIDを返す。
+    /// 存在する次元のIDを返す
     pub fn dimension_ids(&self) -> Result<Vec<String>> {
         let root = self.directory.join("dimensions");
         let mut found = Vec::new();
@@ -530,7 +548,8 @@ impl MinecraftWorld {
         Ok(found)
     }
 
-    /// 次元を得る。ディレクトリが無ければ `None`。
+    /// 次元を得る
+    /// ディレクトリが無ければ `None`
     pub fn dimension(&mut self, dimension_id: &str) -> Result<Option<&mut Dimension>> {
         self.ensure_open()?;
         let normalized = normalize_dimension_id(dimension_id);
@@ -554,7 +573,7 @@ impl MinecraftWorld {
         Ok(self.dimensions.get_mut(&normalized))
     }
 
-    /// プレイヤーのUUID一覧。
+    /// プレイヤーのUUID一覧
     pub fn player_ids(&self) -> Result<Vec<String>> {
         let path = self.directory.join("players").join("data");
         let mut found = Vec::new();
@@ -577,7 +596,8 @@ impl MinecraftWorld {
         Ok(found)
     }
 
-    /// プレイヤーデータを読む。存在しなければ `None`。
+    /// プレイヤーデータを読む
+    /// 存在しなければ `None`
     pub fn player(&self, uuid: &str) -> Result<Option<NbtCompound>> {
         let path = self
             .directory
@@ -592,10 +612,10 @@ impl MinecraftWorld {
         Ok(Some(read_file(&path, &NbtReadOptions::default())?.tag))
     }
 
-    /// `level.dat` を書き戻す。
+    /// `level.dat` を書き戻す
     ///
     /// 壊れるとワールド全体が開けなくなるため、
-    /// 一時ファイルへ書いてから `level.dat_old` へ退避し、最後に置き換える。
+    /// 一時ファイルへ書いてから `level.dat_old` へ退避し、最後に置き換える
     pub fn save_level(&mut self) -> Result<()> {
         self.ensure_open()?;
 
@@ -620,7 +640,7 @@ impl MinecraftWorld {
         Ok(())
     }
 
-    /// 開いている次元をすべて閉じる。
+    /// 開いている次元をすべて閉じる
     pub fn close(&mut self) -> Result<()> {
         if self.closed {
             return Ok(());
@@ -645,7 +665,7 @@ impl MinecraftWorld {
     }
 }
 
-/// 名前空間が省略されていたら `minecraft:` を補う。
+/// 名前空間が省略されていたら `minecraft:` を補う
 fn normalize_dimension_id(dimension_id: &str) -> String {
     if dimension_id.contains(':') {
         return dimension_id.to_string();

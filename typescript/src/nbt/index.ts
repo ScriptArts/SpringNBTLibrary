@@ -1,7 +1,7 @@
 /**
- * NBT (Named Binary Tag) の読み書き。
+ * NBT (Named Binary Tag) の読み書き
  *
- * このレイヤは Minecraft のバージョンに一切依存しない。
+ * このレイヤは Minecraft のバージョンに一切依存しない
  *
  * 仕様: `docs/spec/10-nbt-binary.md`
  */

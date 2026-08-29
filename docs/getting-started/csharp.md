@@ -1,16 +1,15 @@
 # はじめに（C#）
 
-**.NET 8 / C# 12 以上。**
+.NET 8 / C# 12 以上が必要です。
 
-C# は本ライブラリの[基準実装](../adr/0002-idiomatic-naming.md)なので、
-仕様の解釈に迷ったときはまずここを見るとよい。
+C# は[基準実装](../adr/0002-idiomatic-naming.md)です。
+仕様の解釈に迷ったら、まずここを見てください。
 
 ## 導入
 
-NuGet へは公開していない。[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
-`SpringNBTLibrary-<版>-dotnet8.zip` を落として組み込む。
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `SpringNBTLibrary-<版>-dotnet8.zip` を落とします。
 
-1. zip を展開する。中身は次のとおり
+1. zip を展開します。中身は次のとおりです
 
    ```
    SpringNBTLibrary.dll   ライブラリ本体
@@ -18,9 +17,9 @@ NuGet へは公開していない。[Releases](https://github.com/ScriptArts/Spr
    LICENSE / README.md
    ```
 
-2. プロジェクトの適当な場所（`lib/` など）へ **dll と xml を隣り合わせで**置く。
-   xml が無いと補完に説明が出ない
-3. `.csproj` から参照する
+2. プロジェクトの適当な場所（`lib/` など）へ dll と xml を隣り合わせで置きます。
+   xml が無いと補完に説明が出ません
+3. `.csproj` から参照します
 
    ```xml
    <ItemGroup>
@@ -29,12 +28,6 @@ NuGet へは公開していない。[Releases](https://github.com/ScriptArts/Spr
      </Reference>
    </ItemGroup>
    ```
-
-ソースから使いたい場合は、リポジトリを取得して `ProjectReference` で参照してもよい。
-
-```xml
-<ProjectReference Include="../SpringNBTLibrary/csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj" />
-```
 
 ## NBT ファイルを読む
 
@@ -49,8 +42,8 @@ Console.WriteLine(data.GetString("LevelName"));
 Console.WriteLine(data.GetInt("DataVersion"));
 ```
 
-型が違えば `UNEXPECTED_TAG_TYPE` の例外になる。
-キーが無いかもしれないときは `Opt*` を使う。
+型が違えば `UNEXPECTED_TAG_TYPE` の例外になります。
+キーが無いかもしれないときは `Opt*` を使います。
 
 ```csharp
 // 無ければ null。あるが型違いなら例外
@@ -86,7 +79,7 @@ if (overworld is not null)
 
 ## ブロックを書き換える
 
-書き込みは**明示的に許可したときだけ**行える。
+書き込みは明示的に許可したときだけ行えます。
 
 ```csharp
 WorldOpenOptions options = new WorldOpenOptions { Writable = true };
@@ -99,11 +92,11 @@ overworld.Flush();   // ここで初めてディスクへ書かれる
 ```
 
 > **Minecraft を終了してから実行すること。**
-> 起動中のワールドへ書き込むとデータが壊れる。
-> C# 版は `session.lock` を確認して防ぐ（[adr/0008](../adr/0008-session-lock.md)）。
+> 起動中のワールドへ書き込むとデータが壊れます。
+> C# 版は `session.lock` を確認して防いでいます（[adr/0008](../adr/0008-session-lock.md)）。
 
-> ブロックを置き換えても **Heightmaps と光源は再計算されない**（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
-> `Chunk.ClearHeightmaps()` / `InvalidateLighting()` でゲーム側に再計算させる。
+> ブロックを置き換えても Heightmaps と光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> `Chunk.ClearHeightmaps()` / `InvalidateLighting()` でゲーム側に再計算させてください。
 
 ## 次に読むもの
 

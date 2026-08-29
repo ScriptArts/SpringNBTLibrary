@@ -3,49 +3,64 @@ package io.github.scriptarts.springnbt.nbt;
 import io.github.scriptarts.springnbt.SpringNbtException;
 
 /**
- * NBT のタグ型。{@link #id()} は仕様が定めるタグIDと一致する。
+ * NBT のタグ型
+ * {@link #id()} は仕様が定めるタグIDと一致する
  *
  * <p>仕様: {@code docs/spec/10-nbt-binary.md} 1章
  */
 public enum TagType {
 
-    /** TAG_End (0)。Compound の終端を表す。 */
+    /** TAG_End (0)
+    /** Compound の終端を表す
+    /** */
     END(0, "end"),
 
-    /** TAG_Byte (1)。 */
+    /** TAG_Byte (1)
+    /** */
     BYTE(1, "byte"),
 
-    /** TAG_Short (2)。 */
+    /** TAG_Short (2)
+    /** */
     SHORT(2, "short"),
 
-    /** TAG_Int (3)。 */
+    /** TAG_Int (3)
+    /** */
     INT(3, "int"),
 
-    /** TAG_Long (4)。 */
+    /** TAG_Long (4)
+    /** */
     LONG(4, "long"),
 
-    /** TAG_Float (5)。 */
+    /** TAG_Float (5)
+    /** */
     FLOAT(5, "float"),
 
-    /** TAG_Double (6)。 */
+    /** TAG_Double (6)
+    /** */
     DOUBLE(6, "double"),
 
-    /** TAG_Byte_Array (7)。 */
+    /** TAG_Byte_Array (7)
+    /** */
     BYTE_ARRAY(7, "byte_array"),
 
-    /** TAG_String (8)。 */
+    /** TAG_String (8)
+    /** */
     STRING(8, "string"),
 
-    /** TAG_List (9)。 */
+    /** TAG_List (9)
+    /** */
     LIST(9, "list"),
 
-    /** TAG_Compound (10)。 */
+    /** TAG_Compound (10)
+    /** */
     COMPOUND(10, "compound"),
 
-    /** TAG_Int_Array (11)。 */
+    /** TAG_Int_Array (11)
+    /** */
     INT_ARRAY(11, "int_array"),
 
-    /** TAG_Long_Array (12)。 */
+    /** TAG_Long_Array (12)
+    /** */
     LONG_ARRAY(12, "long_array");
 
     private static final TagType[] BY_ID = values();
@@ -59,7 +74,7 @@ public enum TagType {
     }
 
     /**
-     * 仕様が定めるタグID。
+     * 仕様が定めるタグID
      *
      * @return タグID
      */
@@ -68,7 +83,7 @@ public enum TagType {
     }
 
     /**
-     * 適合性テストで言語間比較に使う識別子を返す。
+     * 適合性テストで言語間比較に使う識別子を返す
      *
      * @return 識別子
      */
@@ -77,7 +92,7 @@ public enum TagType {
     }
 
     /**
-     * タグIDから {@link TagType} を得る。
+     * タグIDから {@link TagType} を得る
      *
      * @param id タグID
      * @return タグ型

@@ -21,10 +21,10 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Minecraft Java版のセーブデータ 1 つ分。
+ * Minecraft Java版のセーブデータ 1 つ分
  *
  * <p>26.x では構成が大きく変わっており、標準の3次元も
- * {@code dimensions/<名前空間>/<パス>/} の下に並ぶ。
+ * {@code dimensions/<名前空間>/<パス>/} の下に並ぶ
  *
  * <p>仕様: {@code docs/spec/40-world-layout.md}
  */
@@ -43,7 +43,7 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * ワールドディレクトリのパス。
+     * ワールドディレクトリのパス
      *
      * @return パス
      */
@@ -52,7 +52,7 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * {@code level.dat} の内容。
+     * {@code level.dat} の内容
      *
      * @return level.dat
      */
@@ -61,10 +61,11 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * ワールドを開く。
+     * ワールドを開く
      *
      * @param directory ワールドディレクトリ
-     * @param options   オプション。null なら既定値
+     * @param options   オプション
+     * null なら既定値
      * @return ワールド
      * @throws SpringNbtException ディレクトリや level.dat が無い場合、
      *                            または書き込みモードで session.lock を取得できない場合
@@ -98,7 +99,7 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * 読み取り専用でワールドを開く。
+     * 読み取り専用でワールドを開く
      *
      * @param directory ワールドディレクトリ
      * @return ワールド
@@ -107,7 +108,8 @@ public final class MinecraftWorld implements AutoCloseable {
         return open(directory, null);
     }
 
-    /** {@code session.lock} を排他で開けるか確かめる。 */
+    /** {@code session.lock} を排他で開けるか確かめる
+    /** */
     private static void checkSessionLock(Path directory) {
         Path lockPath = directory.resolve("session.lock");
 
@@ -133,13 +135,14 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * {@code data/minecraft/<name>.dat} を読む。
+     * {@code data/minecraft/<name>.dat} を読む
      *
      * <p>26.x では {@code game_rules} / {@code weather} / {@code world_gen_settings} などが
-     * この形で {@code level.dat} から分離されている。
+     * この形で {@code level.dat} から分離されている
      *
      * @param name ファイル名（拡張子なし）
-     * @return NBT。存在しなければ null
+     * @return NBT
+     * 存在しなければ null
      */
     public NbtCompound dataFile(String name) {
         ensureOpen();
@@ -153,7 +156,7 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * 存在する次元のIDを返す。
+     * 存在する次元のIDを返す
      *
      * @return 次元IDの一覧
      */
@@ -194,11 +197,12 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * 次元を得る。
+     * 次元を得る
      *
-     * @param dimensionId {@code minecraft:overworld} のような名前空間つきのID。
+     * @param dimensionId {@code minecraft:overworld} のような名前空間つきのID
      *                    名前空間が省略されていたら {@code minecraft:} を補う
-     * @return 次元。ディレクトリが無ければ null
+     * @return 次元
+     * ディレクトリが無ければ null
      */
     public Dimension dimension(String dimensionId) {
         ensureOpen();
@@ -226,7 +230,7 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * プレイヤーのUUID一覧。
+     * プレイヤーのUUID一覧
      *
      * @return UUIDの一覧
      */
@@ -254,10 +258,11 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * プレイヤーデータを読む。
+     * プレイヤーデータを読む
      *
      * @param uuid プレイヤーのUUID
-     * @return NBT。存在しなければ null
+     * @return NBT
+     * 存在しなければ null
      */
     public NbtCompound player(String uuid) {
         ensureOpen();
@@ -272,10 +277,10 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * {@code level.dat} を書き戻す。
+     * {@code level.dat} を書き戻す
      *
      * <p>壊れるとワールド全体が開けなくなるため、
-     * 一時ファイルへ書いてから {@code level.dat_old} へ退避し、最後に置き換える。
+     * 一時ファイルへ書いてから {@code level.dat_old} へ退避し、最後に置き換える
      */
     public void saveLevel() {
         ensureOpen();
@@ -302,7 +307,8 @@ public final class MinecraftWorld implements AutoCloseable {
         }
     }
 
-    /** 開いている次元をすべて閉じる。 */
+    /** 開いている次元をすべて閉じる
+    /** */
     @Override
     public void close() {
         if (closed) {
@@ -324,7 +330,8 @@ public final class MinecraftWorld implements AutoCloseable {
         }
     }
 
-    /** 名前空間が省略されていたら {@code minecraft:} を補う。 */
+    /** 名前空間が省略されていたら {@code minecraft:} を補う
+    /** */
     private static String normalizeDimensionId(String dimensionId) {
         if (dimensionId.indexOf(':') >= 0) {
             return dimensionId;

@@ -1,9 +1,10 @@
 /**
- * パレットとビットストレージの組。セクション内のブロック状態やバイオームを格納する。
+ * パレットとビットストレージの組
+ * セクション内のブロック状態やバイオームを格納する
  *
- * パレットの要素は**生の `NbtTag` のまま**持つ。
+ * パレットの要素は**生の `NbtTag` のまま**持つ
  * こうすると、触っていないブロックについては Minecraft が書き出したときの
- * プロパティの並び順まで含めてそのまま書き戻せる。
+ * プロパティの並び順まで含めてそのまま書き戻せる
  *
  * 仕様: `docs/spec/31-paletted-container.md`
  */
@@ -13,10 +14,12 @@ import { NbtCompound, NbtList, NbtLongArray, NbtTag } from "../nbt/index.js";
 import { BitStorage } from "./bitStorage.js";
 
 /**
- * パレットとビットストレージの組。セクション内のブロック状態やバイオームを格納する。
+ * パレットとビットストレージの組
+ * セクション内のブロック状態やバイオームを格納する
  *
- * パレットの要素は**生の `NbtTag` のまま**持つ。こうすると、触っていないブロックの
- * プロパティの並び順まで含めてそのまま書き戻せる。
+ * パレットの要素は**生の `NbtTag` のまま**持つ
+ * こうすると、触っていないブロックの
+ * プロパティの並び順まで含めてそのまま書き戻せる
  */
 export class PalettedContainer {
   readonly #palette: NbtTag[] = [];
@@ -30,22 +33,30 @@ export class PalettedContainer {
     this.#minBits = minBits;
   }
 
-  /** エントリ数。ブロックなら 4096、バイオームなら 64。 */
+  /** エントリ数
+  /** ブロックなら 4096、バイオームなら 64
+  /** */
   get entryCount(): number {
     return this.#entryCount;
   }
 
-  /** ビット幅の下限。ブロックなら 4、バイオームなら 1。 */
+  /** ビット幅の下限
+  /** ブロックなら 4、バイオームなら 1
+  /** */
   get minBits(): number {
     return this.#minBits;
   }
 
-  /** パレット。読み取り専用。 */
+  /** パレット
+  /** 読み取り専用
+  /** */
   get palette(): readonly NbtTag[] {
     return this.#palette;
   }
 
-  /** 現在のビット幅。パレットが 1 要素なら 0（記憶域を持たない）。 */
+  /** 現在のビット幅
+  /** パレットが 1 要素なら 0（記憶域を持たない）
+  /** */
   get bitsPerEntry(): number {
     if (this.#storage === undefined) {
       return 0;
@@ -54,14 +65,16 @@ export class PalettedContainer {
     return this.#storage.bitsPerEntry;
   }
 
-  /** 単一の値で埋めたコンテナを作る。 */
+  /** 単一の値で埋めたコンテナを作る
+  /** */
   static filled(value: NbtTag, entryCount: number, minBits: number): PalettedContainer {
     const result = new PalettedContainer(entryCount, minBits);
     result.#palette.push(value);
     return result;
   }
 
-  /** NBT から読み込む。 */
+  /** NBT から読み込む
+  /** */
   static fromNbt(
     nbt: NbtCompound,
     entryCount: number,
@@ -75,7 +88,8 @@ export class PalettedContainer {
       throw SpringNbtError.malformed("palette が無いか空");
     }
 
-    // パレットの要素は生の NbtTag のまま持つ。並び順まで元どおりに書き戻すため
+    // パレットの要素は生の NbtTag のまま持つ
+    // 並び順まで元どおりに書き戻すため
     for (const entry of paletteTag) {
       result.#palette.push(entry);
     }
@@ -96,7 +110,7 @@ export class PalettedContainer {
     const bits = Math.max(minBits, ceilLog2(result.#palette.length));
     result.#storage = BitStorage.fromLongs(data, bits, entryCount, lenientBitStorage);
 
-    // 取り出した添字がパレットの範囲に収まっているか確かめる。
+    // 取り出した添字がパレットの範囲に収まっているか確かめる
     // 黙って 0 番目で代替すると、壊れたデータをそうと分からない形で書き戻してしまう
     for (let index = 0; index < entryCount; index++) {
       const value = result.#storage.get(index);
@@ -111,7 +125,8 @@ export class PalettedContainer {
     return result;
   }
 
-  /** NBT へ変換する。 */
+  /** NBT へ変換する
+  /** */
   toNbt(): NbtCompound {
     const result = new NbtCompound();
     const paletteTag = new NbtList();
@@ -121,7 +136,8 @@ export class PalettedContainer {
       paletteTag.add(entry);
     }
 
-    // パレットが 1 要素なら data は書かない。Minecraft と同じ振る舞い
+    // パレットが 1 要素なら data は書かない
+    // Minecraft と同じ振る舞い
     if (this.#storage !== undefined && this.#palette.length > 1) {
       result.set("data", new NbtLongArray(this.#storage.toLongs()));
     }
@@ -130,7 +146,8 @@ export class PalettedContainer {
     return result;
   }
 
-  /** 添字の値を取り出す。 */
+  /** 添字の値を取り出す
+  /** */
   get(index: number): NbtTag {
     this.#checkIndex(index);
 
@@ -142,7 +159,9 @@ export class PalettedContainer {
     return this.#palette[this.#storage.get(index)];
   }
 
-  /** 添字の値を書き換える。パレットに無ければ追加する。 */
+  /** 添字の値を書き換える
+  /** パレットに無ければ追加する
+  /** */
   set(index: number, value: NbtTag): void {
     this.#checkIndex(index);
     const paletteIndex = this.#indexOfOrAdd(value);
@@ -156,7 +175,9 @@ export class PalettedContainer {
     this.#storage!.set(index, paletteIndex);
   }
 
-  /** 全エントリを 1 つの値で埋める。パレットもその 1 要素だけにする。 */
+  /** 全エントリを 1 つの値で埋める
+  /** パレットもその 1 要素だけにする
+  /** */
   fill(value: NbtTag): void {
     this.#palette.length = 0;
     this.#palette.push(value);
@@ -164,9 +185,9 @@ export class PalettedContainer {
   }
 
   /**
-   * どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す。
+   * どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す
    *
-   * 大量の `set` を行う用途で遅くならないよう、明示的に呼んだときだけ実行する。
+   * 大量の `set` を行う用途で遅くならないよう、明示的に呼んだときだけ実行する
    */
   compact(): void {
     if (this.#storage === undefined) {
@@ -217,7 +238,9 @@ export class PalettedContainer {
     }
   }
 
-  /** パレット内の位置を返す。無ければ末尾へ追加する。 */
+  /** パレット内の位置を返す
+  /** 無ければ末尾へ追加する
+  /** */
   #indexOfOrAdd(value: NbtTag): number {
     // パレットは高々 4096 要素なので線形探索で足りる
     for (let index = 0; index < this.#palette.length; index++) {
@@ -230,7 +253,8 @@ export class PalettedContainer {
     return this.#palette.length - 1;
   }
 
-  /** 現在のパレット長に合うビット幅の記憶域を用意する。 */
+  /** 現在のパレット長に合うビット幅の記憶域を用意する
+  /** */
   #ensureStorage(): void {
     const required = Math.max(this.#minBits, ceilLog2(this.#palette.length));
 
@@ -257,7 +281,9 @@ export class PalettedContainer {
   }
 }
 
-/** `count` 個の値を表すのに必要な最小ビット数。1 なら 0。 */
+/** `count` 個の値を表すのに必要な最小ビット数
+/** 1 なら 0
+/** */
 export function ceilLog2(count: number): number {
   let bits = 0;
 
@@ -270,10 +296,10 @@ export function ceilLog2(count: number): number {
 }
 
 /**
- * タグどうしが等しいか。
+ * タグどうしが等しいか
  *
- * NBT 層のクラスは `equals` を持たないので、パレットの重複判定用にここで比べる。
- * パレットに入るのは Compound（ブロック）か String（バイオーム）だけ。
+ * NBT 層のクラスは `equals` を持たないので、パレットの重複判定用にここで比べる
+ * パレットに入るのは Compound（ブロック）か String（バイオーム）だけ
  */
 function nbtEquals(left: NbtTag, right: NbtTag): boolean {
   if (left.type !== right.type) {

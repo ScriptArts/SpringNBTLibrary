@@ -1,21 +1,20 @@
 # はじめに（Rust）
 
-**Rust 2021 edition / MSRV 1.75。**
+Rust 2021 edition、MSRV 1.75 です。
 
 ## 導入
 
-crates.io へは公開していない。**git 参照が手軽**である。
+Cargo.toml に git 参照を書きます。
 
 ```toml
 [dependencies]
 spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v0.1.0" }
 ```
 
-Cargo が自分で取得するので、ファイルを落とす必要はない。
+Cargo が自分で取得します。
 
-ネットワークに繋がらない環境では、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) の
-`spring-nbt-library-<版>.crate` を落として展開し、パスで参照する。
-`.crate` は拡張子が違うだけの tar.gz である。
+ネットワークに繋がらない環境なら、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) の
+`spring-nbt-library-<版>.crate`（拡張子が違うだけの tar.gz）を展開してパス参照します。
 
 ```bash
 tar xzf spring-nbt-library-0.1.0.crate
@@ -28,8 +27,8 @@ spring-nbt-library = { path = "spring-nbt-library-0.1.0" }
 
 ## 例外ではなく `Result`
 
-Rust 版だけは例外ではなく `Result<T, Error>` を返す。
-`ErrorCode` の集合は他言語と完全に一致している（[adr/0005](../adr/0005-unified-error-model.md)）。
+Rust 版だけは例外ではなく `Result<T, Error>` を返します。
+`ErrorCode` の集合は他言語と完全に一致します（[adr/0005](../adr/0005-unified-error-model.md)）。
 
 ```rust
 use spring_nbt_library::error::{ErrorCode, Result};
@@ -48,8 +47,8 @@ println!("{}", data.get_string("LevelName")?);
 println!("{}", data.get_int("DataVersion")?);
 ```
 
-型が違えば `ErrorCode::UnexpectedTagType` が返る。
-キーが無いかもしれないときは `opt_*` を使う（無ければ `Ok(None)`）。
+型が違えば `ErrorCode::UnexpectedTagType` が返ります。
+キーが無いかもしれないときは `opt_*` を使います（無ければ `Ok(None)`）。
 
 ## 書く
 
@@ -67,8 +66,8 @@ write_file("out.nbt", &NamedTag::new("", root), &options)?;
 
 ## 文字列は 2 形態
 
-Rust の `String` は UTF-8 に限られるため、NBT に現れうる孤立サロゲートを保持できない。
-そこで `NbtString` を列挙にしている（[spec/10 2.3](../spec/10-nbt-binary.md#23-各言語での保持方法)）。
+Rust の `String` は UTF-8 に限られるので、NBT に現れうる孤立サロゲートを保持できません。
+そこで `NbtString` を列挙にしています（[spec/10 2.3](../spec/10-nbt-binary.md#23-各言語での保持方法)）。
 
 ```rust
 pub enum NbtString {
@@ -111,16 +110,16 @@ world.close()?;
 
 > **Minecraft を終了してから実行すること。**
 > Rust 版は `std` にファイルロックが無いため
-> **`session.lock` を確認しない**（[adr/0008](../adr/0008-session-lock.md)）。
-> 起動していないことは呼び出し側で担保すること。
+> `session.lock` は確認しません（[adr/0008](../adr/0008-session-lock.md)）。
+> 起動していないことは呼び出し側で担保してください。
 
-> ブロックを置き換えても **Heightmaps と光源は再計算されない**（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> ブロックを置き換えても Heightmaps と光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
 
 ## スタックの深さに注意
 
-NBT のネストは既定で深さ 512 まで許す。
-**debug ビルドでは 1 段あたり約 8 KB を使う**ため、
-深いデータを扱うなら大きめのスタックを持つスレッドで走らせること
+NBT のネストは既定で深さ 512 まで許します。
+debug ビルドでは 1 段あたり約 8 KB 使うので、
+深いデータを扱うなら大きめのスタックを持つスレッドで走らせてください
 （[spec/00 5.1](../spec/00-conventions.md#51-深さ上限と実行スタック)）。
 
 ## 次に読むもの

@@ -17,22 +17,27 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**
- * チャンク 1 つ分。地形の読み書きの入口。
+ * チャンク 1 つ分
+ * 地形の読み書きの入口
  *
- * <p><strong>読んだ NBT をそのまま保持し、変更した部分だけを書き戻す。</strong>
- * 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない。
+ * <p><strong>読んだ NBT をそのまま保持し、変更した部分だけを書き戻す</strong>
+ * 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
  *
  * <p>仕様: {@code docs/spec/30-chunk-format.md}
  */
 public final class Chunk {
 
-    /** セクション 1 つに入るブロック数。 */
+    /** セクション 1 つに入るブロック数
+    /** */
     public static final int BLOCKS_PER_SECTION = 4096;
 
-    /** セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）。 */
+    /** セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）
+    /** */
     public static final int BIOMES_PER_SECTION = 64;
 
-    /** ブロックに紐づく付随データのキー。ブロックを置き換えたら整合が崩れる。 */
+    /** ブロックに紐づく付随データのキー
+    /** ブロックを置き換えたら整合が崩れる
+    /** */
     private static final String[] BLOCK_DATA_KEYS = {"block_entities", "block_ticks", "fluid_ticks"};
 
     private final NbtCompound root;
@@ -43,7 +48,7 @@ public final class Chunk {
     }
 
     /**
-     * チャンク構造のバージョン。
+     * チャンク構造のバージョン
      *
      * @return バージョン
      */
@@ -52,7 +57,7 @@ public final class Chunk {
     }
 
     /**
-     * 絶対チャンクX座標。
+     * 絶対チャンクX座標
      *
      * @return 座標
      */
@@ -61,7 +66,7 @@ public final class Chunk {
     }
 
     /**
-     * 絶対チャンクZ座標。
+     * 絶対チャンクZ座標
      *
      * @return 座標
      */
@@ -70,7 +75,8 @@ public final class Chunk {
     }
 
     /**
-     * 最下段セクションのY位置。オーバーワールドは -4。
+     * 最下段セクションのY位置
+     * オーバーワールドは -4
      *
      * @return Y位置
      */
@@ -79,7 +85,7 @@ public final class Chunk {
     }
 
     /**
-     * 生成段階（{@code minecraft:full} など）。
+     * 生成段階（{@code minecraft:full} など）
      *
      * @return 生成段階
      */
@@ -88,7 +94,8 @@ public final class Chunk {
     }
 
     /**
-     * 生成が完了しているか。ブロック改変の対象にしてよいのはこれだけ。
+     * 生成が完了しているか
+     * ブロック改変の対象にしてよいのはこれだけ
      *
      * @return 完了していれば true
      */
@@ -97,7 +104,8 @@ public final class Chunk {
     }
 
     /**
-     * 存在するセクションのY位置。昇順。
+     * 存在するセクションのY位置
+     * 昇順
      *
      * @return Y位置の集合
      */
@@ -106,7 +114,8 @@ public final class Chunk {
     }
 
     /**
-     * 元の NBT。解釈していないキーもここに残っている。
+     * 元の NBT
+     * 解釈していないキーもここに残っている
      *
      * @return NBT
      */
@@ -115,10 +124,11 @@ public final class Chunk {
     }
 
     /**
-     * NBT からチャンクを読む。
+     * NBT からチャンクを読む
      *
      * @param nbt     チャンクの NBT
-     * @param options 読み込みオプション。null なら既定値
+     * @param options 読み込みオプション
+     * null なら既定値
      * @return チャンク
      * @throws SpringNbtException 必須のキーが無い、または構造が想定と違う場合
      */
@@ -154,7 +164,8 @@ public final class Chunk {
         return chunk;
     }
 
-    /** DataVersion を検査し、オプションに従って警告またはエラーにする。 */
+    /** DataVersion を検査し、オプションに従って警告またはエラーにする
+    /** */
     private void checkDataVersion(ChunkReadOptions options) {
         int version = dataVersion();
 
@@ -177,9 +188,11 @@ public final class Chunk {
     }
 
     /**
-     * NBT へ書き戻す。変更したセクションだけを反映し、他のキーはそのまま残す。
+     * NBT へ書き戻す
+     * 変更したセクションだけを反映し、他のキーはそのまま残す
      *
-     * @param options 書き込みオプション。null なら既定値
+     * @param options 書き込みオプション
+     * null なら既定値
      * @return NBT
      * @throws SpringNbtException DataVersion が対象と違い、かつ書き戻しが許可されていない場合
      */
@@ -219,22 +232,24 @@ public final class Chunk {
     }
 
     /**
-     * Y位置からセクションを得る。
+     * Y位置からセクションを得る
      *
      * @param sectionY セクションのY位置
-     * @return セクション。無ければ null
+     * @return セクション
+     * 無ければ null
      */
     public ChunkSection section(int sectionY) {
         return sections.get(sectionY);
     }
 
     /**
-     * ブロックを取得する。
+     * ブロックを取得する
      *
      * @param x チャンク内相対X座標 (0..15)
      * @param y 絶対Y座標
      * @param z チャンク内相対Z座標 (0..15)
-     * @return ブロック。セクションが無い、または block_states を持たない場合は null
+     * @return ブロック
+     * セクションが無い、または block_states を持たない場合は null
      */
     public BlockState getBlock(int x, int y, int z) {
         checkLocalCoordinates(x, z);
@@ -255,7 +270,7 @@ public final class Chunk {
     }
 
     /**
-     * ブロックを設定する。
+     * ブロックを設定する
      *
      * @param x     チャンク内相対X座標 (0..15)
      * @param y     絶対Y座標
@@ -275,7 +290,7 @@ public final class Chunk {
                     + "）が無いか、ブロックを持たない。本ライブラリはセクションを新規生成しない");
         }
 
-        // 同じ状態を置き直すだけなら、付随データを触る理由がない。
+        // 同じ状態を置き直すだけなら、付随データを触る理由がない
         // プロパティの並び順に左右されないよう、NBT ではなく BlockState として比べる
         BlockState current = getBlock(x, y, z);
 
@@ -288,10 +303,10 @@ public final class Chunk {
     }
 
     /**
-     * その座標を指す付随データを取り除く。
+     * その座標を指す付随データを取り除く
      *
      * <p>{@code block_entities} / {@code block_ticks} / {@code fluid_ticks} の要素は
-     * いずれも {@code x} {@code y} {@code z} を<b>絶対座標</b>で持つ。
+     * いずれも {@code x} {@code y} {@code z} を<b>絶対座標</b>で持つ
      */
     private void removeBlockData(int x, int y, int z) {
         int absoluteX = (x() * 16) + x;
@@ -318,7 +333,8 @@ public final class Chunk {
         }
     }
 
-    /** 付随データの要素が、指定の絶対座標を指しているか。 */
+    /** 付随データの要素が、指定の絶対座標を指しているか
+    /** */
     private static boolean matchesPosition(NbtCompound entry, int x, int y, int z) {
         Integer entryX = entry.optInt("x");
         Integer entryY = entry.optInt("y");
@@ -333,12 +349,14 @@ public final class Chunk {
     }
 
     /**
-     * バイオームを取得する。4×4×4 の単位なので、座標は自動的に丸められる。
+     * バイオームを取得する
+     * 4×4×4 の単位なので、座標は自動的に丸められる
      *
      * @param x チャンク内相対X座標 (0..15)
      * @param y 絶対Y座標
      * @param z チャンク内相対Z座標 (0..15)
-     * @return バイオームID。セクションが無い場合は null
+     * @return バイオームID
+     * セクションが無い場合は null
      */
     public String getBiome(int x, int y, int z) {
         checkLocalCoordinates(x, z);
@@ -359,7 +377,8 @@ public final class Chunk {
     }
 
     /**
-     * バイオームを設定する。4×4×4 の単位。
+     * バイオームを設定する
+     * 4×4×4 の単位
      *
      * @param x     チャンク内相対X座標 (0..15)
      * @param y     絶対Y座標
@@ -382,21 +401,24 @@ public final class Chunk {
     }
 
     /**
-     * {@code Heightmaps} を削除し、Minecraft に再計算させる。
+     * {@code Heightmaps} を削除し、Minecraft に再計算させる
      *
-     * <p>本ライブラリは高さマップを再計算しない。ブロックを改変したら呼ぶこと
-     * （{@code docs/adr/0004-defer-heightmap-recalc.md}）。
+     * <p>本ライブラリは高さマップを再計算しない
+     * ブロックを改変したら呼ぶこと
+     * （{@code docs/adr/0004-defer-heightmap-recalc.md}）
      */
     public void clearHeightmaps() {
         root.remove("Heightmaps");
     }
 
-    /** {@code isLightOn} を 0 にし、光源の再計算を促す。 */
+    /** {@code isLightOn} を 0 にし、光源の再計算を促す
+    /** */
     public void invalidateLighting() {
         root.set("isLightOn", new NbtByte((byte) 0));
     }
 
-    /** 使われていないパレット要素を全セクションから取り除く。 */
+    /** 使われていないパレット要素を全セクションから取り除く
+    /** */
     public void compact() {
         Collection<ChunkSection> values = sections.values();
 
@@ -407,9 +429,9 @@ public final class Chunk {
     }
 
     /**
-     * セクション内のブロック添字。
+     * セクション内のブロック添字
      *
-     * <p>{@code & 15} により負のY座標でも正しく求まる。
+     * <p>{@code & 15} により負のY座標でも正しく求まる
      *
      * @param x X座標
      * @param y Y座標
@@ -421,7 +443,8 @@ public final class Chunk {
     }
 
     /**
-     * セクション内のバイオーム添字。1 エントリが 4×4×4 ブロック。
+     * セクション内のバイオーム添字
+     * 1 エントリが 4×4×4 ブロック
      *
      * @param x X座標
      * @param y Y座標

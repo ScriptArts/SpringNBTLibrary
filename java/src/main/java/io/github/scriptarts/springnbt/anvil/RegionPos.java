@@ -1,7 +1,8 @@
 package io.github.scriptarts.springnbt.anvil;
 
 /**
- * リージョンの座標。1リージョンは 32×32 チャンクを担当する。
+ * リージョンの座標
+ * 1リージョンは 32×32 チャンクを担当する
  *
  * @param x リージョンX座標
  * @param z リージョンZ座標
@@ -9,7 +10,7 @@ package io.github.scriptarts.springnbt.anvil;
 public record RegionPos(int x, int z) {
 
     /**
-     * このリージョンのファイル名（{@code r.X.Z.mca}）。
+     * このリージョンのファイル名（{@code r.X.Z.mca}）
      *
      * @return ファイル名
      */
@@ -18,10 +19,11 @@ public record RegionPos(int x, int z) {
     }
 
     /**
-     * {@code r.X.Z.mca} 形式のファイル名から座標を得る。
+     * {@code r.X.Z.mca} 形式のファイル名から座標を得る
      *
      * @param fileName ファイル名
-     * @return 座標。解釈できなければ null
+     * @return 座標
+     * 解釈できなければ null
      */
     public static RegionPos fromFileName(String fileName) {
         String[] parts = fileName.split("\\.");

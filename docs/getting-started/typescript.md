@@ -1,20 +1,19 @@
 # はじめに（TypeScript）
 
-**Node.js 20 以上 / TypeScript 5.7 以上。ESM 専用。**
+Node.js 20 以上、TypeScript 5.7 以上が必要です。ESM 専用です。
 
 ## 導入
 
-npm へは公開していない。[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
-`spring-nbt-library-<版>.tgz` を落として組み込む。
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `spring-nbt-library-<版>.tgz` を落とします。
 
 ```bash
 npm install ./spring-nbt-library-0.1.0.tgz
 ```
 
-これで `node_modules` へ入り、通常のパッケージと同じように import できる。
-型定義（`.d.ts`）も含まれているので補完が効く。
+これで `node_modules` へ入り、通常のパッケージと同じように import できます。
+型定義（`.d.ts`）も含まれているので補完が効きます。
 
-取り込み方は 2 通りある。どちらでもよい。
+取り込み方は 2 通りあります。どちらでも構いません。
 
 ```ts
 // まとめて取る
@@ -26,7 +25,7 @@ import { RegionFile } from "spring-nbt-library/anvil";
 import { BlockState } from "spring-nbt-library/world";
 ```
 
-`package.json` には次のように記録される。
+`package.json` には次のように記録されます。
 
 ```json
 {
@@ -38,9 +37,9 @@ import { BlockState } from "spring-nbt-library/world";
 
 ## `i64` は bigint
 
-TypeScript の `number` は 2^53 を超える整数を表せない。
-`TAG_Long` と `TAG_Long_Array` だけ **`bigint`** を使う（[adr/0007](../adr/0007-typescript-bigint.md)）。
-他の整数型は `number` のままである。
+TypeScript の `number` は 2^53 を超える整数を表せません。
+`TAG_Long` と `TAG_Long_Array` だけ `bigint` を使います（[adr/0007](../adr/0007-typescript-bigint.md)）。
+他の整数型は `number` のままです。
 
 ```ts
 compound.set("time", new NbtLong(449n));   // n を付ける
@@ -59,8 +58,8 @@ console.log(data.getString("LevelName"));
 console.log(data.getInt("DataVersion"));
 ```
 
-型が違えば `UNEXPECTED_TAG_TYPE` の例外になる。
-キーが無いかもしれないときは `opt*` を使う（無ければ `undefined`）。
+型が違えば `UNEXPECTED_TAG_TYPE` の例外になります。
+キーが無いかもしれないときは `opt*` を使います（無ければ `undefined`）。
 
 ## 書く
 
@@ -110,10 +109,10 @@ try {
 
 > **Minecraft を終了してから実行すること。**
 > TypeScript 版は Node にファイルロックの手段が無いため
-> **`session.lock` を確認しない**（[adr/0008](../adr/0008-session-lock.md)）。
-> 起動中でないことは呼び出し側で担保すること。
+> `session.lock` は確認しません（[adr/0008](../adr/0008-session-lock.md)）。
+> 起動中でないことは呼び出し側で担保することです。
 
-> ブロックを置き換えても **Heightmaps と光源は再計算されない**（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> ブロックを置き換えても Heightmaps と光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
 
 ## 次に読むもの
 

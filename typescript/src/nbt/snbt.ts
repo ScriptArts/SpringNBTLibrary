@@ -1,8 +1,8 @@
 /**
- * SNBT (Stringified NBT) のパースと出力。
+ * SNBT (Stringified NBT) のパースと出力
  *
- * 対応範囲は「バイナリ NBT へ損失なく写せる部分集合」。
- * 1.21.5 以降の異種リスト（`[1, "a"]`）は受理しない。
+ * 対応範囲は「バイナリ NBT へ損失なく写せる部分集合」
+ * 1.21.5 以降の異種リスト（`[1, "a"]`）は受理しない
  *
  * 仕様: `docs/spec/11-snbt.md` / `docs/adr/0006-snbt-scope.md`
  */
@@ -46,7 +46,8 @@ const SIMPLE_ESCAPES = new Map<string, string>([
 const LONG_MIN = -9223372036854775808n;
 const LONG_MAX = 9223372036854775807n;
 
-/** 引用符なしで書ける文字か。 */
+/** 引用符なしで書ける文字か
+/** */
 function isBareChar(c: string): boolean {
   if (c >= "a" && c <= "z") {
     return true;
@@ -111,7 +112,9 @@ class Parser {
     this.#chars = text.split("");
   }
 
-  /** 入力全体を 1 つのタグとして読む。末尾に余りがあればエラーにする。 */
+  /** 入力全体を 1 つのタグとして読む
+  /** 末尾に余りがあればエラーにする
+  /** */
   parseWhole(): NbtTag {
     const value = this.#parseValue();
     this.#skipWhitespace();
@@ -321,7 +324,9 @@ class Parser {
     return new NbtLongArray(BigInt64Array.from(values));
   }
 
-  /** 整数タグから値を取り出す。整数以外なら例外。 */
+  /** 整数タグから値を取り出す
+  /** 整数以外なら例外
+  /** */
   #toIntegral(tag: NbtTag): bigint {
     if (tag.type === TagType.Byte || tag.type === TagType.Short || tag.type === TagType.Int) {
       return BigInt(tag.value);
@@ -397,7 +402,8 @@ class Parser {
     }
 
     if (c === "u") {
-      // \uXXXX は UTF-16 コード単位を直接指定する。孤立サロゲートもここで書ける
+      // \uXXXX は UTF-16 コード単位を直接指定する
+      // 孤立サロゲートもここで書ける
       return String.fromCharCode(this.#readHexDigits(4));
     }
 
@@ -442,7 +448,8 @@ class Parser {
     return value;
   }
 
-  /** Unicode 文字名によるエスケープ `\N{...}` を読む。 */
+  /** Unicode 文字名によるエスケープ `\N{...}` を読む
+  /** */
   #readNamedCharacter(): SpringNbtError {
     const start = this.#position;
 
@@ -529,7 +536,9 @@ class Parser {
     return new NbtIntArray(result);
   }
 
-  /** 数値トークンを解釈する。数値として読めなければ undefined（文字列として扱われる）。 */
+  /** 数値トークンを解釈する
+  /** 数値として読めなければ undefined（文字列として扱われる）
+  /** */
   #tryParseNumber(token: string): NbtTag | undefined {
     let negative = false;
     let start = 0;
@@ -551,7 +560,8 @@ class Parser {
     const hexBody = isHexBody(body);
     const last = body[body.length - 1];
 
-    // 幅接尾辞を末尾から剥がす。16進では b/d/f が数字と紛れるため s/l だけを認める
+    // 幅接尾辞を末尾から剥がす
+    // 16進では b/d/f が数字と紛れるため s/l だけを認める
     let suffixAllowed: boolean;
     if (hexBody) {
       suffixAllowed = last === "s" || last === "S" || last === "l" || last === "L";
@@ -719,7 +729,8 @@ class Parser {
       return new NbtDouble(Number(value));
     }
 
-    // 接尾辞なしの整数は Int。暗黙に Long へ格上げしない
+    // 接尾辞なしの整数は Int
+    // 暗黙に Long へ格上げしない
     return new NbtInt(Number(this.#checkRange(value, -2147483648n, 2147483647n, "int")));
   }
 
@@ -765,7 +776,9 @@ class Parser {
     return this.#chars[this.#position];
   }
 
-  /** 末尾でも例外にしない先読み。入力が尽きていれば空文字列を返す。 */
+  /** 末尾でも例外にしない先読み
+  /** 入力が尽きていれば空文字列を返す
+  /** */
   #peekOrEmpty(): string {
     if (this.#position >= this.#chars.length) {
       return "";
@@ -793,12 +806,14 @@ class Parser {
   }
 }
 
-/** SNBT 文字列をタグへ変換する。 */
+/** SNBT 文字列をタグへ変換する
+/** */
 export function parse(text: string): NbtTag {
   return new Parser(text).parseWhole();
 }
 
-/** SNBT 文字列を Compound へ変換する。 */
+/** SNBT 文字列を Compound へ変換する
+/** */
 export function parseCompound(text: string): NbtCompound {
   const tag = parse(text);
 
@@ -813,21 +828,26 @@ export function parseCompound(text: string): NbtCompound {
 // ライタ
 // ---------------------------------------------------------------------------
 
-/** タグを 1 行の SNBT へ変換する。 */
+/** タグを 1 行の SNBT へ変換する
+/** */
 export function write(tag: NbtTag): string {
   const parts: string[] = [];
   writeTag(parts, tag, -1);
   return parts.join("");
 }
 
-/** タグを整形した SNBT へ変換する。インデントは空白 4 個。 */
+/** タグを整形した SNBT へ変換する
+/** インデントは空白 4 個
+/** */
 export function writePretty(tag: NbtTag): string {
   const parts: string[] = [];
   writeTag(parts, tag, 0);
   return parts.join("");
 }
 
-/** タグを書き出す。`depth` が負なら 1 行、0 以上なら整形して出力する。 */
+/** タグを書き出す
+/** `depth` が負なら 1 行、0 以上なら整形して出力する
+/** */
 function writeTag(parts: string[], tag: NbtTag, depth: number): void {
   switch (tag.type) {
     case TagType.Byte:
@@ -947,7 +967,8 @@ function writeTypedArray(
   parts.push("]");
 }
 
-/** 整形出力なら改行とインデントを、1 行出力なら何も入れない。 */
+/** 整形出力なら改行とインデントを、1 行出力なら何も入れない
+/** */
 function appendSeparator(parts: string[], depth: number): void {
   if (depth < 0) {
     return;
@@ -957,7 +978,8 @@ function appendSeparator(parts: string[], depth: number): void {
   parts.push(INDENT_UNIT.repeat(depth));
 }
 
-/** 整形出力のときだけ深さを 1 段進める。 */
+/** 整形出力のときだけ深さを 1 段進める
+/** */
 function nextDepth(depth: number): number {
   if (depth < 0) {
     return -1;
@@ -966,7 +988,9 @@ function nextDepth(depth: number): number {
   return depth + 1;
 }
 
-/** キーを出力する。引用符なしで書ける場合はそのまま出す。 */
+/** キーを出力する
+/** 引用符なしで書ける場合はそのまま出す
+/** */
 function quoteKey(key: string): string {
   if (isBareWritable(key)) {
     return key;
@@ -1001,10 +1025,11 @@ const QUOTE_ESCAPES = new Map<number, string>([
 ]);
 
 /**
- * 文字列を二重引用符で囲み、必要な文字だけエスケープする。
+ * 文字列を二重引用符で囲み、必要な文字だけエスケープする
  *
  * UTF-16 コード単位で処理するのは、正しいサロゲートペアと孤立サロゲートを
- * 区別するため。ここを誤ると Python / Rust と出力が食い違う。
+ * 区別するため
+ * ここを誤ると Python / Rust と出力が食い違う
  */
 function quoteString(text: string): string {
   let result = '"';

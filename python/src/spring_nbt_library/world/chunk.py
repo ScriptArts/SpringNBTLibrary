@@ -1,7 +1,9 @@
-"""チャンク 1 つ分。地形の読み書きの入口。
+"""チャンク 1 つ分
+地形の読み書きの入口
 
-**読んだ NBT をそのまま保持し、変更した部分だけを書き戻す。**
-未知のキーを落とさないので、将来の追加要素があってもデータを壊さない。
+**読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
+**
+未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
 
 仕様: ``docs/spec/30-chunk-format.md``
 """
@@ -29,18 +31,19 @@ __all__ = [
     "block_index",
 ]
 
-#: セクション 1 つに入るブロック数。
+#: セクション 1 つに入るブロック数
 BLOCKS_PER_SECTION = 4096
 
-#: セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）。
+#: セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）
 BIOMES_PER_SECTION = 64
 
-#: ブロックに紐づく付随データのキー。ブロックを置き換えたら整合が崩れる。
+#: ブロックに紐づく付随データのキー
+# ブロックを置き換えたら整合が崩れる
 _BLOCK_DATA_KEYS = ("block_entities", "block_ticks", "fluid_ticks")
 
 
 def _matches_position(entry: NbtCompound, x: int, y: int, z: int) -> bool:
-    """付随データの要素が、指定の絶対座標を指しているか。"""
+    """付随データの要素が、指定の絶対座標を指しているか"""
     entry_x = entry.opt_int("x")
     entry_y = entry.opt_int("y")
     entry_z = entry.opt_int("z")
@@ -53,20 +56,21 @@ def _matches_position(entry: NbtCompound, x: int, y: int, z: int) -> bool:
 
 
 class VersionMismatchAction(enum.Enum):
-    """DataVersion が対象と違ったときの動作。"""
+    """DataVersion が対象と違ったときの動作"""
 
-    #: 警告コールバックを呼んで続行する。既定。
+    #: 警告コールバックを呼んで続行する
+    # 既定
     WARN = "warn"
 
-    #: ``UNSUPPORTED_DATA_VERSION`` の例外にする。
+    #: ``UNSUPPORTED_DATA_VERSION`` の例外にする
     ERROR = "error"
 
-    #: 何もしない。
+    #: 何もしない
     IGNORE = "ignore"
 
 
 class ChunkReadOptions:
-    """チャンク読み込みのオプション。
+    """チャンク読み込みのオプション
 
     仕様: ``docs/spec/30-chunk-format.md`` 5章
     """
@@ -75,22 +79,24 @@ class ChunkReadOptions:
                  on_version_mismatch: VersionMismatchAction = VersionMismatchAction.WARN,
                  on_warning: Optional[Callable[[str], None]] = None,
                  lenient_bit_storage: bool = False) -> None:
-        #: DataVersion が対象と違うときの動作。
+        #: DataVersion が対象と違うときの動作
         self.on_version_mismatch = on_version_mismatch
-        #: 警告の通知先。None なら何もしない。
+        #: 警告の通知先
+        # None なら何もしない
         self.on_warning = on_warning
-        #: data の長さが期待値と違うとき、長さからビット幅を逆算して読むか。
+        #: data の長さが期待値と違うとき、長さからビット幅を逆算して読むか
         self.lenient_bit_storage = lenient_bit_storage
 
 
 class ChunkWriteOptions:
-    """チャンク書き込みのオプション。"""
+    """チャンク書き込みのオプション"""
 
     def __init__(self, allow_foreign_data_version: bool = False) -> None:
-        #: 対象バージョン以外の DataVersion を持つチャンクの書き戻しを許すか。
+        #: 対象バージョン以外の DataVersion を持つチャンクの書き戻しを許すか
         #:
-        #: 既定は False。古いワールドを黙って新形式で上書きし、
-        #: 利用者が気づかないうちに壊すことを防ぐため（``docs/adr/0003-version-policy.md``）。
+        #: 既定は False
+        # 古いワールドを黙って新形式で上書きし、
+        #: 利用者が気づかないうちに壊すことを防ぐため（``docs/adr/0003-version-policy.md``）
         self.allow_foreign_data_version = allow_foreign_data_version
 
 
@@ -99,10 +105,10 @@ _DEFAULT_WRITE = ChunkWriteOptions()
 
 
 class ChunkSection:
-    """チャンクを Y 方向に 16 ブロックずつ区切った 16×16×16 の立方体。
+    """チャンクを Y 方向に 16 ブロックずつ区切った 16×16×16 の立方体
 
     ``BlockLight`` / ``SkyLight`` などの解釈していないキーは元の NBT に残り、
-    書き戻しでそのまま出力される。
+    書き戻しでそのまま出力される
 
     仕様: ``docs/spec/30-chunk-format.md`` 2章
     """
@@ -117,17 +123,17 @@ class ChunkSection:
 
     @property
     def has_block_states(self) -> bool:
-        """ブロック状態を持つか。"""
+        """ブロック状態を持つか"""
         return self.block_states is not None
 
     @property
     def has_biomes(self) -> bool:
-        """バイオームを持つか。"""
+        """バイオームを持つか"""
         return self.biomes is not None
 
     @staticmethod
     def from_nbt(nbt: NbtCompound, options: ChunkReadOptions) -> "ChunkSection":
-        """NBT からセクションを読む。"""
+        """NBT からセクションを読む"""
         section = ChunkSection(nbt, nbt.get_byte("Y"))
         block_states = nbt.opt_compound("block_states")
 
@@ -146,18 +152,21 @@ class ChunkSection:
         return section
 
     def to_nbt(self) -> NbtCompound:
-        """NBT へ書き戻す。解釈していないキーはそのまま残る。"""
+        """NBT へ書き戻す
+        解釈していないキーはそのまま残る
+        """
         if self.block_states is not None:
             self.raw.set("block_states", self.block_states.to_nbt())
 
-        # 解釈したコンテナだけを書き戻す。持たないキーは元のまま残す
+        # 解釈したコンテナだけを書き戻す
+        # 持たないキーは元のまま残す
         if self.biomes is not None:
             self.raw.set("biomes", self.biomes.to_nbt())
 
         return self.raw
 
     def compact(self) -> None:
-        """使われていないパレット要素を取り除く。"""
+        """使われていないパレット要素を取り除く"""
         if self.block_states is not None:
             self.block_states.compact()
 
@@ -167,7 +176,7 @@ class ChunkSection:
 
 
 class Chunk:
-    """チャンク 1 つ分。"""
+    """チャンク 1 つ分"""
 
     __slots__ = ("raw", "_sections")
 
@@ -177,44 +186,50 @@ class Chunk:
 
     @property
     def data_version(self) -> int:
-        """チャンク構造のバージョン。"""
+        """チャンク構造のバージョン"""
         return self.raw.get_int("DataVersion")
 
     @property
     def x(self) -> int:
-        """絶対チャンクX座標。"""
+        """絶対チャンクX座標"""
         return self.raw.get_int("xPos")
 
     @property
     def z(self) -> int:
-        """絶対チャンクZ座標。"""
+        """絶対チャンクZ座標"""
         return self.raw.get_int("zPos")
 
     @property
     def min_section_y(self) -> int:
-        """最下段セクションのY位置。オーバーワールドは -4。"""
+        """最下段セクションのY位置
+        オーバーワールドは -4
+        """
         return self.raw.get_int("yPos")
 
     @property
     def status(self) -> str:
-        """生成段階（``minecraft:full`` など）。"""
+        """生成段階（``minecraft:full`` など）"""
         return self.raw.get_string("Status")
 
     @property
     def is_fully_generated(self) -> bool:
-        """生成が完了しているか。ブロック改変の対象にしてよいのはこれだけ。"""
+        """生成が完了しているか
+        ブロック改変の対象にしてよいのはこれだけ
+        """
         return self.status == "minecraft:full"
 
     @property
     def section_ys(self) -> List[int]:
-        """存在するセクションのY位置。昇順。"""
+        """存在するセクションのY位置
+        昇順
+        """
         return sorted(self._sections)
 
     @staticmethod
     def from_nbt(nbt: NbtCompound, options: Optional[ChunkReadOptions] = None) -> "Chunk":
-        """NBT からチャンクを読む。
+        """NBT からチャンクを読む
 
-        :raises SpringNbtError: 必須のキーが無い、または構造が想定と違う場合。
+        :raises SpringNbtError: 必須のキーが無い、または構造が想定と違う場合
         """
         if options is None:
             effective = _DEFAULT_READ
@@ -240,7 +255,7 @@ class Chunk:
         return chunk
 
     def _check_data_version(self, options: ChunkReadOptions) -> None:
-        """DataVersion を検査し、オプションに従って警告またはエラーにする。"""
+        """DataVersion を検査し、オプションに従って警告またはエラーにする"""
         version = self.data_version
 
         if version == TARGET_DATA_VERSION:
@@ -257,9 +272,10 @@ class Chunk:
             options.on_warning(message)
 
     def to_nbt(self, options: Optional[ChunkWriteOptions] = None) -> NbtCompound:
-        """NBT へ書き戻す。変更したセクションだけを反映し、他のキーはそのまま残す。
+        """NBT へ書き戻す
+        変更したセクションだけを反映し、他のキーはそのまま残す
 
-        :raises SpringNbtError: DataVersion が対象と違い、かつ書き戻しが許可されていない場合。
+        :raises SpringNbtError: DataVersion が対象と違い、かつ書き戻しが許可されていない場合
         """
         if options is None:
             effective = _DEFAULT_WRITE
@@ -291,16 +307,19 @@ class Chunk:
         return self.raw
 
     def section(self, section_y: int) -> Optional[ChunkSection]:
-        """Y位置からセクションを得る。無ければ None。"""
+        """Y位置からセクションを得る
+        無ければ None
+        """
         return self._sections.get(section_y)
 
     def get_block(self, x: int, y: int, z: int) -> Optional[BlockState]:
-        """ブロックを取得する。
+        """ブロックを取得する
 
-        :param x: チャンク内相対X座標 (0..15)。
-        :param y: 絶対Y座標。
-        :param z: チャンク内相対Z座標 (0..15)。
-        :return: ブロック。セクションが無い、または block_states を持たない場合は None。
+        :param x: チャンク内相対X座標 (0..15)
+        :param y: 絶対Y座標
+        :param z: チャンク内相対Z座標 (0..15)
+        :return: ブロック
+        セクションが無い、または block_states を持たない場合は None
         """
         _check_local_coordinates(x, z)
         section = self.section(y >> 4)
@@ -317,16 +336,17 @@ class Chunk:
         return BlockState.from_nbt(entry)
 
     def set_block(self, x: int, y: int, z: int, state: BlockState) -> None:
-        """ブロックを設定する。
+        """ブロックを設定する
 
         置き換えによって不整合になる付随データ（``block_entities`` /
         ``block_ticks`` / ``fluid_ticks`` のうち、その座標を指すもの）は
-        同時に取り除く。残すとブロックと中身が食い違い、
-        Minecraft 側で予期しない挙動になるため。
+        同時に取り除く
+        残すとブロックと中身が食い違い、
+        Minecraft 側で予期しない挙動になるため
 
         仕様: ``docs/spec/30-chunk-format.md`` 2.4章
 
-        :raises SpringNbtError: 対象のセクションが無い、または block_states を持たない場合。
+        :raises SpringNbtError: 対象のセクションが無い、または block_states を持たない場合
         """
         _check_local_coordinates(x, z)
         section_y = y >> 4
@@ -337,7 +357,7 @@ class Chunk:
                 "Y=%d を含むセクション（Y=%d）が無いか、ブロックを持たない。"
                 "本ライブラリはセクションを新規生成しない" % (y, section_y))
 
-        # 同じ状態を置き直すだけなら、付随データを触る理由がない。
+        # 同じ状態を置き直すだけなら、付随データを触る理由がない
         # プロパティの並び順に左右されないよう、NBT ではなく BlockState として比べる
         current = self.get_block(x, y, z)
 
@@ -348,10 +368,10 @@ class Chunk:
         self._remove_block_data(x, y, z)
 
     def _remove_block_data(self, x: int, y: int, z: int) -> None:
-        """その座標を指す付随データを取り除く。
+        """その座標を指す付随データを取り除く
 
         ``block_entities`` / ``block_ticks`` / ``fluid_ticks`` の要素は
-        いずれも ``x`` ``y`` ``z`` を**絶対座標**で持つ。
+        いずれも ``x`` ``y`` ``z`` を**絶対座標**で持つ
         """
         absolute_x = (self.x * 16) + x
         absolute_z = (self.z * 16) + z
@@ -373,7 +393,9 @@ class Chunk:
                     del values[position]
 
     def get_biome(self, x: int, y: int, z: int) -> Optional[str]:
-        """バイオームを取得する。4×4×4 の単位なので、座標は自動的に丸められる。"""
+        """バイオームを取得する
+        4×4×4 の単位なので、座標は自動的に丸められる
+        """
         _check_local_coordinates(x, z)
         section = self.section(y >> 4)
 
@@ -389,7 +411,9 @@ class Chunk:
         return entry.value
 
     def set_biome(self, x: int, y: int, z: int, biome: str) -> None:
-        """バイオームを設定する。4×4×4 の単位。"""
+        """バイオームを設定する
+        4×4×4 の単位
+        """
         _check_local_coordinates(x, z)
         section_y = y >> 4
         section = self.section(section_y)
@@ -401,33 +425,36 @@ class Chunk:
         section.biomes.set(biome_index(x, y, z), NbtString(biome))
 
     def clear_heightmaps(self) -> None:
-        """``Heightmaps`` を削除し、Minecraft に再計算させる。
+        """``Heightmaps`` を削除し、Minecraft に再計算させる
 
-        本ライブラリは高さマップを再計算しない。ブロックを改変したら呼ぶこと
-        （``docs/adr/0004-defer-heightmap-recalc.md``）。
+        本ライブラリは高さマップを再計算しない
+        ブロックを改変したら呼ぶこと
+        （``docs/adr/0004-defer-heightmap-recalc.md``）
         """
         self.raw.remove("Heightmaps")
 
     def invalidate_lighting(self) -> None:
-        """``isLightOn`` を 0 にし、光源の再計算を促す。"""
+        """``isLightOn`` を 0 にし、光源の再計算を促す"""
         self.raw.set("isLightOn", NbtByte(0))
 
     def compact(self) -> None:
-        """使われていないパレット要素を全セクションから取り除く。"""
+        """使われていないパレット要素を全セクションから取り除く"""
         for section in self._sections.values():
             section.compact()
 
 
 def block_index(x: int, y: int, z: int) -> int:
-    """セクション内のブロック添字。
+    """セクション内のブロック添字
 
-    ``& 15`` により負のY座標でも正しく求まる。
+    ``& 15`` により負のY座標でも正しく求まる
     """
     return ((y & 15) * 256) + ((z & 15) * 16) + (x & 15)
 
 
 def biome_index(x: int, y: int, z: int) -> int:
-    """セクション内のバイオーム添字。1 エントリが 4×4×4 ブロック。"""
+    """セクション内のバイオーム添字
+    1 エントリが 4×4×4 ブロック
+    """
     return (((y & 15) // 4) * 16) + (((z & 15) // 4) * 4) + ((x & 15) // 4)
 
 

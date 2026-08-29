@@ -3,11 +3,11 @@ package io.github.scriptarts.springnbt.nbt;
 import io.github.scriptarts.springnbt.SpringNbtException;
 
 /**
- * 展開済みのバイト列から NBT を読み出す。
+ * 展開済みのバイト列から NBT を読み出す
  *
- * <p>入力全体をあらかじめメモリに持つ設計にしている。
- * 「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため。
- * これがないと、長さ 0x7FFFFFFF を宣言しただけの数バイトの入力でメモリを枯渇させられる。
+ * <p>入力全体をあらかじめメモリに持つ設計にしている
+ * 「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため
+ * これがないと、長さ 0x7FFFFFFF を宣言しただけの数バイトの入力でメモリを枯渇させられる
  *
  * <p>仕様: {@code docs/spec/10-nbt-binary.md}
  */
@@ -23,12 +23,14 @@ final class NbtBinaryReader {
         this.position = 0;
     }
 
-    /** 残っている入力バイト数。 */
+    /** 残っている入力バイト数
+    /** */
     private int remaining() {
         return data.length - position;
     }
 
-    /** ルートタグを読む。 */
+    /** ルートタグを読む
+    /** */
     NamedTag readRoot(NbtFormat format) {
         TagType type = TagType.fromId(readByteRaw() & 0xFF);
 
@@ -58,7 +60,8 @@ final class NbtBinaryReader {
         return new NamedTag(name, root);
     }
 
-    /** 指定した型のペイロードを読む。 */
+    /** 指定した型のペイロードを読む
+    /** */
     private NbtTag readPayload(TagType type, int depth) {
         // 深さ上限は再帰する型に入る手前で検査する
         if (depth > maxDepth) {
@@ -82,7 +85,8 @@ final class NbtBinaryReader {
         };
     }
 
-    /** TAG_Compound のペイロード（名前付きタグの並び + TAG_End）を読む。 */
+    /** TAG_Compound のペイロード（名前付きタグの並び + TAG_End）を読む
+    /** */
     private NbtCompound readCompoundPayload(int depth) {
         NbtCompound compound = new NbtCompound();
 
@@ -99,7 +103,8 @@ final class NbtBinaryReader {
         }
     }
 
-    /** TAG_List のペイロードを読む。 */
+    /** TAG_List のペイロードを読む
+    /** */
     private NbtList readListPayload(int depth) {
         TagType elementType = TagType.fromId(readByteRaw() & 0xFF);
         int count = readLength();
@@ -165,7 +170,8 @@ final class NbtBinaryReader {
         return result;
     }
 
-    /** MUTF-8 の文字列（u16 の長さ + 本体）を読む。 */
+    /** MUTF-8 の文字列（u16 の長さ + 本体）を読む
+    /** */
     private String readString() {
         int length = (int) readUnsigned(2);
         ensureAvailable(length);
@@ -175,7 +181,9 @@ final class NbtBinaryReader {
         return text;
     }
 
-    /** 配列・リストの長さフィールドを読む。負値は不正。 */
+    /** 配列・リストの長さフィールドを読む
+    /** 負値は不正
+    /** */
     private int readLength() {
         int length = (int) readUnsigned(4);
 
@@ -194,7 +202,8 @@ final class NbtBinaryReader {
         return value;
     }
 
-    /** 指定バイト数をビッグエンディアンで読み進める。 */
+    /** 指定バイト数をビッグエンディアンで読み進める
+    /** */
     private long readUnsigned(int count) {
         ensureAvailable(count);
         long value = 0;
@@ -208,7 +217,9 @@ final class NbtBinaryReader {
         return value;
     }
 
-    /** 残り入力が必要バイト数を満たすか検査する。メモリを確保する前に呼ぶ。 */
+    /** 残り入力が必要バイト数を満たすか検査する
+    /** メモリを確保する前に呼ぶ
+    /** */
     private void ensureAvailable(long required) {
         if (required > remaining()) {
             throw SpringNbtException.malformed(
@@ -217,11 +228,11 @@ final class NbtBinaryReader {
     }
 
     /**
-     * キーやルート名として使える文字列か検査する。
+     * キーやルート名として使える文字列か検査する
      *
-     * <p>値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）。
+     * <p>値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）
      * Minecraft が書き出すキーは ASCII の識別子のみで、
-     * 孤立サロゲートが現れるのはデータ破損を意味する。
+     * 孤立サロゲートが現れるのはデータ破損を意味する
      */
     private static String requireUtf8Representable(String text, String role) {
         // 対にならないサロゲートが含まれていないか調べる
@@ -230,7 +241,8 @@ final class NbtBinaryReader {
 
             // 上位サロゲートは、対になる下位サロゲートとまとめて 1 文字を成す
             if (Character.isHighSurrogate(c)) {
-                // 対が揃っていれば 2 コード単位を消費する。揃わなければ孤立サロゲート
+                // 対が揃っていれば 2 コード単位を消費する
+                // 揃わなければ孤立サロゲート
                 if (index + 1 < text.length() && Character.isLowSurrogate(text.charAt(index + 1))) {
                     index += 1;
                 } else {
@@ -244,7 +256,9 @@ final class NbtBinaryReader {
         return text;
     }
 
-    /** その型のペイロードが最低何バイトになるかを返す。長さの先行検証に使う。 */
+    /** その型のペイロードが最低何バイトになるかを返す
+    /** 長さの先行検証に使う
+    /** */
     private static int minimumPayloadSize(TagType type) {
         return switch (type) {
             case BYTE -> 1;

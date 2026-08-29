@@ -3,25 +3,26 @@ package io.github.scriptarts.springnbt.nbt;
 import io.github.scriptarts.springnbt.SpringNbtException;
 
 /**
- * Modified UTF-8 (MUTF-8) の符号化・復号。
+ * Modified UTF-8 (MUTF-8) の符号化・復号
  *
- * <p>標準 UTF-8 との違いは 2 点だけ。
+ * <p>標準 UTF-8 との違いは 2 点だけ
  * <ul>
  *   <li>{@code U+0000} を {@code C0 80} の 2 バイトで表す</li>
  *   <li>{@code U+10000} 以上をサロゲートペアへ分解し、3 バイト × 2 で表す (CESU-8)</li>
  * </ul>
  *
  * <p>Java の {@link String} は UTF-16 コード単位の列なので、
- * サロゲートペアも孤立サロゲートもそのまま保持できる。
+ * サロゲートペアも孤立サロゲートもそのまま保持できる
  *
  * <p>{@code DataInput.readUTF} と同じ符号化だが、
- * 65535 バイト超の扱いなど細部を仕様どおりに固定したいため自前で実装している。
+ * 65535 バイト超の扱いなど細部を仕様どおりに固定したいため自前で実装している
  *
  * <p>仕様: {@code docs/spec/10-nbt-binary.md} 2章
  */
 public final class Mutf8 {
 
-    /** MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため）。 */
+    /** MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため）
+    /** */
     public static final int MAX_BYTE_LENGTH = 65535;
 
     private Mutf8() {
@@ -29,7 +30,7 @@ public final class Mutf8 {
     }
 
     /**
-     * MUTF-8 バイト列を文字列へ復号する。
+     * MUTF-8 バイト列を文字列へ復号する
      *
      * @param data   バイト列
      * @param offset 開始位置
@@ -69,7 +70,8 @@ public final class Mutf8 {
 
                 int value = ((b0 & 0x1F) << 6) | (b1 & 0x3F);
 
-                // C0 80 (U+0000) だけは正当。それ以外の 0x80 未満は冗長符号化
+                // C0 80 (U+0000) だけは正当
+                // それ以外の 0x80 未満は冗長符号化
                 if (value < 0x80 && !(b0 == 0xC0 && b1 == 0x80)) {
                     throw SpringNbtException.malformed("MUTF-8: 冗長な2バイト符号化");
                 }
@@ -109,7 +111,7 @@ public final class Mutf8 {
     }
 
     /**
-     * MUTF-8 バイト列を文字列へ復号する。
+     * MUTF-8 バイト列を文字列へ復号する
      *
      * @param data バイト列
      * @return 復号した文字列
@@ -120,10 +122,10 @@ public final class Mutf8 {
     }
 
     /**
-     * 文字列を MUTF-8 バイト列へ符号化する。
+     * 文字列を MUTF-8 バイト列へ符号化する
      *
      * <p>サロゲートは対になっているかどうかに関わらず 1 つずつ 3 バイトで符号化されるため、
-     * 孤立サロゲートもそのまま往復できる。
+     * 孤立サロゲートもそのまま往復できる
      *
      * @param text 文字列
      * @return MUTF-8 バイト列
@@ -156,7 +158,8 @@ public final class Mutf8 {
     }
 
     /**
-     * 文字列を MUTF-8 で符号化したときのバイト長を求める。実際に符号化はしない。
+     * 文字列を MUTF-8 で符号化したときのバイト長を求める
+     * 実際に符号化はしない
      *
      * @param text 文字列
      * @return バイト長

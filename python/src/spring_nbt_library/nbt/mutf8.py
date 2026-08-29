@@ -1,13 +1,13 @@
-"""Modified UTF-8 (MUTF-8) の符号化・復号。
+"""Modified UTF-8 (MUTF-8) の符号化・復号
 
-標準 UTF-8 との違いは 2 点だけ。
+標準 UTF-8 との違いは 2 点だけ
 
 * ``U+0000`` を ``C0 80`` の 2 バイトで表す
 * ``U+10000`` 以上をサロゲートペアへ分解し、3 バイト × 2 で表す (CESU-8)
 
 Python の :class:`str` はコードポイント単位だが、
 ``surrogatepass`` 相当の扱いで孤立サロゲートも保持できるため、
-C# / Java と同じく文字列としてそのまま往復できる。
+C# / Java と同じく文字列としてそのまま往復できる
 
 仕様: ``docs/spec/10-nbt-binary.md`` 2章
 """
@@ -18,12 +18,12 @@ from ..errors import SpringNbtError
 
 __all__ = ["MAX_BYTE_LENGTH", "decode", "encode", "byte_length"]
 
-#: MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため）。
+#: MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため）
 MAX_BYTE_LENGTH = 65535
 
 
 def _to_utf16_units(text: str):
-    """文字列を UTF-16 コード単位の列へ落とす。"""
+    """文字列を UTF-16 コード単位の列へ落とす"""
     units = []
 
     # コードポイントごとに、補助文字ならサロゲートペアへ分解する
@@ -42,7 +42,9 @@ def _to_utf16_units(text: str):
 
 
 def _from_utf16_units(units) -> str:
-    """UTF-16 コード単位の列を文字列へ戻す。孤立サロゲートはそのまま保持する。"""
+    """UTF-16 コード単位の列を文字列へ戻す
+    孤立サロゲートはそのまま保持する
+    """
     result = []
     index = 0
 
@@ -64,9 +66,9 @@ def _from_utf16_units(units) -> str:
 
 
 def decode(data: bytes) -> str:
-    """MUTF-8 バイト列を文字列へ復号する。
+    """MUTF-8 バイト列を文字列へ復号する
 
-    :raises SpringNbtError: バイト列が MUTF-8 として不正な場合。
+    :raises SpringNbtError: バイト列が MUTF-8 として不正な場合
     """
     units = []
     index = 0
@@ -95,7 +97,8 @@ def decode(data: bytes) -> str:
 
             value = ((b0 & 0x1F) << 6) | (b1 & 0x3F)
 
-            # C0 80 (U+0000) だけは正当。それ以外の 0x80 未満は冗長符号化
+            # C0 80 (U+0000) だけは正当
+            # それ以外の 0x80 未満は冗長符号化
             if value < 0x80 and not (b0 == 0xC0 and b1 == 0x80):
                 raise SpringNbtError.malformed("MUTF-8: 冗長な2バイト符号化")
 
@@ -128,16 +131,17 @@ def decode(data: bytes) -> str:
 
 
 def encode(text: str) -> bytes:
-    """文字列を MUTF-8 バイト列へ符号化する。
+    """文字列を MUTF-8 バイト列へ符号化する
 
     サロゲートは対になっているかどうかに関わらず 1 つずつ 3 バイトで符号化されるため、
-    孤立サロゲートもそのまま往復できる。
+    孤立サロゲートもそのまま往復できる
     """
     out = bytearray()
 
     # コード単位ごとに 1〜3 バイトへ展開する
     for unit in _to_utf16_units(text):
-        # U+0001..U+007F だけが 1 バイト。U+0000 は 2 バイトになる
+        # U+0001..U+007F だけが 1 バイト
+        # U+0000 は 2 バイトになる
         if 0x0001 <= unit <= 0x007F:
             out.append(unit)
         elif unit == 0x0000 or unit <= 0x07FF:
@@ -153,12 +157,15 @@ def encode(text: str) -> bytes:
 
 
 def byte_length(text: str) -> int:
-    """文字列を MUTF-8 で符号化したときのバイト長を求める。実際に符号化はしない。"""
+    """文字列を MUTF-8 で符号化したときのバイト長を求める
+    実際に符号化はしない
+    """
     length = 0
 
     # 各コード単位が何バイトになるかを数える
     for unit in _to_utf16_units(text):
-        # U+0001..U+007F だけが 1 バイト。U+0000 は 2 バイトになる
+        # U+0001..U+007F だけが 1 バイト
+        # U+0000 は 2 バイトになる
         if 0x0001 <= unit <= 0x007F:
             length += 1
         elif unit == 0x0000 or unit <= 0x07FF:

@@ -5,10 +5,10 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * SNBT (Stringified NBT) のパースと出力。
+ * SNBT (Stringified NBT) のパースと出力
  *
- * <p>対応範囲は「バイナリ NBT へ損失なく写せる部分集合」。
- * 1.21.5 以降の異種リスト（{@code [1, "a"]}）は受理しない。
+ * <p>対応範囲は「バイナリ NBT へ損失なく写せる部分集合」
+ * 1.21.5 以降の異種リスト（{@code [1, "a"]}）は受理しない
  *
  * <p>仕様: {@code docs/spec/11-snbt.md} / {@code docs/adr/0006-snbt-scope.md}
  */
@@ -21,7 +21,7 @@ public final class Snbt {
     }
 
     /**
-     * SNBT 文字列をタグへ変換する。
+     * SNBT 文字列をタグへ変換する
      *
      * @param text SNBT 文字列
      * @return タグ
@@ -33,7 +33,7 @@ public final class Snbt {
     }
 
     /**
-     * SNBT 文字列を Compound へ変換する。
+     * SNBT 文字列を Compound へ変換する
      *
      * @param text SNBT 文字列
      * @return Compound
@@ -50,7 +50,7 @@ public final class Snbt {
     }
 
     /**
-     * タグを 1 行の SNBT へ変換する。
+     * タグを 1 行の SNBT へ変換する
      *
      * @param tag タグ
      * @return SNBT 文字列
@@ -63,7 +63,8 @@ public final class Snbt {
     }
 
     /**
-     * タグを整形した SNBT へ変換する。インデントは空白 4 個。
+     * タグを整形した SNBT へ変換する
+     * インデントは空白 4 個
      *
      * @param tag タグ
      * @return SNBT 文字列
@@ -75,7 +76,9 @@ public final class Snbt {
         return builder.toString();
     }
 
-    /** タグを書き出す。{@code depth} が負なら 1 行、0 以上なら整形して出力する。 */
+    /** タグを書き出す
+    /** {@code depth} が負なら 1 行、0 以上なら整形して出力する
+    /** */
     private static void writeTag(StringBuilder builder, NbtTag tag, int depth) {
         switch (tag) {
             case NbtByte value -> builder.append(value.value()).append('b');
@@ -154,7 +157,8 @@ public final class Snbt {
     private static void writeByteArray(StringBuilder builder, byte[] values) {
         builder.append("[B;");
 
-        // 型付き配列は 1 行に収める。要素には接尾辞を付ける
+        // 型付き配列は 1 行に収める
+        // 要素には接尾辞を付ける
         for (int index = 0; index < values.length; index++) {
             if (index > 0) {
                 builder.append(',');
@@ -196,7 +200,8 @@ public final class Snbt {
         builder.append(']');
     }
 
-    /** 整形出力なら改行とインデントを、1 行出力なら何も入れない。 */
+    /** 整形出力なら改行とインデントを、1 行出力なら何も入れない
+    /** */
     private static void appendSeparator(StringBuilder builder, int depth) {
         if (depth < 0) {
             return;
@@ -210,7 +215,8 @@ public final class Snbt {
         }
     }
 
-    /** 整形出力のときだけ深さを 1 段進める。 */
+    /** 整形出力のときだけ深さを 1 段進める
+    /** */
     private static int nextDepth(int depth) {
         if (depth < 0) {
             return -1;
@@ -219,7 +225,9 @@ public final class Snbt {
         return depth + 1;
     }
 
-    /** キーを出力する。引用符なしで書ける場合はそのまま出す。 */
+    /** キーを出力する
+    /** 引用符なしで書ける場合はそのまま出す
+    /** */
     private static String quoteKey(String key) {
         if (isBareWritable(key)) {
             return key;
@@ -243,7 +251,8 @@ public final class Snbt {
         return true;
     }
 
-    /** 文字列を二重引用符で囲み、必要な文字だけエスケープする。 */
+    /** 文字列を二重引用符で囲み、必要な文字だけエスケープする
+    /** */
     private static String quoteString(String text) {
         StringBuilder builder = new StringBuilder(text.length() + 2);
         builder.append('"');
@@ -261,7 +270,7 @@ public final class Snbt {
                 case '\f' -> builder.append("\\f");
                 case '\r' -> builder.append("\\r");
                 default -> {
-                    // 正しいサロゲートペアはそのまま出す。
+                    // 正しいサロゲートペアはそのまま出す
                     // ここでエスケープすると、コードポイント単位の言語（Python / Rust）と出力が食い違う
                     if (Character.isHighSurrogate(c)
                             && index + 1 < text.length()

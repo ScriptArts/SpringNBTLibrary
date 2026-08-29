@@ -5,10 +5,10 @@ import java.io.ByteArrayOutputStream;
 import java.util.Map;
 
 /**
- * NBT を展開済みのバイト列へ書き出す。
+ * NBT を展開済みのバイト列へ書き出す
  *
- * <p>出力は一意でなければならない（ラウンドトリップ検証が成立するため）。
- * Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す。
+ * <p>出力は一意でなければならない（ラウンドトリップ検証が成立するため）
+ * Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す
  *
  * <p>仕様: {@code docs/spec/10-nbt-binary.md} 5章
  */
@@ -16,7 +16,8 @@ final class NbtBinaryWriter {
 
     private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 
-    /** ルートタグを書き出し、結果のバイト列を返す。 */
+    /** ルートタグを書き出し、結果のバイト列を返す
+    /** */
     byte[] writeRoot(NamedTag named, NbtFormat format) {
         buffer.write(TagType.COMPOUND.id());
 
@@ -94,7 +95,8 @@ final class NbtBinaryWriter {
     private void writeString(String text) {
         byte[] encoded = Mutf8.encode(text);
 
-        // 長さフィールドは u16。キー名は素の String なのでここでも検査する
+        // 長さフィールドは u16
+        // キー名は素の String なのでここでも検査する
         if (encoded.length > Mutf8.MAX_BYTE_LENGTH) {
             throw SpringNbtException.invalidArgument(
                     "文字列が長すぎる: MUTF-8 で " + encoded.length + " バイト (上限 "
@@ -105,7 +107,8 @@ final class NbtBinaryWriter {
         buffer.writeBytes(encoded);
     }
 
-    /** 値をビッグエンディアンで指定バイト数ぶん書く。 */
+    /** 値をビッグエンディアンで指定バイト数ぶん書く
+    /** */
     private void writeUnsigned(long value, int count) {
         // 上位バイトから順に取り出す
         for (int index = count - 1; index >= 0; index--) {

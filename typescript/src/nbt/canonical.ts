@@ -1,23 +1,26 @@
 /**
- * 浮動小数点の正準10進表記。
+ * 浮動小数点の正準10進表記
  *
  * 各言語の標準の数値書式（C# の `"R"`、Java の `Float.toString`、
- * Python の `repr`、Rust の `{}`、JavaScript の `String(x)`）は互いに一致しない。
- * 指数表記へ切り替わる閾値も、指数部の桁数も、`E` の大文字小文字も処理系ごとに違う。
- * そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する。
+ * Python の `repr`、Rust の `{}`、JavaScript の `String(x)`）は互いに一致しない
+ * 指数表記へ切り替わる閾値も、指数部の桁数も、`E` の大文字小文字も処理系ごとに違う
+ * そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する
  *
  * 仕様: `docs/spec/11-snbt.md` 5.1章
  */
 
-/** 固定小数点表記を使う10進指数の下限。 */
+/** 固定小数点表記を使う10進指数の下限
+/** */
 const MIN_FIXED_EXPONENT = -4;
 
-/** 固定小数点表記を使う10進指数の上限。 */
+/** 固定小数点表記を使う10進指数の上限
+/** */
 const MAX_FIXED_EXPONENT = 16;
 
 const scratch = new DataView(new ArrayBuffer(8));
 
-/** 特殊値なら文字列を、そうでなければ undefined を返す。 */
+/** 特殊値なら文字列を、そうでなければ undefined を返す
+/** */
 function special(value: number): string | undefined {
   if (Number.isNaN(value)) {
     return "NaN";
@@ -34,19 +37,22 @@ function special(value: number): string | undefined {
   return undefined;
 }
 
-/** binary32 のビットパターンを取り出す。 */
+/** binary32 のビットパターンを取り出す
+/** */
 function floatBits(value: number): number {
   scratch.setFloat32(0, value, false);
   return scratch.getUint32(0, false);
 }
 
-/** binary64 のビットパターンを取り出す。 */
+/** binary64 のビットパターンを取り出す
+/** */
 function doubleBits(value: number): bigint {
   scratch.setFloat64(0, value, false);
   return scratch.getBigUint64(0, false);
 }
 
-/** binary32 を正準10進表記へ変換する。 */
+/** binary32 を正準10進表記へ変換する
+/** */
 export function fromFloat(value: number): string {
   const specialText = special(value);
 
@@ -70,7 +76,8 @@ export function fromFloat(value: number): string {
   return formatExponential(value.toExponential(8), negative);
 }
 
-/** binary64 を正準10進表記へ変換する。 */
+/** binary64 を正準10進表記へ変換する
+/** */
 export function fromDouble(value: number): string {
   const specialText = special(value);
 
@@ -95,11 +102,11 @@ export function fromDouble(value: number): string {
 }
 
 /**
- * 符号が負かどうかを判定する。
+ * 符号が負かどうかを判定する
  *
- * `-0` を `< 0` では判定できないため、ビットの符号で見る。
+ * `-0` を `< 0` では判定できないため、ビットの符号で見る
  * JavaScript の `toExponential` は `-0` の符号を落とすので、
- * ここで別に持っておかないと `-0.0d` が `0.0d` になり他言語と食い違う。
+ * ここで別に持っておかないと `-0.0d` が `0.0d` になり他言語と食い違う
  */
 function isNegative(value: number): boolean {
   if (value < 0) {
@@ -109,7 +116,8 @@ function isNegative(value: number): boolean {
   return Object.is(value, -0);
 }
 
-/** 指数表記の文字列（例 `"7.5e-1"`）から、仕様が定める正準表記を組み立てる。 */
+/** 指数表記の文字列（例 `"7.5e-1"`）から、仕様が定める正準表記を組み立てる
+/** */
 function formatExponential(exponential: string, negative: boolean): string {
   let index = 0;
 
@@ -135,7 +143,9 @@ function formatExponential(exponential: string, negative: boolean): string {
   return compose(negative, trimTrailingZeros(digits), exponent);
 }
 
-/** 末尾のゼロを取り除く。すべてゼロなら "0" を残す。 */
+/** 末尾のゼロを取り除く
+/** すべてゼロなら "0" を残す
+/** */
 function trimTrailingZeros(digits: string): string {
   let end = digits.length;
 
@@ -147,7 +157,8 @@ function trimTrailingZeros(digits: string): string {
   return digits.slice(0, end);
 }
 
-/** 数字列と10進指数から最終的な文字列を組み立てる。 */
+/** 数字列と10進指数から最終的な文字列を組み立てる
+/** */
 function compose(negative: boolean, digits: string, exponent: number): string {
   let sign = "";
 
@@ -172,7 +183,8 @@ function compose(negative: boolean, digits: string, exponent: number): string {
   }
 
   if (exponent >= 0) {
-    // 整数部は先頭 (exponent + 1) 桁。足りなければゼロで右詰めする
+    // 整数部は先頭 (exponent + 1) 桁
+    // 足りなければゼロで右詰めする
     const integerDigits = exponent + 1;
     let integerPart: string;
 

@@ -1,5 +1,5 @@
 /**
- * ワールド・チャンク・ブロックの読み書き。
+ * ワールド・チャンク・ブロックの読み書き
  *
  * 仕様: `docs/spec/30-chunk-format.md` / `docs/spec/40-world-layout.md`
  */

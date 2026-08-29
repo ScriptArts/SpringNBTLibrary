@@ -17,10 +17,11 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * ワールド内の次元 1 つ分。{@code region/} {@code entities/} {@code poi/} をまとめて扱う。
+ * ワールド内の次元 1 つ分
+ * {@code region/} {@code entities/} {@code poi/} をまとめて扱う
  *
  * <p>ブロックの取得・設定は<strong>絶対ワールド座標</strong>で行い、
- * リージョン・チャンク・セクションの解決は内部で済ませる。
+ * リージョン・チャンク・セクションの解決は内部で済ませる
  *
  * <p>仕様: {@code docs/spec/40-world-layout.md} 4章
  */
@@ -44,7 +45,7 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * 次元ID（{@code minecraft:overworld} など）。
+     * 次元ID（{@code minecraft:overworld} など）
      *
      * @return 次元ID
      */
@@ -53,7 +54,7 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * この次元のディレクトリ。
+     * この次元のディレクトリ
      *
      * @return パス
      */
@@ -62,7 +63,8 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * 地形のリージョンフォルダ。無ければ null。
+     * 地形のリージョンフォルダ
+     * 無ければ null
      *
      * @return フォルダ
      */
@@ -72,7 +74,8 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * エンティティのリージョンフォルダ。無ければ null。
+     * エンティティのリージョンフォルダ
+     * 無ければ null
      *
      * @return フォルダ
      */
@@ -82,7 +85,8 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * POI のリージョンフォルダ。無ければ null。
+     * POI のリージョンフォルダ
+     * 無ければ null
      *
      * @return フォルダ
      */
@@ -92,10 +96,11 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * {@code data/minecraft/<name>.dat} を読む。
+     * {@code data/minecraft/<name>.dat} を読む
      *
      * @param name ファイル名（拡張子なし）
-     * @return NBT。存在しなければ null
+     * @return NBT
+     * 存在しなければ null
      */
     public NbtCompound dataFile(String name) {
         ensureOpen();
@@ -109,7 +114,7 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * この次元に存在する全チャンクの座標を返す。
+     * この次元に存在する全チャンクの座標を返す
      *
      * @return チャンク座標の一覧
      */
@@ -125,11 +130,13 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * チャンクを読む。読み込んだチャンクはキャッシュされ、次回は同じインスタンスが返る。
+     * チャンクを読む
+     * 読み込んだチャンクはキャッシュされ、次回は同じインスタンスが返る
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
-     * @return チャンク。存在しなければ null
+     * @return チャンク
+     * 存在しなければ null
      */
     public Chunk chunk(int chunkX, int chunkZ) {
         ensureOpen();
@@ -158,7 +165,7 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * チャンクを書き戻す。
+     * チャンクを書き戻す
      *
      * @param chunk チャンク
      */
@@ -178,12 +185,13 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * 絶対座標でブロックを取得する。
+     * 絶対座標でブロックを取得する
      *
      * @param x X座標
      * @param y Y座標
      * @param z Z座標
-     * @return ブロック。チャンクが無ければ null
+     * @return ブロック
+     * チャンクが無ければ null
      */
     public BlockState getBlock(int x, int y, int z) {
         Chunk chunk = chunk(x >> 4, z >> 4);
@@ -196,10 +204,10 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * 絶対座標でブロックを設定する。
+     * 絶対座標でブロックを設定する
      *
-     * <p>変更したチャンクは記録され、{@link #flush()} でまとめて書き戻される。
-     * 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる。
+     * <p>変更したチャンクは記録され、{@link #flush()} でまとめて書き戻される
+     * 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
      *
      * @param x     X座標
      * @param y     Y座標
@@ -224,12 +232,14 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * 絶対座標でバイオームを取得する。4×4×4 の単位。
+     * 絶対座標でバイオームを取得する
+     * 4×4×4 の単位
      *
      * @param x X座標
      * @param y Y座標
      * @param z Z座標
-     * @return バイオームID。チャンクが無ければ null
+     * @return バイオームID
+     * チャンクが無ければ null
      */
     public String getBiome(int x, int y, int z) {
         Chunk chunk = chunk(x >> 4, z >> 4);
@@ -242,7 +252,8 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * 絶対座標でバイオームを設定する。4×4×4 の単位。
+     * 絶対座標でバイオームを設定する
+     * 4×4×4 の単位
      *
      * @param x     X座標
      * @param y     Y座標
@@ -266,7 +277,8 @@ public final class Dimension implements AutoCloseable {
         modifiedChunks.add(chunkKey(chunkX, chunkZ));
     }
 
-    /** 変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する。 */
+    /** 変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する
+    /** */
     public void flush() {
         ensureOpen();
 
@@ -298,7 +310,8 @@ public final class Dimension implements AutoCloseable {
         }
     }
 
-    /** 変更を書き戻してから閉じる。 */
+    /** 変更を書き戻してから閉じる
+    /** */
     @Override
     public void close() {
         if (closed) {
@@ -326,7 +339,9 @@ public final class Dimension implements AutoCloseable {
         closed = true;
     }
 
-    /** フォルダを遅延して開く。存在しなければ null のまま。 */
+    /** フォルダを遅延して開く
+    /** 存在しなければ null のまま
+    /** */
     private RegionFolder folder(RegionFolder slot, String name) {
         ensureOpen();
 
@@ -364,7 +379,8 @@ public final class Dimension implements AutoCloseable {
         }
     }
 
-    /** チャンク座標を 1 つの long に詰めてキャッシュの鍵にする。 */
+    /** チャンク座標を 1 つの long に詰めてキャッシュの鍵にする
+    /** */
     private static long chunkKey(int chunkX, int chunkZ) {
         return ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
     }

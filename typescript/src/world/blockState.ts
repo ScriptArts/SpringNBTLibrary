@@ -1,10 +1,13 @@
 /**
- * ブロックの状態。名前と、任意のプロパティの組。
+ * ブロックの状態
+ * 名前と、任意のプロパティの組
  *
- * プロパティは**常に名前の昇順で保持する**。こうしておくと文字列表現が一意になり、
- * 全言語で同じ出力になる。Minecraft が書き出した並び順は
+ * プロパティは**常に名前の昇順で保持する**
+ * こうしておくと文字列表現が一意になり、
+ * 全言語で同じ出力になる
+ * Minecraft が書き出した並び順は
  * `PalettedContainer` がパレットを生の NBT のまま持つことで守られるので、
- * 触っていないブロックの並びが崩れることはない。
+ * 触っていないブロックの並びが崩れることはない
  *
  * 仕様: `docs/spec/30-chunk-format.md` 2.1章
  */
@@ -13,10 +16,12 @@ import { SpringNbtError } from "../errors.js";
 import { NbtCompound, NbtString, TagType } from "../nbt/index.js";
 
 /**
- * ブロックの状態。名前と、任意のプロパティの組。
+ * ブロックの状態
+ * 名前と、任意のプロパティの組
  *
- * プロパティは**常に名前の昇順で保持する**。こうしておくと文字列表現が一意になり、
- * 全言語で同じ出力になる。
+ * プロパティは**常に名前の昇順で保持する**
+ * こうしておくと文字列表現が一意になり、
+ * 全言語で同じ出力になる
  */
 export class BlockState {
   readonly #name: string;
@@ -36,29 +41,36 @@ export class BlockState {
     this.#sort();
   }
 
-  /** ブロックID（名前空間つき）。 */
+  /** ブロックID（名前空間つき）
+  /** */
   get name(): string {
     return this.#name;
   }
 
-  /** プロパティ。名前の昇順。 */
+  /** プロパティ
+  /** 名前の昇順
+  /** */
   get properties(): ReadonlyMap<string, string> {
     return this.#properties;
   }
 
-  /** プロパティを取得する。無ければ undefined。 */
+  /** プロパティを取得する
+  /** 無ければ undefined
+  /** */
   property(key: string): string | undefined {
     return this.#properties.get(key);
   }
 
-  /** プロパティを 1 つ差し替えた新しい状態を返す。 */
+  /** プロパティを 1 つ差し替えた新しい状態を返す
+  /** */
   with(key: string, value: string): BlockState {
     const entries = [...this.#properties];
     entries.push([key, value]);
     return new BlockState(this.#name, entries);
   }
 
-  /** `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列から作る。 */
+  /** `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列から作る
+  /** */
   static parse(text: string): BlockState {
     const bracket = text.indexOf("[");
 
@@ -106,7 +118,8 @@ export class BlockState {
     return new BlockState(text.slice(0, bracket), entries);
   }
 
-  /** パレット要素の NBT から作る。 */
+  /** パレット要素の NBT から作る
+  /** */
   static fromNbt(nbt: NbtCompound): BlockState {
     const entries: Array<[string, string]> = [];
     const seen = new Set<string>();
@@ -129,9 +142,10 @@ export class BlockState {
   }
 
   /**
-   * パレット要素の NBT へ変換する。
+   * パレット要素の NBT へ変換する
    *
-   * プロパティが空なら `Properties` キー自体を出力しない。Minecraft と同じ振る舞い。
+   * プロパティが空なら `Properties` キー自体を出力しない
+   * Minecraft と同じ振る舞い
    */
   toNbt(): NbtCompound {
     const result = new NbtCompound();
@@ -152,7 +166,8 @@ export class BlockState {
     return result;
   }
 
-  /** 同じ名前・同じプロパティか。 */
+  /** 同じ名前・同じプロパティか
+  /** */
   equals(other: BlockState): boolean {
     if (other.#name !== this.#name || other.#properties.size !== this.#properties.size) {
       return false;
@@ -168,7 +183,8 @@ export class BlockState {
     return true;
   }
 
-  /** `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列を返す。 */
+  /** `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列を返す
+  /** */
   toString(): string {
     if (this.#properties.size === 0) {
       return this.#name;
@@ -184,7 +200,8 @@ export class BlockState {
     return `${this.#name}[${parts.join(",")}]`;
   }
 
-  /** プロパティを名前の昇順へ並べ直す。 */
+  /** プロパティを名前の昇順へ並べ直す
+  /** */
   #sort(): void {
     const sorted = [...this.#properties].sort((left, right) => {
       if (left[0] < right[0]) {
@@ -207,7 +224,8 @@ export class BlockState {
   }
 }
 
-/** 名前空間が省略されていたら `minecraft:` を補う。 */
+/** 名前空間が省略されていたら `minecraft:` を補う
+/** */
 function normalize(name: string): string {
   if (name.includes(":")) {
     return name;

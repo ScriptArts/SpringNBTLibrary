@@ -1,12 +1,14 @@
 package io.github.scriptarts.springnbt.nbt;
 
-/** TAG_Float。IEEE 754 binary32。 */
+/** TAG_Float
+/** IEEE 754 binary32
+/** */
 public final class NbtFloat implements NbtTag {
 
     private float value;
 
     /**
-     * 値を指定して作る。
+     * 値を指定して作る
      *
      * @param value 値
      */
@@ -15,7 +17,7 @@ public final class NbtFloat implements NbtTag {
     }
 
     /**
-     * 保持している値。
+     * 保持している値
      *
      * @return 値
      */
@@ -24,7 +26,7 @@ public final class NbtFloat implements NbtTag {
     }
 
     /**
-     * 値を設定する。
+     * 値を設定する
      *
      * @param newValue 新しい値
      */

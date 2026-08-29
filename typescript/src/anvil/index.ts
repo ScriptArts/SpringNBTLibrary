@@ -1,5 +1,5 @@
 /**
- * Anvil のリージョンファイル (.mca) の読み書き。
+ * Anvil のリージョンファイル (.mca) の読み書き
  *
  * 仕様: `docs/spec/20-anvil-region.md`
  */

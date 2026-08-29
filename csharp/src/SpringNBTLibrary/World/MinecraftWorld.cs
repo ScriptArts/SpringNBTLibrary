@@ -3,39 +3,40 @@ using SpringNBTLibrary.Nbt;
 
 namespace SpringNBTLibrary.World;
 
-/// <summary>ワールドを開くときの動作。</summary>
+/// <summary>ワールドを開くときの動作</summary>
 public sealed class WorldOpenOptions
 {
-    /// <summary>既定のオプション。</summary>
+    /// <summary>既定のオプション</summary>
     public static WorldOpenOptions Default { get; } = new WorldOpenOptions();
 
-    /// <summary>読み書きで開くか。既定は読み取り専用。</summary>
+    /// <summary>読み書きで開くか
+    /// 既定は読み取り専用</summary>
     public bool Writable { get; set; }
 
     /// <summary>
-    /// <c>session.lock</c> の確認を飛ばすか。
+    /// <c>session.lock</c> の確認を飛ばすか
     /// </summary>
     /// <remarks>
-    /// Minecraft が起動中のワールドへ書き込むとデータが壊れる。
-    /// 既定では書き込みモードで開くときに必ず確認する。
-    /// これを立てるのは自己責任。
+    /// Minecraft が起動中のワールドへ書き込むとデータが壊れる
+    /// 既定では書き込みモードで開くときに必ず確認する
+    /// これを立てるのは自己責任
     /// </remarks>
     public bool IgnoreSessionLock { get; set; }
 
-    /// <summary>チャンク読み込みのオプション。</summary>
+    /// <summary>チャンク読み込みのオプション</summary>
     public ChunkReadOptions ChunkRead { get; set; } = ChunkReadOptions.Default;
 
-    /// <summary>チャンク書き込みのオプション。</summary>
+    /// <summary>チャンク書き込みのオプション</summary>
     public ChunkWriteOptions ChunkWrite { get; set; } = ChunkWriteOptions.Default;
 }
 
 /// <summary>
-/// Minecraft Java版のセーブデータ 1 つ分。
+/// Minecraft Java版のセーブデータ 1 つ分
 /// </summary>
 /// <remarks>
 /// <para>
 /// 26.x では構成が大きく変わっており、標準の3次元も
-/// <c>dimensions/&lt;名前空間&gt;/&lt;パス&gt;/</c> の下に並ぶ。
+/// <c>dimensions/&lt;名前空間&gt;/&lt;パス&gt;/</c> の下に並ぶ
 /// </para>
 /// <para>仕様: <c>docs/spec/40-world-layout.md</c></para>
 /// </remarks>
@@ -52,18 +53,18 @@ public sealed class MinecraftWorld : IDisposable
         Level = new LevelData(level);
     }
 
-    /// <summary>ワールドディレクトリのパス。</summary>
+    /// <summary>ワールドディレクトリのパス</summary>
     public string Directory { get; }
 
-    /// <summary><c>level.dat</c> の内容。</summary>
+    /// <summary><c>level.dat</c> の内容</summary>
     public LevelData Level { get; }
 
     /// <summary>
-    /// ワールドを開く。
+    /// ワールドを開く
     /// </summary>
     /// <exception cref="SpringNbtException">
     /// ディレクトリや <c>level.dat</c> が無い場合、
-    /// または書き込みモードで <c>session.lock</c> を取得できない場合。
+    /// または書き込みモードで <c>session.lock</c> を取得できない場合
     /// </exception>
     public static MinecraftWorld Open(string directory, WorldOpenOptions? options = null)
     {
@@ -103,7 +104,7 @@ public sealed class MinecraftWorld : IDisposable
     }
 
     /// <summary>
-    /// <c>session.lock</c> を排他で開けるか確かめる。
+    /// <c>session.lock</c> を排他で開けるか確かめる
     /// </summary>
     private static void CheckSessionLock(string directory)
     {
@@ -130,11 +131,12 @@ public sealed class MinecraftWorld : IDisposable
     }
 
     /// <summary>
-    /// <c>data/minecraft/&lt;name&gt;.dat</c> を読む。存在しなければ null。
+    /// <c>data/minecraft/&lt;name&gt;.dat</c> を読む
+    /// 存在しなければ null
     /// </summary>
     /// <remarks>
     /// 26.x では <c>game_rules</c> / <c>weather</c> / <c>world_gen_settings</c> などが
-    /// この形で <c>level.dat</c> から分離されている。
+    /// この形で <c>level.dat</c> から分離されている
     /// </remarks>
     public NbtCompound? DataFile(string name)
     {
@@ -149,7 +151,7 @@ public sealed class MinecraftWorld : IDisposable
         return NbtIo.ReadFile(path).Tag;
     }
 
-    /// <summary>存在する次元のIDを列挙する。</summary>
+    /// <summary>存在する次元のIDを列挙する</summary>
     public IEnumerable<string> DimensionIds()
     {
         EnsureOpen();
@@ -186,11 +188,12 @@ public sealed class MinecraftWorld : IDisposable
     }
 
     /// <summary>
-    /// 次元を得る。ディレクトリが無ければ null。
+    /// 次元を得る
+    /// ディレクトリが無ければ null
     /// </summary>
     /// <param name="dimensionId">
-    /// <c>minecraft:overworld</c> のような名前空間つきのID。
-    /// 名前空間が省略されていたら <c>minecraft:</c> を補う。
+    /// <c>minecraft:overworld</c> のような名前空間つきのID
+    /// 名前空間が省略されていたら <c>minecraft:</c> を補う
     /// </param>
     public Dimension? Dimension(string dimensionId)
     {
@@ -219,7 +222,7 @@ public sealed class MinecraftWorld : IDisposable
         return opened;
     }
 
-    /// <summary>プレイヤーのUUID一覧。</summary>
+    /// <summary>プレイヤーのUUID一覧</summary>
     public IEnumerable<string> PlayerIds()
     {
         EnsureOpen();
@@ -248,7 +251,8 @@ public sealed class MinecraftWorld : IDisposable
         }
     }
 
-    /// <summary>プレイヤーデータを読む。存在しなければ null。</summary>
+    /// <summary>プレイヤーデータを読む
+    /// 存在しなければ null</summary>
     public NbtCompound? Player(string uuid)
     {
         EnsureOpen();
@@ -265,11 +269,11 @@ public sealed class MinecraftWorld : IDisposable
     }
 
     /// <summary>
-    /// <c>level.dat</c> を書き戻す。
+    /// <c>level.dat</c> を書き戻す
     /// </summary>
     /// <remarks>
     /// 壊れるとワールド全体が開けなくなるため、
-    /// 一時ファイルへ書いてから <c>level.dat_old</c> へ退避し、最後に置き換える。
+    /// 一時ファイルへ書いてから <c>level.dat_old</c> へ退避し、最後に置き換える
     /// </remarks>
     public void SaveLevel()
     {
@@ -302,7 +306,7 @@ public sealed class MinecraftWorld : IDisposable
         }
     }
 
-    /// <summary>開いている次元をすべて閉じる。</summary>
+    /// <summary>開いている次元をすべて閉じる</summary>
     public void Close()
     {
         if (closed)
@@ -331,7 +335,7 @@ public sealed class MinecraftWorld : IDisposable
         }
     }
 
-    /// <summary>名前空間が省略されていたら <c>minecraft:</c> を補う。</summary>
+    /// <summary>名前空間が省略されていたら <c>minecraft:</c> を補う</summary>
     private static string NormalizeDimensionId(string dimensionId)
     {
         if (dimensionId.Contains(':', StringComparison.Ordinal))
@@ -344,11 +348,11 @@ public sealed class MinecraftWorld : IDisposable
 }
 
 /// <summary>
-/// <c>level.dat</c> の内容。
+/// <c>level.dat</c> の内容
 /// </summary>
 /// <remarks>
 /// 26.x では大幅に軽量化されており、ゲームルールやワールド生成設定は
-/// <c>data/minecraft/</c> 配下の個別ファイルへ分離されている。
+/// <c>data/minecraft/</c> 配下の個別ファイルへ分離されている
 ///
 /// <para>仕様: <c>docs/spec/40-world-layout.md</c> 2章</para>
 /// </remarks>
@@ -363,39 +367,42 @@ public sealed class LevelData
         Data = named.Tag.GetCompound("Data");
     }
 
-    /// <summary>ルートの NBT。<c>Data</c> を含む。</summary>
+    /// <summary>ルートの NBT
+    /// <c>Data</c> を含む</summary>
     public NbtCompound Raw { get; }
 
-    /// <summary><c>Data</c> の中身。実際の設定はここに入っている。</summary>
+    /// <summary><c>Data</c> の中身
+    /// 実際の設定はここに入っている</summary>
     public NbtCompound Data { get; }
 
-    /// <summary>チャンク構造のバージョン。</summary>
+    /// <summary>チャンク構造のバージョン</summary>
     public int DataVersion => Data.GetInt("DataVersion");
 
-    /// <summary>ワールド名。</summary>
+    /// <summary>ワールド名</summary>
     public string LevelName => Data.GetString("LevelName");
 
-    /// <summary>ワールドの経過時間（tick）。</summary>
+    /// <summary>ワールドの経過時間（tick）</summary>
     public long Time => Data.GetLong("Time");
 
-    /// <summary>ゲームモード。0=サバイバル 1=クリエイティブ 2=アドベンチャー 3=スペクテイター。</summary>
+    /// <summary>ゲームモード
+    /// 0=サバイバル 1=クリエイティブ 2=アドベンチャー 3=スペクテイター</summary>
     public int GameType => Data.GetInt("GameType");
 
-    /// <summary>スポーン地点の <c>[x, y, z]</c>。</summary>
+    /// <summary>スポーン地点の <c>[x, y, z]</c></summary>
     public int[] SpawnPos => Data.GetCompound("spawn").GetIntArray("pos");
 
-    /// <summary>スポーン地点の次元ID。</summary>
+    /// <summary>スポーン地点の次元ID</summary>
     public string SpawnDimension => Data.GetCompound("spawn").GetString("dimension");
 
-    /// <summary>難易度（<c>normal</c> など）。</summary>
+    /// <summary>難易度（<c>normal</c> など）</summary>
     public string Difficulty => Data.GetCompound("difficulty_settings").GetString("difficulty");
 
-    /// <summary>ハードコアか。</summary>
+    /// <summary>ハードコアか</summary>
     public bool IsHardcore => Data.GetCompound("difficulty_settings").GetBool("hardcore");
 
-    /// <summary>バージョン名（<c>26.2</c> など）。</summary>
+    /// <summary>バージョン名（<c>26.2</c> など）</summary>
     public string VersionName => Data.GetCompound("Version").GetString("Name");
 
-    /// <summary>書き出し用の <see cref="NamedTag"/> を作る。</summary>
+    /// <summary>書き出し用の <see cref="NamedTag"/> を作る</summary>
     public NamedTag ToNamedTag() => new NamedTag(rootName, Raw);
 }

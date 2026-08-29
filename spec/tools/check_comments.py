@@ -11,6 +11,7 @@
 2. **条件分岐のコメント** — `if` の直前に説明のコメントがあるか
 3. **ループのコメント** — `for` / `foreach` / `while` の直前に説明のコメントがあるか
 4. **禁止記法** — 三項演算子、オプショナルチェーン、null 合体演算子
+5. **コメントの句点** — コメントに `。` を使わない
 
 ガード節（引数検証など、`throw` / `return` だけで終わる短い分岐）は
 2 の対象から外す。書いても「不正なら弾く」としか書けず、かえって読みにくいため。
@@ -253,6 +254,10 @@ def has_comment_before(lines, index: int, language: str) -> bool:
             position -= 1
             continue
 
+        # Python は docstring がその前の説明にあたる
+        if language == "python" and '"""' in stripped:
+            return True
+
         return is_comment(lines[position], language)
 
     return False
@@ -388,10 +393,21 @@ def check_language(language: str):
             lines = handle.read().split("\n")
 
         in_block_comment = False
+        in_docstring = False
 
         for index, line in enumerate(lines):
             number = index + 1
             stripped = line.strip()
+
+            # Python の docstring も句点を使わない
+            if language == "python" and in_docstring and "。" in line:
+                findings.append(Finding(language, relative, number,
+                                        "コメントに句点がある", line))
+
+            if language == "python":
+                # 三重引用符の数が奇数なら、docstring の出入りが切り替わる
+                if stripped.count('"""') % 2 == 1:
+                    in_docstring = not in_docstring
 
             # ブロックコメントの中は検査しない
             if stripped.startswith("/*"):
@@ -403,6 +419,11 @@ def check_language(language: str):
                 continue
 
             if is_comment(line, language):
+                # コメントに句点は使わない。文が続くなら行を分ける
+                if "。" in line:
+                    findings.append(Finding(language, relative, number,
+                                            "コメントに句点がある", line))
+
                 continue
 
             # 1. 禁止記法

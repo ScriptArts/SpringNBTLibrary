@@ -4,12 +4,12 @@ using System.Text;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// SNBT (Stringified NBT) のパースと出力。
+/// SNBT (Stringified NBT) のパースと出力
 /// </summary>
 /// <remarks>
 /// <para>
-/// 対応範囲は「バイナリ NBT へ損失なく写せる部分集合」。
-/// 1.21.5 以降の異種リスト（<c>[1, "a"]</c>）は受理しない。
+/// 対応範囲は「バイナリ NBT へ損失なく写せる部分集合」
+/// 1.21.5 以降の異種リスト（<c>[1, "a"]</c>）は受理しない
 /// </para>
 /// <para>仕様: <c>docs/spec/11-snbt.md</c> / <c>docs/adr/0006-snbt-scope.md</c></para>
 /// </remarks>
@@ -17,8 +17,8 @@ public static class Snbt
 {
     private const string IndentUnit = "    ";
 
-    /// <summary>SNBT 文字列をタグへ変換する。</summary>
-    /// <exception cref="SpringNbtException">構文が不正な場合。</exception>
+    /// <summary>SNBT 文字列をタグへ変換する</summary>
+    /// <exception cref="SpringNbtException">構文が不正な場合</exception>
     public static NbtTag Parse(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -26,9 +26,9 @@ public static class Snbt
         return parser.ParseWhole();
     }
 
-    /// <summary>SNBT 文字列を Compound へ変換する。</summary>
+    /// <summary>SNBT 文字列を Compound へ変換する</summary>
     /// <exception cref="SpringNbtException">
-    /// 構文が不正、またはルートが Compound でない場合。
+    /// 構文が不正、またはルートが Compound でない場合
     /// </exception>
     public static NbtCompound ParseCompound(string text)
     {
@@ -43,7 +43,7 @@ public static class Snbt
             $"ルートが compound でない: {tag.Type.AsString()}");
     }
 
-    /// <summary>タグを 1 行の SNBT へ変換する。</summary>
+    /// <summary>タグを 1 行の SNBT へ変換する</summary>
     public static string Write(NbtTag tag)
     {
         ArgumentNullException.ThrowIfNull(tag);
@@ -52,7 +52,8 @@ public static class Snbt
         return builder.ToString();
     }
 
-    /// <summary>タグを整形した SNBT へ変換する。インデントは空白 4 個。</summary>
+    /// <summary>タグを整形した SNBT へ変換する
+    /// インデントは空白 4 個</summary>
     public static string WritePretty(NbtTag tag)
     {
         ArgumentNullException.ThrowIfNull(tag);
@@ -62,7 +63,8 @@ public static class Snbt
     }
 
     /// <summary>
-    /// タグを書き出す。<paramref name="depth"/> が負なら 1 行、0 以上なら整形して出力する。
+    /// タグを書き出す
+    /// <paramref name="depth"/> が負なら 1 行、0 以上なら整形して出力する
     /// </summary>
     private static void WriteTag(StringBuilder builder, NbtTag tag, int depth)
     {
@@ -182,7 +184,8 @@ public static class Snbt
     {
         builder.Append("[B;");
 
-        // 型付き配列は 1 行に収める。要素には接尾辞を付ける
+        // 型付き配列は 1 行に収める
+        // 要素には接尾辞を付ける
         for (int i = 0; i < array.Value.Length; i++)
         {
             // 2 つ目以降の前に区切りのカンマを置く
@@ -235,7 +238,7 @@ public static class Snbt
         builder.Append(']');
     }
 
-    /// <summary>整形出力なら改行とインデントを、1 行出力なら何も入れない。</summary>
+    /// <summary>整形出力なら改行とインデントを、1 行出力なら何も入れない</summary>
     private static void AppendSeparator(StringBuilder builder, int depth)
     {
         if (depth < 0)
@@ -252,7 +255,7 @@ public static class Snbt
         }
     }
 
-    /// <summary>整形出力のときだけ深さを 1 段進める。</summary>
+    /// <summary>整形出力のときだけ深さを 1 段進める</summary>
     private static int NextDepth(int depth)
     {
         if (depth < 0)
@@ -263,7 +266,8 @@ public static class Snbt
         return depth + 1;
     }
 
-    /// <summary>キーを出力する。引用符なしで書ける場合はそのまま出す。</summary>
+    /// <summary>キーを出力する
+    /// 引用符なしで書ける場合はそのまま出す</summary>
     private static string QuoteKey(string key)
     {
         if (IsBareWritable(key))
@@ -293,7 +297,7 @@ public static class Snbt
         return true;
     }
 
-    /// <summary>文字列を二重引用符で囲み、必要な文字だけエスケープする。</summary>
+    /// <summary>文字列を二重引用符で囲み、必要な文字だけエスケープする</summary>
     private static string QuoteString(string text)
     {
         StringBuilder builder = new StringBuilder(text.Length + 2);
@@ -327,7 +331,7 @@ public static class Snbt
                     builder.Append("\\r");
                     break;
                 default:
-                    // 正しいサロゲートペアはそのまま出す。
+                    // 正しいサロゲートペアはそのまま出す
                     // ここでエスケープすると、コードポイント単位の言語（Python / Rust）と出力が食い違う
                     if (char.IsHighSurrogate(c)
                         && index + 1 < text.Length

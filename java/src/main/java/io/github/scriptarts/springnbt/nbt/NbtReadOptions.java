@@ -1,13 +1,14 @@
 package io.github.scriptarts.springnbt.nbt;
 
 /**
- * NBT 読み込みのオプション。
+ * NBT 読み込みのオプション
  *
  * <p>仕様: {@code docs/spec/10-nbt-binary.md} 6章 / {@code docs/spec/00-conventions.md} 5章
  */
 public final class NbtReadOptions {
 
-    /** ネストの深さ上限の既定値。 */
+    /** ネストの深さ上限の既定値
+    /** */
     public static final int DEFAULT_MAX_DEPTH = 512;
 
     private NbtFormat format = NbtFormat.JAVA;
@@ -16,7 +17,7 @@ public final class NbtReadOptions {
     private long maxDecompressedSize = -1;
 
     /**
-     * 既定のオプションを作る。
+     * 既定のオプションを作る
      *
      * @return 既定のオプション
      */
@@ -25,7 +26,7 @@ public final class NbtReadOptions {
     }
 
     /**
-     * ルートタグの並び方。
+     * ルートタグの並び方
      *
      * @return 並び方
      */
@@ -34,7 +35,7 @@ public final class NbtReadOptions {
     }
 
     /**
-     * ルートタグの並び方を設定する。
+     * ルートタグの並び方を設定する
      *
      * @param value 並び方
      * @return このオブジェクト
@@ -45,7 +46,8 @@ public final class NbtReadOptions {
     }
 
     /**
-     * 圧縮方式。既定は {@link Compression#AUTO}。
+     * 圧縮方式
+     * 既定は {@link Compression#AUTO}
      *
      * @return 圧縮方式
      */
@@ -54,7 +56,7 @@ public final class NbtReadOptions {
     }
 
     /**
-     * 圧縮方式を設定する。
+     * 圧縮方式を設定する
      *
      * @param value 圧縮方式
      * @return このオブジェクト
@@ -65,7 +67,8 @@ public final class NbtReadOptions {
     }
 
     /**
-     * ネストの深さ上限。既定は 512。
+     * ネストの深さ上限
+     * 既定は 512
      *
      * @return 深さ上限
      */
@@ -74,7 +77,7 @@ public final class NbtReadOptions {
     }
 
     /**
-     * ネストの深さ上限を設定する。
+     * ネストの深さ上限を設定する
      *
      * @param value 深さ上限
      * @return このオブジェクト
@@ -85,7 +88,8 @@ public final class NbtReadOptions {
     }
 
     /**
-     * 展開後の総バイト数の上限。負値なら無制限。
+     * 展開後の総バイト数の上限
+     * 負値なら無制限
      *
      * @return 上限
      */
@@ -94,9 +98,10 @@ public final class NbtReadOptions {
     }
 
     /**
-     * 展開後の総バイト数の上限を設定する。
+     * 展開後の総バイト数の上限を設定する
      *
-     * @param value 上限。負値なら無制限
+     * @param value 上限
+     * 負値なら無制限
      * @return このオブジェクト
      */
     public NbtReadOptions setMaxDecompressedSize(long value) {

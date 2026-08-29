@@ -4,86 +4,60 @@
 [![lint](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/lint.yml/badge.svg)](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Minecraft **Java版 26.2**（DataVersion `4903`）のワールドデータ・NBTファイルを読み書きするライブラリ。
-
-**複数の言語へ、同じ概念モデルと同じ挙動のものを提供する。**
+Minecraft Java版 26.2（DataVersion `4903`）のワールドデータ・NBTファイルを読み書きするライブラリです。
+複数の言語に、同じ概念モデルと同じ挙動のものを用意しています。
 
 ## 対応言語
 
-対応言語は今後も追加していく。現在対応しているのは次のとおり。
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から落として、自分のプロジェクトに組み込んでください。
 
-| 言語 | パッケージ名 | 必要環境 | はじめに |
+| 言語 | 必要環境 | 入手するもの | 組み込み方 |
 |---|---|---|---|
-| C# | `SpringNBTLibrary` | .NET 8 / C# 12 | [導入と最小サンプル](docs/getting-started/csharp.md) |
-| Java | `io.github.scriptarts:spring-nbt-library` | Java 21 (LTS) | [導入と最小サンプル](docs/getting-started/java.md) |
-| TypeScript | `spring-nbt-library` | Node.js 20+ / TypeScript 5.7+ | [導入と最小サンプル](docs/getting-started/typescript.md) |
-| Python | `spring-nbt-library` | Python 3.10+ | [導入と最小サンプル](docs/getting-started/python.md) |
-| Rust | `spring-nbt-library` | Rust 1.75+ (2021 edition) | [導入と最小サンプル](docs/getting-started/rust.md) |
+| [C#](docs/getting-started/csharp.md) | .NET 8 / C# 12 | `SpringNBTLibrary-<版>-dotnet8.zip` | 展開して `.dll` を参照に追加 |
+| [Java](docs/getting-started/java.md) | Java 21 (LTS) | `spring-nbt-library-<版>.jar` | クラスパスへ追加 |
+| [TypeScript](docs/getting-started/typescript.md) | Node.js 20+ | `spring-nbt-library-<版>.tgz` | `npm install ./<ファイル>` |
+| [Python](docs/getting-started/python.md) | Python 3.10+ | `spring_nbt_library-<版>-py3-none-any.whl` | `pip install <ファイル>` |
+| [Rust](docs/getting-started/rust.md) | Rust 1.75+ | — | `Cargo.toml` で git 参照 |
 
-新しい言語を足す手順は [移植ガイド](docs/contributing/porting-guide.md) にまとめてある。
-言語が増えても、仕様書とテストベクタは共通のものを使う。
+同梱の `SHA256SUMS.txt` でファイルの整合を確認できます。
 
-## 入手
+対応言語は今後も増やします。手順は [移植ガイド](docs/contributing/porting-guide.md) にあります。
 
-パッケージレジストリへは公開していない。
-**[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
-ビルド済みの成果物を落として、自分のプロジェクトへ組み込む。**
+## 何が違うのか
 
-| 言語 | ファイル | 組み込み方 |
-|---|---|---|
-| C# | `SpringNBTLibrary-<版>-dotnet8.zip` | 展開して `.dll` を参照に追加 |
-| Java | `spring-nbt-library-<版>.jar` | クラスパスへ追加 |
-| TypeScript | `spring-nbt-library-<版>.tgz` | `npm install ./<ファイル>` |
-| Python | `spring_nbt_library-<版>-py3-none-any.whl` | `pip install <ファイル>` |
-| Rust | — | `Cargo.toml` で git 参照（`.crate` も置いてある） |
+NBT や Anvil を扱うライブラリは各言語にあります。
+このライブラリは、同じ仕様書と同じテストベクタから対応言語すべてを同時に作っています。
 
-同梱の `SHA256SUMS.txt` で、落としたファイルが壊れていないか確かめられる。
-言語ごとの詳しい手順は上の表の「はじめに」を参照。
+Rust のツールと Java のプラグインで同じワールドを触るとき、
+言語ごとに挙動の違うライブラリを組み合わせて悩まずに済むことを狙っています。
 
-## このライブラリの立ち位置
+そのために次を守っています。
 
-NBT や Anvil を扱うライブラリは各言語に既に存在する。
-本ライブラリの違いは、**同じ設計者が、同じ仕様書と同じテストベクタから、
-対応言語すべての実装を同時に提供している**点にある。
-
-複数言語が絡むプロジェクト（Rust のツールと Java のプラグインで同じワールドを扱う、など）で、
-言語ごとに挙動の違うライブラリを組み合わせて悩む必要をなくすことを狙っている。
-
-そのため次を最優先で維持している。
-
-1. `docs/spec/` が唯一の正であり、各言語実装はその実装であること
-2. 対応言語すべての挙動一致を、人手のレビューではなく**適合性テストで機械的に保証**すること
-3. [機能一覧](docs/features.md)が実装と乖離しないよう CI で検証すること
+- `docs/spec/` を唯一の正とし、各言語はその実装にすぎない
+- 挙動の一致は目視ではなく[適合性テスト](docs/spec/90-conformance.md)で確かめる
+- [機能一覧](docs/features.md)が実装からずれないよう CI で検査する
 
 ## ドキュメント
 
-**[ドキュメントの目次はこちら](docs/README.md)**
+[目次](docs/README.md)から辿れます。
 
-| 目的 | 読むもの |
+| 読みたいこと | 場所 |
 |---|---|
-| 何ができるのか知りたい | [機能一覧](docs/features.md) |
-| とりあえず動かしたい | [はじめに](docs/getting-started/) |
-| 使い方を調べたい | [ガイド](docs/guide/) |
-| 他の言語版の対応するAPIを知りたい | [API対応表](docs/api/overview.md) |
-| 自分で実装・移植したい | [仕様](docs/spec/00-conventions.md) |
-| なぜその設計なのか知りたい | [設計判断の記録](docs/adr/) |
+| 何ができるか | [機能一覧](docs/features.md) |
+| とりあえず動かす | [はじめに](docs/getting-started/) |
+| 使い方 | [ガイド](docs/guide/) |
+| 他言語版との対応 | [API対応表](docs/api/overview.md) |
+| 自分で実装・移植する | [仕様](docs/spec/00-conventions.md) |
+| 設計の理由 | [ADR](docs/adr/) |
 
-## 対応状況
+## 検証
 
-| レイヤ | 内容 | 状態 |
-|---|---|---|
-| 1. NBT | 全13タグ・MUTF-8・圧縮・SNBT | ✅ 対応言語すべてで完成 |
-| 2. Anvil | `.mca` リージョンファイルの読み書き | ✅ 対応言語すべてで完成 |
-| 3. World / Block | `level.dat`・チャンク・ブロック操作 | ✅ 対応言語すべてで完成 |
+NBT・Anvil・World の3レイヤを Java版 26.2 の実ワールドで確かめています。
+`.dat` 23個とチャンク 3,717個のすべてで、読み込みとバイト一致の書き戻しが通りました。
+World レイヤでも 3,481 チャンク（83,544 セクション）の再エンコードが原本と一致し、
+393万ブロックの読み出しに成功しています。
 
-機能ごと・言語ごとの詳細は [機能一覧](docs/features.md) を参照。
-
-3レイヤすべて **Java版 26.2 の実ワールドで検証済み**。
-`.dat` 23個 + チャンク 3,717個 = 3,740件すべてで読み込みとバイト一致のラウンドトリップに成功し、
-World レイヤでも 3,481 チャンク（83,544 セクション）の再エンコードが原本と一致、
-393万ブロックの読み出しも通っています。
-代表ファイルは対応言語すべてで出力が完全一致することも確認済みです。
-自分のワールドで試すには:
+自分のワールドで試すこともできます。読み取りしかしません。
 
 ```bash
 python3 spec/tools/scan_world.py "<ワールドのパス>"

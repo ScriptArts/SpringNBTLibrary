@@ -3,13 +3,16 @@ package io.github.scriptarts.springnbt.nbt;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** TAG_Byte_Array。8bit 符号付き整数の配列。 */
+/** TAG_Byte_Array
+/** 8bit 符号付き整数の配列
+/** */
 public final class NbtByteArray implements NbtTag {
 
     private byte[] value;
 
     /**
-     * 配列を指定して作る。渡した配列をそのまま保持する（コピーしない）。
+     * 配列を指定して作る
+     * 渡した配列をそのまま保持する（コピーしない）
      *
      * @param value 配列
      */
@@ -18,7 +21,7 @@ public final class NbtByteArray implements NbtTag {
     }
 
     /**
-     * 保持している配列。
+     * 保持している配列
      *
      * @return 配列
      */
@@ -27,7 +30,7 @@ public final class NbtByteArray implements NbtTag {
     }
 
     /**
-     * 配列を設定する。
+     * 配列を設定する
      *
      * @param newValue 新しい配列
      */

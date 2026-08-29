@@ -17,7 +17,7 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 
 /**
- * NBT のファイル・バイト列・ストリームからの読み書き。
+ * NBT のファイル・バイト列・ストリームからの読み書き
  *
  * <p>仕様: {@code docs/spec/10-nbt-binary.md} 3章・4章
  */
@@ -28,10 +28,11 @@ public final class NbtIo {
     }
 
     /**
-     * ファイルから NBT を読む。
+     * ファイルから NBT を読む
      *
      * @param path    ファイルパス
-     * @param options 読み込みオプション。null なら既定値
+     * @param options 読み込みオプション
+     * null なら既定値
      * @return 読み込んだルート
      * @throws SpringNbtException 読み込みに失敗した場合
      */
@@ -50,10 +51,11 @@ public final class NbtIo {
     }
 
     /**
-     * バイト列から NBT を読む。
+     * バイト列から NBT を読む
      *
      * @param bytes   バイト列
-     * @param options 読み込みオプション。null なら既定値
+     * @param options 読み込みオプション
+     * null なら既定値
      * @return 読み込んだルート
      * @throws SpringNbtException 読み込みに失敗した場合
      */
@@ -72,10 +74,12 @@ public final class NbtIo {
     }
 
     /**
-     * ストリームから NBT を読む。ストリームは最後まで読み切る。
+     * ストリームから NBT を読む
+     * ストリームは最後まで読み切る
      *
      * @param stream  入力ストリーム
-     * @param options 読み込みオプション。null なら既定値
+     * @param options 読み込みオプション
+     * null なら既定値
      * @return 読み込んだルート
      * @throws SpringNbtException 読み込みに失敗した場合
      */
@@ -90,11 +94,12 @@ public final class NbtIo {
     }
 
     /**
-     * NBT をファイルへ書き出す。
+     * NBT をファイルへ書き出す
      *
      * @param path    ファイルパス
      * @param tag     書き出すルート
-     * @param options 書き込みオプション。null なら既定値
+     * @param options 書き込みオプション
+     * null なら既定値
      * @throws SpringNbtException 書き込みに失敗した場合
      */
     public static void writeFile(Path path, NamedTag tag, NbtWriteOptions options) {
@@ -110,10 +115,11 @@ public final class NbtIo {
     }
 
     /**
-     * NBT をバイト列へ書き出す。
+     * NBT をバイト列へ書き出す
      *
      * @param tag     書き出すルート
-     * @param options 書き込みオプション。null なら既定値
+     * @param options 書き込みオプション
+     * null なら既定値
      * @return バイト列
      * @throws SpringNbtException 書き込みに失敗した場合
      */
@@ -137,11 +143,12 @@ public final class NbtIo {
     }
 
     /**
-     * NBT をストリームへ書き出す。
+     * NBT をストリームへ書き出す
      *
      * @param stream  出力ストリーム
      * @param tag     書き出すルート
-     * @param options 書き込みオプション。null なら既定値
+     * @param options 書き込みオプション
+     * null なら既定値
      * @throws SpringNbtException 書き込みに失敗した場合
      */
     public static void writeStream(OutputStream stream, NamedTag tag, NbtWriteOptions options) {
@@ -157,7 +164,7 @@ public final class NbtIo {
     }
 
     /**
-     * 先頭バイトから圧縮方式を判定する。
+     * 先頭バイトから圧縮方式を判定する
      *
      * @param bytes バイト列
      * @return 圧縮方式
@@ -194,7 +201,8 @@ public final class NbtIo {
                 String.format("圧縮方式を判定できない (先頭バイト 0x%02X)", bytes[0] & 0xFF));
     }
 
-    /** 指定された方式で展開する。 */
+    /** 指定された方式で展開する
+    /** */
     private static byte[] decompress(byte[] bytes, NbtReadOptions options) {
         Compression method;
         // AUTO なら先頭バイトから圧縮方式を見分ける
@@ -218,7 +226,8 @@ public final class NbtIo {
         }
     }
 
-    /** 指定された方式で圧縮する。 */
+    /** 指定された方式で圧縮する
+    /** */
     private static byte[] compress(byte[] plain, Compression method) {
         if (method == Compression.NONE) {
             return plain;
@@ -262,7 +271,8 @@ public final class NbtIo {
         throw SpringNbtException.invalidArgument("圧縮できない方式: " + method);
     }
 
-    /** 展開後のサイズ上限を見ながらコピーする。 */
+    /** 展開後のサイズ上限を見ながらコピーする
+    /** */
     private static void copyWithLimit(InputStream source, OutputStream destination, long maxSize)
             throws IOException {
         byte[] chunk = new byte[81920];

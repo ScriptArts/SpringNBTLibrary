@@ -1,8 +1,9 @@
-//! パレットとビットストレージの組。セクション内のブロック状態やバイオームを格納する。
+//! パレットとビットストレージの組
+//! セクション内のブロック状態やバイオームを格納する
 //!
-//! パレットの要素は**生の [`NbtTag`] のまま**持つ。
+//! パレットの要素は**生の [`NbtTag`] のまま**持つ
 //! こうすると、触っていないブロックについては Minecraft が書き出したときの
-//! プロパティの並び順まで含めてそのまま書き戻せる。
+//! プロパティの並び順まで含めてそのまま書き戻せる
 //!
 //! 仕様: `docs/spec/31-paletted-container.md`
 
@@ -11,7 +12,8 @@ use crate::nbt::tag::{NbtCompound, NbtList, NbtTag};
 
 use super::bit_storage::BitStorage;
 
-/// `count` 個の値を表すのに必要な最小ビット数。1 なら 0。
+/// `count` 個の値を表すのに必要な最小ビット数
+/// 1 なら 0
 pub fn ceil_log2(count: usize) -> usize {
     let mut bits = 0usize;
 
@@ -23,7 +25,7 @@ pub fn ceil_log2(count: usize) -> usize {
     bits
 }
 
-/// パレット付きのコンテナ。
+/// パレット付きのコンテナ
 #[derive(Debug, Clone)]
 pub struct PalettedContainer {
     palette: Vec<NbtTag>,
@@ -33,22 +35,25 @@ pub struct PalettedContainer {
 }
 
 impl PalettedContainer {
-    /// エントリ数。ブロックなら 4096、バイオームなら 64。
+    /// エントリ数
+    /// ブロックなら 4096、バイオームなら 64
     pub fn entry_count(&self) -> usize {
         self.entry_count
     }
 
-    /// ビット幅の下限。ブロックなら 4、バイオームなら 1。
+    /// ビット幅の下限
+    /// ブロックなら 4、バイオームなら 1
     pub fn min_bits(&self) -> usize {
         self.min_bits
     }
 
-    /// パレット。
+    /// パレット
     pub fn palette(&self) -> &[NbtTag] {
         &self.palette
     }
 
-    /// 現在のビット幅。パレットが 1 要素なら 0（記憶域を持たない）。
+    /// 現在のビット幅
+    /// パレットが 1 要素なら 0（記憶域を持たない）
     pub fn bits_per_entry(&self) -> usize {
         match &self.storage {
             Some(storage) => storage.bits_per_entry(),
@@ -56,7 +61,7 @@ impl PalettedContainer {
         }
     }
 
-    /// 単一の値で埋めたコンテナを作る。
+    /// 単一の値で埋めたコンテナを作る
     pub fn filled(value: NbtTag, entry_count: usize, min_bits: usize) -> PalettedContainer {
         PalettedContainer {
             palette: vec![value],
@@ -66,7 +71,7 @@ impl PalettedContainer {
         }
     }
 
-    /// NBT から読み込む。
+    /// NBT から読み込む
     pub fn from_nbt(
         nbt: &NbtCompound,
         entry_count: usize,
@@ -105,7 +110,7 @@ impl PalettedContainer {
         let bits = min_bits.max(ceil_log2(palette.len()));
         let storage = BitStorage::from_longs(data, bits, entry_count, lenient_bit_storage)?;
 
-        // 取り出した添字がパレットの範囲に収まっているか確かめる。
+        // 取り出した添字がパレットの範囲に収まっているか確かめる
         // 黙って 0 番目で代替すると、壊れたデータをそうと分からない形で書き戻してしまう
         for index in 0..entry_count {
             let value = storage.get(index)? as usize;
@@ -129,7 +134,7 @@ impl PalettedContainer {
         })
     }
 
-    /// NBT へ変換する。
+    /// NBT へ変換する
     pub fn to_nbt(&self) -> Result<NbtCompound> {
         let mut result = NbtCompound::new();
         let mut palette_tag = NbtList::new();
@@ -139,7 +144,8 @@ impl PalettedContainer {
             palette_tag.push(entry.clone())?;
         }
 
-        // パレットが 1 要素なら data は書かない。Minecraft と同じ振る舞い
+        // パレットが 1 要素なら data は書かない
+        // Minecraft と同じ振る舞い
         if let Some(storage) = &self.storage {
             // パレットが 1 要素なら data は書かない
             if self.palette.len() > 1 {
@@ -151,7 +157,7 @@ impl PalettedContainer {
         Ok(result)
     }
 
-    /// 添字の値を取り出す。
+    /// 添字の値を取り出す
     pub fn get(&self, index: usize) -> Result<&NbtTag> {
         self.check_index(index)?;
 
@@ -162,7 +168,8 @@ impl PalettedContainer {
         }
     }
 
-    /// 添字の値を書き換える。パレットに無ければ追加する。
+    /// 添字の値を書き換える
+    /// パレットに無ければ追加する
     pub fn set(&mut self, index: usize, value: NbtTag) -> Result<()> {
         self.check_index(index)?;
         let palette_index = self.index_of_or_add(value);
@@ -180,16 +187,17 @@ impl PalettedContainer {
         }
     }
 
-    /// 全エントリを 1 つの値で埋める。パレットもその 1 要素だけにする。
+    /// 全エントリを 1 つの値で埋める
+    /// パレットもその 1 要素だけにする
     pub fn fill(&mut self, value: NbtTag) {
         self.palette.clear();
         self.palette.push(value);
         self.storage = None;
     }
 
-    /// どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す。
+    /// どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す
     ///
-    /// 大量の `set` を行う用途で遅くならないよう、明示的に呼んだときだけ実行する。
+    /// 大量の `set` を行う用途で遅くならないよう、明示的に呼んだときだけ実行する
     pub fn compact(&mut self) -> Result<()> {
         let storage = match &self.storage {
             Some(storage) => storage.clone(),
@@ -241,7 +249,8 @@ impl PalettedContainer {
         Ok(())
     }
 
-    /// パレット内の位置を返す。無ければ末尾へ追加する。
+    /// パレット内の位置を返す
+    /// 無ければ末尾へ追加する
     fn index_of_or_add(&mut self, value: NbtTag) -> usize {
         // パレットは高々 4096 要素なので線形探索で足りる
         for index in 0..self.palette.len() {
@@ -254,7 +263,7 @@ impl PalettedContainer {
         self.palette.len() - 1
     }
 
-    /// 現在のパレット長に合うビット幅の記憶域を用意する。
+    /// 現在のパレット長に合うビット幅の記憶域を用意する
     fn ensure_storage(&mut self) -> Result<()> {
         let required = self.min_bits.max(ceil_log2(self.palette.len()));
 

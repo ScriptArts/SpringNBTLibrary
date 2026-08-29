@@ -1,9 +1,11 @@
 /**
- * Anvil のリージョンファイル (`r.X.Z.mca`)。32×32 チャンクを格納する。
+ * Anvil のリージョンファイル (`r.X.Z.mca`)
+ * 32×32 チャンクを格納する
  *
- * ファイル全体をメモリに読み込んで扱う。実データのリージョンは数 MB 程度で、
- * この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい。
- * 開いて何も変えずに `flush()` すると、バイト単位で元と同じファイルになる。
+ * ファイル全体をメモリに読み込んで扱う
+ * 実データのリージョンは数 MB 程度で、
+ * この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
+ * 開いて何も変えずに `flush()` すると、バイト単位で元と同じファイルになる
  *
  * 仕様: `docs/spec/20-anvil-region.md`
  */
@@ -28,34 +30,46 @@ import {
 } from "./compression.js";
 import { ChunkPos, RegionPos } from "./pos.js";
 
-/** セクタ長。 */
+/** セクタ長
+/** */
 export const SECTOR_SIZE = 4096;
 
-/** ロケーションテーブルとタイムスタンプテーブルが占めるセクタ数。 */
+/** ロケーションテーブルとタイムスタンプテーブルが占めるセクタ数
+/** */
 const HEADER_SECTORS = 2;
 
-/** 1リージョンに入るチャンク数。 */
+/** 1リージョンに入るチャンク数
+/** */
 const CHUNK_COUNT = 1024;
 
-/** 1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため）。 */
+/** 1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため）
+/** */
 const MAX_SECTORS = 255;
 
-/** リージョン内に収められるペイロードの上限。超えると外部ファイルへ退避する。 */
+/** リージョン内に収められるペイロードの上限
+/** 超えると外部ファイルへ退避する
+/** */
 const MAX_INLINE_PAYLOAD = MAX_SECTORS * SECTOR_SIZE - 5;
 
-/** リージョンファイルを開くときの動作。 */
+/** リージョンファイルを開くときの動作
+/** */
 export enum RegionFileMode {
-  /** 読み取り専用。書き込み系の操作はエラーになる。 */
+  /** 読み取り専用
+  /** 書き込み系の操作はエラーになる
+  /** */
   ReadOnly = "read_only",
-  /** 読み書き。ファイルが無ければ空のリージョンとして扱う。 */
+  /** 読み書き
+  /** ファイルが無ければ空のリージョンとして扱う
+  /** */
   ReadWrite = "read_write",
 }
 
 /**
- * Anvil のリージョンファイル (`r.X.Z.mca`)。32×32 チャンクを格納する。
+ * Anvil のリージョンファイル (`r.X.Z.mca`)
+ * 32×32 チャンクを格納する
  *
  * ファイル全体をメモリに読み込んで扱うので、開いて何も変えずに `flush()` すると
- * バイト単位で元と同じファイルになる。
+ * バイト単位で元と同じファイルになる
  */
 export class RegionFile {
   readonly #path: string;
@@ -79,16 +93,19 @@ export class RegionFile {
     this.#parseHeader();
   }
 
-  /** このリージョンのX座標。 */
+  /** このリージョンのX座標
+  /** */
   readonly regionX: number;
 
-  /** このリージョンのZ座標。 */
+  /** このリージョンのZ座標
+  /** */
   readonly regionZ: number;
 
   /**
-   * リージョンファイルを開く。
+   * リージョンファイルを開く
    *
-   * @param path `r.X.Z.mca` という名前のファイル。座標はファイル名から読み取る
+   * @param path `r.X.Z.mca` という名前のファイル
+   * 座標はファイル名から読み取る
    * @param mode 読み取り専用か読み書きか
    */
   static open(path: string, mode: RegionFileMode = RegionFileMode.ReadOnly): RegionFile {
@@ -119,7 +136,8 @@ export class RegionFile {
     return new RegionFile(path, mode, position, raw);
   }
 
-  /** ヘッダを解析し、ロケーションとタイムスタンプを取り込む。 */
+  /** ヘッダを解析し、ロケーションとタイムスタンプを取り込む
+  /** */
   #parseHeader(): void {
     // 空ファイルは「チャンクが 1 つも無いリージョン」として受け入れる
     if (this.#data.length === 0) {
@@ -188,7 +206,8 @@ export class RegionFile {
     }
   }
 
-  /** 指定した座標がこのリージョンの担当範囲にあるか確認し、添字を返す。 */
+  /** 指定した座標がこのリージョンの担当範囲にあるか確認し、添字を返す
+  /** */
   #indexOf(chunkX: number, chunkZ: number): number {
     const position = new ChunkPos(chunkX, chunkZ);
     const region = position.region;
@@ -214,13 +233,15 @@ export class RegionFile {
     }
   }
 
-  /** チャンクが存在するか。 */
+  /** チャンクが存在するか
+  /** */
   hasChunk(chunkX: number, chunkZ: number): boolean {
     this.#ensureOpen();
     return this.#sectorCounts[this.#indexOf(chunkX, chunkZ)] > 0;
   }
 
-  /** 存在するチャンクの座標を、ロケーションテーブルの並び順で返す。 */
+  /** 存在するチャンクの座標を、ロケーションテーブルの並び順で返す
+  /** */
   chunkPositions(): ChunkPos[] {
     this.#ensureOpen();
     const result: ChunkPos[] = [];
@@ -239,13 +260,16 @@ export class RegionFile {
     return result;
   }
 
-  /** チャンクの最終更新時刻（Unix 秒）。存在しなければ 0。 */
+  /** チャンクの最終更新時刻（Unix 秒）
+  /** 存在しなければ 0
+  /** */
   timestamp(chunkX: number, chunkZ: number): number {
     this.#ensureOpen();
     return this.#timestamps[this.#indexOf(chunkX, chunkZ)];
   }
 
-  /** チャンクの最終更新時刻を設定する。 */
+  /** チャンクの最終更新時刻を設定する
+  /** */
   setTimestamp(chunkX: number, chunkZ: number, value: number): void {
     this.#ensureOpen();
     this.#ensureWritable();
@@ -253,7 +277,9 @@ export class RegionFile {
     this.#dirty = true;
   }
 
-  /** チャンクを圧縮されたまま取り出す。存在しなければ undefined。 */
+  /** チャンクを圧縮されたまま取り出す
+  /** 存在しなければ undefined
+  /** */
   readChunkRaw(chunkX: number, chunkZ: number): RawChunk | undefined {
     this.#ensureOpen();
     const index = this.#indexOf(chunkX, chunkZ);
@@ -289,7 +315,9 @@ export class RegionFile {
     return new RawChunk(compression, this.#data.slice(start + 5, start + 4 + length), false);
   }
 
-  /** チャンクを NBT として読む。存在しなければ undefined。 */
+  /** チャンクを NBT として読む
+  /** 存在しなければ undefined
+  /** */
   readChunk(chunkX: number, chunkZ: number): NbtCompound | undefined {
     const raw = this.readChunkRaw(chunkX, chunkZ);
 
@@ -300,7 +328,8 @@ export class RegionFile {
     return readBytes(decompressChunk(raw), { compression: Compression.None }).tag;
   }
 
-  /** チャンクを NBT として書き込む。 */
+  /** チャンクを NBT として書き込む
+  /** */
   writeChunk(
     chunkX: number,
     chunkZ: number,
@@ -311,7 +340,8 @@ export class RegionFile {
     this.writeChunkRaw(chunkX, chunkZ, new RawChunk(compression, compressChunk(plain, compression)));
   }
 
-  /** 圧縮済みのチャンクをそのまま書き込む。 */
+  /** 圧縮済みのチャンクをそのまま書き込む
+  /** */
   writeChunkRaw(chunkX: number, chunkZ: number, raw: RawChunk): void {
     this.#ensureOpen();
     this.#ensureWritable();
@@ -357,7 +387,9 @@ export class RegionFile {
     this.#dirty = true;
   }
 
-  /** チャンクを削除する。削除できたら true。 */
+  /** チャンクを削除する
+  /** 削除できたら true
+  /** */
   deleteChunk(chunkX: number, chunkZ: number): boolean {
     this.#ensureOpen();
     this.#ensureWritable();
@@ -377,13 +409,14 @@ export class RegionFile {
   }
 
   /**
-   * 必要なセクタ数を確保し、開始セクタ番号を返す。
+   * 必要なセクタ数を確保し、開始セクタ番号を返す
    *
    * 既存の割り当てがちょうど同じ大きさならその場を使い、
-   * そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する。
+   * そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する
    */
   #allocateSectors(index: number, needed: number): number {
-    // 大きさが変わらないなら動かさない。触っていないチャンクの配置を保つため
+    // 大きさが変わらないなら動かさない
+    // 触っていないチャンクの配置を保つため
     if (this.#sectorCounts[index] === needed) {
       return this.#offsets[index];
     }
@@ -406,13 +439,16 @@ export class RegionFile {
       }
     }
 
-    // 見つからなければ末尾へ追加する。末尾の空きは再利用できる
+    // 見つからなければ末尾へ追加する
+    // 末尾の空きは再利用できる
     const start = totalSectors - run;
     this.#resize((start + needed) * SECTOR_SIZE);
     return start;
   }
 
-  /** セクタの使用状況を作る。`ignoreIndex` のチャンクは空きとして扱う。 */
+  /** セクタの使用状況を作る
+  /** `ignoreIndex` のチャンクは空きとして扱う
+  /** */
   #buildSectorUsage(ignoreIndex: number): boolean[] {
     const totalSectors = this.#data.length / SECTOR_SIZE;
     const used = new Array<boolean>(totalSectors).fill(false);
@@ -441,7 +477,9 @@ export class RegionFile {
     return used;
   }
 
-  /** 全チャンクを隙間なく詰め直す。断片化したファイルを縮めたいときに使う。 */
+  /** 全チャンクを隙間なく詰め直す
+  /** 断片化したファイルを縮めたいときに使う
+  /** */
   optimize(): void {
     this.#ensureOpen();
     this.#ensureWritable();
@@ -500,7 +538,8 @@ export class RegionFile {
     this.#dirty = true;
   }
 
-  /** 変更をファイルへ書き出す。 */
+  /** 変更をファイルへ書き出す
+  /** */
   flush(): void {
     this.#ensureOpen();
 
@@ -519,14 +558,17 @@ export class RegionFile {
     this.#dirty = false;
   }
 
-  /** 現在の内容をバイト列として組み立てる。ファイルには書かない。 */
+  /** 現在の内容をバイト列として組み立てる
+  /** ファイルには書かない
+  /** */
   toBytes(): Uint8Array {
     this.#ensureOpen();
     this.#writeHeader();
     return this.#data.slice();
   }
 
-  /** ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す。 */
+  /** ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す
+  /** */
   #writeHeader(): void {
     // 位置表とタイムスタンプ表を、添字順に組み立て直す
     for (let index = 0; index < CHUNK_COUNT; index++) {
@@ -535,7 +577,8 @@ export class RegionFile {
     }
   }
 
-  /** 変更があれば書き出してから閉じる。 */
+  /** 変更があれば書き出してから閉じる
+  /** */
   close(): void {
     if (this.#closed) {
       return;
@@ -560,7 +603,8 @@ export class RegionFile {
     this.#data = grown;
   }
 
-  /** 指定位置からビッグエンディアンで読む。 */
+  /** 指定位置からビッグエンディアンで読む
+  /** */
   #readUnsigned(position: number, count: number): number {
     let value = 0;
 
@@ -572,7 +616,8 @@ export class RegionFile {
     return value;
   }
 
-  /** 指定位置へビッグエンディアンで書く。 */
+  /** 指定位置へビッグエンディアンで書く
+  /** */
   #writeUnsigned(position: number, value: number, count: number): void {
     let remaining = value >>> 0;
 
@@ -635,7 +680,8 @@ export class RegionFile {
   }
 }
 
-/** 圧縮済みペイロードを展開する。 */
+/** 圧縮済みペイロードを展開する
+/** */
 function decompressChunk(raw: RawChunk): Uint8Array {
   if (raw.compression === ChunkCompression.None) {
     return raw.data;
@@ -661,7 +707,8 @@ function decompressChunk(raw: RawChunk): Uint8Array {
   );
 }
 
-/** ペイロードを指定の方式で圧縮する。 */
+/** ペイロードを指定の方式で圧縮する
+/** */
 function compressChunk(plain: Uint8Array, compression: ChunkCompression): Uint8Array {
   if (compression === ChunkCompression.None) {
     return plain;

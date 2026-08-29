@@ -1,4 +1,4 @@
-"""NBT のファイル・バイト列・ストリームからの読み書き。
+"""NBT のファイル・バイト列・ストリームからの読み書き
 
 仕様: ``docs/spec/10-nbt-binary.md`` 3章〜6章
 """
@@ -47,28 +47,31 @@ __all__ = [
 
 
 class NbtFormat(enum.Enum):
-    """NBT のルートタグの並び方。"""
+    """NBT のルートタグの並び方"""
 
-    #: ファイル形式。ルートは「タグID + 名前長 + 名前 + ペイロード」の順。
+    #: ファイル形式
+    # ルートは「タグID + 名前長 + 名前 + ペイロード」の順
     JAVA = "java"
 
-    #: ネットワーク形式 (1.20.2 以降)。ルートに名前が付かない。
+    #: ネットワーク形式 (1.20.2 以降)
+    # ルートに名前が付かない
     NETWORK = "network"
 
 
 class Compression(enum.Enum):
-    """圧縮方式。"""
+    """圧縮方式"""
 
     NONE = "none"
     GZIP = "gzip"
     ZLIB = "zlib"
 
-    #: 先頭バイトから自動判定する。読み込み時のみ指定できる。
+    #: 先頭バイトから自動判定する
+    # 読み込み時のみ指定できる
     AUTO = "auto"
 
 
 class NamedTag:
-    """ルート名とルートタグの組。"""
+    """ルート名とルートタグの組"""
 
     __slots__ = ("name", "tag")
 
@@ -81,30 +84,33 @@ class NamedTag:
 
 
 class NbtReadOptions:
-    """NBT 読み込みのオプション。"""
+    """NBT 読み込みのオプション"""
 
     def __init__(self, fmt: NbtFormat = NbtFormat.JAVA,
                  compression: Compression = Compression.AUTO,
                  max_depth: int = _recursion.DEFAULT_MAX_DEPTH,
                  max_decompressed_size: int = -1) -> None:
-        #: ルートタグの並び方。
+        #: ルートタグの並び方
         self.format = fmt
-        #: 圧縮方式。既定は自動判定。
+        #: 圧縮方式
+        # 既定は自動判定
         self.compression = compression
-        #: ネストの深さ上限。
+        #: ネストの深さ上限
         self.max_depth = max_depth
-        #: 展開後の総バイト数の上限。負値なら無制限。
+        #: 展開後の総バイト数の上限
+        # 負値なら無制限
         self.max_decompressed_size = max_decompressed_size
 
 
 class NbtWriteOptions:
-    """NBT 書き込みのオプション。"""
+    """NBT 書き込みのオプション"""
 
     def __init__(self, fmt: NbtFormat = NbtFormat.JAVA,
                  compression: Compression = Compression.GZIP) -> None:
-        #: ルートタグの並び方。
+        #: ルートタグの並び方
         self.format = fmt
-        #: 圧縮方式。既定は GZip。
+        #: 圧縮方式
+        # 既定は GZip
         self.compression = compression
 
 
@@ -119,10 +125,10 @@ _DEFAULT_WRITE = NbtWriteOptions()
 
 
 class _Reader:
-    """展開済みのバイト列から NBT を読み出す。
+    """展開済みのバイト列から NBT を読み出す
 
-    入力全体をあらかじめメモリに持つ設計にしている。
-    「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため。
+    入力全体をあらかじめメモリに持つ設計にしている
+    「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため
     """
 
     def __init__(self, data: bytes, max_depth: int) -> None:
@@ -135,7 +141,9 @@ class _Reader:
         return len(self._data) - self._position
 
     def read_root(self, fmt: NbtFormat) -> NamedTag:
-        """ルートタグを 1 つ読む。形式によって名前の有無が変わる。"""
+        """ルートタグを 1 つ読む
+        形式によって名前の有無が変わる
+        """
         tag_type = TagType.from_id(self._read_byte())
 
         # Java版のファイル形式でもネットワーク形式でも、ルートは必ず TAG_Compound
@@ -279,18 +287,20 @@ class _Reader:
         return chunk
 
     def _ensure_available(self, required: int) -> None:
-        """残り入力が必要バイト数を満たすか検査する。メモリを確保する前に呼ぶ。"""
+        """残り入力が必要バイト数を満たすか検査する
+        メモリを確保する前に呼ぶ
+        """
         if required > self._remaining:
             raise SpringNbtError.malformed(
                 "入力が足りない: %d バイト必要だが残り %d バイト" % (required, self._remaining))
 
 
 def _require_utf8_representable(text: str, role: str) -> str:
-    """キーやルート名として使える文字列か検査する。
+    """キーやルート名として使える文字列か検査する
 
-    値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）。
+    値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）
     Minecraft が書き出すキーは ASCII の識別子のみで、
-    孤立サロゲートが現れるのはデータ破損を意味する。
+    孤立サロゲートが現れるのはデータ破損を意味する
     """
     # 対にならないサロゲートが含まれていないか調べる
     index = 0
@@ -300,7 +310,8 @@ def _require_utf8_representable(text: str, role: str) -> str:
 
         # 上位サロゲートは、対になる下位サロゲートとまとめて 1 文字を成す
         if 0xD800 <= code <= 0xDBFF:
-            # 対が揃っていれば 2 コード単位を消費する。揃わなければ孤立サロゲート
+            # 対が揃っていれば 2 コード単位を消費する
+            # 揃わなければ孤立サロゲート
             if index + 1 < len(text) and 0xDC00 <= ord(text[index + 1]) <= 0xDFFF:
                 index += 2
                 continue
@@ -316,7 +327,9 @@ def _require_utf8_representable(text: str, role: str) -> str:
 
 
 def _minimum_payload_size(tag_type: TagType) -> int:
-    """その型のペイロードが最低何バイトになるかを返す。長さの先行検証に使う。"""
+    """その型のペイロードが最低何バイトになるかを返す
+    長さの先行検証に使う
+    """
     return _MINIMUM_PAYLOAD_SIZE.get(tag_type, 1)
 
 
@@ -346,17 +359,19 @@ _MINIMUM_PAYLOAD_SIZE = {
 
 
 class _Writer:
-    """NBT を展開済みのバイト列へ書き出す。
+    """NBT を展開済みのバイト列へ書き出す
 
-    出力は一意でなければならない（ラウンドトリップ検証が成立するため）。
-    Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す。
+    出力は一意でなければならない（ラウンドトリップ検証が成立するため）
+    Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す
     """
 
     def __init__(self) -> None:
         self._buffer = bytearray()
 
     def write_root(self, named: NamedTag, fmt: NbtFormat) -> bytes:
-        """ルートタグを 1 つ書き出す。形式によって名前の有無が変わる。"""
+        """ルートタグを 1 つ書き出す
+        形式によって名前の有無が変わる
+        """
         self._buffer.append(TagType.COMPOUND.value)
 
         if fmt == NbtFormat.JAVA:
@@ -422,7 +437,8 @@ class _Writer:
     def _write_string(self, text: str) -> None:
         encoded = mutf8.encode(text)
 
-        # 長さフィールドは u16。キー名は素の str なのでここでも検査する
+        # 長さフィールドは u16
+        # キー名は素の str なのでここでも検査する
         if len(encoded) > mutf8.MAX_BYTE_LENGTH:
             raise SpringNbtError.invalid_argument(
                 "文字列が長すぎる: MUTF-8 で %d バイト (上限 %d)"
@@ -438,9 +454,9 @@ class _Writer:
 
 
 def detect_compression(data: bytes) -> Compression:
-    """先頭バイトから圧縮方式を判定する。
+    """先頭バイトから圧縮方式を判定する
 
-    :raises SpringNbtError: どの方式とも判定できない場合。
+    :raises SpringNbtError: どの方式とも判定できない場合
     """
     if len(data) == 0:
         raise SpringNbtError.malformed("入力が空で圧縮方式を判定できない")
@@ -515,7 +531,7 @@ def _compress(plain: bytes, method: Compression) -> bytes:
 
 
 def read_bytes(data: bytes, options: Optional[NbtReadOptions] = None) -> NamedTag:
-    """バイト列から NBT を読む。"""
+    """バイト列から NBT を読む"""
     if options is None:
         effective = _DEFAULT_READ
     else:
@@ -529,7 +545,7 @@ def read_bytes(data: bytes, options: Optional[NbtReadOptions] = None) -> NamedTa
 
 
 def read_file(path: str, options: Optional[NbtReadOptions] = None) -> NamedTag:
-    """ファイルから NBT を読む。"""
+    """ファイルから NBT を読む"""
     try:
         with open(path, "rb") as handle:
             data = handle.read()
@@ -540,7 +556,9 @@ def read_file(path: str, options: Optional[NbtReadOptions] = None) -> NamedTag:
 
 
 def read_stream(stream, options: Optional[NbtReadOptions] = None) -> NamedTag:
-    """ストリームから NBT を読む。ストリームは最後まで読み切る。"""
+    """ストリームから NBT を読む
+    ストリームは最後まで読み切る
+    """
     try:
         data = stream.read()
     except OSError as error:
@@ -550,7 +568,7 @@ def read_stream(stream, options: Optional[NbtReadOptions] = None) -> NamedTag:
 
 
 def write_bytes(named: NamedTag, options: Optional[NbtWriteOptions] = None) -> bytes:
-    """NBT をバイト列へ書き出す。"""
+    """NBT をバイト列へ書き出す"""
     if options is None:
         effective = _DEFAULT_WRITE
     else:
@@ -570,7 +588,7 @@ def write_bytes(named: NamedTag, options: Optional[NbtWriteOptions] = None) -> b
 
 
 def write_file(path: str, named: NamedTag, options: Optional[NbtWriteOptions] = None) -> None:
-    """NBT をファイルへ書き出す。"""
+    """NBT をファイルへ書き出す"""
     data = write_bytes(named, options)
 
     try:
@@ -581,7 +599,7 @@ def write_file(path: str, named: NamedTag, options: Optional[NbtWriteOptions] = 
 
 
 def write_stream(stream, named: NamedTag, options: Optional[NbtWriteOptions] = None) -> None:
-    """NBT をストリームへ書き出す。"""
+    """NBT をストリームへ書き出す"""
     data = write_bytes(named, options)
 
     try:

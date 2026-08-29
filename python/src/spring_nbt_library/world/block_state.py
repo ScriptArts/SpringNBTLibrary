@@ -1,9 +1,12 @@
-"""ブロックの状態。名前と、任意のプロパティの組。
+"""ブロックの状態
+名前と、任意のプロパティの組
 
-プロパティは**常に名前の昇順で保持する**。こうしておくと文字列表現が一意になり、
-全言語で同じ出力になる。Minecraft が書き出した並び順は
+プロパティは**常に名前の昇順で保持する**
+こうしておくと文字列表現が一意になり、
+全言語で同じ出力になる
+Minecraft が書き出した並び順は
 :class:`PalettedContainer` がパレットを生の NBT のまま持つことで守られるので、
-触っていないブロックの並びが崩れることはない。
+触っていないブロックの並びが崩れることはない
 
 仕様: ``docs/spec/30-chunk-format.md`` 2.1章
 """
@@ -19,7 +22,7 @@ __all__ = ["BlockState"]
 
 
 class BlockState:
-    """ブロックの状態。"""
+    """ブロックの状態"""
 
     __slots__ = ("name", "_properties")
 
@@ -34,24 +37,28 @@ class BlockState:
 
     @property
     def properties(self) -> Mapping[str, str]:
-        """プロパティ。名前の昇順。"""
+        """プロパティ
+        名前の昇順
+        """
         return self._properties
 
     def property(self, key: str) -> Optional[str]:
-        """プロパティを取得する。無ければ None。"""
+        """プロパティを取得する
+        無ければ None
+        """
         return self._properties.get(key)
 
     def with_property(self, key: str, value: str) -> "BlockState":
-        """プロパティを 1 つ差し替えた新しい状態を返す。"""
+        """プロパティを 1 つ差し替えた新しい状態を返す"""
         merged = dict(self._properties)
         merged[key] = value
         return BlockState(self.name, merged)
 
     @staticmethod
     def parse(text: str) -> "BlockState":
-        """``minecraft:oak_stairs[facing=north,half=top]`` 形式の文字列から作る。
+        """``minecraft:oak_stairs[facing=north,half=top]`` 形式の文字列から作る
 
-        :raises SpringNbtError: 形式が不正な場合。
+        :raises SpringNbtError: 形式が不正な場合
         """
         bracket = text.find("[")
 
@@ -91,9 +98,9 @@ class BlockState:
 
     @staticmethod
     def from_nbt(nbt: NbtCompound) -> "BlockState":
-        """パレット要素の NBT から作る。
+        """パレット要素の NBT から作る
 
-        :raises SpringNbtError: ``Name`` が無い、または ``Properties`` の値が文字列でない場合。
+        :raises SpringNbtError: ``Name`` が無い、または ``Properties`` の値が文字列でない場合
         """
         properties_tag = nbt.opt_compound("Properties")
         properties = {}
@@ -110,9 +117,10 @@ class BlockState:
         return BlockState(nbt.get_string("Name"), properties)
 
     def to_nbt(self) -> NbtCompound:
-        """パレット要素の NBT へ変換する。
+        """パレット要素の NBT へ変換する
 
-        プロパティが空なら ``Properties`` キー自体を出力しない。Minecraft と同じ振る舞い。
+        プロパティが空なら ``Properties`` キー自体を出力しない
+        Minecraft と同じ振る舞い
         """
         result = NbtCompound()
         result.set("Name", NbtString(self.name))
@@ -139,7 +147,7 @@ class BlockState:
         return hash((self.name, tuple(sorted(self._properties.items()))))
 
     def __str__(self) -> str:
-        """``minecraft:oak_stairs[facing=north,half=top]`` 形式の文字列を返す。"""
+        """``minecraft:oak_stairs[facing=north,half=top]`` 形式の文字列を返す"""
         if len(self._properties) == 0:
             return self.name
 
@@ -152,7 +160,7 @@ class BlockState:
 
 
 def _normalize(name: str) -> str:
-    """名前空間が省略されていたら ``minecraft:`` を補う。"""
+    """名前空間が省略されていたら ``minecraft:`` を補う"""
     if ":" in name:
         return name
 

@@ -3,7 +3,7 @@ package io.github.scriptarts.springnbt.world;
 import java.util.function.Consumer;
 
 /**
- * チャンク読み込みのオプション。
+ * チャンク読み込みのオプション
  *
  * <p>仕様: {@code docs/spec/30-chunk-format.md} 5章
  */
@@ -14,7 +14,7 @@ public final class ChunkReadOptions {
     private boolean lenientBitStorage;
 
     /**
-     * 既定のオプションを作る。
+     * 既定のオプションを作る
      *
      * @return オプション
      */
@@ -23,7 +23,7 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * DataVersion が対象と違うときの動作。
+     * DataVersion が対象と違うときの動作
      *
      * @return 動作
      */
@@ -32,7 +32,7 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * DataVersion が対象と違うときの動作を設定する。
+     * DataVersion が対象と違うときの動作を設定する
      *
      * @param value 動作
      * @return このオブジェクト
@@ -43,7 +43,8 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * 警告の通知先。null なら何もしない。
+     * 警告の通知先
+     * null なら何もしない
      *
      * @return 通知先
      */
@@ -52,7 +53,7 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * 警告の通知先を設定する。
+     * 警告の通知先を設定する
      *
      * @param value 通知先
      * @return このオブジェクト
@@ -63,7 +64,7 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * data の長さが期待値と違うとき、長さからビット幅を逆算して読むか。
+     * data の長さが期待値と違うとき、長さからビット幅を逆算して読むか
      *
      * @return 逆算するなら true
      */
@@ -72,7 +73,7 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * data の長さから逆算するかを設定する。
+     * data の長さから逆算するかを設定する
      *
      * @param value 逆算するなら true
      * @return このオブジェクト

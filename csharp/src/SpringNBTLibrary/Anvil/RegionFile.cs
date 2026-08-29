@@ -5,42 +5,47 @@ using SpringNBTLibrary.Nbt;
 
 namespace SpringNBTLibrary.Anvil;
 
-/// <summary>リージョンファイルを開くときの動作。</summary>
+/// <summary>リージョンファイルを開くときの動作</summary>
 public enum RegionFileMode
 {
-    /// <summary>読み取り専用。書き込み系の操作はエラーになる。</summary>
+    /// <summary>読み取り専用
+    /// 書き込み系の操作はエラーになる</summary>
     ReadOnly,
 
-    /// <summary>読み書き。ファイルが無ければ空のリージョンとして扱う。</summary>
+    /// <summary>読み書き
+    /// ファイルが無ければ空のリージョンとして扱う</summary>
     ReadWrite,
 }
 
 /// <summary>
-/// Anvil のリージョンファイル (<c>r.X.Z.mca</c>)。32×32 チャンクを格納する。
+/// Anvil のリージョンファイル (<c>r.X.Z.mca</c>)
+/// 32×32 チャンクを格納する
 /// </summary>
 /// <remarks>
 /// <para>
-/// ファイル全体をメモリに読み込んで扱う。実データのリージョンは数 MB 程度で、
-/// この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい。
-/// 開いて何も変えずに <see cref="Flush"/> すると、バイト単位で元と同じファイルになる。
+/// ファイル全体をメモリに読み込んで扱う
+/// 実データのリージョンは数 MB 程度で、
+/// この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
+/// 開いて何も変えずに <see cref="Flush"/> すると、バイト単位で元と同じファイルになる
 /// </para>
 /// <para>仕様: <c>docs/spec/20-anvil-region.md</c></para>
 /// </remarks>
 public sealed class RegionFile : IDisposable
 {
-    /// <summary>セクタ長。</summary>
+    /// <summary>セクタ長</summary>
     public const int SectorSize = 4096;
 
-    /// <summary>ロケーションテーブルとタイムスタンプテーブルが占めるセクタ数。</summary>
+    /// <summary>ロケーションテーブルとタイムスタンプテーブルが占めるセクタ数</summary>
     private const int HeaderSectors = 2;
 
-    /// <summary>1リージョンに入るチャンク数。</summary>
+    /// <summary>1リージョンに入るチャンク数</summary>
     private const int ChunkCount = 1024;
 
-    /// <summary>1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため）。</summary>
+    /// <summary>1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため）</summary>
     private const int MaxSectors = 255;
 
-    /// <summary>リージョン内に収められるペイロードの上限。超えると外部ファイルへ退避する。</summary>
+    /// <summary>リージョン内に収められるペイロードの上限
+    /// 超えると外部ファイルへ退避する</summary>
     private const int MaxInlinePayload = (MaxSectors * SectorSize) - 5;
 
     private readonly string path;
@@ -76,21 +81,22 @@ public sealed class RegionFile : IDisposable
         ParseHeader();
     }
 
-    /// <summary>このリージョンのX座標。</summary>
+    /// <summary>このリージョンのX座標</summary>
     public int RegionX { get; }
 
-    /// <summary>このリージョンのZ座標。</summary>
+    /// <summary>このリージョンのZ座標</summary>
     public int RegionZ { get; }
 
     /// <summary>
-    /// リージョンファイルを開く。
+    /// リージョンファイルを開く
     /// </summary>
     /// <param name="path">
-    /// <c>r.X.Z.mca</c> という名前のファイル。座標はファイル名から読み取る。
+    /// <c>r.X.Z.mca</c> という名前のファイル
+    /// 座標はファイル名から読み取る
     /// </param>
-    /// <param name="mode">読み取り専用か読み書きか。</param>
+    /// <param name="mode">読み取り専用か読み書きか</param>
     /// <exception cref="SpringNbtException">
-    /// ファイル名から座標を読み取れない、または読み込みに失敗した場合。
+    /// ファイル名から座標を読み取れない、または読み込みに失敗した場合
     /// </exception>
     public static RegionFile Open(string path, RegionFileMode mode = RegionFileMode.ReadOnly)
     {
@@ -135,7 +141,7 @@ public sealed class RegionFile : IDisposable
         return new RegionFile(path, mode, position.Value, raw);
     }
 
-    /// <summary>ヘッダを解析し、ロケーションとタイムスタンプを取り込む。</summary>
+    /// <summary>ヘッダを解析し、ロケーションとタイムスタンプを取り込む</summary>
     private void ParseHeader()
     {
         // 空ファイルは「チャンクが 1 つも無いリージョン」として受け入れる
@@ -210,7 +216,7 @@ public sealed class RegionFile : IDisposable
         }
     }
 
-    /// <summary>指定した座標がこのリージョンの担当範囲にあるか確認し、添字を返す。</summary>
+    /// <summary>指定した座標がこのリージョンの担当範囲にあるか確認し、添字を返す</summary>
     private int IndexOf(int chunkX, int chunkZ)
     {
         ChunkPos position = new ChunkPos(chunkX, chunkZ);
@@ -242,14 +248,14 @@ public sealed class RegionFile : IDisposable
         }
     }
 
-    /// <summary>チャンクが存在するか。</summary>
+    /// <summary>チャンクが存在するか</summary>
     public bool HasChunk(int chunkX, int chunkZ)
     {
         EnsureOpen();
         return sectorCounts[IndexOf(chunkX, chunkZ)] > 0;
     }
 
-    /// <summary>存在するチャンクの座標を、ロケーションテーブルの並び順で列挙する。</summary>
+    /// <summary>存在するチャンクの座標を、ロケーションテーブルの並び順で列挙する</summary>
     public IEnumerable<ChunkPos> ChunkPositions()
     {
         EnsureOpen();
@@ -268,14 +274,15 @@ public sealed class RegionFile : IDisposable
         }
     }
 
-    /// <summary>チャンクの最終更新時刻（Unix 秒）。存在しなければ 0。</summary>
+    /// <summary>チャンクの最終更新時刻（Unix 秒）
+    /// 存在しなければ 0</summary>
     public int Timestamp(int chunkX, int chunkZ)
     {
         EnsureOpen();
         return timestamps[IndexOf(chunkX, chunkZ)];
     }
 
-    /// <summary>チャンクの最終更新時刻を設定する。</summary>
+    /// <summary>チャンクの最終更新時刻を設定する</summary>
     public void SetTimestamp(int chunkX, int chunkZ, int value)
     {
         EnsureOpen();
@@ -285,9 +292,10 @@ public sealed class RegionFile : IDisposable
     }
 
     /// <summary>
-    /// チャンクを圧縮されたまま取り出す。存在しなければ null。
+    /// チャンクを圧縮されたまま取り出す
+    /// 存在しなければ null
     /// </summary>
-    /// <exception cref="SpringNbtException">格納内容が壊れている場合。</exception>
+    /// <exception cref="SpringNbtException">格納内容が壊れている場合</exception>
     public RawChunk? ReadChunkRaw(int chunkX, int chunkZ)
     {
         EnsureOpen();
@@ -331,10 +339,11 @@ public sealed class RegionFile : IDisposable
     }
 
     /// <summary>
-    /// チャンクを NBT として読む。存在しなければ null。
+    /// チャンクを NBT として読む
+    /// 存在しなければ null
     /// </summary>
     /// <exception cref="SpringNbtException">
-    /// 対応していない圧縮方式、または NBT として壊れている場合。
+    /// 対応していない圧縮方式、または NBT として壊れている場合
     /// </exception>
     public NbtCompound? ReadChunk(int chunkX, int chunkZ)
     {
@@ -350,13 +359,14 @@ public sealed class RegionFile : IDisposable
         return NbtIo.ReadBytes(plain, options).Tag;
     }
 
-    /// <summary>チャンクを NBT として書き込む。圧縮方式は Zlib。</summary>
+    /// <summary>チャンクを NBT として書き込む
+    /// 圧縮方式は Zlib</summary>
     public void WriteChunk(int chunkX, int chunkZ, NbtCompound tag)
     {
         WriteChunk(chunkX, chunkZ, tag, ChunkCompression.Zlib);
     }
 
-    /// <summary>チャンクを NBT として、圧縮方式を指定して書き込む。</summary>
+    /// <summary>チャンクを NBT として、圧縮方式を指定して書き込む</summary>
     public void WriteChunk(int chunkX, int chunkZ, NbtCompound tag, ChunkCompression compression)
     {
         ArgumentNullException.ThrowIfNull(tag);
@@ -366,7 +376,7 @@ public sealed class RegionFile : IDisposable
         WriteChunkRaw(chunkX, chunkZ, new RawChunk(compression, ChunkCodec.Compress(plain, compression)));
     }
 
-    /// <summary>圧縮済みのチャンクをそのまま書き込む。</summary>
+    /// <summary>圧縮済みのチャンクをそのまま書き込む</summary>
     public void WriteChunkRaw(int chunkX, int chunkZ, RawChunk raw)
     {
         ArgumentNullException.ThrowIfNull(raw);
@@ -418,7 +428,8 @@ public sealed class RegionFile : IDisposable
         dirty = true;
     }
 
-    /// <summary>チャンクを削除する。削除できたら true。</summary>
+    /// <summary>チャンクを削除する
+    /// 削除できたら true</summary>
     public bool DeleteChunk(int chunkX, int chunkZ)
     {
         EnsureOpen();
@@ -440,15 +451,16 @@ public sealed class RegionFile : IDisposable
     }
 
     /// <summary>
-    /// 必要なセクタ数を確保し、開始セクタ番号を返す。
+    /// 必要なセクタ数を確保し、開始セクタ番号を返す
     /// </summary>
     /// <remarks>
     /// 既存の割り当てがちょうど同じ大きさならその場を使い、
-    /// そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する。
+    /// そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する
     /// </remarks>
     private int AllocateSectors(int index, int needed)
     {
-        // 大きさが変わらないなら動かさない。触っていないチャンクの配置を保つため
+        // 大きさが変わらないなら動かさない
+        // 触っていないチャンクの配置を保つため
         if (sectorCounts[index] == needed)
         {
             return offsets[index];
@@ -476,7 +488,8 @@ public sealed class RegionFile : IDisposable
             }
         }
 
-        // 見つからなければ末尾へ追加する。末尾の空きは再利用できる
+        // 見つからなければ末尾へ追加する
+        // 末尾の空きは再利用できる
         int start = totalSectors - run;
         int requiredSectors = start + needed;
         Array.Resize(ref data, requiredSectors * SectorSize);
@@ -484,7 +497,8 @@ public sealed class RegionFile : IDisposable
     }
 
     /// <summary>
-    /// セクタの使用状況を作る。<paramref name="ignoreIndex"/> のチャンクは空きとして扱う。
+    /// セクタの使用状況を作る
+    /// <paramref name="ignoreIndex"/> のチャンクは空きとして扱う
     /// </summary>
     private bool[] BuildSectorUsage(int ignoreIndex)
     {
@@ -520,7 +534,8 @@ public sealed class RegionFile : IDisposable
     }
 
     /// <summary>
-    /// 全チャンクを隙間なく詰め直す。断片化したファイルを縮めたいときに使う。
+    /// 全チャンクを隙間なく詰め直す
+    /// 断片化したファイルを縮めたいときに使う
     /// </summary>
     public void Optimize()
     {
@@ -590,7 +605,7 @@ public sealed class RegionFile : IDisposable
         dirty = true;
     }
 
-    /// <summary>変更をファイルへ書き出す。</summary>
+    /// <summary>変更をファイルへ書き出す</summary>
     public void Flush()
     {
         EnsureOpen();
@@ -618,7 +633,8 @@ public sealed class RegionFile : IDisposable
         dirty = false;
     }
 
-    /// <summary>現在の内容をバイト列として組み立てる。ファイルには書かない。</summary>
+    /// <summary>現在の内容をバイト列として組み立てる
+    /// ファイルには書かない</summary>
     public byte[] ToBytes()
     {
         EnsureOpen();
@@ -626,7 +642,7 @@ public sealed class RegionFile : IDisposable
         return (byte[])data.Clone();
     }
 
-    /// <summary>ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す。</summary>
+    /// <summary>ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す</summary>
     private void WriteHeader()
     {
         // 位置表とタイムスタンプ表を、添字順に組み立て直す
@@ -639,7 +655,7 @@ public sealed class RegionFile : IDisposable
         }
     }
 
-    /// <summary>変更があれば書き出してから閉じる。</summary>
+    /// <summary>変更があれば書き出してから閉じる</summary>
     public void Close()
     {
         if (closed)
@@ -717,10 +733,10 @@ public sealed class RegionFile : IDisposable
     }
 }
 
-/// <summary>チャンクのペイロードを圧縮方式IDに従って展開・圧縮する。</summary>
+/// <summary>チャンクのペイロードを圧縮方式IDに従って展開・圧縮する</summary>
 internal static class ChunkCodec
 {
-    /// <summary>圧縮済みペイロードを展開する。</summary>
+    /// <summary>圧縮済みペイロードを展開する</summary>
     internal static byte[] Decompress(RawChunk raw)
     {
         switch (raw.Compression)
@@ -740,7 +756,7 @@ internal static class ChunkCodec
         }
     }
 
-    /// <summary>ペイロードを指定の方式で圧縮する。</summary>
+    /// <summary>ペイロードを指定の方式で圧縮する</summary>
     internal static byte[] Compress(byte[] plain, ChunkCompression compression)
     {
         if (compression == ChunkCompression.None)

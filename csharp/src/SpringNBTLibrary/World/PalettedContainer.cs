@@ -3,13 +3,14 @@ using SpringNBTLibrary.Nbt;
 namespace SpringNBTLibrary.World;
 
 /// <summary>
-/// パレットとビットストレージの組。セクション内のブロック状態やバイオームを格納する。
+/// パレットとビットストレージの組
+/// セクション内のブロック状態やバイオームを格納する
 /// </summary>
 /// <remarks>
 /// <para>
-/// パレットの要素は**生の <see cref="NbtTag"/> のまま**持つ。
+/// パレットの要素は**生の <see cref="NbtTag"/> のまま**持つ
 /// こうすると、触っていないブロックについては Minecraft が書き出したときの
-/// プロパティの並び順まで含めてそのまま書き戻せる。
+/// プロパティの並び順まで含めてそのまま書き戻せる
 /// </para>
 /// <para>仕様: <c>docs/spec/31-paletted-container.md</c></para>
 /// </remarks>
@@ -24,16 +25,20 @@ public sealed class PalettedContainer
         MinBits = minBits;
     }
 
-    /// <summary>エントリ数。ブロックなら 4096、バイオームなら 64。</summary>
+    /// <summary>エントリ数
+    /// ブロックなら 4096、バイオームなら 64</summary>
     public int EntryCount { get; }
 
-    /// <summary>ビット幅の下限。ブロックなら 4、バイオームなら 1。</summary>
+    /// <summary>ビット幅の下限
+    /// ブロックなら 4、バイオームなら 1</summary>
     public int MinBits { get; }
 
-    /// <summary>パレット。読み取り専用。</summary>
+    /// <summary>パレット
+    /// 読み取り専用</summary>
     public IReadOnlyList<NbtTag> Palette => palette;
 
-    /// <summary>現在のビット幅。パレットが 1 要素なら 0（記憶域を持たない）。</summary>
+    /// <summary>現在のビット幅
+    /// パレットが 1 要素なら 0（記憶域を持たない）</summary>
     public int BitsPerEntry
     {
         get
@@ -48,7 +53,7 @@ public sealed class PalettedContainer
     }
 
     /// <summary>
-    /// 単一の値で埋めたコンテナを作る。
+    /// 単一の値で埋めたコンテナを作る
     /// </summary>
     public static PalettedContainer Filled(NbtTag value, int entryCount, int minBits)
     {
@@ -59,10 +64,10 @@ public sealed class PalettedContainer
     }
 
     /// <summary>
-    /// NBT から読み込む。
+    /// NBT から読み込む
     /// </summary>
     /// <exception cref="SpringNbtException">
-    /// パレットが空、data の長さが合わない、添字がパレット範囲外のいずれか。
+    /// パレットが空、data の長さが合わない、添字がパレット範囲外のいずれか
     /// </exception>
     public static PalettedContainer FromNbt(
         NbtCompound nbt, int entryCount, int minBits, bool lenientBitStorage = false)
@@ -77,7 +82,8 @@ public sealed class PalettedContainer
             throw SpringNbtException.Malformed("palette が無いか空");
         }
 
-        // パレットの要素は生の NbtTag のまま持つ。並び順まで元どおりに書き戻すため
+        // パレットの要素は生の NbtTag のまま持つ
+        // 並び順まで元どおりに書き戻すため
         foreach (NbtTag entry in paletteTag)
         {
             result.palette.Add(entry);
@@ -100,7 +106,7 @@ public sealed class PalettedContainer
         int bits = Math.Max(minBits, CeilLog2(result.palette.Count));
         result.storage = BitStorage.FromLongs(data, bits, entryCount, lenientBitStorage);
 
-        // 取り出した添字がパレットの範囲に収まっているか確かめる。
+        // 取り出した添字がパレットの範囲に収まっているか確かめる
         // 黙って 0 番目で代替すると、壊れたデータをそうと分からない形で書き戻してしまう
         for (int index = 0; index < entryCount; index++)
         {
@@ -116,7 +122,7 @@ public sealed class PalettedContainer
         return result;
     }
 
-    /// <summary>NBT へ変換する。</summary>
+    /// <summary>NBT へ変換する</summary>
     public NbtCompound ToNbt()
     {
         NbtCompound result = new NbtCompound();
@@ -128,7 +134,8 @@ public sealed class PalettedContainer
             paletteTag.Add(entry);
         }
 
-        // パレットが 1 要素なら data は書かない。Minecraft と同じ振る舞い
+        // パレットが 1 要素なら data は書かない
+        // Minecraft と同じ振る舞い
         if (storage is not null && palette.Count > 1)
         {
             result.Set("data", new NbtLongArray(storage.ToLongs()));
@@ -138,7 +145,7 @@ public sealed class PalettedContainer
         return result;
     }
 
-    /// <summary>添字の値を取り出す。</summary>
+    /// <summary>添字の値を取り出す</summary>
     public NbtTag Get(int index)
     {
         if (index < 0 || index >= EntryCount)
@@ -155,7 +162,8 @@ public sealed class PalettedContainer
         return palette[storage.Get(index)];
     }
 
-    /// <summary>添字の値を書き換える。パレットに無ければ追加する。</summary>
+    /// <summary>添字の値を書き換える
+    /// パレットに無ければ追加する</summary>
     public void Set(int index, NbtTag value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -177,7 +185,8 @@ public sealed class PalettedContainer
         storage!.Set(index, paletteIndex);
     }
 
-    /// <summary>全エントリを 1 つの値で埋める。パレットもその 1 要素だけにする。</summary>
+    /// <summary>全エントリを 1 つの値で埋める
+    /// パレットもその 1 要素だけにする</summary>
     public void Fill(NbtTag value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -187,10 +196,10 @@ public sealed class PalettedContainer
     }
 
     /// <summary>
-    /// どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す。
+    /// どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す
     /// </summary>
     /// <remarks>
-    /// 大量の <c>Set</c> を行う用途で遅くならないよう、明示的に呼んだときだけ実行する。
+    /// 大量の <c>Set</c> を行う用途で遅くならないよう、明示的に呼んだときだけ実行する
     /// </remarks>
     public void Compact()
     {
@@ -252,7 +261,8 @@ public sealed class PalettedContainer
         }
     }
 
-    /// <summary>パレット内の位置を返す。無ければ末尾へ追加する。</summary>
+    /// <summary>パレット内の位置を返す
+    /// 無ければ末尾へ追加する</summary>
     private int IndexOfOrAdd(NbtTag value)
     {
         // パレットは高々 4096 要素なので線形探索で足りる
@@ -268,7 +278,7 @@ public sealed class PalettedContainer
         return palette.Count - 1;
     }
 
-    /// <summary>現在のパレット長に合うビット幅の記憶域を用意する。</summary>
+    /// <summary>現在のパレット長に合うビット幅の記憶域を用意する</summary>
     private void EnsureStorage()
     {
         int required = Math.Max(MinBits, CeilLog2(palette.Count));
@@ -289,7 +299,8 @@ public sealed class PalettedContainer
         storage = storage.Resize(required);
     }
 
-    /// <summary><paramref name="count"/> 個の値を表すのに必要な最小ビット数。1 なら 0。</summary>
+    /// <summary><paramref name="count"/> 個の値を表すのに必要な最小ビット数
+    /// 1 なら 0</summary>
     public static int CeilLog2(int count)
     {
         int bits = 0;

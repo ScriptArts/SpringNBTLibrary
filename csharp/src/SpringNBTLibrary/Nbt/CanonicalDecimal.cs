@@ -4,25 +4,26 @@ using System.Text;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// 浮動小数点の正準10進表記。
+/// 浮動小数点の正準10進表記
 /// </summary>
 /// <remarks>
 /// <para>
-/// 各言語の標準の数値書式は互いに一致しない。指数表記へ切り替わる閾値も、
-/// 指数部の桁数も、E の大文字小文字も処理系ごとに違う。
-/// そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する。
+/// 各言語の標準の数値書式は互いに一致しない
+/// 指数表記へ切り替わる閾値も、
+/// 指数部の桁数も、E の大文字小文字も処理系ごとに違う
+/// そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する
 /// </para>
 /// <para>仕様: <c>docs/spec/11-snbt.md</c> 5.1章</para>
 /// </remarks>
 internal static class CanonicalDecimal
 {
-    /// <summary>固定小数点表記を使う10進指数の下限。</summary>
+    /// <summary>固定小数点表記を使う10進指数の下限</summary>
     private const int MinFixedExponent = -4;
 
-    /// <summary>固定小数点表記を使う10進指数の上限。</summary>
+    /// <summary>固定小数点表記を使う10進指数の上限</summary>
     private const int MaxFixedExponent = 16;
 
-    /// <summary>binary32 を正準10進表記へ変換する。</summary>
+    /// <summary>binary32 を正準10進表記へ変換する</summary>
     internal static string FromFloat(float value)
     {
         if (float.IsNaN(value))
@@ -59,7 +60,7 @@ internal static class CanonicalDecimal
         return Format(value.ToString("E8", CultureInfo.InvariantCulture));
     }
 
-    /// <summary>binary64 を正準10進表記へ変換する。</summary>
+    /// <summary>binary64 を正準10進表記へ変換する</summary>
     internal static string FromDouble(double value)
     {
         if (double.IsNaN(value))
@@ -97,7 +98,7 @@ internal static class CanonicalDecimal
     }
 
     /// <summary>
-    /// 指数表記の文字列（例 <c>"7.5E-001"</c>）から、仕様が定める正準表記を組み立てる。
+    /// 指数表記の文字列（例 <c>"7.5E-001"</c>）から、仕様が定める正準表記を組み立てる
     /// </summary>
     private static string Format(string exponential)
     {
@@ -137,7 +138,8 @@ internal static class CanonicalDecimal
         return Compose(negative, digits, exponent);
     }
 
-    /// <summary>末尾のゼロを取り除く。すべてゼロなら "0" を残す。</summary>
+    /// <summary>末尾のゼロを取り除く
+    /// すべてゼロなら "0" を残す</summary>
     private static string TrimTrailingZeros(string digits)
     {
         int end = digits.Length;
@@ -151,7 +153,7 @@ internal static class CanonicalDecimal
         return digits.Substring(0, end);
     }
 
-    /// <summary>数字列と10進指数から最終的な文字列を組み立てる。</summary>
+    /// <summary>数字列と10進指数から最終的な文字列を組み立てる</summary>
     private static string Compose(bool negative, string digits, int exponent)
     {
         StringBuilder builder = new StringBuilder();
@@ -192,7 +194,8 @@ internal static class CanonicalDecimal
 
         if (exponent >= 0)
         {
-            // 整数部は先頭 (exponent + 1) 桁。足りなければゼロで右詰めする
+            // 整数部は先頭 (exponent + 1) 桁
+            // 足りなければゼロで右詰めする
             int integerDigits = exponent + 1;
 
             // 整数部が数字の並びに収まるなら、そのまま切り出す

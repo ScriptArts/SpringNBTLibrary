@@ -1,6 +1,7 @@
 package io.github.scriptarts.springnbt.world;
 
-/** ワールドを開くときの動作。 */
+/** ワールドを開くときの動作
+/** */
 public final class WorldOpenOptions {
 
     private boolean writable;
@@ -9,7 +10,7 @@ public final class WorldOpenOptions {
     private ChunkWriteOptions chunkWrite = ChunkWriteOptions.defaults();
 
     /**
-     * 既定のオプションを作る。
+     * 既定のオプションを作る
      *
      * @return オプション
      */
@@ -18,7 +19,8 @@ public final class WorldOpenOptions {
     }
 
     /**
-     * 読み書きで開くか。既定は読み取り専用。
+     * 読み書きで開くか
+     * 既定は読み取り専用
      *
      * @return 読み書きなら true
      */
@@ -27,7 +29,7 @@ public final class WorldOpenOptions {
     }
 
     /**
-     * 読み書きで開くかを設定する。
+     * 読み書きで開くかを設定する
      *
      * @param value 読み書きなら true
      * @return このオブジェクト
@@ -38,10 +40,11 @@ public final class WorldOpenOptions {
     }
 
     /**
-     * {@code session.lock} の確認を飛ばすか。
+     * {@code session.lock} の確認を飛ばすか
      *
-     * <p>Minecraft が起動中のワールドへ書き込むとデータが壊れる。
-     * 既定では書き込みモードで開くときに必ず確認する。これを立てるのは自己責任。
+     * <p>Minecraft が起動中のワールドへ書き込むとデータが壊れる
+     * 既定では書き込みモードで開くときに必ず確認する
+     * これを立てるのは自己責任
      *
      * @return 飛ばすなら true
      */
@@ -50,7 +53,7 @@ public final class WorldOpenOptions {
     }
 
     /**
-     * {@code session.lock} の確認を飛ばすかを設定する。
+     * {@code session.lock} の確認を飛ばすかを設定する
      *
      * @param value 飛ばすなら true
      * @return このオブジェクト
@@ -61,7 +64,7 @@ public final class WorldOpenOptions {
     }
 
     /**
-     * チャンク読み込みのオプション。
+     * チャンク読み込みのオプション
      *
      * @return オプション
      */
@@ -70,7 +73,7 @@ public final class WorldOpenOptions {
     }
 
     /**
-     * チャンク読み込みのオプションを設定する。
+     * チャンク読み込みのオプションを設定する
      *
      * @param value オプション
      * @return このオブジェクト
@@ -81,7 +84,7 @@ public final class WorldOpenOptions {
     }
 
     /**
-     * チャンク書き込みのオプション。
+     * チャンク書き込みのオプション
      *
      * @return オプション
      */
@@ -90,7 +93,7 @@ public final class WorldOpenOptions {
     }
 
     /**
-     * チャンク書き込みのオプションを設定する。
+     * チャンク書き込みのオプションを設定する
      *
      * @param value オプション
      * @return このオブジェクト

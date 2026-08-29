@@ -11,12 +11,15 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**
- * ブロックの状態。名前と、任意のプロパティの組。
+ * ブロックの状態
+ * 名前と、任意のプロパティの組
  *
- * <p>プロパティは<strong>常に名前の昇順で保持する</strong>。こうしておくと文字列表現が一意になり、
- * 全言語で同じ出力になる。Minecraft が書き出した並び順は
+ * <p>プロパティは<strong>常に名前の昇順で保持する</strong>
+ * こうしておくと文字列表現が一意になり、
+ * 全言語で同じ出力になる
+ * Minecraft が書き出した並び順は
  * {@link PalettedContainer} がパレットを生の NBT のまま持つことで守られるので、
- * 触っていないブロックの並びが崩れることはない。
+ * 触っていないブロックの並びが崩れることはない
  *
  * <p>仕様: {@code docs/spec/30-chunk-format.md} 2.1章
  */
@@ -26,10 +29,12 @@ public final class BlockState {
     private final SortedMap<String, String> properties;
 
     /**
-     * 名前とプロパティを指定して作る。
+     * 名前とプロパティを指定して作る
      *
-     * @param name       ブロックID。名前空間が省略されていたら {@code minecraft:} を補う
-     * @param properties プロパティ。null なら空
+     * @param name       ブロックID
+     * 名前空間が省略されていたら {@code minecraft:} を補う
+     * @param properties プロパティ
+     * null なら空
      */
     public BlockState(String name, Map<String, String> properties) {
         Objects.requireNonNull(name, "name");
@@ -42,7 +47,7 @@ public final class BlockState {
     }
 
     /**
-     * プロパティを持たない状態を作る。
+     * プロパティを持たない状態を作る
      *
      * @param name ブロックID
      */
@@ -51,7 +56,7 @@ public final class BlockState {
     }
 
     /**
-     * ブロックID（名前空間つき）。
+     * ブロックID（名前空間つき）
      *
      * @return ブロックID
      */
@@ -60,7 +65,8 @@ public final class BlockState {
     }
 
     /**
-     * プロパティ。名前の昇順。
+     * プロパティ
+     * 名前の昇順
      *
      * @return プロパティ
      */
@@ -69,17 +75,18 @@ public final class BlockState {
     }
 
     /**
-     * プロパティを取得する。
+     * プロパティを取得する
      *
      * @param key プロパティ名
-     * @return 値。無ければ null
+     * @return 値
+     * 無ければ null
      */
     public String property(String key) {
         return properties.get(key);
     }
 
     /**
-     * プロパティを 1 つ差し替えた新しい状態を返す。
+     * プロパティを 1 つ差し替えた新しい状態を返す
      *
      * @param key   プロパティ名
      * @param value 値
@@ -95,7 +102,7 @@ public final class BlockState {
     }
 
     /**
-     * {@code minecraft:oak_stairs[facing=north,half=top]} 形式の文字列から作る。
+     * {@code minecraft:oak_stairs[facing=north,half=top]} 形式の文字列から作る
      *
      * @param text 文字列
      * @return ブロック状態
@@ -150,7 +157,7 @@ public final class BlockState {
     }
 
     /**
-     * パレット要素の NBT から作る。
+     * パレット要素の NBT から作る
      *
      * @param nbt パレット要素
      * @return ブロック状態
@@ -179,9 +186,10 @@ public final class BlockState {
     }
 
     /**
-     * パレット要素の NBT へ変換する。
+     * パレット要素の NBT へ変換する
      *
-     * <p>プロパティが空なら {@code Properties} キー自体を出力しない。Minecraft と同じ振る舞い。
+     * <p>プロパティが空なら {@code Properties} キー自体を出力しない
+     * Minecraft と同じ振る舞い
      *
      * @return NBT
      */
@@ -204,7 +212,8 @@ public final class BlockState {
         return result;
     }
 
-    /** 名前空間が省略されていたら {@code minecraft:} を補う。 */
+    /** 名前空間が省略されていたら {@code minecraft:} を補う
+    /** */
     private static String normalize(String name) {
         if (name.indexOf(':') >= 0) {
             return name;
@@ -226,7 +235,7 @@ public final class BlockState {
     }
 
     /**
-     * {@code minecraft:oak_stairs[facing=north,half=top]} 形式の文字列を返す。
+     * {@code minecraft:oak_stairs[facing=north,half=top]} 形式の文字列を返す
      */
     @Override
     public String toString() {

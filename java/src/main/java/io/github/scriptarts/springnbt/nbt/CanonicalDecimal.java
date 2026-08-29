@@ -3,27 +3,31 @@ package io.github.scriptarts.springnbt.nbt;
 import java.util.Locale;
 
 /**
- * 浮動小数点の正準10進表記。
+ * 浮動小数点の正準10進表記
  *
- * <p>各言語の標準の数値書式は互いに一致しない。指数表記へ切り替わる閾値も、
- * 指数部の桁数も、E の大文字小文字も処理系ごとに違う。
- * そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する。
+ * <p>各言語の標準の数値書式は互いに一致しない
+ * 指数表記へ切り替わる閾値も、
+ * 指数部の桁数も、E の大文字小文字も処理系ごとに違う
+ * そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する
  *
  * <p>仕様: {@code docs/spec/11-snbt.md} 5.1章
  */
 final class CanonicalDecimal {
 
-    /** 固定小数点表記を使う10進指数の下限。 */
+    /** 固定小数点表記を使う10進指数の下限
+    /** */
     private static final int MIN_FIXED_EXPONENT = -4;
 
-    /** 固定小数点表記を使う10進指数の上限。 */
+    /** 固定小数点表記を使う10進指数の上限
+    /** */
     private static final int MAX_FIXED_EXPONENT = 16;
 
     private CanonicalDecimal() {
         // ユーティリティクラス
     }
 
-    /** binary32 を正準10進表記へ変換する。 */
+    /** binary32 を正準10進表記へ変換する
+    /** */
     static String fromFloat(float value) {
         if (Float.isNaN(value)) {
             return "NaN";
@@ -52,7 +56,8 @@ final class CanonicalDecimal {
         return format(String.format(Locale.ROOT, "%.8e", value));
     }
 
-    /** binary64 を正準10進表記へ変換する。 */
+    /** binary64 を正準10進表記へ変換する
+    /** */
     static String fromDouble(double value) {
         if (Double.isNaN(value)) {
             return "NaN";
@@ -81,7 +86,8 @@ final class CanonicalDecimal {
         return format(String.format(Locale.ROOT, "%.16e", value));
     }
 
-    /** 指数表記の文字列（例 {@code "7.5e-01"}）から、仕様が定める正準表記を組み立てる。 */
+    /** 指数表記の文字列（例 {@code "7.5e-01"}）から、仕様が定める正準表記を組み立てる
+    /** */
     private static String format(String exponential) {
         boolean negative = false;
         int index = 0;
@@ -112,7 +118,8 @@ final class CanonicalDecimal {
         return compose(negative, digits, exponent);
     }
 
-    /** {@code Integer.parseInt} は先頭の "+" を受け付けるが、環境差を避けるため明示的に外す。 */
+    /** {@code Integer.parseInt} は先頭の "+" を受け付けるが、環境差を避けるため明示的に外す
+    /** */
     private static String stripPlus(String text) {
         if (text.startsWith("+")) {
             return text.substring(1);
@@ -121,7 +128,9 @@ final class CanonicalDecimal {
         return text;
     }
 
-    /** 末尾のゼロを取り除く。すべてゼロなら "0" を残す。 */
+    /** 末尾のゼロを取り除く
+    /** すべてゼロなら "0" を残す
+    /** */
     private static String trimTrailingZeros(String digits) {
         int end = digits.length();
 
@@ -133,7 +142,8 @@ final class CanonicalDecimal {
         return digits.substring(0, end);
     }
 
-    /** 数字列と10進指数から最終的な文字列を組み立てる。 */
+    /** 数字列と10進指数から最終的な文字列を組み立てる
+    /** */
     private static String compose(boolean negative, String digits, int exponent) {
         StringBuilder builder = new StringBuilder();
 
@@ -165,7 +175,8 @@ final class CanonicalDecimal {
         }
 
         if (exponent >= 0) {
-            // 整数部は先頭 (exponent + 1) 桁。足りなければゼロで右詰めする
+            // 整数部は先頭 (exponent + 1) 桁
+            // 足りなければゼロで右詰めする
             int integerDigits = exponent + 1;
 
             // 整数部が数字の並びに収まるなら、そのまま切り出す

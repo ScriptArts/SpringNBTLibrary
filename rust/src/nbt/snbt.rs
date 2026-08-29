@@ -1,7 +1,7 @@
-//! SNBT (Stringified NBT) のパースと出力。
+//! SNBT (Stringified NBT) のパースと出力
 //!
-//! 対応範囲は「バイナリ NBT へ損失なく写せる部分集合」。
-//! 1.21.5 以降の異種リスト（`[1, "a"]`）は受理しない。
+//! 対応範囲は「バイナリ NBT へ損失なく写せる部分集合」
+//! 1.21.5 以降の異種リスト（`[1, "a"]`）は受理しない
 //!
 //! 仕様: `docs/spec/11-snbt.md` / `docs/adr/0006-snbt-scope.md`
 
@@ -13,12 +13,12 @@ const INDENT_UNIT: &str = "    ";
 
 const WIDTH_SUFFIXES: &str = "bBsSlLfFdD";
 
-/// SNBT 文字列をタグへ変換する。
+/// SNBT 文字列をタグへ変換する
 pub fn parse(text: &str) -> Result<NbtTag> {
     Parser::new(text).parse_whole()
 }
 
-/// SNBT 文字列を Compound へ変換する。
+/// SNBT 文字列を Compound へ変換する
 pub fn parse_compound(text: &str) -> Result<NbtCompound> {
     match parse(text)? {
         NbtTag::Compound(compound) => Ok(compound),
@@ -29,14 +29,15 @@ pub fn parse_compound(text: &str) -> Result<NbtCompound> {
     }
 }
 
-/// タグを 1 行の SNBT へ変換する。
+/// タグを 1 行の SNBT へ変換する
 pub fn write(tag: &NbtTag) -> String {
     let mut out = String::new();
     write_tag(&mut out, tag, -1);
     out
 }
 
-/// タグを整形した SNBT へ変換する。インデントは空白 4 個。
+/// タグを整形した SNBT へ変換する
+/// インデントは空白 4 個
 pub fn write_pretty(tag: &NbtTag) -> String {
     let mut out = String::new();
     write_tag(&mut out, tag, 0);
@@ -128,7 +129,8 @@ impl Parser {
             self.skip_whitespace();
             let next = self.peek()?;
 
-            // カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
+            // カンマがあれば次の要素へ進む
+            // 無ければ閉じ括弧のはず
             if next == ',' {
                 self.position += 1;
             } else if next == '}' {
@@ -147,7 +149,8 @@ impl Parser {
         if self.position + 1 < self.chars.len() && self.chars[self.position + 1] == ';' {
             let marker = self.chars[self.position];
 
-            // [B; [I; [L; は型付き配列の印。ただの List と見分ける
+            // [B; [I; [L; は型付き配列の印
+            // ただの List と見分ける
             if marker == 'B' || marker == 'I' || marker == 'L' {
                 self.position += 2;
                 return self.parse_typed_array(marker);
@@ -193,7 +196,8 @@ impl Parser {
             self.skip_whitespace();
             let next = self.peek()?;
 
-            // カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
+            // カンマがあれば次の要素へ進む
+            // 無ければ閉じ括弧のはず
             if next == ',' {
                 self.position += 1;
             } else if next == ']' {
@@ -229,7 +233,8 @@ impl Parser {
                 self.skip_whitespace();
                 let next = self.peek()?;
 
-                // カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
+                // カンマがあれば次の要素へ進む
+                // 無ければ閉じ括弧のはず
                 if next == ',' {
                     self.position += 1;
                 } else if next == ']' {
@@ -257,7 +262,8 @@ impl Parser {
             return Ok(NbtTag::ByteArray(result));
         }
 
-        // [I; は TAG_Int_Array。残りは TAG_Long_Array
+        // [I; は TAG_Int_Array
+        // 残りは TAG_Long_Array
         if marker == 'I' {
             let mut result: Vec<i32> = Vec::with_capacity(values.len());
 
@@ -276,7 +282,8 @@ impl Parser {
         Ok(NbtTag::LongArray(values))
     }
 
-    /// 整数タグから値を取り出す。整数以外ならエラー。
+    /// 整数タグから値を取り出す
+    /// 整数以外ならエラー
     fn to_integral(&self, tag: &NbtTag) -> Result<i64> {
         match tag {
             NbtTag::Byte(value) => Ok(*value as i64),
@@ -314,9 +321,9 @@ impl Parser {
         Ok(bare)
     }
 
-    /// 引用符つき文字列を UTF-16 コード単位の列として読む。
+    /// 引用符つき文字列を UTF-16 コード単位の列として読む
     ///
-    /// `\uXXXX` で孤立サロゲートを書けるため、`String` ではなくコード単位で受ける。
+    /// `\uXXXX` で孤立サロゲートを書けるため、`String` ではなくコード単位で受ける
     fn parse_quoted_string(&mut self) -> Result<Vec<u16>> {
         let quote = self.chars[self.position];
         self.position += 1;
@@ -383,7 +390,8 @@ impl Parser {
         }
 
         if c == 'u' {
-            // \uXXXX は UTF-16 コード単位を直接指定する。孤立サロゲートもここで書ける
+            // \uXXXX は UTF-16 コード単位を直接指定する
+            // 孤立サロゲートもここで書ける
             units.push(self.read_hex_digits(4)? as u16);
             return Ok(());
         }
@@ -439,7 +447,7 @@ impl Parser {
         Ok(value)
     }
 
-    /// Unicode 文字名によるエスケープ `\N{...}` を読む。
+    /// Unicode 文字名によるエスケープ `\N{...}` を読む
     fn read_named_character(&mut self) -> Error {
         // 実装間で Unicode 文字名の表が揃わないため対応しない（C# / Rust には表が無い）
         let start = self.position;
@@ -541,7 +549,8 @@ impl Parser {
         Ok(NbtTag::IntArray(values))
     }
 
-    /// 数値トークンを解釈する。数値として読めなければ `None`（文字列として扱われる）。
+    /// 数値トークンを解釈する
+    /// 数値として読めなければ `None`（文字列として扱われる）
     fn try_parse_number(&self, token: &str) -> Result<Option<NbtTag>> {
         let chars: Vec<char> = token.chars().collect();
         let mut negative = false;
@@ -564,7 +573,8 @@ impl Parser {
 
         let is_hex = is_hex_body(&body);
 
-        // 幅接尾辞を末尾から剥がす。16進では b/d/f が数字と紛れるため s/l だけを認める
+        // 幅接尾辞を末尾から剥がす
+        // 16進では b/d/f が数字と紛れるため s/l だけを認める
         let last = body.chars().last().unwrap();
         let suffix_allowed = if is_hex {
             last == 's' || last == 'S' || last == 'l' || last == 'L'
@@ -572,7 +582,8 @@ impl Parser {
             WIDTH_SUFFIXES.contains(last)
         };
 
-        // 末尾 1 文字が型の印なら切り離す。1 文字だけの token は数字そのもの
+        // 末尾 1 文字が型の印なら切り離す
+        // 1 文字だけの token は数字そのもの
         if suffix_allowed && body.chars().count() >= 2 {
             width_suffix = last.to_ascii_lowercase();
             body.pop();
@@ -581,7 +592,8 @@ impl Parser {
             if body.chars().count() >= 2 {
                 let sign_char = body.chars().last().unwrap();
 
-                // u / U は符号なしの印。1.21.5 以降の拡張構文
+                // u / U は符号なしの印
+                // 1.21.5 以降の拡張構文
                 if sign_char == 'u' || sign_char == 'U' {
                     unsigned_suffix = true;
                     body.pop();
@@ -658,7 +670,8 @@ impl Parser {
 
         let mut magnitude: u64 = 0;
 
-        // 桁を1つずつ積み上げる。桁あふれはその場で検出する
+        // 桁を1つずつ積み上げる
+        // 桁あふれはその場で検出する
         for c in digits.chars() {
             let digit = digit_value(c, radix);
 
@@ -718,7 +731,8 @@ impl Parser {
             'l' => Ok(NbtTag::Long(value)),
             'f' => Ok(NbtTag::Float(value as f32)),
             'd' => Ok(NbtTag::Double(value as f64)),
-            // 接尾辞なしの整数は Int。暗黙に Long へ格上げしない
+            // 接尾辞なしの整数は Int
+            // 暗黙に Long へ格上げしない
             _ => Ok(NbtTag::Int(self.check_range(
                 value,
                 i32::MIN as i64,
@@ -793,7 +807,8 @@ impl Parser {
         Ok(self.chars[self.position])
     }
 
-    /// 末尾でもエラーにしない先読み。入力が尽きていれば NUL を返す。
+    /// 末尾でもエラーにしない先読み
+    /// 入力が尽きていれば NUL を返す
     fn peek_or_nul(&self) -> char {
         if self.position >= self.chars.len() {
             return '\0';
@@ -876,7 +891,7 @@ fn hex_digit_value(c: char) -> i32 {
     -1
 }
 
-/// 引用符なしで書ける文字か。
+/// 引用符なしで書ける文字か
 fn is_bare_char(c: char) -> bool {
     if c.is_ascii_alphanumeric() {
         return true;
@@ -889,7 +904,8 @@ fn is_bare_char(c: char) -> bool {
 // ライタ
 // ---------------------------------------------------------------------------
 
-/// タグを書き出す。`depth` が負なら 1 行、0 以上なら整形して出力する。
+/// タグを書き出す
+/// `depth` が負なら 1 行、0 以上なら整形して出力する
 fn write_tag(out: &mut String, tag: &NbtTag, depth: i32) {
     match tag {
         NbtTag::Byte(value) => {
@@ -1004,7 +1020,7 @@ fn write_typed_array<T: std::fmt::Display>(
     out.push(']');
 }
 
-/// 整形出力なら改行とインデントを、1 行出力なら何も入れない。
+/// 整形出力なら改行とインデントを、1 行出力なら何も入れない
 fn append_separator(out: &mut String, depth: i32) {
     if depth < 0 {
         return;
@@ -1018,7 +1034,7 @@ fn append_separator(out: &mut String, depth: i32) {
     }
 }
 
-/// 整形出力のときだけ深さを 1 段進める。
+/// 整形出力のときだけ深さを 1 段進める
 fn next_depth(depth: i32) -> i32 {
     if depth < 0 {
         return -1;
@@ -1027,7 +1043,8 @@ fn next_depth(depth: i32) -> i32 {
     depth + 1
 }
 
-/// キーを出力する。引用符なしで書ける場合はそのまま出す。
+/// キーを出力する
+/// 引用符なしで書ける場合はそのまま出す
 fn quote_key(key: &str) -> String {
     if is_bare_writable(key) {
         return key.to_string();
@@ -1051,10 +1068,11 @@ fn is_bare_writable(text: &str) -> bool {
     true
 }
 
-/// 文字列を二重引用符で囲み、必要な文字だけエスケープする。
+/// 文字列を二重引用符で囲み、必要な文字だけエスケープする
 ///
 /// UTF-16 コード単位で処理するのは、正しいサロゲートペアと孤立サロゲートを
-/// 区別するため。C# / Java と同じ判定にしないと出力が食い違う。
+/// 区別するため
+/// C# / Java と同じ判定にしないと出力が食い違う
 fn quote_string(units: &[u16]) -> String {
     let mut out = String::from("\"");
     let mut index = 0usize;

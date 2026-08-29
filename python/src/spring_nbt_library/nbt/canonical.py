@@ -1,9 +1,9 @@
-"""浮動小数点の正準10進表記。
+"""浮動小数点の正準10進表記
 
 各言語の標準の数値書式（C# の ``"R"``、Java の ``Float.toString``、
-Python の ``repr``、Rust の ``{}``）は互いに一致しない。
-指数表記へ切り替わる閾値も、指数部の桁数も、``E`` の大文字小文字も処理系ごとに違う。
-そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する。
+Python の ``repr``、Rust の ``{}``）は互いに一致しない
+指数表記へ切り替わる閾値も、指数部の桁数も、``E`` の大文字小文字も処理系ごとに違う
+そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する
 
 仕様: ``docs/spec/11-snbt.md`` 5.1章
 """
@@ -15,15 +15,15 @@ import struct
 
 __all__ = ["from_float", "from_double"]
 
-#: 固定小数点表記を使う10進指数の下限。
+#: 固定小数点表記を使う10進指数の下限
 _MIN_FIXED_EXPONENT = -4
 
-#: 固定小数点表記を使う10進指数の上限。
+#: 固定小数点表記を使う10進指数の上限
 _MAX_FIXED_EXPONENT = 16
 
 
 def _special(value: float):
-    """特殊値なら文字列を、そうでなければ None を返す。"""
+    """特殊値なら文字列を、そうでなければ None を返す"""
     if math.isnan(value):
         return "NaN"
 
@@ -38,7 +38,7 @@ def _special(value: float):
 
 
 def from_float(value: float) -> str:
-    """binary32 を正準10進表記へ変換する。"""
+    """binary32 を正準10進表記へ変換する"""
     special = _special(value)
 
     if special is not None:
@@ -58,7 +58,7 @@ def from_float(value: float) -> str:
 
 
 def from_double(value: float) -> str:
-    """binary64 を正準10進表記へ変換する。"""
+    """binary64 を正準10進表記へ変換する"""
     special = _special(value)
 
     if special is not None:
@@ -78,7 +78,7 @@ def from_double(value: float) -> str:
 
 
 def _format(exponential: str) -> str:
-    """指数表記の文字列（例 ``"7.5e-01"``）から、仕様が定める正準表記を組み立てる。"""
+    """指数表記の文字列（例 ``"7.5e-01"``）から、仕様が定める正準表記を組み立てる"""
     negative = False
     index = 0
 
@@ -106,7 +106,9 @@ def _format(exponential: str) -> str:
 
 
 def _trim_trailing_zeros(digits: str) -> str:
-    """末尾のゼロを取り除く。すべてゼロなら "0" を残す。"""
+    """末尾のゼロを取り除く
+    すべてゼロなら "0" を残す
+    """
     end = len(digits)
 
     # 末尾から連続するゼロを削る
@@ -117,7 +119,7 @@ def _trim_trailing_zeros(digits: str) -> str:
 
 
 def _compose(negative: bool, digits: str, exponent: int) -> str:
-    """数字列と10進指数から最終的な文字列を組み立てる。"""
+    """数字列と10進指数から最終的な文字列を組み立てる"""
     if negative:
         sign = "-"
     else:
@@ -137,7 +139,8 @@ def _compose(negative: bool, digits: str, exponent: int) -> str:
         return "%s%s.%sE%d" % (sign, digits[0], fraction, exponent)
 
     if exponent >= 0:
-        # 整数部は先頭 (exponent + 1) 桁。足りなければゼロで右詰めする
+        # 整数部は先頭 (exponent + 1) 桁
+        # 足りなければゼロで右詰めする
         integer_digits = exponent + 1
 
         # 整数部が数字の並びに収まるなら、そのまま切り出す

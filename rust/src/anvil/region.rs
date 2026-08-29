@@ -1,8 +1,10 @@
-//! Anvil のリージョンファイル (`r.X.Z.mca`)。32×32 チャンクを格納する。
+//! Anvil のリージョンファイル (`r.X.Z.mca`)
+//! 32×32 チャンクを格納する
 //!
-//! ファイル全体をメモリに読み込んで扱う。実データのリージョンは数 MB 程度で、
-//! この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい。
-//! 開いて何も変えずに [`RegionFile::flush`] すると、バイト単位で元と同じファイルになる。
+//! ファイル全体をメモリに読み込んで扱う
+//! 実データのリージョンは数 MB 程度で、
+//! この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
+//! 開いて何も変えずに [`RegionFile::flush`] すると、バイト単位で元と同じファイルになる
 //!
 //! 仕様: `docs/spec/20-anvil-region.md`
 
@@ -19,44 +21,49 @@ use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::tag::NbtCompound;
 use crate::nbt::{read_bytes, write_bytes, Compression, NamedTag, NbtReadOptions, NbtWriteOptions};
 
-/// セクタ長。
+/// セクタ長
 pub const SECTOR_SIZE: usize = 4096;
 
-/// ロケーションテーブルとタイムスタンプテーブルが占めるセクタ数。
+/// ロケーションテーブルとタイムスタンプテーブルが占めるセクタ数
 const HEADER_SECTORS: usize = 2;
 
-/// 1リージョンに入るチャンク数。
+/// 1リージョンに入るチャンク数
 const CHUNK_COUNT: usize = 1024;
 
-/// 1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため）。
+/// 1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため）
 const MAX_SECTORS: usize = 255;
 
-/// リージョン内に収められるペイロードの上限。超えると外部ファイルへ退避する。
+/// リージョン内に収められるペイロードの上限
+/// 超えると外部ファイルへ退避する
 const MAX_INLINE_PAYLOAD: usize = (MAX_SECTORS * SECTOR_SIZE) - 5;
 
-/// リージョンファイル内でチャンクに使われる圧縮方式。
+/// リージョンファイル内でチャンクに使われる圧縮方式
 ///
-/// NBT 層の [`Compression`] とは別物であることに注意。
+/// NBT 層の [`Compression`] とは別物であることに注意
 /// あちらはファイル全体の圧縮を表し、こちらはリージョン内の 1 チャンクに付く
-/// 1 バイトのIDを表す。
+/// 1 バイトのIDを表す
 ///
 /// 仕様: `docs/spec/20-anvil-region.md` 3.1章
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChunkCompression {
-    /// GZip (RFC 1952)。実データではほぼ使われない。
+    /// GZip (RFC 1952)
+    /// 実データではほぼ使われない
     Gzip,
-    /// Zlib (RFC 1950)。Minecraft が実際に書き出す方式。
+    /// Zlib (RFC 1950)
+    /// Minecraft が実際に書き出す方式
     Zlib,
-    /// 無圧縮。
+    /// 無圧縮
     None,
-    /// LZ4（ブロック形式）。任意依存。
+    /// LZ4（ブロック形式）
+    /// 任意依存
     Lz4,
-    /// サードパーティ製サーバのカスタム方式。中身は解釈できない。
+    /// サードパーティ製サーバのカスタム方式
+    /// 中身は解釈できない
     Custom,
 }
 
 impl ChunkCompression {
-    /// 仕様が定める圧縮方式ID。
+    /// 仕様が定める圧縮方式ID
     pub fn id(self) -> u8 {
         match self {
             ChunkCompression::Gzip => 1,
@@ -67,7 +74,7 @@ impl ChunkCompression {
         }
     }
 
-    /// 適合性テストで言語間比較に使う識別子。
+    /// 適合性テストで言語間比較に使う識別子
     pub fn as_str(self) -> &'static str {
         match self {
             ChunkCompression::Gzip => "gzip",
@@ -78,7 +85,8 @@ impl ChunkCompression {
         }
     }
 
-    /// 圧縮方式IDから [`ChunkCompression`] を得る。未知のIDならエラー。
+    /// 圧縮方式IDから [`ChunkCompression`] を得る
+    /// 未知のIDならエラー
     pub fn from_id(id: u8) -> Result<ChunkCompression> {
         // 仕様が定めるのは 1・2・3・4・127 の 5 種類だけ
         match id {
@@ -95,36 +103,40 @@ impl ChunkCompression {
     }
 }
 
-/// リージョンファイルを開くときの動作。
+/// リージョンファイルを開くときの動作
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegionFileMode {
-    /// 読み取り専用。書き込み系の操作はエラーになる。
+    /// 読み取り専用
+    /// 書き込み系の操作はエラーになる
     ReadOnly,
-    /// 読み書き。ファイルが無ければ空のリージョンとして扱う。
+    /// 読み書き
+    /// ファイルが無ければ空のリージョンとして扱う
     ReadWrite,
 }
 
-/// リージョンの座標。1リージョンは 32×32 チャンクを担当する。
+/// リージョンの座標
+/// 1リージョンは 32×32 チャンクを担当する
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RegionPos {
-    /// リージョンX座標。
+    /// リージョンX座標
     pub x: i32,
-    /// リージョンZ座標。
+    /// リージョンZ座標
     pub z: i32,
 }
 
 impl RegionPos {
-    /// 座標を指定して作る。
+    /// 座標を指定して作る
     pub fn new(x: i32, z: i32) -> RegionPos {
         RegionPos { x, z }
     }
 
-    /// このリージョンのファイル名（`r.X.Z.mca`）。
+    /// このリージョンのファイル名（`r.X.Z.mca`）
     pub fn file_name(&self) -> String {
         format!("r.{}.{}.mca", self.x, self.z)
     }
 
-    /// `r.X.Z.mca` 形式のファイル名から座標を得る。解釈できなければ `None`。
+    /// `r.X.Z.mca` 形式のファイル名から座標を得る
+    /// 解釈できなければ `None`
     pub fn from_file_name(file_name: &str) -> Option<RegionPos> {
         let parts: Vec<&str> = file_name.split('.').collect();
 
@@ -147,66 +159,67 @@ impl RegionPos {
     }
 }
 
-/// チャンクの絶対座標。
+/// チャンクの絶対座標
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkPos {
-    /// 絶対チャンクX座標。
+    /// 絶対チャンクX座標
     pub x: i32,
-    /// 絶対チャンクZ座標。
+    /// 絶対チャンクZ座標
     pub z: i32,
 }
 
 impl ChunkPos {
-    /// 座標を指定して作る。
+    /// 座標を指定して作る
     pub fn new(x: i32, z: i32) -> ChunkPos {
         ChunkPos { x, z }
     }
 
-    /// このチャンクを含むリージョンの座標。
+    /// このチャンクを含むリージョンの座標
     ///
-    /// Rust の `>>` は符号付き整数では算術右シフトなので、負の座標でも正しく求まる。
+    /// Rust の `>>` は符号付き整数では算術右シフトなので、負の座標でも正しく求まる
     pub fn region(&self) -> RegionPos {
         RegionPos::new(self.x >> 5, self.z >> 5)
     }
 
-    /// リージョン内でのX位置 (0..31)。
+    /// リージョン内でのX位置 (0..31)
     pub fn local_x(&self) -> i32 {
         self.x & 31
     }
 
-    /// リージョン内でのZ位置 (0..31)。
+    /// リージョン内でのZ位置 (0..31)
     pub fn local_z(&self) -> i32 {
         self.z & 31
     }
 
-    /// ロケーションテーブル内の添字 (0..1023)。
+    /// ロケーションテーブル内の添字 (0..1023)
     pub fn index(&self) -> usize {
         (self.local_x() + (self.local_z() * 32)) as usize
     }
 }
 
-/// リージョンファイルに格納されたままの、圧縮済みチャンクデータ。
+/// リージョンファイルに格納されたままの、圧縮済みチャンクデータ
 ///
 /// 本ライブラリが解釈できない圧縮方式（LZ4 未導入、カスタム方式）でも
-/// これなら取り出せる。バックアップや別ツールへの受け渡しに使う。
+/// これなら取り出せる
+/// バックアップや別ツールへの受け渡しに使う
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawChunk {
-    /// この本体に使われている圧縮方式。
+    /// この本体に使われている圧縮方式
     pub compression: ChunkCompression,
-    /// 圧縮されたままの本体。
+    /// 圧縮されたままの本体
     pub data: Vec<u8>,
-    /// 外部ファイル `c.X.Z.mcc` に格納されていたか。
+    /// 外部ファイル `c.X.Z.mcc` に格納されていたか
     pub external: bool,
 }
 
 impl RawChunk {
-    /// 内部格納のチャンクとして作る。
+    /// 内部格納のチャンクとして作る
     pub fn new(compression: ChunkCompression, data: Vec<u8>) -> RawChunk {
         RawChunk { compression, data, external: false }
     }
 }
 
-/// リージョンファイル 1 つ分。
+/// リージョンファイル 1 つ分
 pub struct RegionFile {
     path: PathBuf,
     directory: PathBuf,
@@ -222,9 +235,10 @@ pub struct RegionFile {
 }
 
 impl RegionFile {
-    /// リージョンファイルを開く。
+    /// リージョンファイルを開く
     ///
-    /// `path` は `r.X.Z.mca` という名前でなければならない。座標はファイル名から読み取る。
+    /// `path` は `r.X.Z.mca` という名前でなければならない
+    /// 座標はファイル名から読み取る
     pub fn open(path: impl AsRef<Path>, mode: RegionFileMode) -> Result<RegionFile> {
         let path = path.as_ref();
 
@@ -287,17 +301,17 @@ impl RegionFile {
         Ok(region)
     }
 
-    /// このリージョンのX座標。
+    /// このリージョンのX座標
     pub fn region_x(&self) -> i32 {
         self.region_x
     }
 
-    /// このリージョンのZ座標。
+    /// このリージョンのZ座標
     pub fn region_z(&self) -> i32 {
         self.region_z
     }
 
-    /// ヘッダを解析し、ロケーションとタイムスタンプを取り込む。
+    /// ヘッダを解析し、ロケーションとタイムスタンプを取り込む
     fn parse_header(&mut self) -> Result<()> {
         // 空ファイルは「チャンクが 1 つも無いリージョン」として受け入れる
         if self.data.is_empty() {
@@ -377,7 +391,7 @@ impl RegionFile {
         Ok(())
     }
 
-    /// ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す。
+    /// ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す
     fn write_header(&mut self) {
         // 位置表とタイムスタンプ表を、添字順に組み立て直す
         for index in 0..CHUNK_COUNT {
@@ -391,7 +405,7 @@ impl RegionFile {
         }
     }
 
-    /// 指定した座標がこのリージョンの担当範囲にあるか確認し、添字を返す。
+    /// 指定した座標がこのリージョンの担当範囲にあるか確認し、添字を返す
     fn index_of(&self, chunk_x: i32, chunk_z: i32) -> Result<usize> {
         let position = ChunkPos::new(chunk_x, chunk_z);
         let region = position.region();
@@ -431,14 +445,14 @@ impl RegionFile {
         Ok(())
     }
 
-    /// チャンクが存在するか。
+    /// チャンクが存在するか
     pub fn has_chunk(&self, chunk_x: i32, chunk_z: i32) -> Result<bool> {
         self.ensure_open()?;
         let index = self.index_of(chunk_x, chunk_z)?;
         Ok(self.sector_counts[index] > 0)
     }
 
-    /// 存在するチャンクの座標を、ロケーションテーブルの並び順で返す。
+    /// 存在するチャンクの座標を、ロケーションテーブルの並び順で返す
     pub fn chunk_positions(&self) -> Result<Vec<ChunkPos>> {
         self.ensure_open()?;
         let mut result = Vec::new();
@@ -460,14 +474,15 @@ impl RegionFile {
         Ok(result)
     }
 
-    /// チャンクの最終更新時刻（Unix 秒）。存在しなければ 0。
+    /// チャンクの最終更新時刻（Unix 秒）
+    /// 存在しなければ 0
     pub fn timestamp(&self, chunk_x: i32, chunk_z: i32) -> Result<i32> {
         self.ensure_open()?;
         let index = self.index_of(chunk_x, chunk_z)?;
         Ok(self.timestamps[index])
     }
 
-    /// チャンクの最終更新時刻を設定する。
+    /// チャンクの最終更新時刻を設定する
     pub fn set_timestamp(&mut self, chunk_x: i32, chunk_z: i32, value: i32) -> Result<()> {
         self.ensure_open()?;
         self.ensure_writable()?;
@@ -477,7 +492,8 @@ impl RegionFile {
         Ok(())
     }
 
-    /// チャンクを圧縮されたまま取り出す。存在しなければ `None`。
+    /// チャンクを圧縮されたまま取り出す
+    /// 存在しなければ `None`
     pub fn read_chunk_raw(&self, chunk_x: i32, chunk_z: i32) -> Result<Option<RawChunk>> {
         self.ensure_open()?;
         let index = self.index_of(chunk_x, chunk_z)?;
@@ -517,7 +533,8 @@ impl RegionFile {
         Ok(Some(RawChunk { compression, data: body, external: false }))
     }
 
-    /// チャンクを NBT として読む。存在しなければ `None`。
+    /// チャンクを NBT として読む
+    /// 存在しなければ `None`
     pub fn read_chunk(&self, chunk_x: i32, chunk_z: i32) -> Result<Option<NbtCompound>> {
         let raw = match self.read_chunk_raw(chunk_x, chunk_z)? {
             Some(value) => value,
@@ -530,7 +547,7 @@ impl RegionFile {
         Ok(Some(read_bytes(&plain, &options)?.tag))
     }
 
-    /// チャンクを NBT として書き込む。
+    /// チャンクを NBT として書き込む
     pub fn write_chunk(
         &mut self,
         chunk_x: i32,
@@ -544,7 +561,7 @@ impl RegionFile {
         self.write_chunk_raw(chunk_x, chunk_z, &RawChunk::new(compression, payload))
     }
 
-    /// 圧縮済みのチャンクをそのまま書き込む。
+    /// 圧縮済みのチャンクをそのまま書き込む
     pub fn write_chunk_raw(&mut self, chunk_x: i32, chunk_z: i32, raw: &RawChunk) -> Result<()> {
         self.ensure_open()?;
         self.ensure_writable()?;
@@ -594,7 +611,8 @@ impl RegionFile {
         Ok(())
     }
 
-    /// チャンクを削除する。削除できたら `true`。
+    /// チャンクを削除する
+    /// 削除できたら `true`
     pub fn delete_chunk(&mut self, chunk_x: i32, chunk_z: i32) -> Result<bool> {
         self.ensure_open()?;
         self.ensure_writable()?;
@@ -613,12 +631,13 @@ impl RegionFile {
         Ok(true)
     }
 
-    /// 必要なセクタ数を確保し、開始セクタ番号を返す。
+    /// 必要なセクタ数を確保し、開始セクタ番号を返す
     ///
     /// 既存の割り当てがちょうど同じ大きさならその場を使い、
-    /// そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する。
+    /// そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する
     fn allocate_sectors(&mut self, index: usize, needed: usize) -> usize {
-        // 大きさが変わらないなら動かさない。触っていないチャンクの配置を保つため
+        // 大きさが変わらないなら動かさない
+        // 触っていないチャンクの配置を保つため
         if self.sector_counts[index] == needed {
             return self.offsets[index];
         }
@@ -642,13 +661,15 @@ impl RegionFile {
             }
         }
 
-        // 見つからなければ末尾へ追加する。末尾の空きは再利用できる
+        // 見つからなければ末尾へ追加する
+        // 末尾の空きは再利用できる
         let start = total_sectors - run;
         self.data.resize((start + needed) * SECTOR_SIZE, 0);
         start
     }
 
-    /// セクタの使用状況を作る。`ignore_index` のチャンクは空きとして扱う。
+    /// セクタの使用状況を作る
+    /// `ignore_index` のチャンクは空きとして扱う
     fn build_sector_usage(&self, ignore_index: usize) -> Vec<bool> {
         let total_sectors = self.data.len() / SECTOR_SIZE;
         let mut used = vec![false; total_sectors];
@@ -678,7 +699,8 @@ impl RegionFile {
         used
     }
 
-    /// 全チャンクを隙間なく詰め直す。断片化したファイルを縮めたいときに使う。
+    /// 全チャンクを隙間なく詰め直す
+    /// 断片化したファイルを縮めたいときに使う
     pub fn optimize(&mut self) -> Result<()> {
         self.ensure_open()?;
         self.ensure_writable()?;
@@ -743,7 +765,7 @@ impl RegionFile {
         Ok(())
     }
 
-    /// 変更をファイルへ書き出す。
+    /// 変更をファイルへ書き出す
     pub fn flush(&mut self) -> Result<()> {
         self.ensure_open()?;
 
@@ -766,14 +788,15 @@ impl RegionFile {
         }
     }
 
-    /// 現在の内容をバイト列として組み立てる。ファイルには書かない。
+    /// 現在の内容をバイト列として組み立てる
+    /// ファイルには書かない
     pub fn to_bytes(&mut self) -> Result<Vec<u8>> {
         self.ensure_open()?;
         self.write_header();
         Ok(self.data.clone())
     }
 
-    /// 変更があれば書き出してから閉じる。
+    /// 変更があれば書き出してから閉じる
     pub fn close(&mut self) -> Result<()> {
         if self.closed {
             return Ok(());
@@ -790,7 +813,7 @@ impl RegionFile {
 
     // -- バイト操作 ---------------------------------------------------------
 
-    /// 指定位置からビッグエンディアンで読む。
+    /// 指定位置からビッグエンディアンで読む
     fn read_unsigned(&self, position: usize, count: usize) -> u64 {
         let mut value: u64 = 0;
 
@@ -802,7 +825,7 @@ impl RegionFile {
         value
     }
 
-    /// 指定位置へビッグエンディアンで書く。
+    /// 指定位置へビッグエンディアンで書く
     fn write_unsigned(&mut self, position: usize, value: u64, count: usize) {
         // 上位バイトから順に取り出す
         for offset in 0..count {
@@ -868,7 +891,8 @@ impl RegionFile {
 
 impl Drop for RegionFile {
     fn drop(&mut self) {
-        // 書き忘れを防ぐため、破棄時にも書き出しを試みる。失敗は握り潰すしかない
+        // 書き忘れを防ぐため、破棄時にも書き出しを試みる
+        // 失敗は握り潰すしかない
         let _ = self.close();
     }
 }
@@ -880,7 +904,7 @@ fn current_unix_seconds() -> i32 {
     }
 }
 
-/// 圧縮済みペイロードを展開する。
+/// 圧縮済みペイロードを展開する
 fn decompress_chunk(raw: &RawChunk) -> Result<Vec<u8>> {
     match raw.compression {
         ChunkCompression::None => Ok(raw.data.clone()),
@@ -917,7 +941,7 @@ fn read_all(source: &mut impl Read, destination: &mut Vec<u8>) -> Result<()> {
     }
 }
 
-/// ペイロードを指定の方式で圧縮する。
+/// ペイロードを指定の方式で圧縮する
 fn compress_chunk(plain: &[u8], compression: ChunkCompression) -> Result<Vec<u8>> {
     match compression {
         ChunkCompression::None => Ok(plain.to_vec()),

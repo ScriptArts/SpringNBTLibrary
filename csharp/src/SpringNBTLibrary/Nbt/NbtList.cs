@@ -3,12 +3,14 @@ using System.Collections;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// TAG_List。要素型が 1 つに固定されたタグの列。
+/// TAG_List
+/// 要素型が 1 つに固定されたタグの列
 /// </summary>
 /// <remarks>
 /// <para>
-/// 空リストの要素型は <see cref="TagType.End"/>。最初の要素を追加した時点で型が確定する。
-/// 全要素を削除しても確定済みの要素型は維持される（読み書きの往復で型が消えないようにするため）。
+/// 空リストの要素型は <see cref="TagType.End"/>
+/// 最初の要素を追加した時点で型が確定する
+/// 全要素を削除しても確定済みの要素型は維持される（読み書きの往復で型が消えないようにするため）
 /// </para>
 /// <para>仕様: <c>docs/spec/10-nbt-binary.md</c> 7.2章</para>
 /// </remarks>
@@ -16,21 +18,22 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
 {
     private readonly List<NbtTag> items = new List<NbtTag>();
 
-    /// <summary>空のリストを作る。要素型は未確定。</summary>
+    /// <summary>空のリストを作る
+    /// 要素型は未確定</summary>
     public NbtList()
     {
         ElementType = TagType.End;
     }
 
-    /// <summary>要素型を明示して空のリストを作る。</summary>
+    /// <summary>要素型を明示して空のリストを作る</summary>
     public NbtList(TagType elementType)
     {
         ElementType = elementType;
     }
 
-    /// <summary>要素型を明示し、要素を与えてリストを作る。</summary>
+    /// <summary>要素型を明示し、要素を与えてリストを作る</summary>
     /// <exception cref="SpringNbtException">
-    /// 要素型と一致しない要素が含まれる場合（<see cref="ErrorCode.UnexpectedTagType"/>）。
+    /// 要素型と一致しない要素が含まれる場合（<see cref="ErrorCode.UnexpectedTagType"/>）
     /// </exception>
     public NbtList(TagType elementType, IEnumerable<NbtTag> elements)
         : this(elementType)
@@ -44,7 +47,8 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
         }
     }
 
-    /// <summary>要素の型。空で未確定なら <see cref="TagType.End"/>。</summary>
+    /// <summary>要素の型
+    /// 空で未確定なら <see cref="TagType.End"/></summary>
     public TagType ElementType { get; private set; }
 
     /// <inheritdoc/>
@@ -58,7 +62,7 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
 
     /// <inheritdoc/>
     /// <exception cref="SpringNbtException">
-    /// 要素型と一致しないタグを設定した場合（<see cref="ErrorCode.UnexpectedTagType"/>）。
+    /// 要素型と一致しないタグを設定した場合（<see cref="ErrorCode.UnexpectedTagType"/>）
     /// </exception>
     public NbtTag this[int index]
     {
@@ -73,7 +77,7 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
 
     /// <inheritdoc/>
     /// <exception cref="SpringNbtException">
-    /// 要素型と一致しないタグを追加した場合（<see cref="ErrorCode.UnexpectedTagType"/>）。
+    /// 要素型と一致しないタグを追加した場合（<see cref="ErrorCode.UnexpectedTagType"/>）
     /// </exception>
     public void Add(NbtTag item)
     {
@@ -84,7 +88,7 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
 
     /// <inheritdoc/>
     /// <exception cref="SpringNbtException">
-    /// 要素型と一致しないタグを挿入した場合（<see cref="ErrorCode.UnexpectedTagType"/>）。
+    /// 要素型と一致しないタグを挿入した場合（<see cref="ErrorCode.UnexpectedTagType"/>）
     /// </exception>
     public void Insert(int index, NbtTag item)
     {
@@ -93,7 +97,8 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
         items.Insert(index, item);
     }
 
-    /// <summary>全要素を削除する。確定済みの要素型は維持する。</summary>
+    /// <summary>全要素を削除する
+    /// 確定済みの要素型は維持する</summary>
     public void Clear() => items.Clear();
 
     /// <inheritdoc/>
@@ -162,8 +167,8 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
     public override string ToString() => $"[{ElementType.AsString()}; {items.Count} 要素]";
 
     /// <summary>
-    /// 追加しようとしているタグが要素型と一致するか調べる。
-    /// リストが未確定なら、そのタグの型で確定させる。
+    /// 追加しようとしているタグが要素型と一致するか調べる
+    /// リストが未確定なら、そのタグの型で確定させる
     /// </summary>
     private void EnsureElementType(NbtTag item)
     {

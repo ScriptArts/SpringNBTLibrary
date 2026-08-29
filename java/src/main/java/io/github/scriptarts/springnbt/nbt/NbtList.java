@@ -7,11 +7,13 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * TAG_List。要素型が 1 つに固定されたタグの列。
+ * TAG_List
+ * 要素型が 1 つに固定されたタグの列
  *
- * <p>空リストの要素型は {@link TagType#END}。最初の要素を追加した時点で型が確定する。
+ * <p>空リストの要素型は {@link TagType#END}
+ * 最初の要素を追加した時点で型が確定する
  * 全要素を削除しても確定済みの要素型は維持される
- * （読み書きの往復で型が消えないようにするため）。
+ * （読み書きの往復で型が消えないようにするため）
  *
  * <p>仕様: {@code docs/spec/10-nbt-binary.md} 7.2章
  */
@@ -20,13 +22,15 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
     private final List<NbtTag> items = new ArrayList<>();
     private TagType elementType;
 
-    /** 空のリストを作る。要素型は未確定。 */
+    /** 空のリストを作る
+    /** 要素型は未確定
+    /** */
     public NbtList() {
         this.elementType = TagType.END;
     }
 
     /**
-     * 要素型を明示して空のリストを作る。
+     * 要素型を明示して空のリストを作る
      *
      * @param elementType 要素型
      */
@@ -35,7 +39,8 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
     }
 
     /**
-     * 要素の型。空で未確定なら {@link TagType#END}。
+     * 要素の型
+     * 空で未確定なら {@link TagType#END}
      *
      * @return 要素型
      */
@@ -44,7 +49,7 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
     }
 
     /**
-     * 要素数。
+     * 要素数
      *
      * @return 要素数
      */
@@ -53,7 +58,7 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
     }
 
     /**
-     * 位置を指定して取り出す。
+     * 位置を指定して取り出す
      *
      * @param index 位置
      * @return 要素
@@ -63,7 +68,7 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
     }
 
     /**
-     * 位置を指定して置き換える。
+     * 位置を指定して置き換える
      *
      * @param index 位置
      * @param item  新しい要素
@@ -75,7 +80,7 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
     }
 
     /**
-     * 末尾に追加する。
+     * 末尾に追加する
      *
      * @param item 要素
      * @throws SpringNbtException 要素型と一致しない場合
@@ -86,7 +91,7 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
     }
 
     /**
-     * 位置を指定して挿入する。
+     * 位置を指定して挿入する
      *
      * @param index 位置
      * @param item  要素
@@ -98,7 +103,7 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
     }
 
     /**
-     * 位置を指定して削除する。
+     * 位置を指定して削除する
      *
      * @param index 位置
      */
@@ -106,7 +111,9 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
         items.remove(index);
     }
 
-    /** 全要素を削除する。確定済みの要素型は維持する。 */
+    /** 全要素を削除する
+    /** 確定済みの要素型は維持する
+    /** */
     public void clear() {
         items.clear();
     }
@@ -153,8 +160,8 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
     }
 
     /**
-     * 追加しようとしているタグが要素型と一致するか調べる。
-     * リストが未確定なら、そのタグの型で確定させる。
+     * 追加しようとしているタグが要素型と一致するか調べる
+     * リストが未確定なら、そのタグの型で確定させる
      */
     private void ensureElementType(NbtTag item) {
         Objects.requireNonNull(item, "item");

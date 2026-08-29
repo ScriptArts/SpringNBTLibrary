@@ -17,34 +17,39 @@ import java.util.Objects;
 
 /**
  * リージョンファイルが並ぶディレクトリ 1 つ分
- * （{@code region/}、{@code entities/}、{@code poi/} のいずれか）。
+ * （{@code region/}、{@code entities/}、{@code poi/} のいずれか）
  *
- * <p>開いたリージョンファイルはキャッシュし、{@link #close()} でまとめて閉じる。
- * チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい。
+ * <p>開いたリージョンファイルはキャッシュし、{@link #close()} でまとめて閉じる
+ * チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい
  *
  * <p>{@link RegionFile} はファイル全体をメモリへ載せるため、キャッシュには
- * {@link #maxCachedRegions()} 件の上限がある。上限を超えると、最も長く使われていない
- * ものから書き出して閉じる。大きなワールドを端から走査してもメモリを使い切らない。
+ * {@link #maxCachedRegions()} 件の上限がある
+ * 上限を超えると、最も長く使われていない
+ * ものから書き出して閉じる
+ * 大きなワールドを端から走査してもメモリを使い切らない
  *
  * <p>このため {@link #region(int, int)} が返した参照は、
- * <b>別のリージョンへアクセスすると閉じられている場合がある</b>。
- * 参照を保持せず、必要なたびに取得すること。
+ * <b>別のリージョンへアクセスすると閉じられている場合がある</b>
+ * 参照を保持せず、必要なたびに取得すること
  *
  * <p>仕様: {@code docs/spec/20-anvil-region.md} 5章
  */
 public final class RegionFolder implements AutoCloseable {
 
     /**
-     * 同時に開いておくリージョンファイル数の既定の上限。
+     * 同時に開いておくリージョンファイル数の既定の上限
      *
-     * <p>1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる。
-     * 実データでは数 MB から数十 MB 程度。8 件なら通常のワールドで数百 MB に収まる。
+     * <p>1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる
+     * 実データでは数 MB から数十 MB 程度
+     * 8 件なら通常のワールドで数百 MB に収まる
      */
     public static final int DEFAULT_MAX_CACHED_REGIONS = 8;
 
     private final Map<RegionPos, RegionFile> cache = new HashMap<>();
 
-    /** 最近使った順のリージョン座標。末尾がいちばん新しい。 */
+    /** 最近使った順のリージョン座標
+    /** 末尾がいちばん新しい
+    /** */
     private final LinkedList<RegionPos> recentlyUsed = new LinkedList<>();
 
     private final Path directory;
@@ -59,7 +64,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * 同時に開いておくリージョンファイル数の上限。
+     * 同時に開いておくリージョンファイル数の上限
      *
      * @return 上限
      */
@@ -68,7 +73,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * いま開いているリージョンファイル数。
+     * いま開いているリージョンファイル数
      *
      * @return 件数
      */
@@ -77,7 +82,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * このフォルダのパス。
+     * このフォルダのパス
      *
      * @return パス
      */
@@ -86,7 +91,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * リージョンフォルダを開く。
+     * リージョンフォルダを開く
      *
      * @param directory ディレクトリ
      * @param mode      読み取り専用か読み書きか
@@ -98,7 +103,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * 上限を指定してリージョンフォルダを開く。
+     * 上限を指定してリージョンフォルダを開く
      *
      * @param directory        ディレクトリ
      * @param mode             読み取り専用か読み書きか
@@ -124,7 +129,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * 読み取り専用でリージョンフォルダを開く。
+     * 読み取り専用でリージョンフォルダを開く
      *
      * @param directory ディレクトリ
      * @return 開いたフォルダ
@@ -134,7 +139,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * このフォルダに存在するリージョンの座標を返す。
+     * このフォルダに存在するリージョンの座標を返す
      *
      * @return リージョン座標の一覧
      */
@@ -166,11 +171,12 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * リージョンファイルを取得する。
+     * リージョンファイルを取得する
      *
      * @param regionX リージョンX座標
      * @param regionZ リージョンZ座標
-     * @return リージョン。読み取り専用で存在しなければ null
+     * @return リージョン
+     * 読み取り専用で存在しなければ null
      */
     public RegionFile region(int regionX, int regionZ) {
         ensureOpen();
@@ -189,7 +195,8 @@ public final class RegionFolder implements AutoCloseable {
             return null;
         }
 
-        // 開く前に空きを作る。開いてからだと一瞬だけ上限を超える
+        // 開く前に空きを作る
+        // 開いてからだと一瞬だけ上限を超える
         evictUntilBelowLimit();
 
         RegionFile opened = RegionFile.open(path, mode);
@@ -198,13 +205,15 @@ public final class RegionFolder implements AutoCloseable {
         return opened;
     }
 
-    /** 使ったリージョンを、最近使った列の末尾へ移す。 */
+    /** 使ったリージョンを、最近使った列の末尾へ移す
+    /** */
     private void touch(RegionPos position) {
         recentlyUsed.remove(position);
         recentlyUsed.addLast(position);
     }
 
-    /** 新しく 1 件開けるよう、上限を下回るまで古いものを閉じる。 */
+    /** 新しく 1 件開けるよう、上限を下回るまで古いものを閉じる
+    /** */
     private void evictUntilBelowLimit() {
         // 上限に達している間、いちばん長く使っていないものから閉じる
         while (cache.size() >= maxCachedRegions && !recentlyUsed.isEmpty()) {
@@ -212,14 +221,15 @@ public final class RegionFolder implements AutoCloseable {
             RegionFile file = cache.remove(oldest);
 
             if (file != null) {
-                // 閉じる前に必ず書き出す。捨てると変更が失われる
+                // 閉じる前に必ず書き出す
+                // 捨てると変更が失われる
                 file.close();
             }
         }
     }
 
     /**
-     * チャンクが存在するか。
+     * チャンクが存在するか
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -236,11 +246,12 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * チャンクを NBT として読む。
+     * チャンクを NBT として読む
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
-     * @return チャンク。存在しなければ null
+     * @return チャンク
+     * 存在しなければ null
      */
     public NbtCompound readChunk(int chunkX, int chunkZ) {
         RegionFile file = regionFor(chunkX, chunkZ);
@@ -253,7 +264,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * チャンクを NBT として書き込む。
+     * チャンクを NBT として書き込む
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -271,7 +282,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * チャンクを削除する。
+     * チャンクを削除する
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -288,7 +299,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * このフォルダに存在する全チャンクの座標を返す。
+     * このフォルダに存在する全チャンクの座標を返す
      *
      * @return チャンク座標の一覧
      */
@@ -309,7 +320,8 @@ public final class RegionFolder implements AutoCloseable {
         return result;
     }
 
-    /** 開いている全リージョンの変更を書き出す。 */
+    /** 開いている全リージョンの変更を書き出す
+    /** */
     public void flush() {
         ensureOpen();
 
@@ -319,7 +331,8 @@ public final class RegionFolder implements AutoCloseable {
         }
     }
 
-    /** 開いている全リージョンを閉じる。 */
+    /** 開いている全リージョンを閉じる
+    /** */
     @Override
     public void close() {
         if (closed) {

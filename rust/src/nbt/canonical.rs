@@ -1,19 +1,19 @@
-//! 浮動小数点の正準10進表記。
+//! 浮動小数点の正準10進表記
 //!
 //! 各言語の標準の数値書式（C# の `"R"`、Java の `Float.toString`、
-//! Python の `repr`、Rust の `{}`）は互いに一致しない。
-//! 指数表記へ切り替わる閾値も、指数部の桁数も、`E` の大文字小文字も処理系ごとに違う。
-//! そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する。
+//! Python の `repr`、Rust の `{}`）は互いに一致しない
+//! 指数表記へ切り替わる閾値も、指数部の桁数も、`E` の大文字小文字も処理系ごとに違う
+//! そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する
 //!
 //! 仕様: `docs/spec/11-snbt.md` 5.1章
 
-/// 固定小数点表記を使う10進指数の下限。
+/// 固定小数点表記を使う10進指数の下限
 const MIN_FIXED_EXPONENT: i32 = -4;
 
-/// 固定小数点表記を使う10進指数の上限。
+/// 固定小数点表記を使う10進指数の上限
 const MAX_FIXED_EXPONENT: i32 = 16;
 
-/// binary32 を正準10進表記へ変換する。
+/// binary32 を正準10進表記へ変換する
 pub fn from_f32(value: f32) -> String {
     if value.is_nan() {
         return "NaN".to_string();
@@ -47,7 +47,7 @@ pub fn from_f32(value: f32) -> String {
     format_exponential(&format!("{:.8e}", value))
 }
 
-/// binary64 を正準10進表記へ変換する。
+/// binary64 を正準10進表記へ変換する
 pub fn from_f64(value: f64) -> String {
     if value.is_nan() {
         return "NaN".to_string();
@@ -81,7 +81,7 @@ pub fn from_f64(value: f64) -> String {
     format_exponential(&format!("{:.16e}", value))
 }
 
-/// 指数表記の文字列（Rust の `{:e}` は `7.5e-1` 形式）から、仕様が定める正準表記を組み立てる。
+/// 指数表記の文字列（Rust の `{:e}` は `7.5e-1` 形式）から、仕様が定める正準表記を組み立てる
 fn format_exponential(exponential: &str) -> String {
     let bytes: Vec<char> = exponential.chars().collect();
     let mut negative = false;
@@ -110,7 +110,8 @@ fn format_exponential(exponential: &str) -> String {
     compose(negative, trim_trailing_zeros(&digits), exponent)
 }
 
-/// 末尾のゼロを取り除く。すべてゼロなら "0" を残す。
+/// 末尾のゼロを取り除く
+/// すべてゼロなら "0" を残す
 fn trim_trailing_zeros(digits: &str) -> String {
     let chars: Vec<char> = digits.chars().collect();
     let mut end = chars.len();
@@ -123,7 +124,7 @@ fn trim_trailing_zeros(digits: &str) -> String {
     chars[..end].iter().collect()
 }
 
-/// 数字列と10進指数から最終的な文字列を組み立てる。
+/// 数字列と10進指数から最終的な文字列を組み立てる
 fn compose(negative: bool, digits: String, exponent: i32) -> String {
     let mut result = String::new();
 
@@ -156,7 +157,8 @@ fn compose(negative: bool, digits: String, exponent: i32) -> String {
     }
 
     if exponent >= 0 {
-        // 整数部は先頭 (exponent + 1) 桁。足りなければゼロで右詰めする
+        // 整数部は先頭 (exponent + 1) 桁
+        // 足りなければゼロで右詰めする
         let integer_digits = (exponent + 1) as usize;
 
         // 整数部が数字の並びに収まるなら、そのまま切り出す

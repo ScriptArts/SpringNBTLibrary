@@ -4,10 +4,10 @@ import io.github.scriptarts.springnbt.nbt.NbtCompound;
 import java.util.Objects;
 
 /**
- * チャンクを Y 方向に 16 ブロックずつ区切った 16×16×16 の立方体。
+ * チャンクを Y 方向に 16 ブロックずつ区切った 16×16×16 の立方体
  *
  * <p>{@code BlockLight} / {@code SkyLight} などの解釈していないキーは元の NBT に残り、
- * 書き戻しでそのまま出力される。
+ * 書き戻しでそのまま出力される
  *
  * <p>仕様: {@code docs/spec/30-chunk-format.md} 2章
  */
@@ -25,7 +25,8 @@ public final class ChunkSection {
     }
 
     /**
-     * セクションのY位置。オーバーワールドは -5..20。
+     * セクションのY位置
+     * オーバーワールドは -5..20
      *
      * @return Y位置
      */
@@ -34,7 +35,8 @@ public final class ChunkSection {
     }
 
     /**
-     * ブロック状態。持たないセクション（光源専用）では null。
+     * ブロック状態
+     * 持たないセクション（光源専用）では null
      *
      * @return ブロック状態
      */
@@ -43,7 +45,8 @@ public final class ChunkSection {
     }
 
     /**
-     * バイオーム。持たないセクションでは null。
+     * バイオーム
+     * 持たないセクションでは null
      *
      * @return バイオーム
      */
@@ -52,7 +55,7 @@ public final class ChunkSection {
     }
 
     /**
-     * ブロック状態を持つか。
+     * ブロック状態を持つか
      *
      * @return 持つなら true
      */
@@ -61,7 +64,7 @@ public final class ChunkSection {
     }
 
     /**
-     * バイオームを持つか。
+     * バイオームを持つか
      *
      * @return 持つなら true
      */
@@ -70,7 +73,8 @@ public final class ChunkSection {
     }
 
     /**
-     * 元の NBT。解釈していないキーもここに残っている。
+     * 元の NBT
+     * 解釈していないキーもここに残っている
      *
      * @return NBT
      */
@@ -79,7 +83,7 @@ public final class ChunkSection {
     }
 
     /**
-     * NBT からセクションを読む。
+     * NBT からセクションを読む
      *
      * @param nbt     セクションの NBT
      * @param options 読み込みオプション
@@ -107,7 +111,8 @@ public final class ChunkSection {
     }
 
     /**
-     * NBT へ書き戻す。解釈していないキーはそのまま残る。
+     * NBT へ書き戻す
+     * 解釈していないキーはそのまま残る
      *
      * @return NBT
      */
@@ -123,7 +128,8 @@ public final class ChunkSection {
         return raw;
     }
 
-    /** 使われていないパレット要素を取り除く。 */
+    /** 使われていないパレット要素を取り除く
+    /** */
     public void compact() {
         if (blockStates != null) {
             blockStates.compact();

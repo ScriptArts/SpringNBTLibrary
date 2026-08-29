@@ -1,7 +1,7 @@
 package io.github.scriptarts.springnbt.anvil;
 
 /**
- * チャンクの絶対座標。
+ * チャンクの絶対座標
  *
  * <p>仕様: {@code docs/spec/20-anvil-region.md} 1章
  *
@@ -11,9 +11,9 @@ package io.github.scriptarts.springnbt.anvil;
 public record ChunkPos(int x, int z) {
 
     /**
-     * このチャンクを含むリージョンの座標。
+     * このチャンクを含むリージョンの座標
      *
-     * <p>算術右シフトなので負の座標でも正しく求まる。
+     * <p>算術右シフトなので負の座標でも正しく求まる
      *
      * @return リージョン座標
      */
@@ -22,7 +22,7 @@ public record ChunkPos(int x, int z) {
     }
 
     /**
-     * リージョン内でのX位置 (0..31)。
+     * リージョン内でのX位置 (0..31)
      *
      * @return 位置
      */
@@ -31,7 +31,7 @@ public record ChunkPos(int x, int z) {
     }
 
     /**
-     * リージョン内でのZ位置 (0..31)。
+     * リージョン内でのZ位置 (0..31)
      *
      * @return 位置
      */
@@ -40,7 +40,7 @@ public record ChunkPos(int x, int z) {
     }
 
     /**
-     * ロケーションテーブル内の添字 (0..1023)。
+     * ロケーションテーブル内の添字 (0..1023)
      *
      * @return 添字
      */

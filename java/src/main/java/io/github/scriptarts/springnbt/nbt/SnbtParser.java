@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * SNBT (Stringified NBT) のパーサ。
+ * SNBT (Stringified NBT) のパーサ
  *
  * <p>仕様: {@code docs/spec/11-snbt.md}
  */
@@ -23,7 +23,9 @@ final class SnbtParser {
         this.position = 0;
     }
 
-    /** 入力全体を 1 つの値として読む。末尾に余りがあれば例外。 */
+    /** 入力全体を 1 つの値として読む
+    /** 末尾に余りがあれば例外
+    /** */
     NbtTag parseWhole() {
         NbtTag value = parseValue();
         skipWhitespace();
@@ -238,7 +240,9 @@ final class SnbtParser {
         return new NbtLongArray(result);
     }
 
-    /** 整数タグから値を取り出す。整数以外なら例外。 */
+    /** 整数タグから値を取り出す
+    /** 整数以外なら例外
+    /** */
     private long toIntegral(NbtTag tag) {
         return switch (tag) {
             case NbtByte value -> value.value();
@@ -351,7 +355,8 @@ final class SnbtParser {
         builder.appendCodePoint((int) codePoint);
     }
 
-    /** Unicode 文字名によるエスケープ {@code \N{...}} を読む。 */
+    /** Unicode 文字名によるエスケープ {@code \N{...}} を読む
+    /** */
     private void appendNamedCharacter(StringBuilder builder) {
         expect('{');
         int start = position;
@@ -443,7 +448,9 @@ final class SnbtParser {
         });
     }
 
-    /** 数値トークンを解釈する。数値として読めなければ null を返す（文字列として扱われる）。 */
+    /** 数値トークンを解釈する
+    /** 数値として読めなければ null を返す（文字列として扱われる）
+    /** */
     private NbtTag tryParseNumber(String token) {
         boolean negative = false;
         int start = 0;
@@ -465,7 +472,8 @@ final class SnbtParser {
 
         boolean isHex = isHexBody(body);
 
-        // 幅接尾辞を末尾から剥がす。16進では b/d/f が数字と紛れるため s/l だけを認める
+        // 幅接尾辞を末尾から剥がす
+        // 16進では b/d/f が数字と紛れるため s/l だけを認める
         char last = body.charAt(body.length() - 1);
         boolean suffixAllowed;
 
@@ -475,7 +483,8 @@ final class SnbtParser {
             suffixAllowed = WIDTH_SUFFIXES.indexOf(last) >= 0;
         }
 
-        // 末尾 1 文字が型の印なら切り離す。1 文字だけの token は数字そのもの
+        // 末尾 1 文字が型の印なら切り離す
+        // 1 文字だけの token は数字そのもの
         if (suffixAllowed && body.length() >= 2) {
             widthSuffix = Character.toLowerCase(last);
             body = body.substring(0, body.length() - 1);
@@ -586,7 +595,8 @@ final class SnbtParser {
 
         long magnitude = 0;
 
-        // 桁を1つずつ積み上げる。桁あふれはその場で検出する
+        // 桁を1つずつ積み上げる
+        // 桁あふれはその場で検出する
         for (int index = 0; index < digits.length(); index++) {
             int digit = digitValue(digits.charAt(index), radix);
 
@@ -627,7 +637,8 @@ final class SnbtParser {
             case 'l' -> new NbtLong(value);
             case 'f' -> new NbtFloat((float) value);
             case 'd' -> new NbtDouble(value);
-            // 接尾辞なしの整数は Int。暗黙に Long へ格上げしない
+            // 接尾辞なしの整数は Int
+            // 暗黙に Long へ格上げしない
             default -> new NbtInt(
                     (int) checkRange(value, Integer.MIN_VALUE, Integer.MAX_VALUE, "int"));
         };
@@ -708,7 +719,8 @@ final class SnbtParser {
         return text.substring(start, position);
     }
 
-    /** 引用符なしで書ける文字か。 */
+    /** 引用符なしで書ける文字か
+    /** */
     static boolean isBareChar(char c) {
         if (c >= 'a' && c <= 'z') {
             return true;
@@ -740,7 +752,9 @@ final class SnbtParser {
         return text.charAt(position);
     }
 
-    /** 末尾でも例外にしない先読み。入力が尽きていれば NUL を返す。 */
+    /** 末尾でも例外にしない先読み
+    /** 入力が尽きていれば NUL を返す
+    /** */
     private char peekOrNul() {
         if (position >= text.length()) {
             return '\0';

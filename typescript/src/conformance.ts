@@ -1,8 +1,9 @@
 /**
- * 適合性検証ツール。全言語が同じインターフェースで同じ出力を出す。
+ * 適合性検証ツール
+ * 全言語が同じインターフェースで同じ出力を出す
  *
  * `spec/run-conformance.sh` がこのツールを言語ぶん起動し、
- * 出力を相互に diff することで「全言語が同一に振る舞う」ことを機械的に確かめる。
+ * 出力を相互に diff することで「全言語が同一に振る舞う」ことを機械的に確かめる
  *
  * 仕様: `docs/spec/90-conformance.md` 2.3章
  */
@@ -49,9 +50,9 @@ const USAGE = `使い方:
 // ---------------------------------------------------------------------------
 // 正規化JSON
 //
-// 浮動小数点をビットパターンで、64bit 整数を10進文字列で表すのが要。
+// 浮動小数点をビットパターンで、64bit 整数を10進文字列で表すのが要
 // 10進表記の丸めや JSON 数値の精度は処理系ごとに差が出るため、
-// そのまま出すと言語間で出力が一致しない。
+// そのまま出すと言語間で出力が一致しない
 //
 // 仕様: docs/spec/00-conventions.md 6章
 // ---------------------------------------------------------------------------
@@ -67,10 +68,11 @@ const JSON_ESCAPES = new Map<number, string>([
 ]);
 
 /**
- * JSON 文字列を書き出す。非 ASCII は必ず `\uXXXX` へ逃がす。
+ * JSON 文字列を書き出す
+ * 非 ASCII は必ず `\uXXXX` へ逃がす
  *
- * エスケープの単位は UTF-16 コード単位。
- * 言語ごとに既定のエスケープ方針が違うため、ここで一律に固定しないと出力が一致しない。
+ * エスケープの単位は UTF-16 コード単位
+ * 言語ごとに既定のエスケープ方針が違うため、ここで一律に固定しないと出力が一致しない
  */
 function jsonString(text: string): string {
   let result = '"';
@@ -148,7 +150,8 @@ function jsonTag(tag: NbtTag): string {
     case TagType.String:
       result += jsonString(tag.value);
 
-      // MUTF-8 のバイト列も併記する。孤立サロゲートなど UTF-8 に写せない値を厳密に比較するため
+      // MUTF-8 のバイト列も併記する
+      // 孤立サロゲートなど UTF-8 に写せない値を厳密に比較するため
       result += `,"mutf8":${jsonString(toHex(mutf8.encode(tag.value)))}`;
       break;
     case TagType.ByteArray:
@@ -182,7 +185,8 @@ function jsonTag(tag: NbtTag): string {
       // JSON オブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
       const items: string[] = [];
 
-      // compound はキーと値の組の配列として写す。挿入順を保つため
+      // compound はキーと値の組の配列として写す
+      // 挿入順を保つため
       for (const [key, value] of (tag as NbtCompound).entries()) {
         items.push(`[${jsonString(key)},${jsonTag(value)}]`);
       }
@@ -197,7 +201,9 @@ function jsonTag(tag: NbtTag): string {
   return `${result}}`;
 }
 
-/** ルートを含む全体を JSON 文字列へ変換する。末尾に改行を1つ付ける。 */
+/** ルートを含む全体を JSON 文字列へ変換する
+/** 末尾に改行を1つ付ける
+/** */
 function normalizedJson(named: NamedTag, format: NbtFormat): string {
   return (
     `{"format":${jsonString(format)}` +
@@ -214,9 +220,10 @@ function normalizedJson(named: NamedTag, format: NbtFormat): string {
 // ---------------------------------------------------------------------------
 
 /**
- * 存在するチャンクを 1 行 1 チャンクで書き出す。並びはロケーションテーブルの添字順。
+ * 存在するチャンクを 1 行 1 チャンクで書き出す
+ * 並びはロケーションテーブルの添字順
  *
- * 各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 キー数」。
+ * 各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 キー数」
  */
 function regionList(region: RegionFile): string {
   const lines: string[] = [`region ${region.regionX} ${region.regionZ}`];
@@ -253,10 +260,10 @@ function regionList(region: RegionFile): string {
 }
 
 /**
- * 全チャンクを読み直し、無圧縮で新しいリージョンへ詰め直して書き出す。
+ * 全チャンクを読み直し、無圧縮で新しいリージョンへ詰め直して書き出す
  *
  * 無圧縮にするのは、zlib の出力が処理系ごとに違い、
- * 圧縮したままでは言語間でバイトが一致しないため。
+ * 圧縮したままでは言語間でバイトが一致しないため
  */
 function regionRewrite(source: RegionFile, outputPath: string): void {
   // 途中結果が残らないよう、書き出し先は必ず作り直す
@@ -290,10 +297,10 @@ function regionRewrite(source: RegionFile, outputPath: string): void {
 // ---------------------------------------------------------------------------
 
 /**
- * チャンクの全ブロック・全バイオームを走査して集計する。
+ * チャンクの全ブロック・全バイオームを走査して集計する
  *
  * パレットとビットストレージを端から端まで通すので、
- * ビット詰めの実装が 1 か所でもずれれば集計値が変わる。
+ * ビット詰めの実装が 1 か所でもずれれば集計値が変わる
  */
 function chunkDescribe(chunk: Chunk): string {
   const lines: string[] = [
@@ -370,9 +377,10 @@ function chunkDescribe(chunk: Chunk): string {
 }
 
 /**
- * 決まった手順でチャンクを編集する。全言語で同じ結果になるはず。
+ * 決まった手順でチャンクを編集する
+ * 全言語で同じ結果になるはず
  *
- * パレット拡張・ビット幅の再計算・未使用要素の掃除を一通り通す。
+ * パレット拡張・ビット幅の再計算・未使用要素の掃除を一通り通す
  */
 function chunkEdit(chunk: Chunk): void {
   const baseY = chunk.minSectionY * 16;
@@ -400,7 +408,9 @@ function chunkEdit(chunk: Chunk): void {
   chunk.invalidateLighting();
 }
 
-/** 集計表から現在の件数を取り出す。まだ無ければ 0。 */
+/** 集計表から現在の件数を取り出す
+/** まだ無ければ 0
+/** */
 function countOf(counts: Map<string, number>, key: string): number {
   const current = counts.get(key);
 
@@ -411,7 +421,8 @@ function countOf(counts: Map<string, number>, key: string): number {
   return current;
 }
 
-/** チャンク NBT のファイルを読む。 */
+/** チャンク NBT のファイルを読む
+/** */
 function readChunkFile(path: string): Chunk {
   // 検証では DataVersion の違いを警告にせず、そのまま読む
   return Chunk.fromNbt(readFile(path).tag, {
@@ -423,7 +434,8 @@ function readChunkFile(path: string): Chunk {
 // コマンド
 // ---------------------------------------------------------------------------
 
-/** `--format network` が指定されていればネットワーク形式として読む。 */
+/** `--format network` が指定されていればネットワーク形式として読む
+/** */
 function parseFormat(args: string[]): NbtFormat {
   // 3 番目以降の引数からオプションを探す
   for (let index = 3; index < args.length - 1; index++) {
@@ -436,10 +448,10 @@ function parseFormat(args: string[]): NbtFormat {
 }
 
 /**
- * 改行を変換せず、BOM も付けずに UTF-8 で書く。
+ * 改行を変換せず、BOM も付けずに UTF-8 で書く
  *
  * 孤立サロゲートを含みうるが、標準の UTF-8 エンコーダは置換文字にしてしまうため、
- * 自前で符号化する（WTF-8）。
+ * 自前で符号化する（WTF-8）
  */
 function writeTextFile(path: string, content: string): void {
   const bytes: number[] = [];

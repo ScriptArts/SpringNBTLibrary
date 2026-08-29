@@ -3,30 +3,30 @@ using System.Text;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// Modified UTF-8 (MUTF-8) の符号化・復号。
+/// Modified UTF-8 (MUTF-8) の符号化・復号
 /// </summary>
 /// <remarks>
-/// <para>標準 UTF-8 との違いは 2 点だけ。</para>
+/// <para>標準 UTF-8 との違いは 2 点だけ</para>
 /// <list type="bullet">
 ///   <item><description><c>U+0000</c> を <c>C0 80</c> の 2 バイトで表す</description></item>
 ///   <item><description><c>U+10000</c> 以上をサロゲートペアへ分解し、3 バイト × 2 で表す (CESU-8)</description></item>
 /// </list>
 /// <para>
 /// C# の <see cref="string"/> は UTF-16 コード単位の列なので、
-/// サロゲートペアも孤立サロゲートもそのまま保持できる。
+/// サロゲートペアも孤立サロゲートもそのまま保持できる
 /// </para>
 /// <para>仕様: <c>docs/spec/10-nbt-binary.md</c> 2章</para>
 /// </remarks>
 public static class Mutf8
 {
-    /// <summary>MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが <c>u16</c> のため）。</summary>
+    /// <summary>MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが <c>u16</c> のため）</summary>
     public const int MaxByteLength = 65535;
 
     /// <summary>
-    /// MUTF-8 バイト列を文字列へ復号する。
+    /// MUTF-8 バイト列を文字列へ復号する
     /// </summary>
     /// <exception cref="SpringNbtException">
-    /// バイト列が MUTF-8 として不正な場合（<see cref="ErrorCode.MalformedData"/>）。
+    /// バイト列が MUTF-8 として不正な場合（<see cref="ErrorCode.MalformedData"/>）
     /// </exception>
     public static string Decode(ReadOnlySpan<byte> bytes)
     {
@@ -66,7 +66,8 @@ public static class Mutf8
 
                 int value = ((b0 & 0x1F) << 6) | (b1 & 0x3F);
 
-                // C0 80 (U+0000) だけは正当。それ以外の 0x80 未満は冗長符号化
+                // C0 80 (U+0000) だけは正当
+                // それ以外の 0x80 未満は冗長符号化
                 if (value < 0x80 && !(b0 == 0xC0 && b1 == 0x80))
                 {
                     throw SpringNbtException.Malformed("MUTF-8: 冗長な2バイト符号化");
@@ -112,11 +113,11 @@ public static class Mutf8
     }
 
     /// <summary>
-    /// 文字列を MUTF-8 バイト列へ符号化する。
+    /// 文字列を MUTF-8 バイト列へ符号化する
     /// </summary>
     /// <remarks>
     /// サロゲートは対になっているかどうかに関わらず 1 つずつ 3 バイトで符号化されるため、
-    /// 孤立サロゲートもそのまま往復できる。
+    /// 孤立サロゲートもそのまま往復できる
     /// </remarks>
     public static byte[] Encode(string text)
     {
@@ -126,7 +127,8 @@ public static class Mutf8
         // コード単位ごとに 1〜3 バイトへ展開する
         foreach (char unit in text)
         {
-            // U+0001..U+007F だけが 1 バイト。U+0000 は 2 バイトになる
+            // U+0001..U+007F だけが 1 バイト
+            // U+0000 は 2 バイトになる
             if (unit >= 0x0001 && unit <= 0x007F)
             {
                 buffer[position] = (byte)unit;
@@ -152,7 +154,8 @@ public static class Mutf8
     }
 
     /// <summary>
-    /// 文字列を MUTF-8 で符号化したときのバイト長を求める。実際に符号化はしない。
+    /// 文字列を MUTF-8 で符号化したときのバイト長を求める
+    /// 実際に符号化はしない
     /// </summary>
     public static int ByteLength(string text)
     {
@@ -161,7 +164,8 @@ public static class Mutf8
         // 各コード単位が何バイトになるかを数える
         foreach (char unit in text)
         {
-            // U+0001..U+007F だけが 1 バイト。U+0000 は 2 バイトになる
+            // U+0001..U+007F だけが 1 バイト
+            // U+0000 は 2 バイトになる
             if (unit >= 0x0001 && unit <= 0x007F)
             {
                 length += 1;

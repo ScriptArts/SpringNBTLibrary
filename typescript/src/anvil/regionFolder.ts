@@ -1,17 +1,19 @@
 /**
  * リージョンファイルが並ぶディレクトリ 1 つ分
- * （`region/`、`entities/`、`poi/` のいずれか）。
+ * （`region/`、`entities/`、`poi/` のいずれか）
  *
- * 開いたリージョンファイルはキャッシュし、`close()` でまとめて閉じる。
- * チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい。
+ * 開いたリージョンファイルはキャッシュし、`close()` でまとめて閉じる
+ * チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい
  *
  * `RegionFile` はファイル全体をメモリへ載せるため、キャッシュには
- * `maxCachedRegions` 件の上限がある。上限を超えると、最も長く使われていない
- * ものから書き出して閉じる。大きなワールドを端から走査してもメモリを使い切らない。
+ * `maxCachedRegions` 件の上限がある
+ * 上限を超えると、最も長く使われていない
+ * ものから書き出して閉じる
+ * 大きなワールドを端から走査してもメモリを使い切らない
  *
  * このため `region()` が返した参照は、
- * **別のリージョンへアクセスすると閉じられている場合がある**。
- * 参照を保持せず、必要なたびに取得すること。
+ * **別のリージョンへアクセスすると閉じられている場合がある**
+ * 参照を保持せず、必要なたびに取得すること
  *
  * 仕様: `docs/spec/20-anvil-region.md` 5章
  */
@@ -25,23 +27,26 @@ import { ChunkPos, RegionPos } from "./pos.js";
 import { RegionFile, RegionFileMode } from "./regionFile.js";
 
 /**
- * 同時に開いておくリージョンファイル数の既定の上限。
+ * 同時に開いておくリージョンファイル数の既定の上限
  *
- * 1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる。
- * 実データでは数 MB から数十 MB 程度。8 件なら通常のワールドで数百 MB に収まる。
+ * 1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる
+ * 実データでは数 MB から数十 MB 程度
+ * 8 件なら通常のワールドで数百 MB に収まる
  */
 export const DEFAULT_MAX_CACHED_REGIONS = 8;
 
 /**
  * リージョンファイルが並ぶディレクトリ 1 つ分
- * （`region/`、`entities/`、`poi/` のいずれか）。
+ * （`region/`、`entities/`、`poi/` のいずれか）
  *
- * チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい。
+ * チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい
  */
 export class RegionFolder {
   readonly #cache = new Map<string, RegionFile>();
 
-  /** 最近使った順のリージョンキー。末尾がいちばん新しい。 */
+  /** 最近使った順のリージョンキー
+  /** 末尾がいちばん新しい
+  /** */
   readonly #recentlyUsed: string[] = [];
 
   readonly #mode: RegionFileMode;
@@ -55,12 +60,14 @@ export class RegionFolder {
     this.#mode = mode;
   }
 
-  /** いま開いているリージョンファイル数。 */
+  /** いま開いているリージョンファイル数
+  /** */
   get cachedRegionCount(): number {
     return this.#cache.size;
   }
 
-  /** リージョンフォルダを開く。 */
+  /** リージョンフォルダを開く
+  /** */
   static open(
     directory: string,
     mode: RegionFileMode = RegionFileMode.ReadOnly,
@@ -79,7 +86,8 @@ export class RegionFolder {
     return new RegionFolder(directory, mode, maxCachedRegions);
   }
 
-  /** このフォルダに存在するリージョンの座標を返す。 */
+  /** このフォルダに存在するリージョンの座標を返す
+  /** */
   regionPositions(): RegionPos[] {
     this.#ensureOpen();
 
@@ -110,7 +118,9 @@ export class RegionFolder {
     return found;
   }
 
-  /** リージョンファイルを取得する。読み取り専用で存在しなければ undefined。 */
+  /** リージョンファイルを取得する
+  /** 読み取り専用で存在しなければ undefined
+  /** */
   region(regionX: number, regionZ: number): RegionFile | undefined {
     this.#ensureOpen();
     const position = new RegionPos(regionX, regionZ);
@@ -128,7 +138,8 @@ export class RegionFolder {
       return undefined;
     }
 
-    // 開く前に空きを作る。開いてからだと一瞬だけ上限を超える
+    // 開く前に空きを作る
+    // 開いてからだと一瞬だけ上限を超える
     this.#evictUntilBelowLimit();
 
     const opened = RegionFile.open(path, this.#mode);
@@ -137,7 +148,8 @@ export class RegionFolder {
     return opened;
   }
 
-  /** 使ったリージョンを、最近使った列の末尾へ移す。 */
+  /** 使ったリージョンを、最近使った列の末尾へ移す
+  /** */
   #touch(key: string): void {
     const index = this.#recentlyUsed.indexOf(key);
 
@@ -148,7 +160,8 @@ export class RegionFolder {
     this.#recentlyUsed.push(key);
   }
 
-  /** 新しく 1 件開けるよう、上限を下回るまで古いものを閉じる。 */
+  /** 新しく 1 件開けるよう、上限を下回るまで古いものを閉じる
+  /** */
   #evictUntilBelowLimit(): void {
     // 上限に達している間、いちばん長く使っていないものから閉じる
     while (this.#cache.size >= this.maxCachedRegions && this.#recentlyUsed.length > 0) {
@@ -161,14 +174,16 @@ export class RegionFolder {
       const file = this.#cache.get(oldest);
 
       if (file !== undefined) {
-        // 閉じる前に必ず書き出す。捨てると変更が失われる
+        // 閉じる前に必ず書き出す
+        // 捨てると変更が失われる
         file.close();
         this.#cache.delete(oldest);
       }
     }
   }
 
-  /** チャンクが存在するか。 */
+  /** チャンクが存在するか
+  /** */
   hasChunk(chunkX: number, chunkZ: number): boolean {
     const file = this.#regionFor(chunkX, chunkZ);
 
@@ -179,7 +194,9 @@ export class RegionFolder {
     return file.hasChunk(chunkX, chunkZ);
   }
 
-  /** チャンクを NBT として読む。存在しなければ undefined。 */
+  /** チャンクを NBT として読む
+  /** 存在しなければ undefined
+  /** */
   readChunk(chunkX: number, chunkZ: number): NbtCompound | undefined {
     const file = this.#regionFor(chunkX, chunkZ);
 
@@ -190,7 +207,8 @@ export class RegionFolder {
     return file.readChunk(chunkX, chunkZ);
   }
 
-  /** チャンクを NBT として書き込む。 */
+  /** チャンクを NBT として書き込む
+  /** */
   writeChunk(chunkX: number, chunkZ: number, tag: NbtCompound): void {
     const file = this.#regionFor(chunkX, chunkZ);
 
@@ -203,7 +221,9 @@ export class RegionFolder {
     file.writeChunk(chunkX, chunkZ, tag);
   }
 
-  /** チャンクを削除する。削除できたら true。 */
+  /** チャンクを削除する
+  /** 削除できたら true
+  /** */
   deleteChunk(chunkX: number, chunkZ: number): boolean {
     const file = this.#regionFor(chunkX, chunkZ);
 
@@ -214,7 +234,8 @@ export class RegionFolder {
     return file.deleteChunk(chunkX, chunkZ);
   }
 
-  /** このフォルダに存在する全チャンクの座標を返す。 */
+  /** このフォルダに存在する全チャンクの座標を返す
+  /** */
   chunkPositions(): ChunkPos[] {
     const result: ChunkPos[] = [];
 
@@ -232,7 +253,8 @@ export class RegionFolder {
     return result;
   }
 
-  /** 開いている全リージョンの変更を書き出す。 */
+  /** 開いている全リージョンの変更を書き出す
+  /** */
   flush(): void {
     this.#ensureOpen();
 
@@ -242,7 +264,8 @@ export class RegionFolder {
     }
   }
 
-  /** 開いている全リージョンを閉じる。 */
+  /** 開いている全リージョンを閉じる
+  /** */
   close(): void {
     if (this.#closed) {
       return;

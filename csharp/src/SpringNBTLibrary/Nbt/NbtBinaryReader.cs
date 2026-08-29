@@ -3,13 +3,13 @@ using System.Buffers.Binary;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// 展開済みのバイト列から NBT を読み出す。
+/// 展開済みのバイト列から NBT を読み出す
 /// </summary>
 /// <remarks>
 /// <para>
-/// 入力全体をあらかじめメモリに持つ設計にしている。
-/// 「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため。
-/// これがないと、長さ 0x7FFFFFFF を宣言しただけの数バイトの入力でメモリを枯渇させられる。
+/// 入力全体をあらかじめメモリに持つ設計にしている
+/// 「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため
+/// これがないと、長さ 0x7FFFFFFF を宣言しただけの数バイトの入力でメモリを枯渇させられる
 /// </para>
 /// <para>仕様: <c>docs/spec/10-nbt-binary.md</c></para>
 /// </remarks>
@@ -26,10 +26,10 @@ internal sealed class NbtBinaryReader
         this.position = 0;
     }
 
-    /// <summary>残っている入力バイト数。</summary>
+    /// <summary>残っている入力バイト数</summary>
     private int Remaining => data.Length - position;
 
-    /// <summary>ルートタグを読む。</summary>
+    /// <summary>ルートタグを読む</summary>
     internal NamedTag ReadRoot(NbtFormat format)
     {
         byte id = ReadByteRaw();
@@ -65,7 +65,7 @@ internal sealed class NbtBinaryReader
         return new NamedTag(name, root);
     }
 
-    /// <summary>指定した型のペイロードを読む。</summary>
+    /// <summary>指定した型のペイロードを読む</summary>
     private NbtTag ReadPayload(TagType type, int depth)
     {
         // 深さ上限は再帰する型に入る手前で検査する
@@ -107,7 +107,7 @@ internal sealed class NbtBinaryReader
         }
     }
 
-    /// <summary>TAG_Compound のペイロード（名前付きタグの並び + TAG_End）を読む。</summary>
+    /// <summary>TAG_Compound のペイロード（名前付きタグの並び + TAG_End）を読む</summary>
     private NbtCompound ReadCompoundPayload(int depth)
     {
         NbtCompound compound = new NbtCompound();
@@ -129,7 +129,7 @@ internal sealed class NbtBinaryReader
         }
     }
 
-    /// <summary>TAG_List のペイロードを読む。</summary>
+    /// <summary>TAG_List のペイロードを読む</summary>
     private NbtList ReadListPayload(int depth)
     {
         byte elementId = ReadByteRaw();
@@ -212,7 +212,7 @@ internal sealed class NbtBinaryReader
         return result;
     }
 
-    /// <summary>MUTF-8 の文字列（u16 の長さ + 本体）を読む。</summary>
+    /// <summary>MUTF-8 の文字列（u16 の長さ + 本体）を読む</summary>
     private string ReadString()
     {
         int length = BinaryPrimitives.ReadUInt16BigEndian(Take(2));
@@ -223,7 +223,8 @@ internal sealed class NbtBinaryReader
         return text;
     }
 
-    /// <summary>配列・リストの長さフィールドを読む。負値は不正。</summary>
+    /// <summary>配列・リストの長さフィールドを読む
+    /// 負値は不正</summary>
     private int ReadLength()
     {
         int length = BinaryPrimitives.ReadInt32BigEndian(Take(4));
@@ -245,7 +246,7 @@ internal sealed class NbtBinaryReader
         return value;
     }
 
-    /// <summary>指定バイト数を切り出して読み進める。</summary>
+    /// <summary>指定バイト数を切り出して読み進める</summary>
     private ReadOnlySpan<byte> Take(int count)
     {
         EnsureAvailable(count);
@@ -254,7 +255,8 @@ internal sealed class NbtBinaryReader
         return span;
     }
 
-    /// <summary>残り入力が必要バイト数を満たすか検査する。メモリを確保する前に呼ぶ。</summary>
+    /// <summary>残り入力が必要バイト数を満たすか検査する
+    /// メモリを確保する前に呼ぶ</summary>
     private void EnsureAvailable(long required)
     {
         if (required > Remaining)
@@ -265,14 +267,14 @@ internal sealed class NbtBinaryReader
     }
 
     /// <summary>
-    /// キーやルート名として使える文字列か検査する。
+    /// キーやルート名として使える文字列か検査する
     /// </summary>
     /// <remarks>
-    /// 値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）。
+    /// 値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）
     /// Minecraft が書き出すキーは ASCII の識別子のみで、
-    /// 孤立サロゲートが現れるのはデータ破損を意味する。
+    /// 孤立サロゲートが現れるのはデータ破損を意味する
     /// またキーを「ただの文字列」として扱えることが、
-    /// 4言語すべてでマップ型をそのまま使えるという実装上の利点につながる。
+    /// 4言語すべてでマップ型をそのまま使えるという実装上の利点につながる
     /// </remarks>
     private static string RequireUtf8Representable(string text, string role)
     {
@@ -284,7 +286,8 @@ internal sealed class NbtBinaryReader
             // 上位サロゲートは、対になる下位サロゲートとまとめて 1 文字を成す
             if (char.IsHighSurrogate(c))
             {
-                // 対が揃っていれば 2 コード単位を消費する。揃わなければ孤立サロゲート
+                // 対が揃っていれば 2 コード単位を消費する
+                // 揃わなければ孤立サロゲート
                 if (index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]))
                 {
                     index += 1;
@@ -305,7 +308,8 @@ internal sealed class NbtBinaryReader
         return text;
     }
 
-    /// <summary>その型のペイロードが最低何バイトになるかを返す。長さの先行検証に使う。</summary>
+    /// <summary>その型のペイロードが最低何バイトになるかを返す
+    /// 長さの先行検証に使う</summary>
     private static int MinimumPayloadSize(TagType type)
     {
         switch (type)

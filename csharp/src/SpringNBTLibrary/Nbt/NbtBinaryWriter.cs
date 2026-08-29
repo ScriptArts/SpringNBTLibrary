@@ -3,12 +3,12 @@ using System.Buffers.Binary;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// NBT を展開済みのバイト列へ書き出す。
+/// NBT を展開済みのバイト列へ書き出す
 /// </summary>
 /// <remarks>
 /// <para>
-/// 出力は一意でなければならない（ラウンドトリップ検証が成立するため）。
-/// Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す。
+/// 出力は一意でなければならない（ラウンドトリップ検証が成立するため）
+/// Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す
 /// </para>
 /// <para>仕様: <c>docs/spec/10-nbt-binary.md</c> 5章</para>
 /// </remarks>
@@ -16,7 +16,7 @@ internal sealed class NbtBinaryWriter
 {
     private readonly List<byte> buffer = new List<byte>();
 
-    /// <summary>ルートタグを書き出し、結果のバイト列を返す。</summary>
+    /// <summary>ルートタグを書き出し、結果のバイト列を返す</summary>
     internal byte[] WriteRoot(NamedTag named, NbtFormat format)
     {
         buffer.Add((byte)TagType.Compound);
@@ -139,7 +139,8 @@ internal sealed class NbtBinaryWriter
     {
         byte[] encoded = Mutf8.Encode(text);
 
-        // 長さフィールドは u16。NbtString 側でも検査しているが、キー名は素の string なのでここでも見る
+        // 長さフィールドは u16
+        // NbtString 側でも検査しているが、キー名は素の string なのでここでも見る
         if (encoded.Length > Mutf8.MaxByteLength)
         {
             throw SpringNbtException.InvalidArgument(

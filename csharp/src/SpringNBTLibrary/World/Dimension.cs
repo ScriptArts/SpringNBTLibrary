@@ -4,12 +4,13 @@ using SpringNBTLibrary.Nbt;
 namespace SpringNBTLibrary.World;
 
 /// <summary>
-/// ワールド内の次元 1 つ分。<c>region/</c> <c>entities/</c> <c>poi/</c> をまとめて扱う。
+/// ワールド内の次元 1 つ分
+/// <c>region/</c> <c>entities/</c> <c>poi/</c> をまとめて扱う
 /// </summary>
 /// <remarks>
 /// <para>
 /// ブロックの取得・設定は**絶対ワールド座標**で行い、
-/// リージョン・チャンク・セクションの解決は内部で済ませる。
+/// リージョン・チャンク・セクションの解決は内部で済ませる
 /// </para>
 /// <para>仕様: <c>docs/spec/40-world-layout.md</c> 4章</para>
 /// </remarks>
@@ -31,26 +32,30 @@ public sealed class Dimension : IDisposable
         this.options = options;
     }
 
-    /// <summary>次元ID（<c>minecraft:overworld</c> など）。</summary>
+    /// <summary>次元ID（<c>minecraft:overworld</c> など）</summary>
     public string Id { get; }
 
-    /// <summary>この次元のディレクトリ。</summary>
+    /// <summary>この次元のディレクトリ</summary>
     public string Directory { get; }
 
-    /// <summary>地形のリージョンフォルダ。無ければ null。</summary>
+    /// <summary>地形のリージョンフォルダ
+    /// 無ければ null</summary>
     public RegionFolder? RegionFolder => Folder(ref regions, "region");
 
-    /// <summary>エンティティのリージョンフォルダ。無ければ null。</summary>
+    /// <summary>エンティティのリージョンフォルダ
+    /// 無ければ null</summary>
     public RegionFolder? EntityFolder => Folder(ref entities, "entities");
 
-    /// <summary>POI のリージョンフォルダ。無ければ null。</summary>
+    /// <summary>POI のリージョンフォルダ
+    /// 無ければ null</summary>
     public RegionFolder? PoiFolder => Folder(ref poi, "poi");
 
     /// <summary>
-    /// <c>data/minecraft/&lt;name&gt;.dat</c> を読む。存在しなければ null。
+    /// <c>data/minecraft/&lt;name&gt;.dat</c> を読む
+    /// 存在しなければ null
     /// </summary>
     /// <remarks>
-    /// 次元ごとの <c>world_border</c> / <c>raids</c> / <c>chunk_tickets</c> などが入る。
+    /// 次元ごとの <c>world_border</c> / <c>raids</c> / <c>chunk_tickets</c> などが入る
     /// </remarks>
     public NbtCompound? DataFile(string name)
     {
@@ -65,7 +70,7 @@ public sealed class Dimension : IDisposable
         return NbtIo.ReadFile(path).Tag;
     }
 
-    /// <summary>この次元に存在する全チャンクの座標を列挙する。</summary>
+    /// <summary>この次元に存在する全チャンクの座標を列挙する</summary>
     public IEnumerable<ChunkPos> ChunkPositions()
     {
         EnsureOpen();
@@ -80,9 +85,10 @@ public sealed class Dimension : IDisposable
     }
 
     /// <summary>
-    /// チャンクを読む。存在しなければ null。
+    /// チャンクを読む
+    /// 存在しなければ null
     /// </summary>
-    /// <remarks>読み込んだチャンクはキャッシュされ、次回は同じインスタンスが返る。</remarks>
+    /// <remarks>読み込んだチャンクはキャッシュされ、次回は同じインスタンスが返る</remarks>
     public Chunk? Chunk(int chunkX, int chunkZ)
     {
         EnsureOpen();
@@ -112,7 +118,7 @@ public sealed class Dimension : IDisposable
         return chunk;
     }
 
-    /// <summary>チャンクを書き戻す。</summary>
+    /// <summary>チャンクを書き戻す</summary>
     public void SaveChunk(Chunk chunk)
     {
         ArgumentNullException.ThrowIfNull(chunk);
@@ -131,7 +137,8 @@ public sealed class Dimension : IDisposable
     }
 
     /// <summary>
-    /// 絶対座標でブロックを取得する。チャンクが無ければ null。
+    /// 絶対座標でブロックを取得する
+    /// チャンクが無ければ null
     /// </summary>
     public BlockState? GetBlock(int x, int y, int z)
     {
@@ -146,11 +153,11 @@ public sealed class Dimension : IDisposable
     }
 
     /// <summary>
-    /// 絶対座標でブロックを設定する。
+    /// 絶対座標でブロックを設定する
     /// </summary>
     /// <remarks>
-    /// 変更したチャンクは記録され、<see cref="Flush"/> でまとめて書き戻される。
-    /// 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる。
+    /// 変更したチャンクは記録され、<see cref="Flush"/> でまとめて書き戻される
+    /// 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
     /// </remarks>
     public void SetBlock(int x, int y, int z, BlockState state)
     {
@@ -171,7 +178,8 @@ public sealed class Dimension : IDisposable
         modifiedChunks.Add(ChunkKey(chunkX, chunkZ));
     }
 
-    /// <summary>絶対座標でバイオームを取得する。4×4×4 の単位。</summary>
+    /// <summary>絶対座標でバイオームを取得する
+    /// 4×4×4 の単位</summary>
     public string? GetBiome(int x, int y, int z)
     {
         Chunk? chunk = Chunk(x >> 4, z >> 4);
@@ -184,7 +192,8 @@ public sealed class Dimension : IDisposable
         return chunk.GetBiome(x & 15, y, z & 15);
     }
 
-    /// <summary>絶対座標でバイオームを設定する。4×4×4 の単位。</summary>
+    /// <summary>絶対座標でバイオームを設定する
+    /// 4×4×4 の単位</summary>
     public void SetBiome(int x, int y, int z, string biome)
     {
         ArgumentNullException.ThrowIfNull(biome);
@@ -204,7 +213,7 @@ public sealed class Dimension : IDisposable
         modifiedChunks.Add(ChunkKey(chunkX, chunkZ));
     }
 
-    /// <summary>変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する。</summary>
+    /// <summary>変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する</summary>
     public void Flush()
     {
         EnsureOpen();
@@ -236,7 +245,7 @@ public sealed class Dimension : IDisposable
         }
     }
 
-    /// <summary>変更を書き戻してから閉じる。</summary>
+    /// <summary>変更を書き戻してから閉じる</summary>
     public void Close()
     {
         if (closed)
@@ -266,7 +275,8 @@ public sealed class Dimension : IDisposable
     /// <inheritdoc/>
     public void Dispose() => Close();
 
-    /// <summary>フォルダを遅延して開く。存在しなければ null のまま。</summary>
+    /// <summary>フォルダを遅延して開く
+    /// 存在しなければ null のまま</summary>
     private RegionFolder? Folder(ref RegionFolder? slot, string name)
     {
         EnsureOpen();
@@ -315,7 +325,7 @@ public sealed class Dimension : IDisposable
         }
     }
 
-    /// <summary>チャンク座標を 1 つの long に詰めてキャッシュの鍵にする。</summary>
+    /// <summary>チャンク座標を 1 つの long に詰めてキャッシュの鍵にする</summary>
     private static long ChunkKey(int chunkX, int chunkZ) =>
         ((long)chunkX << 32) | (uint)chunkZ;
 }

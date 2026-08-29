@@ -4,14 +4,17 @@ using SpringNBTLibrary.Nbt;
 namespace SpringNBTLibrary.World;
 
 /// <summary>
-/// ブロックの状態。名前と、任意のプロパティの組。
+/// ブロックの状態
+/// 名前と、任意のプロパティの組
 /// </summary>
 /// <remarks>
 /// <para>
-/// プロパティは**常に名前の昇順で保持する**。こうしておくと文字列表現が一意になり、
-/// 全言語で同じ出力になる。Minecraft が書き出した並び順は
+/// プロパティは**常に名前の昇順で保持する**
+/// こうしておくと文字列表現が一意になり、
+/// 全言語で同じ出力になる
+/// Minecraft が書き出した並び順は
 /// <see cref="PalettedContainer"/> がパレットを生の NBT のまま持つことで守られるので、
-/// 触っていないブロックの並びが崩れることはない。
+/// 触っていないブロックの並びが崩れることはない
 /// </para>
 /// <para>仕様: <c>docs/spec/30-chunk-format.md</c> 2.1章</para>
 /// </remarks>
@@ -19,11 +22,13 @@ public sealed class BlockState : IEquatable<BlockState>
 {
     private readonly SortedDictionary<string, string> properties;
 
-    /// <summary>名前とプロパティを指定して作る。</summary>
+    /// <summary>名前とプロパティを指定して作る</summary>
     /// <param name="name">
-    /// ブロックID。名前空間が省略されていたら <c>minecraft:</c> を補う。
+    /// ブロックID
+    /// 名前空間が省略されていたら <c>minecraft:</c> を補う
     /// </param>
-    /// <param name="properties">プロパティ。null なら空。</param>
+    /// <param name="properties">プロパティ
+    /// null なら空</param>
     public BlockState(string name, IEnumerable<KeyValuePair<string, string>>? properties = null)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -35,20 +40,23 @@ public sealed class BlockState : IEquatable<BlockState>
             return;
         }
 
-        // 与えられたプロパティを取り込む。並びは常に昇順になる
+        // 与えられたプロパティを取り込む
+        // 並びは常に昇順になる
         foreach (KeyValuePair<string, string> entry in properties)
         {
             this.properties[entry.Key] = entry.Value;
         }
     }
 
-    /// <summary>ブロックID（名前空間つき）。</summary>
+    /// <summary>ブロックID（名前空間つき）</summary>
     public string Name { get; }
 
-    /// <summary>プロパティ。名前の昇順。</summary>
+    /// <summary>プロパティ
+    /// 名前の昇順</summary>
     public IReadOnlyDictionary<string, string> Properties => properties;
 
-    /// <summary>プロパティを取得する。無ければ null。</summary>
+    /// <summary>プロパティを取得する
+    /// 無ければ null</summary>
     public string? Property(string key)
     {
         if (properties.TryGetValue(key, out string? value))
@@ -59,7 +67,7 @@ public sealed class BlockState : IEquatable<BlockState>
         return null;
     }
 
-    /// <summary>プロパティを 1 つ差し替えた新しい状態を返す。</summary>
+    /// <summary>プロパティを 1 つ差し替えた新しい状態を返す</summary>
     public BlockState With(string key, string value)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -71,10 +79,10 @@ public sealed class BlockState : IEquatable<BlockState>
     }
 
     /// <summary>
-    /// <c>minecraft:oak_stairs[facing=north,half=top]</c> 形式の文字列から作る。
+    /// <c>minecraft:oak_stairs[facing=north,half=top]</c> 形式の文字列から作る
     /// </summary>
     /// <exception cref="SpringNbtException">
-    /// 形式が不正な場合（<see cref="ErrorCode.MalformedData"/>）。
+    /// 形式が不正な場合（<see cref="ErrorCode.MalformedData"/>）
     /// </exception>
     public static BlockState Parse(string text)
     {
@@ -137,9 +145,9 @@ public sealed class BlockState : IEquatable<BlockState>
         return state;
     }
 
-    /// <summary>パレット要素の NBT から作る。</summary>
+    /// <summary>パレット要素の NBT から作る</summary>
     /// <exception cref="SpringNbtException">
-    /// <c>Name</c> が無い、または <c>Properties</c> の値が文字列でない場合。
+    /// <c>Name</c> が無い、または <c>Properties</c> の値が文字列でない場合
     /// </exception>
     public static BlockState FromNbt(NbtCompound nbt)
     {
@@ -167,9 +175,10 @@ public sealed class BlockState : IEquatable<BlockState>
         return state;
     }
 
-    /// <summary>パレット要素の NBT へ変換する。</summary>
+    /// <summary>パレット要素の NBT へ変換する</summary>
     /// <remarks>
-    /// プロパティが空なら <c>Properties</c> キー自体を出力しない。Minecraft と同じ振る舞い。
+    /// プロパティが空なら <c>Properties</c> キー自体を出力しない
+    /// Minecraft と同じ振る舞い
     /// </remarks>
     public NbtCompound ToNbt()
     {
@@ -193,7 +202,7 @@ public sealed class BlockState : IEquatable<BlockState>
         return result;
     }
 
-    /// <summary>名前空間が省略されていたら <c>minecraft:</c> を補う。</summary>
+    /// <summary>名前空間が省略されていたら <c>minecraft:</c> を補う</summary>
     private static string Normalize(string name)
     {
         if (name.Contains(':', StringComparison.Ordinal))
@@ -221,7 +230,8 @@ public sealed class BlockState : IEquatable<BlockState>
         using IEnumerator<KeyValuePair<string, string>> left = properties.GetEnumerator();
         using IEnumerator<KeyValuePair<string, string>> right = other.properties.GetEnumerator();
 
-        // 名前と値を先頭から突き合わせる。並びは昇順に揃っている
+        // 名前と値を先頭から突き合わせる
+        // 並びは昇順に揃っている
         while (left.MoveNext() && right.MoveNext())
         {
             if (!string.Equals(left.Current.Key, right.Current.Key, StringComparison.Ordinal))
@@ -245,7 +255,7 @@ public sealed class BlockState : IEquatable<BlockState>
     public override int GetHashCode() => HashCode.Combine(Name, properties.Count);
 
     /// <summary>
-    /// <c>minecraft:oak_stairs[facing=north,half=top]</c> 形式の文字列を返す。
+    /// <c>minecraft:oak_stairs[facing=north,half=top]</c> 形式の文字列を返す
     /// </summary>
     public override string ToString()
     {
