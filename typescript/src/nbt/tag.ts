@@ -106,6 +106,7 @@ export class NbtByte {
     return this.#value;
   }
 
+  /** 値を差し替える。範囲外なら INVALID_ARGUMENT。 */
   set value(newValue: number) {
     this.#value = checkRange(newValue, -128, 127, "byte");
   }
@@ -130,6 +131,7 @@ export class NbtShort {
     return this.#value;
   }
 
+  /** 値を差し替える。範囲外なら INVALID_ARGUMENT。 */
   set value(newValue: number) {
     this.#value = checkRange(newValue, -32768, 32767, "short");
   }
@@ -154,6 +156,7 @@ export class NbtInt {
     return this.#value;
   }
 
+  /** 値を差し替える。範囲外なら INVALID_ARGUMENT。 */
   set value(newValue: number) {
     this.#value = checkRange(newValue, -2147483648, 2147483647, "int");
   }
@@ -186,6 +189,7 @@ export class NbtLong {
     return this.#value;
   }
 
+  /** 値を差し替える。範囲外なら INVALID_ARGUMENT。 */
   set value(newValue: bigint) {
     this.#value = NbtLong.#check(newValue);
   }
@@ -223,6 +227,7 @@ export class NbtFloat {
     return this.#value;
   }
 
+  /** 値を差し替える。範囲外なら INVALID_ARGUMENT。 */
   set value(newValue: number) {
     this.#value = Math.fround(newValue);
   }
@@ -259,6 +264,7 @@ export class NbtString {
     return this.#value;
   }
 
+  /** 値を差し替える。範囲外なら INVALID_ARGUMENT。 */
   set value(newValue: string) {
     this.#value = NbtString.#check(newValue);
   }

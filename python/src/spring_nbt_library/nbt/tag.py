@@ -119,12 +119,14 @@ class _ScalarTag(NbtTag):
 
     @value.setter
     def value(self, new_value) -> None:
+        """値を差し替える。範囲外なら INVALID_ARGUMENT。"""
         self._value = self._validate(new_value)
 
     def _validate(self, value):
         raise NotImplementedError
 
     def clone(self) -> "NbtTag":
+        """同じ値を持つ新しいタグを作る。"""
         return type(self)(self._value)
 
     def __eq__(self, other) -> bool:
@@ -260,6 +262,7 @@ class _ArrayTag(NbtTag):
 
     @value.setter
     def value(self, new_value) -> None:
+        """値を差し替える。範囲外なら INVALID_ARGUMENT。"""
         self._value = self._validate(new_value)
 
     def _validate(self, value) -> List[int]:
@@ -272,6 +275,7 @@ class _ArrayTag(NbtTag):
         return result
 
     def clone(self) -> "NbtTag":
+        """同じ値を持つ新しいタグを作る。"""
         return type(self)(list(self._value))
 
     def __eq__(self, other) -> bool:
@@ -355,6 +359,7 @@ class NbtList(NbtTag):
         self._items.clear()
 
     def clone(self) -> "NbtTag":
+        """同じ値を持つ新しいタグを作る。"""
         copy = NbtList(self._element_type)
 
         # 要素も深くコピーする
@@ -471,6 +476,7 @@ class NbtCompound(NbtTag):
         return iter(self._entries.items())
 
     def clone(self) -> "NbtTag":
+        """同じ値を持つ新しいタグを作る。"""
         copy = NbtCompound()
 
         # 挿入順のまま深くコピーする

@@ -9,6 +9,12 @@
 
 import { SpringNbtError } from "../errors.js";
 
+/**
+ * 添字を 64bit 整数の配列へ詰めた表現。1.16 以降の**跨ぎなし**パッキング。
+ *
+ * 1 つの `bigint` に入りきらない分は、その値の残りビットを未使用のまま捨て、
+ * 次の値の最下位ビットから始める。
+ */
 export class BitStorage {
   readonly #data: BigInt64Array;
   readonly #bitsPerEntry: number;

@@ -135,6 +135,7 @@ class _Reader:
         return len(self._data) - self._position
 
     def read_root(self, fmt: NbtFormat) -> NamedTag:
+        """ルートタグを 1 つ読む。形式によって名前の有無が変わる。"""
         tag_type = TagType.from_id(self._read_byte())
 
         # Java版のファイル形式でもネットワーク形式でも、ルートは必ず TAG_Compound
@@ -352,6 +353,7 @@ class _Writer:
         self._buffer = bytearray()
 
     def write_root(self, named: NamedTag, fmt: NbtFormat) -> bytes:
+        """ルートタグを 1 つ書き出す。形式によって名前の有無が変わる。"""
         self._buffer.append(TagType.COMPOUND.value)
 
         if fmt == NbtFormat.JAVA:

@@ -110,6 +110,7 @@ class Reader {
     return this.#data.length - this.#position;
   }
 
+  /** ルートタグを 1 つ読む。形式によって名前の有無が変わる。 */
   readRoot(format: NbtFormat): NamedTag {
     const type = tagTypeFromId(this.#readByte());
 
@@ -387,6 +388,7 @@ class Writer {
   #chunks: Uint8Array[] = [];
   #scratch = new DataView(new ArrayBuffer(8));
 
+  /** ルートタグを 1 つ書き出す。形式によって名前の有無が変わる。 */
   writeRoot(named: NamedTag, format: NbtFormat): Uint8Array {
     this.#pushByte(TagType.Compound);
 

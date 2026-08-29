@@ -32,6 +32,12 @@ import { RegionFile, RegionFileMode } from "./regionFile.js";
  */
 export const DEFAULT_MAX_CACHED_REGIONS = 8;
 
+/**
+ * リージョンファイルが並ぶディレクトリ 1 つ分
+ * （`region/`、`entities/`、`poi/` のいずれか）。
+ *
+ * チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい。
+ */
 export class RegionFolder {
   readonly #cache = new Map<string, RegionFile>();
 

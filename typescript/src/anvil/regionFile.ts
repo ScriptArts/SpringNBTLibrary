@@ -51,6 +51,12 @@ export enum RegionFileMode {
   ReadWrite = "read_write",
 }
 
+/**
+ * Anvil のリージョンファイル (`r.X.Z.mca`)。32×32 チャンクを格納する。
+ *
+ * ファイル全体をメモリに読み込んで扱うので、開いて何も変えずに `flush()` すると
+ * バイト単位で元と同じファイルになる。
+ */
 export class RegionFile {
   readonly #path: string;
   readonly #directory: string;

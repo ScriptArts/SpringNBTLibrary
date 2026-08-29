@@ -111,6 +111,7 @@ class Parser {
     this.#chars = text.split("");
   }
 
+  /** 入力全体を 1 つのタグとして読む。末尾に余りがあればエラーにする。 */
   parseWhole(): NbtTag {
     const value = this.#parseValue();
     this.#skipWhitespace();

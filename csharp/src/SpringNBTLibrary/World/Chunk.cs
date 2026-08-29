@@ -176,7 +176,11 @@ public sealed class Chunk
 
         if (options.OnVersionMismatch == VersionMismatchAction.Warn)
         {
-            options.OnWarning?.Invoke(message);
+            // 通知先が設定されているときだけ知らせる
+            if (options.OnWarning is not null)
+            {
+                options.OnWarning.Invoke(message);
+            }
         }
     }
 

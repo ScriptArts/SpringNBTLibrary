@@ -12,6 +12,12 @@
 import { SpringNbtError } from "../errors.js";
 import { NbtCompound, NbtString, TagType } from "../nbt/index.js";
 
+/**
+ * ブロックの状態。名前と、任意のプロパティの組。
+ *
+ * プロパティは**常に名前の昇順で保持する**。こうしておくと文字列表現が一意になり、
+ * 全言語で同じ出力になる。
+ */
 export class BlockState {
   readonly #name: string;
   readonly #properties: Map<string, string>;

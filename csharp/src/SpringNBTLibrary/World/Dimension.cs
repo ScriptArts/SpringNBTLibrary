@@ -224,9 +224,14 @@ public sealed class Dimension : IDisposable
         }
 
         modifiedChunks.Clear();
-        regions?.Flush();
-        entities?.Flush();
-        poi?.Flush();
+        // 開いているフォルダだけを書き出す
+        foreach (RegionFolder? folder in new[] { regions, entities, poi })
+        {
+            if (folder is not null)
+            {
+                folder.Flush();
+            }
+        }
     }
 
     /// <summary>変更を書き戻してから閉じる。</summary>
@@ -242,9 +247,14 @@ public sealed class Dimension : IDisposable
             Flush();
         }
 
-        regions?.Close();
-        entities?.Close();
-        poi?.Close();
+        // 開いているフォルダだけを閉じる
+        foreach (RegionFolder? folder in new[] { regions, entities, poi })
+        {
+            if (folder is not null)
+            {
+                folder.Close();
+            }
+        }
         chunkCache.Clear();
         closed = true;
     }

@@ -76,6 +76,7 @@ class _Parser:
         self._position = 0
 
     def parse_whole(self) -> NbtTag:
+        """入力全体を 1 つのタグとして読む。末尾に余りがあればエラーにする。"""
         value = self._parse_value()
         self._skip_whitespace()
 

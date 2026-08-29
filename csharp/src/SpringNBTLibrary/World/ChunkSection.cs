@@ -85,7 +85,15 @@ public sealed class ChunkSection
     /// <summary>使われていないパレット要素を取り除く。</summary>
     public void Compact()
     {
-        BlockStates?.Compact();
-        Biomes?.Compact();
+        // 持っているコンテナだけを掃除する
+        if (BlockStates is not null)
+        {
+            BlockStates.Compact();
+        }
+
+        if (Biomes is not null)
+        {
+            Biomes.Compact();
+        }
     }
 }

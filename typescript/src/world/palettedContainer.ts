@@ -12,6 +12,12 @@ import { SpringNbtError } from "../errors.js";
 import { NbtCompound, NbtList, NbtLongArray, NbtTag } from "../nbt/index.js";
 import { BitStorage } from "./bitStorage.js";
 
+/**
+ * パレットとビットストレージの組。セクション内のブロック状態やバイオームを格納する。
+ *
+ * パレットの要素は**生の `NbtTag` のまま**持つ。こうすると、触っていないブロックの
+ * プロパティの並び順まで含めてそのまま書き戻せる。
+ */
 export class PalettedContainer {
   readonly #palette: NbtTag[] = [];
   readonly #entryCount: number;

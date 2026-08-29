@@ -368,6 +368,11 @@ export class Dimension {
   }
 }
 
+/**
+ * Minecraft Java版のセーブデータ 1 つ分。
+ *
+ * 26.x では標準の3次元も `dimensions/<名前空間>/<パス>/` の下に並ぶ。
+ */
 export class MinecraftWorld {
   readonly #dimensions = new Map<string, Dimension>();
   readonly #options: WorldOpenOptions;

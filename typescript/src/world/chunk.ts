@@ -164,6 +164,12 @@ export class ChunkSection {
   }
 }
 
+/**
+ * チャンク 1 つ分。地形の読み書きの入口。
+ *
+ * **読んだ NBT をそのまま保持し、変更した部分だけを書き戻す。**
+ * 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない。
+ */
 export class Chunk {
   readonly #sections = new Map<number, ChunkSection>();
 
