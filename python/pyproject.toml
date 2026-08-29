@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spring-nbt-library"
+version = "0.1.0"
+description = "Minecraft Java Edition の NBT / Anvil ワールドデータを読み書きするライブラリ"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["minecraft", "nbt", "anvil", "mca"]
+dependencies = []
+
+[project.optional-dependencies]
+lz4 = ["lz4>=4.0"]
+dev = ["pytest>=8.0"]
+
+[project.urls]
+Repository = "https://github.com/scriptarts/SpringNBTLibrary"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spring_nbt_library"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

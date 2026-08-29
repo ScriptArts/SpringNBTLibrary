@@ -1,0 +1,32 @@
+# --- OS ---
+.DS_Store
+
+# --- Rust ---
+/rust/target/
+**/*.rs.bk
+
+# --- C# / .NET ---
+/csharp/**/bin/
+/csharp/**/obj/
+*.user
+
+# --- Java / Maven ---
+/java/target/
+/java/.mvn/wrapper/maven-wrapper.jar
+
+# --- TypeScript / Node ---
+node_modules/
+/typescript/dist/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+/python/build/
+/python/dist/
+/python/*.egg-info/
+/python/.pytest_cache/
+.pytest_cache/
+.venv/
+
+# --- 適合性テストの実行結果（生成物） ---
+/spec/out/

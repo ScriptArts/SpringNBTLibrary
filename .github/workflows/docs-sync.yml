@@ -1,0 +1,28 @@
+name: docs-sync
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# ドキュメントと実装のズレを検出する。
+#
+# 人手で5言語のドキュメントを揃え続けるのは必ず破綻するので、
+# ここで機械的に守る（docs/adr/0009-static-api-extraction.md）。
+jobs:
+  check:
+    name: ドキュメントと実装の一致
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ソースの静的解析だけで済むので、言語のツールチェーンは要らない
+      - name: 公開APIとドキュメントを突き合わせる
+        run: python3 spec/tools/check_docs_sync.py
+
+      - name: ドキュメント内のリンク切れを調べる
+        run: python3 spec/tools/check_links.py

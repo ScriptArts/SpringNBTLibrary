@@ -1,0 +1,405 @@
+{
+  "comment": "spec/tools/build_testdata.py が生成する。手で編集しないこと",
+  "vectors": [
+    {
+      "id": "nbt/hello_world",
+      "kind": "nbt",
+      "input": "nbt/hello_world.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "最小の Compound。ルート名が空でない例でもある",
+      "expect": "expect/nbt/hello_world.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/all_tags",
+      "kind": "nbt",
+      "input": "nbt/all_tags.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "全13タグを1つずつ含む",
+      "expect": "expect/nbt/all_tags.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/nested_deep",
+      "kind": "nbt",
+      "input": "nbt/nested_deep.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "ネスト深さ 500。既定の上限 512 の直下",
+      "expect": "expect/nbt/nested_deep.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/nested_too_deep",
+      "kind": "nbt",
+      "input": "nbt/nested_too_deep.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "ネスト深さ 600。既定の上限 512 を超える",
+      "expect_error": "LIMIT_EXCEEDED",
+      "roundtrip": false
+    },
+    {
+      "id": "nbt/empty_list",
+      "kind": "nbt",
+      "input": "nbt/empty_list.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "空リスト（要素型 End）",
+      "expect": "expect/nbt/empty_list.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/empty_list_typed",
+      "kind": "nbt",
+      "input": "nbt/empty_list_typed.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "空リストだが要素型が Byte。第三者ツールが書いた形を壊さず往復できること",
+      "expect": "expect/nbt/empty_list_typed.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/numeric_bounds",
+      "kind": "nbt",
+      "input": "nbt/numeric_bounds.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "各整数型の最小値・最大値",
+      "expect": "expect/nbt/numeric_bounds.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/float_specials",
+      "kind": "nbt",
+      "input": "nbt/float_specials.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "浮動小数点の特殊値。ビットパターンが保たれること",
+      "expect": "expect/nbt/float_specials.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/mutf8_nul",
+      "kind": "nbt",
+      "input": "nbt/mutf8_nul.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "U+0000 を含む文字列。C0 80 で符号化される",
+      "expect": "expect/nbt/mutf8_nul.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/mutf8_supplementary",
+      "kind": "nbt",
+      "input": "nbt/mutf8_supplementary.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "補助文字（絵文字）と3バイト文字。CESU-8 になる",
+      "expect": "expect/nbt/mutf8_supplementary.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/mutf8_lone_surrogate",
+      "kind": "nbt",
+      "input": "nbt/mutf8_lone_surrogate.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "孤立サロゲート。UTF-8 に写せないが往復できること",
+      "expect": "expect/nbt/mutf8_lone_surrogate.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/mutf8_max_length",
+      "kind": "nbt",
+      "input": "nbt/mutf8_max_length.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "MUTF-8 で 65535 バイトちょうどの文字列。長さフィールドの上限",
+      "expect": "expect/nbt/mutf8_max_length.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/uncompressed",
+      "kind": "nbt",
+      "input": "nbt/uncompressed.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "無圧縮。自動判定で読めること",
+      "expect": "expect/nbt/uncompressed.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/gzip",
+      "kind": "nbt",
+      "input": "nbt/gzip.nbt",
+      "format": "java",
+      "compression": "gzip",
+      "description": "GZip 圧縮。自動判定で読めること",
+      "expect": "expect/nbt/gzip.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/zlib",
+      "kind": "nbt",
+      "input": "nbt/zlib.nbt",
+      "format": "java",
+      "compression": "zlib",
+      "description": "Zlib 圧縮。自動判定で読めること",
+      "expect": "expect/nbt/zlib.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/network_format",
+      "kind": "nbt",
+      "input": "nbt/network_format.nbt",
+      "format": "network",
+      "compression": "none",
+      "description": "ネットワーク形式（無名ルート、1.20.2+）",
+      "expect": "expect/nbt/network_format.json",
+      "roundtrip": true
+    },
+    {
+      "id": "nbt/truncated",
+      "kind": "nbt",
+      "input": "nbt/truncated.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "途中で切れた入力",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "nbt/huge_declared_length",
+      "kind": "nbt",
+      "input": "nbt/huge_declared_length.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "長さ 0x7FFFFFFF を宣言するだけの入力。確保前に弾くこと",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "nbt/unknown_tag_id",
+      "kind": "nbt",
+      "input": "nbt/unknown_tag_id.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "未知のタグID 13",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "nbt/negative_length",
+      "kind": "nbt",
+      "input": "nbt/negative_length.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "長さフィールドが負値",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "nbt/trailing_bytes",
+      "kind": "nbt",
+      "input": "nbt/trailing_bytes.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "ルートの後に余分なバイトがある",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "nbt/mutf8_lone_surrogate_key",
+      "kind": "nbt",
+      "input": "nbt/mutf8_lone_surrogate_key.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "Compound のキーが孤立サロゲート。値と違いキーでは許さない",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "nbt/mutf8_raw_nul",
+      "kind": "nbt",
+      "input": "nbt/mutf8_raw_nul.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "MUTF-8 に反する素の 0x00 を含む文字列",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "anvil/empty",
+      "kind": "anvil",
+      "input": "anvil/empty/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "全エントリ 0 のリージョン。ヘッダ 2 セクタのみ",
+      "expect": "expect/anvil/empty.json",
+      "roundtrip": true
+    },
+    {
+      "id": "anvil/single_chunk",
+      "kind": "anvil",
+      "input": "anvil/single_chunk/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "チャンクが 1 つだけ",
+      "expect": "expect/anvil/single_chunk.json",
+      "roundtrip": true
+    },
+    {
+      "id": "anvil/fragmented",
+      "kind": "anvil",
+      "input": "anvil/fragmented/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "セクタ 3〜5 と 7〜8 が空いた断片化した配置",
+      "expect": "expect/anvil/fragmented.json",
+      "roundtrip": true
+    },
+    {
+      "id": "anvil/mixed_compression",
+      "kind": "anvil",
+      "input": "anvil/mixed_compression/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "圧縮方式ID 1 (GZip) / 2 (Zlib) / 3 (無圧縮) が混在",
+      "expect": "expect/anvil/mixed_compression.json",
+      "roundtrip": true
+    },
+    {
+      "id": "anvil/external_mcc",
+      "kind": "anvil",
+      "input": "anvil/external_mcc/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "チャンクが c.0.0.mcc へ退避されている（圧縮方式IDに 0x80 が立つ）",
+      "expect": "expect/anvil/external_mcc.json",
+      "roundtrip": true
+    },
+    {
+      "id": "anvil/bad_offset",
+      "kind": "anvil",
+      "input": "anvil/bad_offset/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "オフセットがヘッダ領域 (セクタ 1) を指している",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "anvil/overlapping_sectors",
+      "kind": "anvil",
+      "input": "anvil/overlapping_sectors/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "2 つのチャンクが同じセクタを指している",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "anvil/unaligned_length",
+      "kind": "anvil",
+      "input": "anvil/unaligned_length/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "ファイル長が 4096 の倍数になっていない",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "anvil/offset_out_of_file",
+      "kind": "anvil",
+      "input": "anvil/offset_out_of_file/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "オフセットがファイル末尾より後ろを指している",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "world/palette_1",
+      "kind": "world",
+      "input": "world/palette_1.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "パレット 1 要素のセクション（data 無し）",
+      "expect": "expect/world/palette_1.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/palette_5",
+      "kind": "world",
+      "input": "world/palette_5.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "パレット 5 要素 -> bits=4、data は 256 long（端数なし）",
+      "expect": "expect/world/palette_5.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/palette_17",
+      "kind": "world",
+      "input": "world/palette_17.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "パレット 17 要素 -> bits=5、data は 342 long（最後に端数）",
+      "expect": "expect/world/palette_17.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/multi_section",
+      "kind": "world",
+      "input": "world/multi_section.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "セクション 3 個。バイオームも 2 種（bits=1）",
+      "expect": "expect/world/multi_section.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/palette_unused",
+      "kind": "world",
+      "input": "world/palette_unused.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "参照されていないパレット要素が 2 つある。compact() で減る",
+      "expect": "expect/world/palette_unused.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/proto_chunk",
+      "kind": "world",
+      "input": "world/proto_chunk.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "生成途中のチャンク（Status が full でない）",
+      "expect": "expect/world/proto_chunk.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/palette_index_out_of_range",
+      "kind": "world",
+      "input": "world/palette_index_out_of_range.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "添字がパレットの範囲外を指している",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "world/bitstorage_wrong_length",
+      "kind": "world",
+      "input": "world/bitstorage_wrong_length.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "data の長さがパレット長から求めたビット幅と合わない",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    }
+  ]
+}

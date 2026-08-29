@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 同じブランチへ続けて push したら、前の実行は打ち切る
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 言語ごとの単体テスト。1 つ落ちても他の結果を見たいので fail-fast は切る
+  test:
+    name: ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+          - language: java
+          - language: typescript
+          - language: python
+          - language: rust
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: .NET 8 を用意
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: JDK 21 を用意
+        if: matrix.language == 'java'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Node 20 を用意
+        if: matrix.language == 'typescript'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+
+      - name: Python 3.12 を用意
+        if: matrix.language == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Rust を用意
+        if: matrix.language == 'rust'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: C# のテスト
+        if: matrix.language == 'csharp'
+        working-directory: csharp
+        run: dotnet test --configuration Release
+
+      - name: Java のテスト
+        if: matrix.language == 'java'
+        working-directory: java
+        run: mvn --batch-mode test
+
+      - name: TypeScript のテスト
+        if: matrix.language == 'typescript'
+        working-directory: typescript
+        run: npm ci && npm test
+
+      - name: Python のテスト
+        if: matrix.language == 'python'
+        working-directory: python
+        run: pip install pytest && python -m pytest tests
+
+      - name: Rust のテスト
+        if: matrix.language == 'rust'
+        working-directory: rust
+        run: cargo test --all-features
+
+  # このライブラリの核。全言語に同じ入力を与えて出力バイト列を突き合わせる
+  conformance:
+    name: クロス言語適合性
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: テストベクタが生成器と一致するか
+        run: |
+          python3 spec/tools/build_testdata.py
+          git diff --exit-code spec/testdata
+
+      - name: 全言語の出力を突き合わせる
+        run: ./spec/run-conformance.sh
+
+  # 最低限の MSRV を割っていないか
+  msrv:
+    name: Rust MSRV (1.75)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.75.0
+      - working-directory: rust
+        run: cargo check --all-features

@@ -1,0 +1,41 @@
+{
+  "name": "spring-nbt-library",
+  "version": "0.1.0",
+  "description": "Minecraft Java Edition の NBT / Anvil ワールドデータを読み書きするライブラリ",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist/src",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "minecraft",
+    "nbt",
+    "anvil",
+    "mca"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/scriptarts/SpringNBTLibrary.git",
+    "directory": "typescript"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test \"dist/tests/**/*.test.js\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

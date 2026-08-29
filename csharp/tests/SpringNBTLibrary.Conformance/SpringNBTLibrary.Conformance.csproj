@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>SpringNBTLibrary.Conformance</RootNamespace>
+    <AssemblyName>springnbt-conformance</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/SpringNBTLibrary/SpringNBTLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

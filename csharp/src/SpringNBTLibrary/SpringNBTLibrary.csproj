@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>SpringNBTLibrary</RootNamespace>
+    <AssemblyName>SpringNBTLibrary</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <PackageId>SpringNBTLibrary</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Minecraft Java Edition の NBT / Anvil ワールドデータを読み書きするライブラリ</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/scriptarts/SpringNBTLibrary</RepositoryUrl>
+    <PackageTags>minecraft;nbt;anvil;mca</PackageTags>
+    <Authors>ScriptArts</Authors>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <!-- 配布物に MIT ライセンスと説明を同梱する -->
+  <ItemGroup>
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>

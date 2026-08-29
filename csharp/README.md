@@ -1,0 +1,37 @@
+# SpringNBTLibrary（C# 版）
+
+Minecraft **Java版 26.2**（DataVersion `4903`）のワールド／NBTファイルを読み書きするライブラリ。
+
+**.NET 8 / C# 12 以上**
+
+## これは5言語版のうちの1つです
+
+SpringNBTLibrary は **C# / Java / TypeScript / Python / Rust** の5言語へ、
+同じ設計者が**同一の概念・同一の挙動**で提供しているライブラリです。
+言語をまたぐプロジェクトで、実装ごとの挙動差に悩まされないことを狙っています。
+
+全言語の挙動一致は人手のレビューではなく
+[適合性テスト](../docs/spec/90-conformance.md)で機械的に保証しています。
+
+## 導入
+
+```xml
+<PackageReference Include="SpringNBTLibrary" Version="0.1.0" />
+```
+
+> NuGet へはまだ公開していない。現時点ではリポジトリを取得して
+> `ProjectReference` で参照する。
+
+## 使い方
+
+- **[はじめに（C#）](../docs/getting-started/csharp.md)** — まずここから
+- [ガイド](../docs/guide/01-nbt.md) — 目的別の使い方
+- [API 対応表](../docs/api/overview.md) — 他言語版との対応
+- [機能一覧](../docs/features.md) — 何ができて何ができないか
+
+**ドキュメントの実体は [`docs/`](../docs/README.md) にあります。**
+言語ごとに説明を重複させず、一箇所で管理しています。
+
+## ライセンス
+
+MIT License — Copyright (c) 2026 ScriptArts
