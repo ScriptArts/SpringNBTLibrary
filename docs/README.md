@@ -67,7 +67,6 @@ Minecraft **Java版 26.2**（DataVersion `4903`）のワールド／NBTファイ
 - [新しい言語を追加する](contributing/porting-guide.md)
 - [リリース手順](contributing/release.md)
 - [変更履歴](../CHANGELOG.md)
-- [ライセンス（日本語参考訳）](../LICENSE.ja.md) — 原文は [LICENSE](../LICENSE)
 
 ### 設計判断の記録 (ADR)
 
