@@ -281,8 +281,10 @@ internal sealed class NbtBinaryReader
         {
             char c = text[index];
 
+            // 上位サロゲートは、対になる下位サロゲートとまとめて 1 文字を成す
             if (char.IsHighSurrogate(c))
             {
+                // 対が揃っていれば 2 コード単位を消費する。揃わなければ孤立サロゲート
                 if (index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]))
                 {
                     index += 1;

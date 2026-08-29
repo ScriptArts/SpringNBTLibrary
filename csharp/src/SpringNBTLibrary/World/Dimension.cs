@@ -217,6 +217,7 @@ public sealed class Dimension : IDisposable
         // 変更のあったチャンクだけを書き戻す
         foreach (long key in modifiedChunks)
         {
+            // キャッシュに残っているものだけ書き戻せる
             if (chunkCache.TryGetValue(key, out Chunk? chunk))
             {
                 RegionFolder!.WriteChunk(chunk.X, chunk.Z, chunk.ToNbt(options.ChunkWrite));
@@ -227,6 +228,7 @@ public sealed class Dimension : IDisposable
         // 開いているフォルダだけを書き出す
         foreach (RegionFolder? folder in new[] { regions, entities, poi })
         {
+            // 開いているフォルダだけを書き出す
             if (folder is not null)
             {
                 folder.Flush();
@@ -242,6 +244,7 @@ public sealed class Dimension : IDisposable
             return;
         }
 
+        // 書き込みモードなら、閉じる前に変更を反映する
         if (options.Writable)
         {
             Flush();
@@ -250,6 +253,7 @@ public sealed class Dimension : IDisposable
         // 開いているフォルダだけを閉じる
         foreach (RegionFolder? folder in new[] { regions, entities, poi })
         {
+            // 開いているフォルダだけを閉じる
             if (folder is not null)
             {
                 folder.Close();
@@ -281,6 +285,7 @@ public sealed class Dimension : IDisposable
         }
 
         RegionFileMode mode;
+        // ワールドを開いたモードに合わせる
         if (options.Writable)
         {
             mode = RegionFileMode.ReadWrite;

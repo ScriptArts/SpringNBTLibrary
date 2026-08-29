@@ -73,6 +73,7 @@ class PalettedContainer:
         if palette_tag is None or len(palette_tag) == 0:
             raise SpringNbtError.malformed("palette が無いか空")
 
+        # パレットの要素は生の NbtTag のまま持つ。並び順まで元どおりに書き戻すため
         for entry in palette_tag:
             result._palette.append(entry)
 
@@ -106,6 +107,7 @@ class PalettedContainer:
         result = NbtCompound()
         palette_tag = NbtList()
 
+        # パレットの要素は読んだときのまま書き出す
         for entry in self._palette:
             palette_tag.append(entry)
 
@@ -160,6 +162,7 @@ class PalettedContainer:
         compacted = []
         remap = [-1] * len(self._palette)
 
+        # 使われている要素だけを詰め直し、新しい添字を割り当てる
         for old in range(len(self._palette)):
             if not used_entries[old]:
                 continue

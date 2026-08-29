@@ -61,6 +61,7 @@ public sealed class RegionFile : IDisposable
         this.data = data;
 
         string? parent = Path.GetDirectoryName(path);
+        // パスが階層を含まない場合、.mcc の置き場としてカレントディレクトリを使う
         if (string.IsNullOrEmpty(parent))
         {
             this.directory = ".";
@@ -105,6 +106,7 @@ public sealed class RegionFile : IDisposable
 
         byte[] raw;
 
+        // 既にあるファイルは読み込み、無ければ空のヘッダだけを組み立てる
         if (File.Exists(path))
         {
             try
@@ -459,6 +461,7 @@ public sealed class RegionFile : IDisposable
         // 先頭から連続した空き領域を探す
         for (int sector = HeaderSectors; sector < totalSectors; sector++)
         {
+            // 使用中のセクタに当たったら、空きの連続はそこで途切れる
             if (used[sector])
             {
                 run = 0;
@@ -502,8 +505,10 @@ public sealed class RegionFile : IDisposable
                 continue;
             }
 
+            // 他のチャンクが占めるセクタに印を付ける
             for (int sector = offsets[other]; sector < offsets[other] + sectorCounts[other]; sector++)
             {
+                // ファイル長を超える位置は既に検証で弾いているが、念のため範囲を確かめる
                 if (sector < totalSectors)
                 {
                     used[sector] = true;
@@ -536,6 +541,7 @@ public sealed class RegionFile : IDisposable
             int localZ = index / 32;
             RawChunk? raw = ReadChunkRaw((RegionX * 32) + localX, (RegionZ * 32) + localZ);
 
+            // 存在するチャンクだけを集める
             if (raw is not null)
             {
                 chunks.Add((index, raw));
@@ -555,6 +561,7 @@ public sealed class RegionFile : IDisposable
             byte[] payload;
             int schemeByte;
 
+            // 外部ファイルへ退避したチャンクは、本体を持たず印だけを書く
             if (raw.External)
             {
                 payload = Array.Empty<byte>();
@@ -622,6 +629,7 @@ public sealed class RegionFile : IDisposable
     /// <summary>ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す。</summary>
     private void WriteHeader()
     {
+        // 位置表とタイムスタンプ表を、添字順に組み立て直す
         for (int index = 0; index < ChunkCount; index++)
         {
             uint entry = ((uint)offsets[index] << 8) | (uint)sectorCounts[index];
@@ -639,6 +647,7 @@ public sealed class RegionFile : IDisposable
             return;
         }
 
+        // 読み書きで開いていて変更があるなら、閉じる前に書き出す
         if (dirty && mode == RegionFileMode.ReadWrite)
         {
             Flush();

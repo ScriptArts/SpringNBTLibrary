@@ -104,6 +104,7 @@ internal static class CanonicalDecimal
         bool negative = false;
         int index = 0;
 
+        // 先頭の符号を取り除き、数字の並びだけを読めるようにする
         if (exponential[0] == '-' || exponential[0] == '+')
         {
             negative = exponential[0] == '-';
@@ -113,11 +114,13 @@ internal static class CanonicalDecimal
         // 仮数部の数字だけを集める
         StringBuilder digitsBuilder = new StringBuilder();
 
+        // 指数部 (E) の手前までが仮数部
         while (index < exponential.Length
             && exponential[index] != 'E' && exponential[index] != 'e')
         {
             char c = exponential[index];
 
+            // 小数点は落とし、数字だけを集める
             if (c >= '0' && c <= '9')
             {
                 digitsBuilder.Append(c);
@@ -153,6 +156,7 @@ internal static class CanonicalDecimal
     {
         StringBuilder builder = new StringBuilder();
 
+        // 符号は数字の前に置く
         if (negative)
         {
             builder.Append('-');
@@ -171,6 +175,7 @@ internal static class CanonicalDecimal
             builder.Append(digits[0]);
             builder.Append('.');
 
+            // 2 桁目以降があれば小数点のうしろへ回す
             if (digits.Length > 1)
             {
                 builder.Append(digits, 1, digits.Length - 1);
@@ -190,6 +195,7 @@ internal static class CanonicalDecimal
             // 整数部は先頭 (exponent + 1) 桁。足りなければゼロで右詰めする
             int integerDigits = exponent + 1;
 
+            // 整数部が数字の並びに収まるなら、そのまま切り出す
             if (digits.Length >= integerDigits)
             {
                 builder.Append(digits, 0, integerDigits);
@@ -198,6 +204,7 @@ internal static class CanonicalDecimal
             {
                 builder.Append(digits);
 
+                // 数字が足りない分は 0 で埋めて桁を合わせる
                 for (int i = digits.Length; i < integerDigits; i++)
                 {
                     builder.Append('0');
@@ -206,6 +213,7 @@ internal static class CanonicalDecimal
 
             builder.Append('.');
 
+            // 整数部で使い切らなかった数字が小数部になる
             if (digits.Length > integerDigits)
             {
                 builder.Append(digits, integerDigits, digits.Length - integerDigits);
@@ -221,6 +229,7 @@ internal static class CanonicalDecimal
         // 指数が負なら "0." に続けてゼロを詰めてから数字を置く
         builder.Append("0.");
 
+        // 指数のぶんだけ 0.000... と 0 を並べる
         for (int i = 0; i < (-exponent) - 1; i++)
         {
             builder.Append('0');

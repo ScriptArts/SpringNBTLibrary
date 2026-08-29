@@ -87,6 +87,7 @@ fn format_exponential(exponential: &str) -> String {
     let mut negative = false;
     let mut index = 0usize;
 
+    // 先頭の符号を取り除き、数字の並びだけを読めるようにする
     if bytes[0] == '-' || bytes[0] == '+' {
         negative = bytes[0] == '-';
         index = 1;
@@ -126,6 +127,7 @@ fn trim_trailing_zeros(digits: &str) -> String {
 fn compose(negative: bool, digits: String, exponent: i32) -> String {
     let mut result = String::new();
 
+    // 符号は数字の前に置く
     if negative {
         result.push('-');
     }
@@ -141,6 +143,7 @@ fn compose(negative: bool, digits: String, exponent: i32) -> String {
         result.push_str(&digits[0..1]);
         result.push('.');
 
+        // 2 桁目以降があれば小数点のうしろへ回す
         if digits.len() > 1 {
             result.push_str(&digits[1..]);
         } else {
@@ -156,11 +159,13 @@ fn compose(negative: bool, digits: String, exponent: i32) -> String {
         // 整数部は先頭 (exponent + 1) 桁。足りなければゼロで右詰めする
         let integer_digits = (exponent + 1) as usize;
 
+        // 整数部が数字の並びに収まるなら、そのまま切り出す
         if digits.len() >= integer_digits {
             result.push_str(&digits[..integer_digits]);
         } else {
             result.push_str(&digits);
 
+            // 数字が足りない分は 0 で埋めて桁を合わせる
             for _ in digits.len()..integer_digits {
                 result.push('0');
             }
@@ -168,6 +173,7 @@ fn compose(negative: bool, digits: String, exponent: i32) -> String {
 
         result.push('.');
 
+        // 整数部で使い切らなかった数字が小数部になる
         if digits.len() > integer_digits {
             result.push_str(&digits[integer_digits..]);
         } else {
@@ -180,6 +186,7 @@ fn compose(negative: bool, digits: String, exponent: i32) -> String {
     // 指数が負なら "0." に続けてゼロを詰めてから数字を置く
     result.push_str("0.");
 
+    // 指数のぶんだけ 0.000... と 0 を並べる
     for _ in 0..((-exponent) - 1) {
         result.push('0');
     }

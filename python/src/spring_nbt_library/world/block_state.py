@@ -55,6 +55,7 @@ class BlockState:
         """
         bracket = text.find("[")
 
+        # 角括弧が無ければプロパティ無しのブロック名
         if bracket < 0:
             if len(text) == 0:
                 raise SpringNbtError.invalid_argument("ブロック名が空")

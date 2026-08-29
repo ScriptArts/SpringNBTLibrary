@@ -281,13 +281,16 @@ class Dimension:
         for key in self._modified:
             chunk = self._chunk_cache.get(key)
 
+            # キャッシュに残っているものだけ書き戻せる
             if chunk is not None:
                 self.region_folder().write_chunk(
                     chunk.x, chunk.z, chunk.to_nbt(self._options.chunk_write))
 
         self._modified.clear()
 
+        # 開いているフォルダだけを書き出す
         for folder in (self._regions, self._entities, self._poi):
+            # 開いていないフォルダは触らない
             if folder is not None:
                 folder.flush()
 
@@ -296,10 +299,13 @@ class Dimension:
         if self._closed:
             return
 
+        # 書き込みモードなら、閉じる前に変更を反映する
         if self._options.writable:
             self.flush()
 
+        # 開いているフォルダだけを閉じる
         for folder in (self._regions, self._entities, self._poi):
+            # 開いていないフォルダは触らない
             if folder is not None:
                 folder.close()
 
@@ -319,6 +325,7 @@ class Dimension:
         if not os.path.isdir(path) and not self._options.writable:
             return None
 
+        # ワールドを開いたモードに合わせる
         if self._options.writable:
             mode = RegionFileMode.READ_WRITE
         else:
@@ -408,7 +415,9 @@ class MinecraftWorld:
             if not os.path.isdir(namespace_dir):
                 continue
 
+            # 2 段目が次元のパス
             for path_name in os.listdir(namespace_dir):
+                # ディレクトリだけを次元として数える
                 if os.path.isdir(os.path.join(namespace_dir, path_name)):
                     found.append("%s:%s" % (namespace_name, path_name))
 
@@ -475,6 +484,7 @@ class MinecraftWorld:
 
         write_file(temporary, self.level.to_named_tag())
 
+        # 既存の level.dat は、置き換える前に level.dat_old へ退避する
         if os.path.exists(path):
             shutil.copyfile(path, backup)
 
@@ -485,6 +495,7 @@ class MinecraftWorld:
         if self._closed:
             return
 
+        # 開いている次元をすべて閉じる
         for dimension in self._dimensions.values():
             dimension.close()
 

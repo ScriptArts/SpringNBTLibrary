@@ -168,13 +168,16 @@ public final class MinecraftWorld implements AutoCloseable {
 
         // dimensions/<名前空間>/<パス>/ の 2 段を辿る
         try (DirectoryStream<Path> namespaces = Files.newDirectoryStream(root)) {
+            // 1 段目が名前空間
             for (Path namespaceDir : namespaces) {
                 if (!Files.isDirectory(namespaceDir)) {
                     continue;
                 }
 
                 try (DirectoryStream<Path> paths = Files.newDirectoryStream(namespaceDir)) {
+                    // 2 段目が次元のパス
                     for (Path pathDir : paths) {
+                        // ディレクトリだけを次元として数える
                         if (Files.isDirectory(pathDir)) {
                             found.add(namespaceDir.getFileName() + ":" + pathDir.getFileName());
                         }
@@ -237,6 +240,7 @@ public final class MinecraftWorld implements AutoCloseable {
         }
 
         try (DirectoryStream<Path> files = Files.newDirectoryStream(path, "*.dat")) {
+            // <uuid>.dat の名前部分が UUID にあたる
             for (Path file : files) {
                 String name = file.getFileName().toString();
                 found.add(name.substring(0, name.length() - 4));
@@ -287,6 +291,7 @@ public final class MinecraftWorld implements AutoCloseable {
         try {
             NbtIo.writeFile(temporary, level.toNamedTag(), null);
 
+            // 既存の level.dat は、置き換える前に level.dat_old へ退避する
             if (Files.exists(path)) {
                 Files.copy(path, backup, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -304,6 +309,7 @@ public final class MinecraftWorld implements AutoCloseable {
             return;
         }
 
+        // 開いている次元をすべて閉じる
         for (Dimension dimension : dimensions.values()) {
             dimension.close();
         }

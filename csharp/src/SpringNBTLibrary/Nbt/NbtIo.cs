@@ -39,6 +39,7 @@ public static class NbtIo
         ArgumentNullException.ThrowIfNull(bytes);
 
         NbtReadOptions effective;
+        // 省略されたら既定のオプションで読む
         if (options is null)
         {
             effective = NbtReadOptions.Default;
@@ -101,6 +102,7 @@ public static class NbtIo
         ArgumentNullException.ThrowIfNull(tag);
 
         NbtWriteOptions effective;
+        // 省略されたら既定のオプションで書く
         if (options is null)
         {
             effective = NbtWriteOptions.Default;
@@ -184,6 +186,7 @@ public static class NbtIo
     private static byte[] Decompress(byte[] bytes, NbtReadOptions options)
     {
         Compression method;
+        // Auto なら先頭バイトから圧縮方式を見分ける
         if (options.Compression == Compression.Auto)
         {
             method = DetectCompression(bytes);

@@ -82,6 +82,7 @@ public sealed class BlockState : IEquatable<BlockState>
 
         int bracket = text.IndexOf('[', StringComparison.Ordinal);
 
+        // 角括弧が無ければプロパティ無しのブロック名
         if (bracket < 0)
         {
             if (text.Length == 0)
@@ -220,6 +221,7 @@ public sealed class BlockState : IEquatable<BlockState>
         using IEnumerator<KeyValuePair<string, string>> left = properties.GetEnumerator();
         using IEnumerator<KeyValuePair<string, string>> right = other.properties.GetEnumerator();
 
+        // 名前と値を先頭から突き合わせる。並びは昇順に揃っている
         while (left.MoveNext() && right.MoveNext())
         {
             if (!string.Equals(left.Current.Key, right.Current.Key, StringComparison.Ordinal))
@@ -259,6 +261,7 @@ public sealed class BlockState : IEquatable<BlockState>
         // 名前の昇順で並べるので、同じ状態なら必ず同じ文字列になる
         foreach (KeyValuePair<string, string> entry in properties)
         {
+            // 2 つ目以降の前に区切りのカンマを置く
             if (!first)
             {
                 builder.Append(',');

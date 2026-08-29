@@ -315,6 +315,7 @@ export class Dimension {
 
   /** 開いているフォルダだけを書き出す。 */
   #flushFolders(): void {
+    // 開いているフォルダだけを書き出す
     for (const folder of [this.#regions, this.#entities, this.#poi]) {
       if (folder !== undefined) {
         folder.flush();
@@ -324,6 +325,7 @@ export class Dimension {
 
   /** 開いているフォルダだけを閉じる。 */
   #closeFolders(): void {
+    // 開いているフォルダだけを閉じる
     for (const folder of [this.#regions, this.#entities, this.#poi]) {
       if (folder !== undefined) {
         folder.close();
@@ -442,7 +444,9 @@ export class MinecraftWorld {
         continue;
       }
 
+      // 2 段目が次元のパス
       for (const pathName of readdirSync(namespaceDir)) {
+        // ディレクトリだけを次元として数える
         if (statSync(join(namespaceDir, pathName)).isDirectory()) {
           found.push(`${namespaceName}:${pathName}`);
         }
@@ -492,7 +496,9 @@ export class MinecraftWorld {
 
     const found: string[] = [];
 
+    // <uuid>.dat の名前部分が UUID にあたる
     for (const name of readdirSync(path)) {
+      // .dat 以外のファイルは対象外
       if (name.endsWith(".dat")) {
         found.push(basename(name, ".dat"));
       }
@@ -533,6 +539,7 @@ export class MinecraftWorld {
 
     writeFile(temporary, this.level.toNamedTag());
 
+    // 既存の level.dat は、置き換える前に level.dat_old へ退避する
     if (existsSync(path)) {
       copyFileSync(path, backup);
     }
@@ -546,6 +553,7 @@ export class MinecraftWorld {
       return;
     }
 
+    // 開いている次元をすべて閉じる
     for (const dimension of this.#dimensions.values()) {
       dimension.close();
     }

@@ -86,6 +86,7 @@ final class CanonicalDecimal {
         boolean negative = false;
         int index = 0;
 
+        // 先頭の符号を取り除き、数字の並びだけを読めるようにする
         if (exponential.charAt(0) == '-' || exponential.charAt(0) == '+') {
             negative = exponential.charAt(0) == '-';
             index = 1;
@@ -151,6 +152,7 @@ final class CanonicalDecimal {
             builder.append(digits.charAt(0));
             builder.append('.');
 
+            // 2 桁目以降があれば小数点のうしろへ回す
             if (digits.length() > 1) {
                 builder.append(digits, 1, digits.length());
             } else {
@@ -166,11 +168,13 @@ final class CanonicalDecimal {
             // 整数部は先頭 (exponent + 1) 桁。足りなければゼロで右詰めする
             int integerDigits = exponent + 1;
 
+            // 整数部が数字の並びに収まるなら、そのまま切り出す
             if (digits.length() >= integerDigits) {
                 builder.append(digits, 0, integerDigits);
             } else {
                 builder.append(digits);
 
+                // 数字が足りない分は 0 で埋めて桁を合わせる
                 for (int i = digits.length(); i < integerDigits; i++) {
                     builder.append('0');
                 }
@@ -178,6 +182,7 @@ final class CanonicalDecimal {
 
             builder.append('.');
 
+            // 整数部で使い切らなかった数字が小数部になる
             if (digits.length() > integerDigits) {
                 builder.append(digits, integerDigits, digits.length());
             } else {
@@ -190,6 +195,7 @@ final class CanonicalDecimal {
         // 指数が負なら "0." に続けてゼロを詰めてから数字を置く
         builder.append("0.");
 
+        // 指数のぶんだけ 0.000... と 0 を並べる
         for (int i = 0; i < (-exponent) - 1; i++) {
             builder.append('0');
         }

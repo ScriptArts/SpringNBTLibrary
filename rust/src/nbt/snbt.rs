@@ -89,6 +89,7 @@ impl Parser {
             return self.parse_list_or_array();
         }
 
+        // 引用符で始まるなら文字列
         if c == '"' || c == '\'' {
             let text = self.parse_quoted_string()?;
             return Ok(NbtTag::String(NbtString::from_utf16(text)));
@@ -127,6 +128,7 @@ impl Parser {
             self.skip_whitespace();
             let next = self.peek()?;
 
+            // カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
             if next == ',' {
                 self.position += 1;
             } else if next == '}' {
@@ -145,6 +147,7 @@ impl Parser {
         if self.position + 1 < self.chars.len() && self.chars[self.position + 1] == ';' {
             let marker = self.chars[self.position];
 
+            // [B; [I; [L; は型付き配列の印。ただの List と見分ける
             if marker == 'B' || marker == 'I' || marker == 'L' {
                 self.position += 2;
                 return self.parse_typed_array(marker);
@@ -190,6 +193,7 @@ impl Parser {
             self.skip_whitespace();
             let next = self.peek()?;
 
+            // カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
             if next == ',' {
                 self.position += 1;
             } else if next == ']' {
@@ -209,6 +213,7 @@ impl Parser {
         if self.peek()? == ']' {
             self.position += 1;
         } else {
+            // 閉じ括弧が来るまで要素を読み続ける
             loop {
                 self.skip_whitespace();
 
@@ -224,6 +229,7 @@ impl Parser {
                 self.skip_whitespace();
                 let next = self.peek()?;
 
+                // カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
                 if next == ',' {
                     self.position += 1;
                 } else if next == ']' {
@@ -235,6 +241,7 @@ impl Parser {
             }
         }
 
+        // [B; は TAG_Byte_Array
         if marker == 'B' {
             let mut result: Vec<i8> = Vec::with_capacity(values.len());
 
@@ -250,6 +257,7 @@ impl Parser {
             return Ok(NbtTag::ByteArray(result));
         }
 
+        // [I; は TAG_Int_Array。残りは TAG_Long_Array
         if marker == 'I' {
             let mut result: Vec<i32> = Vec::with_capacity(values.len());
 
@@ -285,6 +293,7 @@ impl Parser {
     fn parse_key(&mut self) -> Result<String> {
         let c = self.peek()?;
 
+        // 引用符で始まるキーは、エスケープを解いて読む
         if c == '"' || c == '\'' {
             let units = self.parse_quoted_string()?;
 
@@ -321,11 +330,13 @@ impl Parser {
 
             let c = self.chars[self.position];
 
+            // 開いたときと同じ引用符に出会ったら文字列の終わり
             if c == quote {
                 self.position += 1;
                 return Ok(units);
             }
 
+            // 逆スラッシュの次はエスケープとして読む
             if c == '\\' {
                 self.position += 1;
                 self.read_escape(&mut units)?;
@@ -358,12 +369,14 @@ impl Parser {
             _ => None,
         };
 
+        // 1 文字で置き換えられるエスケープはここで片付く
         if let Some(value) = simple {
             let mut buffer = [0u16; 2];
             units.extend_from_slice(value.encode_utf16(&mut buffer));
             return Ok(());
         }
 
+        // \x は 2 桁の 16 進表記
         if c == 'x' {
             units.push(self.read_hex_digits(2)? as u16);
             return Ok(());
@@ -375,6 +388,7 @@ impl Parser {
             return Ok(());
         }
 
+        // \U は 8 桁のコードポイント表記
         if c == 'U' {
             let code_point = self.read_hex_digits(8)?;
 
@@ -533,6 +547,7 @@ impl Parser {
         let mut negative = false;
         let mut start = 0usize;
 
+        // 先頭の符号を取り除き、数字の並びだけを残す
         if chars[0] == '+' || chars[0] == '-' {
             negative = chars[0] == '-';
             start = 1;
@@ -557,6 +572,7 @@ impl Parser {
             WIDTH_SUFFIXES.contains(last)
         };
 
+        // 末尾 1 文字が型の印なら切り離す。1 文字だけの token は数字そのもの
         if suffix_allowed && body.chars().count() >= 2 {
             width_suffix = last.to_ascii_lowercase();
             body.pop();
@@ -565,6 +581,7 @@ impl Parser {
             if body.chars().count() >= 2 {
                 let sign_char = body.chars().last().unwrap();
 
+                // u / U は符号なしの印。1.21.5 以降の拡張構文
                 if sign_char == 'u' || sign_char == 'U' {
                     unsigned_suffix = true;
                     body.pop();
@@ -916,6 +933,7 @@ fn write_compound(out: &mut String, compound: &NbtCompound, depth: i32) {
 
     // 挿入順のまま「キー: 値」を並べる
     for (key, value) in compound.iter() {
+        // 2 つ目以降の前に区切りのカンマを置く
         if !first {
             out.push(',');
         }
@@ -948,6 +966,7 @@ fn write_list(out: &mut String, list: &NbtList, depth: i32) {
 
     // 要素型は共通なので値だけを並べる
     for item in list.iter() {
+        // 2 つ目以降の前に区切りのカンマを置く
         if !first {
             out.push(',');
         }
@@ -973,6 +992,7 @@ fn write_typed_array<T: std::fmt::Display>(
 
     // 型付き配列は 1 行に収める
     for (index, value) in values.iter().enumerate() {
+        // 2 つ目以降の前に区切りのカンマを置く
         if index > 0 {
             out.push(',');
         }
@@ -1061,6 +1081,7 @@ fn quote_string(units: &[u16]) -> String {
                         + (((unit as u32) - 0xD800) << 10)
                         + ((units[index + 1] as u32) - 0xDC00);
 
+                    // 有効なコードポイントに戻せたものだけを文字として積む
                     if let Some(value) = char::from_u32(code) {
                         out.push(value);
                     }

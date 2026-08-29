@@ -118,6 +118,7 @@ impl RegionFolder {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
 
+            // r.X.Z.mca として解釈できるファイルだけを拾う
             if let Some(position) = RegionPos::from_file_name(&name) {
                 found.push(position);
             }
@@ -249,6 +250,7 @@ impl RegionFolder {
 
         // リージョンごとに、その中のチャンクを順に集める
         for position in positions {
+            // 存在するリージョンのチャンク座標を集める
             if let Some(file) = self.region(position.x, position.z)? {
                 result.extend(file.chunk_positions()?);
             }
@@ -261,6 +263,7 @@ impl RegionFolder {
     pub fn flush(&mut self) -> Result<()> {
         self.ensure_open()?;
 
+        // 開いているリージョンをすべて書き出す
         for file in self.cache.values_mut() {
             file.flush()?;
         }
@@ -274,6 +277,7 @@ impl RegionFolder {
             return Ok(());
         }
 
+        // 開いているリージョンをすべて閉じる
         for file in self.cache.values_mut() {
             file.close()?;
         }

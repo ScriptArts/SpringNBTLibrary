@@ -188,6 +188,7 @@ impl fmt::Display for BlockState {
 
         // 名前の昇順で並べるので、同じ状態なら必ず同じ文字列になる
         for (key, value) in &self.properties {
+            // 2 つ目以降の前に区切りのカンマを置く
             if !first {
                 f.write_str(",")?;
             }

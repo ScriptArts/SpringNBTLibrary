@@ -132,6 +132,7 @@ class _Parser:
             self._skip_whitespace()
             following = self._peek()
 
+            # カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
             if following == ",":
                 self._position += 1
             elif following == "}":
@@ -147,6 +148,7 @@ class _Parser:
         if self._position + 1 < len(self._text) and self._text[self._position + 1] == ";":
             marker = self._text[self._position]
 
+            # [B; [I; [L; は型付き配列の印。ただの List と見分ける
             if marker in "BIL":
                 self._position += 2
                 return self._parse_typed_array(marker)
@@ -184,6 +186,7 @@ class _Parser:
             self._skip_whitespace()
             following = self._peek()
 
+            # カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
             if following == ",":
                 self._position += 1
             elif following == "]":
@@ -200,6 +203,7 @@ class _Parser:
         if self._peek() == "]":
             self._position += 1
         else:
+            # 閉じ括弧が来るまで要素を読み続ける
             while True:
                 self._skip_whitespace()
 
@@ -213,6 +217,7 @@ class _Parser:
                 self._skip_whitespace()
                 following = self._peek()
 
+                # カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
                 if following == ",":
                     self._position += 1
                 elif following == "]":
@@ -226,6 +231,7 @@ class _Parser:
             self._check_elements(values, -128, 127, "ByteArray")
             return NbtByteArray(values)
 
+        # [I; は TAG_Int_Array。残りは TAG_Long_Array
         if marker == "I":
             self._check_elements(values, -2147483648, 2147483647, "IntArray")
             return NbtIntArray(values)
@@ -234,6 +240,7 @@ class _Parser:
         return NbtLongArray(values)
 
     def _check_elements(self, values, minimum: int, maximum: int, name: str) -> None:
+        # 範囲を確かめながら詰め直す
         for value in values:
             if value < minimum or value > maximum:
                 raise self._malformed("%s の要素が範囲外: %d" % (name, value))
@@ -270,10 +277,12 @@ class _Parser:
 
             character = self._text[self._position]
 
+            # 開いたときと同じ引用符に出会ったら文字列の終わり
             if character == quote:
                 self._position += 1
                 return "".join(parts)
 
+            # 逆スラッシュの次はエスケープとして読む
             if character == "\\":
                 self._position += 1
                 parts.append(self._read_escape())
@@ -297,6 +306,7 @@ class _Parser:
         if character == "u":
             return chr(self._read_hex_digits(4))
 
+        # \U は 8 桁のコードポイント表記
         if character == "U":
             code_point = self._read_hex_digits(8)
 
@@ -397,6 +407,7 @@ class _Parser:
         raw = parsed.bytes
         values = []
 
+        # UUID の 16 バイトを、4 バイトずつ 4 つの i32 へ詰める
         for index in range(4):
             chunk = int.from_bytes(raw[index * 4:(index * 4) + 4], "big", signed=True)
             values.append(chunk)
@@ -408,6 +419,7 @@ class _Parser:
         negative = False
         start = 0
 
+        # 先頭の符号を取り除き、数字の並びだけを残す
         if token[0] in "+-":
             negative = token[0] == "-"
             start = 1
@@ -425,11 +437,13 @@ class _Parser:
         # 幅接尾辞を末尾から剥がす。16進では b/d/f が数字と紛れるため s/l だけを認める
         last = body[-1]
 
+        # 16 進では b/d/f が数字なので、型の印として使えるのは s と l だけ
         if is_hex:
             suffix_allowed = last in "sSlL"
         else:
             suffix_allowed = last in _WIDTH_SUFFIXES
 
+        # 末尾 1 文字が型の印なら切り離す。1 文字だけの token は数字そのもの
         if suffix_allowed and len(body) >= 2:
             width_suffix = last.lower()
             body = body[:-1]
@@ -438,6 +452,7 @@ class _Parser:
             if len(body) >= 2:
                 sign_char = body[-1]
 
+                # u / U は符号なしの印。1.21.5 以降の拡張構文
                 if sign_char in "uU":
                     unsigned_suffix = True
                     body = body[:-1]
@@ -464,6 +479,7 @@ class _Parser:
 
         looks_floating = "." in body or "e" in body or "E" in body
 
+        # 小数点・指数・f/d の印があれば浮動小数点として読む
         if looks_floating or width_suffix in ("f", "d"):
             try:
                 parsed = float(body)
@@ -475,6 +491,7 @@ class _Parser:
         return self._parse_radix(body, 10, negative, width_suffix, unsigned_suffix)
 
     def _make_floating(self, value: float, negative: bool, width_suffix: str) -> NbtTag:
+        # 符号を戻してから型ごとの範囲に収める
         if negative:
             signed = -value
         else:
@@ -523,6 +540,7 @@ class _Parser:
 
             return NbtInt(_wrap_unsigned(self._check_unsigned(magnitude, 0xFFFFFFFF), 32))
 
+        # 符号を戻してから型ごとの範囲に収める
         if negative:
             value = -magnitude
         else:
@@ -716,6 +734,7 @@ def _write_tag(parts, tag: NbtTag, depth: int) -> None:
 
 
 def _write_compound(parts, compound: NbtCompound, depth: int) -> None:
+    # 空の compound は改行もインデントも入れず {} と書く
     if len(compound) == 0:
         parts.append("{}")
         return
@@ -725,6 +744,7 @@ def _write_compound(parts, compound: NbtCompound, depth: int) -> None:
 
     # 挿入順のまま「キー: 値」を並べる
     for key, value in compound.items():
+        # 2 つ目以降の前に区切りのカンマを置く
         if not first:
             parts.append(",")
 
@@ -744,6 +764,7 @@ def _write_compound(parts, compound: NbtCompound, depth: int) -> None:
 
 
 def _write_list(parts, value: NbtList, depth: int) -> None:
+    # 空のリストは改行もインデントも入れず [] と書く
     if len(value) == 0:
         parts.append("[]")
         return
@@ -753,6 +774,7 @@ def _write_list(parts, value: NbtList, depth: int) -> None:
 
     # 要素型は共通なので値だけを並べる
     for item in value:
+        # 2 つ目以降の前に区切りのカンマを置く
         if not first:
             parts.append(",")
 
@@ -769,6 +791,7 @@ def _write_typed_array(parts, marker: str, values, element_suffix: str) -> None:
 
     # 型付き配列は 1 行に収める
     for index, value in enumerate(values):
+        # 2 つ目以降の前に区切りのカンマを置く
         if index > 0:
             parts.append(",")
 
@@ -831,6 +854,7 @@ def _quote_string(text: str) -> str:
 
     # 1 文字ずつ見てエスケープが要るものだけ置き換える
     for character in text:
+        # 引用符と逆スラッシュだけを機械的に置き換える
         if character in _QUOTE_ESCAPES:
             parts.append(_QUOTE_ESCAPES[character])
             continue

@@ -85,6 +85,7 @@ pub fn encode_from_utf16(units: &[u16]) -> Vec<u8> {
 
     // コード単位ごとに 1〜3 バイトへ展開する
     for &unit in units {
+        // U+0001..U+007F だけが 1 バイト。U+0000 は 2 バイトになる
         if unit >= 0x0001 && unit <= 0x007F {
             out.push(unit as u8);
         } else if unit == 0x0000 || unit <= 0x07FF {

@@ -158,6 +158,7 @@ export class BlockState {
       return false;
     }
 
+    // 名前と値がすべて一致するかを見る
     for (const [key, value] of this.#properties) {
       if (other.#properties.get(key) !== value) {
         return false;
@@ -199,6 +200,7 @@ export class BlockState {
 
     this.#properties.clear();
 
+    // 昇順に並べ直したものを入れ直す
     for (const [key, value] of sorted) {
       this.#properties.set(key, value);
     }

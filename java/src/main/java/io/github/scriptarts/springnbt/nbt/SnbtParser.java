@@ -168,6 +168,7 @@ final class SnbtParser {
         if (peek() == ']') {
             position += 1;
         } else {
+            // 閉じ括弧が来るまで要素を読み続ける
             while (true) {
                 skipWhitespace();
 
@@ -229,6 +230,7 @@ final class SnbtParser {
 
         long[] result = new long[values.size()];
 
+        // 読み取った値を配列へ移す
         for (int i = 0; i < values.size(); i++) {
             result[i] = values.get(i);
         }
@@ -446,6 +448,7 @@ final class SnbtParser {
         boolean negative = false;
         int start = 0;
 
+        // 先頭の符号を取り除き、数字の並びだけを残す
         if (token.charAt(0) == '+' || token.charAt(0) == '-') {
             negative = token.charAt(0) == '-';
             start = 1;
@@ -472,6 +475,7 @@ final class SnbtParser {
             suffixAllowed = WIDTH_SUFFIXES.indexOf(last) >= 0;
         }
 
+        // 末尾 1 文字が型の印なら切り離す。1 文字だけの token は数字そのもの
         if (suffixAllowed && body.length() >= 2) {
             widthSuffix = Character.toLowerCase(last);
             body = body.substring(0, body.length() - 1);
@@ -535,6 +539,7 @@ final class SnbtParser {
     }
 
     private static boolean isBinaryBody(String body) {
+        // 0b / 0B で始まり、続きがある場合だけ 2 進リテラルとみなす
         if (!(body.length() > 2 && body.charAt(0) == '0'
                 && (body.charAt(1) == 'b' || body.charAt(1) == 'B'))) {
             return false;

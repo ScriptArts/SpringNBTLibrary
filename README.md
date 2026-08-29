@@ -1,7 +1,7 @@
 # SpringNBTLibrary
 
 [![CI](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/ci.yml/badge.svg)](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/ci.yml)
-[![docs-sync](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/docs-sync.yml/badge.svg)](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/docs-sync.yml)
+[![lint](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/lint.yml/badge.svg)](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Minecraft **Java版 26.2**（DataVersion `4903`）のワールドデータ・NBTファイルを読み書きするライブラリ。
@@ -91,6 +91,9 @@ source spec/tools/env.sh
 # ドキュメントと実装の一致検証
 python3 spec/tools/check_docs_sync.py
 python3 spec/tools/check_links.py
+
+# コメントと禁止記法の規約適合
+python3 spec/tools/check_comments.py
 ```
 
 ## ライセンス

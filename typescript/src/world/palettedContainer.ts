@@ -75,6 +75,7 @@ export class PalettedContainer {
       throw SpringNbtError.malformed("palette が無いか空");
     }
 
+    // パレットの要素は生の NbtTag のまま持つ。並び順まで元どおりに書き戻すため
     for (const entry of paletteTag) {
       result.#palette.push(entry);
     }
@@ -115,6 +116,7 @@ export class PalettedContainer {
     const result = new NbtCompound();
     const paletteTag = new NbtList();
 
+    // パレットの要素は読んだときのまま書き出す
     for (const entry of this.#palette) {
       paletteTag.add(entry);
     }
@@ -181,6 +183,7 @@ export class PalettedContainer {
     const compacted: NbtTag[] = [];
     const remap = new Int32Array(this.#palette.length);
 
+    // 使われている要素だけを詰め直し、新しい添字を割り当てる
     for (let old = 0; old < this.#palette.length; old++) {
       if (!usedEntries[old]) {
         remap[old] = -1;

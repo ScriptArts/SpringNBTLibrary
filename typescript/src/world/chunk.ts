@@ -261,6 +261,7 @@ export class Chunk {
       throw new SpringNbtError(ErrorCode.UnsupportedDataVersion, message);
     }
 
+    // 警告として扱う設定で、通知先があるときだけ知らせる
     if (action === VersionMismatchAction.Warn && options !== undefined
         && options.onWarning !== undefined) {
       options.onWarning(message);
@@ -378,6 +379,7 @@ export class Chunk {
       for (let position = list.size - 1; position >= 0; position--) {
         const element = list.get(position);
 
+        // 座標を持つ要素のうち、指定の位置を指すものだけを取り除く
         if (element instanceof NbtCompound && matchesPosition(element, absoluteX, y, absoluteZ)) {
           list.removeAt(position);
         }
@@ -436,6 +438,7 @@ export class Chunk {
 
   /** 使われていないパレット要素を全セクションから取り除く。 */
   compact(): void {
+    // 全セクションのパレットをまとめて掃除する
     for (const section of this.#sections.values()) {
       section.compact();
     }

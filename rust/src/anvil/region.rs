@@ -379,6 +379,7 @@ impl RegionFile {
 
     /// ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す。
     fn write_header(&mut self) {
+        // 位置表とタイムスタンプ表を、添字順に組み立て直す
         for index in 0..CHUNK_COUNT {
             let entry = ((self.offsets[index] as u64) << 8) | (self.sector_counts[index] as u64);
             self.write_unsigned(index * 4, entry, 4);
@@ -628,6 +629,7 @@ impl RegionFile {
 
         // 先頭から連続した空き領域を探す
         for sector in HEADER_SECTORS..total_sectors {
+            // 使用中のセクタに当たったら、空きの連続はそこで途切れる
             if used[sector] {
                 run = 0;
                 continue;
@@ -664,7 +666,9 @@ impl RegionFile {
 
             let start = self.offsets[other];
 
+            // 他のチャンクが占めるセクタに印を付ける
             for sector in start..start + self.sector_counts[other] {
+                // ファイル長を超える位置は既に検証で弾いているが、念のため範囲を確かめる
                 if sector < total_sectors {
                     used[sector] = true;
                 }
@@ -694,6 +698,7 @@ impl RegionFile {
                 (self.region_z * 32) + local_z,
             )?;
 
+            // 存在するチャンクだけを集める
             if let Some(value) = raw {
                 collected.push((index, value));
             }
@@ -711,6 +716,7 @@ impl RegionFile {
             let payload: Vec<u8>;
             let scheme_byte: u8;
 
+            // 外部ファイルへ退避したチャンクは、本体を持たず印だけを書く
             if raw.external {
                 payload = Vec::new();
                 scheme_byte = raw.compression.id() | 0x80;
@@ -773,6 +779,7 @@ impl RegionFile {
             return Ok(());
         }
 
+        // 読み書きで開いていて変更があるなら、閉じる前に書き出す
         if self.dirty && self.mode == RegionFileMode::ReadWrite {
             self.flush()?;
         }

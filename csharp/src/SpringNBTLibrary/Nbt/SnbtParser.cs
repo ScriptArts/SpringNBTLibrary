@@ -96,6 +96,7 @@ internal sealed class SnbtParser
             SkipWhitespace();
             char next = Peek();
 
+            // カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
             if (next == ',')
             {
                 position += 1;
@@ -121,6 +122,7 @@ internal sealed class SnbtParser
         {
             char marker = text[position];
 
+            // [B; [I; [L; は型付き配列の印。ただの List と見分ける
             if (marker == 'B' || marker == 'I' || marker == 'L')
             {
                 position += 2;
@@ -169,6 +171,7 @@ internal sealed class SnbtParser
             SkipWhitespace();
             char next = Peek();
 
+            // カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
             if (next == ',')
             {
                 position += 1;
@@ -197,6 +200,7 @@ internal sealed class SnbtParser
         }
         else
         {
+            // 閉じ括弧が来るまで要素を読み続ける
             while (true)
             {
                 SkipWhitespace();
@@ -214,6 +218,7 @@ internal sealed class SnbtParser
                 SkipWhitespace();
                 char next = Peek();
 
+                // カンマがあれば次の要素へ進む。無ければ閉じ括弧のはず
                 if (next == ',')
                 {
                     position += 1;
@@ -230,6 +235,7 @@ internal sealed class SnbtParser
             }
         }
 
+        // [B; は TAG_Byte_Array
         if (marker == 'B')
         {
             sbyte[] result = new sbyte[values.Count];
@@ -248,6 +254,7 @@ internal sealed class SnbtParser
             return new NbtByteArray(result);
         }
 
+        // [I; は TAG_Int_Array。残りは TAG_Long_Array
         if (marker == 'I')
         {
             int[] result = new int[values.Count];
@@ -322,12 +329,14 @@ internal sealed class SnbtParser
 
             char c = text[position];
 
+            // 開いたときと同じ引用符に出会ったら文字列の終わり
             if (c == quote)
             {
                 position += 1;
                 return builder.ToString();
             }
 
+            // 逆スラッシュの次はエスケープとして読む
             if (c == '\\')
             {
                 position += 1;
@@ -534,6 +543,7 @@ internal sealed class SnbtParser
         byte[] bytes = guid.ToByteArray(bigEndian: true);
         int[] result = new int[4];
 
+        // UUID の 16 バイトを、4 バイトずつ 4 つの i32 へ詰める
         for (int i = 0; i < 4; i++)
         {
             result[i] = (bytes[i * 4] << 24)
@@ -553,6 +563,7 @@ internal sealed class SnbtParser
         bool negative = false;
         int start = 0;
 
+        // 先頭の符号を取り除き、数字の並びだけを残す
         if (token[0] == '+' || token[0] == '-')
         {
             negative = token[0] == '-';
@@ -577,6 +588,7 @@ internal sealed class SnbtParser
         char last = body[body.Length - 1];
         bool suffixAllowed;
 
+        // 16 進では b/d/f が数字なので、型の印として使えるのは s と l だけ
         if (isHex)
         {
             suffixAllowed = last == 's' || last == 'S' || last == 'l' || last == 'L';
@@ -586,6 +598,7 @@ internal sealed class SnbtParser
             suffixAllowed = "bBsSlLfFdD".IndexOf(last) >= 0;
         }
 
+        // 末尾 1 文字が型の印なら切り離す。1 文字だけの token は数字そのもの
         if (suffixAllowed && body.Length >= 2)
         {
             widthSuffix = char.ToLowerInvariant(last);
@@ -596,6 +609,7 @@ internal sealed class SnbtParser
             {
                 char signChar = body[body.Length - 1];
 
+                // u / U は符号なしの印。1.21.5 以降の拡張構文
                 if (signChar == 'u' || signChar == 'U')
                 {
                     unsignedSuffix = true;
@@ -643,6 +657,7 @@ internal sealed class SnbtParser
 
         bool looksFloating = body.IndexOf('.') >= 0 || body.IndexOf('e') >= 0 || body.IndexOf('E') >= 0;
 
+        // 小数点・指数・f/d の印があれば浮動小数点として読む
         if (looksFloating || widthSuffix == 'f' || widthSuffix == 'd')
         {
             if (!double.TryParse(body, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
@@ -679,6 +694,7 @@ internal sealed class SnbtParser
     {
         double signed;
 
+        // 符号を戻してから型ごとの範囲に収める
         if (negative)
         {
             signed = -value;

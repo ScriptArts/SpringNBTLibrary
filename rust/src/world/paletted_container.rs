@@ -134,12 +134,14 @@ impl PalettedContainer {
         let mut result = NbtCompound::new();
         let mut palette_tag = NbtList::new();
 
+        // パレットの要素は読んだときのまま書き出す
         for entry in &self.palette {
             palette_tag.push(entry.clone())?;
         }
 
         // パレットが 1 要素なら data は書かない。Minecraft と同じ振る舞い
         if let Some(storage) = &self.storage {
+            // パレットが 1 要素なら data は書かない
             if self.palette.len() > 1 {
                 result.set("data", NbtTag::LongArray(storage.as_longs().to_vec()));
             }
@@ -204,6 +206,7 @@ impl PalettedContainer {
         let mut compacted: Vec<NbtTag> = Vec::new();
         let mut remap = vec![0usize; self.palette.len()];
 
+        // 使われている要素だけを詰め直し、新しい添字を割り当てる
         for old in 0..self.palette.len() {
             if !used_entries[old] {
                 continue;

@@ -287,6 +287,26 @@ def has_explanation(lines, index: int, language: str) -> bool:
     return has_comment_inside(lines, index, language)
 
 
+def is_nested_loop(lines, index: int, language: str) -> bool:
+    """直前の行もループの開始か。
+
+    多重ループは 1 つの処理単位なので、いちばん外側に目的が書いてあれば足りる。
+    内側にも同じ説明を重ねると、かえって読みにくくなる。
+    """
+    position = index - 1
+
+    while position >= 0:
+        stripped = lines[position].strip()
+
+        if len(stripped) == 0:
+            position -= 1
+            continue
+
+        return LOOP[language].match(lines[position]) is not None
+
+    return False
+
+
 def is_guard(lines, index: int, language: str) -> bool:
     """引数検証などのガード節か。本体が 1 文で、抜けるだけのもの。"""
     # 同じ行に本体がある場合（`if (x) return;`）
@@ -418,8 +438,12 @@ def check_language(language: str):
 
                 continue
 
-            # 4. 条件分岐のコメント（ガード節は除く）
+            # 4. 条件分岐のコメント（ガード節と定型句は除く）
             if BRANCH[language].match(line):
+                # スクリプトの入口を示す定型句。説明することがない
+                if stripped.startswith("if __name__ =="):
+                    continue
+
                 if not is_guard(lines, index, language) and not has_explanation(lines, index, language):
                     findings.append(Finding(language, relative, number, "if にコメントが無い", line))
 
@@ -427,6 +451,10 @@ def check_language(language: str):
 
             # 5. ループのコメント
             if LOOP[language].match(line):
+                # 多重ループの内側は、外側に付けた説明が 効いている
+                if is_nested_loop(lines, index, language):
+                    continue
+
                 if not has_explanation(lines, index, language):
                     findings.append(Finding(language, relative, number, "ループにコメントが無い", line))
 

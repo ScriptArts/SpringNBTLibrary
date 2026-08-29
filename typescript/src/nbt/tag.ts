@@ -341,6 +341,7 @@ export class NbtList {
 
     // 与えられた要素は 1 つずつ型検査しながら追加する
     if (elements !== undefined) {
+      // add を通すことで、要素型の検査も一緒にかかる
       for (const element of elements) {
         this.add(element);
       }

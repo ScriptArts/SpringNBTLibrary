@@ -513,6 +513,7 @@ class Writer {
     const result = new Uint8Array(total);
     let offset = 0;
 
+    // 溜めた断片を 1 つの配列へ連結する
     for (const chunk of this.#chunks) {
       result.set(chunk, offset);
       offset += chunk.length;

@@ -107,6 +107,7 @@ public final class PalettedContainer {
             throw SpringNbtException.malformed("palette が無いか空");
         }
 
+        // パレットの要素は生の NbtTag のまま持つ。並び順まで元どおりに書き戻すため
         for (NbtTag entry : paletteTag) {
             result.palette.add(entry);
         }
@@ -149,6 +150,7 @@ public final class PalettedContainer {
         NbtCompound result = new NbtCompound();
         NbtList paletteTag = new NbtList();
 
+        // パレットの要素は読んだときのまま書き出す
         for (NbtTag entry : palette) {
             paletteTag.add(entry);
         }
@@ -232,6 +234,7 @@ public final class PalettedContainer {
         List<NbtTag> compacted = new ArrayList<>();
         int[] remap = new int[palette.size()];
 
+        // 使われている要素だけを詰め直し、新しい添字を割り当てる
         for (int old = 0; old < palette.size(); old++) {
             if (!usedEntries[old]) {
                 remap[old] = -1;

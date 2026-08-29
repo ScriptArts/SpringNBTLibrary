@@ -138,6 +138,7 @@ class ChunkSection:
 
         biomes = nbt.opt_compound("biomes")
 
+        # 光源だけを持つセクションにはバイオームが無い
         if biomes is not None:
             section.biomes = PalettedContainer.from_nbt(
                 biomes, BIOMES_PER_SECTION, 1, options.lenient_bit_storage)
@@ -149,6 +150,7 @@ class ChunkSection:
         if self.block_states is not None:
             self.raw.set("block_states", self.block_states.to_nbt())
 
+        # 解釈したコンテナだけを書き戻す。持たないキーは元のまま残す
         if self.biomes is not None:
             self.raw.set("biomes", self.biomes.to_nbt())
 
@@ -159,6 +161,7 @@ class ChunkSection:
         if self.block_states is not None:
             self.block_states.compact()
 
+        # 持っているコンテナだけを掃除する
         if self.biomes is not None:
             self.biomes.compact()
 
@@ -248,6 +251,7 @@ class Chunk:
         if options.on_version_mismatch == VersionMismatchAction.ERROR:
             raise SpringNbtError(ErrorCode.UNSUPPORTED_DATA_VERSION, message)
 
+        # 警告として扱う設定で、通知先があるときだけ知らせる
         if options.on_version_mismatch == VersionMismatchAction.WARN \
                 and options.on_warning is not None:
             options.on_warning(message)
@@ -363,6 +367,7 @@ class Chunk:
             for position in range(len(values) - 1, -1, -1):
                 entry = values[position]
 
+                # 座標を持つ要素のうち、指定の位置を指すものだけを取り除く
                 if isinstance(entry, NbtCompound) and _matches_position(
                         entry, absolute_x, y, absolute_z):
                     del values[position]

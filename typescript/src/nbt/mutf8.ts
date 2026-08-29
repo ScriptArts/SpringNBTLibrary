@@ -94,6 +94,7 @@ export function decode(data: Uint8Array, offset = 0, length = data.length - offs
   let result = "";
   const chunkSize = 8192;
 
+  // 一度に渡す引数が多すぎるとスタックが溢れるので、小分けにして繋ぐ
   for (let start = 0; start < units.length; start += chunkSize) {
     result += String.fromCharCode(...units.slice(start, start + chunkSize));
   }

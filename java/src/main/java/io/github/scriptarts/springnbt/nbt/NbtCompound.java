@@ -147,6 +147,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
         var left = entries.entrySet().iterator();
         var right = tag.entries.entrySet().iterator();
 
+        // キーと値を挿入順に突き合わせる。順序も等価性の一部
         while (left.hasNext()) {
             Map.Entry<String, NbtTag> a = left.next();
             Map.Entry<String, NbtTag> b = right.next();

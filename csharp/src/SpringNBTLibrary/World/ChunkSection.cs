@@ -57,6 +57,7 @@ public sealed class ChunkSection
 
         NbtCompound? biomes = nbt.OptCompound("biomes");
 
+        // 光源だけを持つセクションにはバイオームが無い
         if (biomes is not null)
         {
             section.Biomes = PalettedContainer.FromNbt(
@@ -69,11 +70,13 @@ public sealed class ChunkSection
     /// <summary>NBT へ書き戻す。解釈していないキーはそのまま残る。</summary>
     public NbtCompound ToNbt()
     {
+        // 解釈したコンテナだけを書き戻す。持たないキーは元のまま残す
         if (BlockStates is not null)
         {
             raw.Set("block_states", BlockStates.ToNbt());
         }
 
+        // 解釈したコンテナだけを書き戻す。持たないキーは元のまま残す
         if (Biomes is not null)
         {
             raw.Set("biomes", Biomes.ToNbt());
@@ -91,6 +94,7 @@ public sealed class ChunkSection
             BlockStates.Compact();
         }
 
+        // 持っているコンテナだけを掃除する
         if (Biomes is not null)
         {
             Biomes.Compact();

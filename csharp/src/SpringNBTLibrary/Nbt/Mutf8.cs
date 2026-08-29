@@ -126,6 +126,7 @@ public static class Mutf8
         // コード単位ごとに 1〜3 バイトへ展開する
         foreach (char unit in text)
         {
+            // U+0001..U+007F だけが 1 バイト。U+0000 は 2 バイトになる
             if (unit >= 0x0001 && unit <= 0x007F)
             {
                 buffer[position] = (byte)unit;
@@ -160,6 +161,7 @@ public static class Mutf8
         // 各コード単位が何バイトになるかを数える
         foreach (char unit in text)
         {
+            // U+0001..U+007F だけが 1 バイト。U+0000 は 2 バイトになる
             if (unit >= 0x0001 && unit <= 0x007F)
             {
                 length += 1;

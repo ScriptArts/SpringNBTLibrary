@@ -122,6 +122,7 @@ public final class RegionFile implements AutoCloseable {
 
         byte[] raw;
 
+        // 既にあるファイルは読み込み、無ければ空のヘッダだけを組み立てる
         if (Files.exists(path)) {
             try {
                 raw = Files.readAllBytes(path);
@@ -514,6 +515,7 @@ public final class RegionFile implements AutoCloseable {
                 continue;
             }
 
+            // 他のチャンクが占めるセクタに印を付ける
             for (int sector = offsets[other]; sector < offsets[other] + sectorCounts[other]; sector++) {
                 if (sector < totalSectors) {
                     used[sector] = true;
@@ -563,6 +565,7 @@ public final class RegionFile implements AutoCloseable {
             byte[] payload;
             int schemeByte;
 
+            // 外部ファイルへ退避したチャンクは、本体を持たず印だけを書く
             if (raw.external()) {
                 payload = new byte[0];
                 schemeByte = raw.compression().id() | 0x80;
@@ -620,6 +623,7 @@ public final class RegionFile implements AutoCloseable {
 
     /** ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す。 */
     private void writeHeader() {
+        // 位置表とタイムスタンプ表を、添字順に組み立て直す
         for (int index = 0; index < CHUNK_COUNT; index++) {
             long entry = ((long) offsets[index] << 8) | (long) sectorCounts[index];
             writeUnsigned(index * 4, entry, 4);

@@ -70,6 +70,7 @@ public sealed class MinecraftWorld : IDisposable
         ArgumentNullException.ThrowIfNull(directory);
 
         WorldOpenOptions effective;
+        // 省略されたら既定のオプションで開く
         if (options is null)
         {
             effective = WorldOpenOptions.Default;
@@ -154,6 +155,7 @@ public sealed class MinecraftWorld : IDisposable
         EnsureOpen();
         string root = Path.Combine(Directory, "dimensions");
 
+        // dimensions/ が無いワールドには次元が 1 つも無い
         if (!System.IO.Directory.Exists(root))
         {
             yield break;
@@ -166,6 +168,7 @@ public sealed class MinecraftWorld : IDisposable
         {
             string namespaceName = Path.GetFileName(namespaceDir);
 
+            // dimensions/<名前空間>/<パス>/ の 2 段目を次元の名前として拾う
             foreach (string pathDir in System.IO.Directory.EnumerateDirectories(namespaceDir))
             {
                 found.Add(namespaceName + ":" + Path.GetFileName(pathDir));
@@ -175,6 +178,7 @@ public sealed class MinecraftWorld : IDisposable
         // 走査順がファイルシステム依存にならないよう並べる
         found.Sort(StringComparer.Ordinal);
 
+        // 並べ替えたものを 1 件ずつ返す
         foreach (string id in found)
         {
             yield return id;
@@ -221,6 +225,7 @@ public sealed class MinecraftWorld : IDisposable
         EnsureOpen();
         string directory = Path.Combine(Directory, "players", "data");
 
+        // players/data/ が無ければプレイヤーは 1 人もいない
         if (!System.IO.Directory.Exists(directory))
         {
             yield break;
@@ -228,6 +233,7 @@ public sealed class MinecraftWorld : IDisposable
 
         List<string> found = new List<string>();
 
+        // <uuid>.dat の名前部分が UUID にあたる
         foreach (string path in System.IO.Directory.EnumerateFiles(directory, "*.dat"))
         {
             found.Add(Path.GetFileNameWithoutExtension(path));
@@ -235,6 +241,7 @@ public sealed class MinecraftWorld : IDisposable
 
         found.Sort(StringComparer.Ordinal);
 
+        // 並べ替えたものを 1 件ずつ返す
         foreach (string id in found)
         {
             yield return id;
@@ -281,6 +288,7 @@ public sealed class MinecraftWorld : IDisposable
         {
             NbtIo.WriteFile(temporary, Level.ToNamedTag());
 
+            // 既存の level.dat は、置き換える前に level.dat_old へ退避する
             if (File.Exists(path))
             {
                 File.Copy(path, backup, overwrite: true);
@@ -302,6 +310,7 @@ public sealed class MinecraftWorld : IDisposable
             return;
         }
 
+        // 開いている次元をすべて閉じる
         foreach (Dimension dimension in dimensions.Values)
         {
             dimension.Close();

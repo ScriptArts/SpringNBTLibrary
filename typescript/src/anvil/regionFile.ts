@@ -102,6 +102,7 @@ export class RegionFile {
 
     let raw: Uint8Array;
 
+    // 既にあるファイルは読み込み、無ければ空のヘッダだけを組み立てる
     if (existsSync(path)) {
       try {
         raw = new Uint8Array(readFileSync(path));
@@ -429,6 +430,7 @@ export class RegionFile {
 
       const from = this.#offsets[other];
 
+      // 他のチャンクが占めるセクタに印を付ける
       for (let sector = from; sector < from + this.#sectorCounts[other]; sector++) {
         if (sector < totalSectors) {
           used[sector] = true;
@@ -526,6 +528,7 @@ export class RegionFile {
 
   /** ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す。 */
   #writeHeader(): void {
+    // 位置表とタイムスタンプ表を、添字順に組み立て直す
     for (let index = 0; index < CHUNK_COUNT; index++) {
       this.#writeUnsigned(index * 4, this.#offsets[index] * 256 + this.#sectorCounts[index], 4);
       this.#writeUnsigned(SECTOR_SIZE + index * 4, this.#timestamps[index] >>> 0, 4);

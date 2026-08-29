@@ -30,6 +30,7 @@ def _to_utf16_units(text: str):
     for character in text:
         code = ord(character)
 
+        # BMP 外の文字は、UTF-16 のサロゲート対へ分解して持つ
         if code >= 0x10000:
             code -= 0x10000
             units.append(0xD800 + (code >> 10))
@@ -49,6 +50,7 @@ def _from_utf16_units(units) -> str:
     while index < len(units):
         unit = units[index]
 
+        # サロゲート対が揃っていれば 1 つのコードポイントへ戻す
         if 0xD800 <= unit <= 0xDBFF and index + 1 < len(units) and 0xDC00 <= units[index + 1] <= 0xDFFF:
             low = units[index + 1]
             code = 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00)
@@ -135,6 +137,7 @@ def encode(text: str) -> bytes:
 
     # コード単位ごとに 1〜3 バイトへ展開する
     for unit in _to_utf16_units(text):
+        # U+0001..U+007F だけが 1 バイト。U+0000 は 2 バイトになる
         if 0x0001 <= unit <= 0x007F:
             out.append(unit)
         elif unit == 0x0000 or unit <= 0x07FF:
@@ -155,6 +158,7 @@ def byte_length(text: str) -> int:
 
     # 各コード単位が何バイトになるかを数える
     for unit in _to_utf16_units(text):
+        # U+0001..U+007F だけが 1 バイト。U+0000 は 2 バイトになる
         if 0x0001 <= unit <= 0x007F:
             length += 1
         elif unit == 0x0000 or unit <= 0x07FF:

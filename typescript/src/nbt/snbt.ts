@@ -258,6 +258,7 @@ class Parser {
     if (this.#peek() === "]") {
       this.#position += 1;
     } else {
+      // 閉じ括弧が来るまで要素を読み続ける
       for (;;) {
         this.#skipWhitespace();
 

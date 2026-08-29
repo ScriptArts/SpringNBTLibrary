@@ -336,13 +336,16 @@ impl Dimension {
         let modified: Vec<(i32, i32)> = self.modified.iter().copied().collect();
         let write_options = self.chunk_write;
 
+        // 変更のあったチャンクだけを書き戻す
         for key in modified {
             let nbt = match self.chunk_cache.get(&key) {
                 Some(chunk) => Some(chunk.to_nbt(&write_options)?),
                 None => None,
             };
 
+            // 組み立てられたものだけを書き込む
             if let Some(nbt) = nbt {
+                // 地形のフォルダが無ければ書き込めない
                 if let Some(folder) = self.region_folder()? {
                     folder.write_chunk_nbt(key.0, key.1, &nbt)?;
                 }
@@ -351,6 +354,7 @@ impl Dimension {
 
         self.modified.clear();
 
+        // 開いているフォルダだけを書き出す
         for folder in [&mut self.regions, &mut self.entities, &mut self.poi]
             .into_iter()
             .flatten()
@@ -367,10 +371,12 @@ impl Dimension {
             return Ok(());
         }
 
+        // 書き込みモードなら、閉じる前に変更を反映する
         if self.writable {
             self.flush()?;
         }
 
+        // 開いているフォルダだけを閉じる
         for folder in [&mut self.regions, &mut self.entities, &mut self.poi]
             .into_iter()
             .flatten()
@@ -507,7 +513,9 @@ impl MinecraftWorld {
 
             let namespace_name = namespace.file_name().to_string_lossy().into_owned();
 
+            // 2 段目が次元のパス
             for entry in std::fs::read_dir(namespace.path())?.flatten() {
+                // ディレクトリだけを次元として数える
                 if entry.path().is_dir() {
                     found.push(format!(
                         "{namespace_name}:{}",
@@ -555,9 +563,11 @@ impl MinecraftWorld {
             return Ok(found);
         }
 
+        // <uuid>.dat の名前部分が UUID にあたる
         for entry in std::fs::read_dir(&path)?.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
 
+            // .dat で終わるファイルだけを対象にする
             if let Some(stripped) = name.strip_suffix(".dat") {
                 found.push(stripped.to_string());
             }
@@ -616,6 +626,7 @@ impl MinecraftWorld {
             return Ok(());
         }
 
+        // 開いている次元をすべて閉じる
         for dimension in self.dimensions.values_mut() {
             dimension.close()?;
         }

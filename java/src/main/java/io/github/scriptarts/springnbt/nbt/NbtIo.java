@@ -197,6 +197,7 @@ public final class NbtIo {
     /** 指定された方式で展開する。 */
     private static byte[] decompress(byte[] bytes, NbtReadOptions options) {
         Compression method;
+        // AUTO なら先頭バイトから圧縮方式を見分ける
         if (options.compression() == Compression.AUTO) {
             method = detectCompression(bytes);
         } else {

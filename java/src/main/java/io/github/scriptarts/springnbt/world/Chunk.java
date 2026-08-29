@@ -169,6 +169,7 @@ public final class Chunk {
             throw new SpringNbtException(ErrorCode.UNSUPPORTED_DATA_VERSION, message);
         }
 
+        // 警告として扱う設定で、通知先があるときだけ知らせる
         if (options.onVersionMismatch() == VersionMismatchAction.WARN
                 && options.onWarning() != null) {
             options.onWarning().accept(message);
@@ -308,6 +309,7 @@ public final class Chunk {
             for (int position = list.size() - 1; position >= 0; position--) {
                 NbtTag element = list.get(position);
 
+                // 座標を持つ要素のうち、指定の位置を指すものだけを取り除く
                 if (element instanceof NbtCompound entry
                         && matchesPosition(entry, absoluteX, y, absoluteZ)) {
                     list.removeAt(position);
@@ -398,6 +400,7 @@ public final class Chunk {
     public void compact() {
         Collection<ChunkSection> values = sections.values();
 
+        // 全セクションのパレットをまとめて掃除する
         for (ChunkSection section : values) {
             section.compact();
         }

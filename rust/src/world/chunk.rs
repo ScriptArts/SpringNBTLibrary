@@ -166,6 +166,7 @@ impl ChunkSection {
             )?);
         }
 
+        // 光源だけを持つセクションにはバイオームが無い
         if let Some(biomes) = nbt.opt_compound("biomes")? {
             section.biomes = Some(PalettedContainer::from_nbt(
                 biomes,
@@ -182,10 +183,12 @@ impl ChunkSection {
     pub fn to_nbt(&self) -> Result<NbtCompound> {
         let mut result = self.raw.clone();
 
+        // 解釈したコンテナだけを書き戻す。持たないキーは元のまま残す
         if let Some(block_states) = &self.block_states {
             result.set("block_states", NbtTag::Compound(block_states.to_nbt()?));
         }
 
+        // 解釈したコンテナだけを書き戻す。持たないキーは元のまま残す
         if let Some(biomes) = &self.biomes {
             result.set("biomes", NbtTag::Compound(biomes.to_nbt()?));
         }
@@ -195,10 +198,12 @@ impl ChunkSection {
 
     /// 使われていないパレット要素を取り除く。
     pub fn compact(&mut self) -> Result<()> {
+        // 持っているコンテナだけを掃除する
         if let Some(block_states) = &mut self.block_states {
             block_states.compact()?;
         }
 
+        // 持っているコンテナだけを掃除する
         if let Some(biomes) = &mut self.biomes {
             biomes.compact()?;
         }
@@ -305,7 +310,9 @@ impl Chunk {
             return Err(Error::new(ErrorCode::UnsupportedDataVersion, message));
         }
 
+        // 警告として扱う設定のときだけ知らせる
         if options.on_version_mismatch == VersionMismatchAction::Warn {
+            // 通知先が設定されているときだけ呼ぶ
             if let Some(callback) = &options.on_warning {
                 callback(&message);
             }
@@ -431,6 +438,7 @@ impl Chunk {
                     // 全要素を消しても要素型が変わらないよう、元の型で作り直す
                     let mut kept = NbtList::with_element_type(list.element_type());
 
+                    // 座標を持つ要素のうち、指定の位置を指すものだけを取り除く
                     for entry in list.iter() {
                         let keep = match entry {
                             NbtTag::Compound(compound) => {
@@ -440,6 +448,7 @@ impl Chunk {
                             _ => true,
                         };
 
+                        // 残す要素だけを新しいリストへ積む
                         if keep {
                             kept.push(entry.clone())?;
                         }
@@ -455,6 +464,7 @@ impl Chunk {
                 _ => None,
             };
 
+            // 減ったときだけ書き戻す
             if let Some(kept) = filtered {
                 self.raw.set(key, NbtTag::List(kept));
             }
@@ -529,6 +539,7 @@ impl Chunk {
 
     /// 使われていないパレット要素を全セクションから取り除く。
     pub fn compact(&mut self) -> Result<()> {
+        // 全セクションのパレットをまとめて掃除する
         for section in self.sections.values_mut() {
             section.compact()?;
         }

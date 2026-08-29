@@ -313,6 +313,7 @@ public final class RegionFolder implements AutoCloseable {
     public void flush() {
         ensureOpen();
 
+        // 開いているリージョンをすべて書き出す
         for (RegionFile file : cache.values()) {
             file.flush();
         }
@@ -325,6 +326,7 @@ public final class RegionFolder implements AutoCloseable {
             return;
         }
 
+        // 開いているリージョンをすべて閉じる
         for (RegionFile file : cache.values()) {
             file.close();
         }

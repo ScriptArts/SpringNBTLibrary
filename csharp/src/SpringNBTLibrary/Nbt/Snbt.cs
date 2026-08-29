@@ -111,6 +111,7 @@ public static class Snbt
 
     private static void WriteCompound(StringBuilder builder, NbtCompound compound, int depth)
     {
+        // 空の compound は改行もインデントも入れず {} と書く
         if (compound.Count == 0)
         {
             builder.Append("{}");
@@ -123,6 +124,7 @@ public static class Snbt
         // 挿入順のまま「キー: 値」を並べる
         foreach (KeyValuePair<string, NbtTag> entry in compound)
         {
+            // 2 つ目以降の前に区切りのカンマを置く
             if (!first)
             {
                 builder.Append(',');
@@ -148,6 +150,7 @@ public static class Snbt
 
     private static void WriteList(StringBuilder builder, NbtList list, int depth)
     {
+        // 空のリストは改行もインデントも入れず [] と書く
         if (list.Count == 0)
         {
             builder.Append("[]");
@@ -160,6 +163,7 @@ public static class Snbt
         // 要素型は共通なので値だけを並べる
         foreach (NbtTag item in list)
         {
+            // 2 つ目以降の前に区切りのカンマを置く
             if (!first)
             {
                 builder.Append(',');
@@ -181,6 +185,7 @@ public static class Snbt
         // 型付き配列は 1 行に収める。要素には接尾辞を付ける
         for (int i = 0; i < array.Value.Length; i++)
         {
+            // 2 つ目以降の前に区切りのカンマを置く
             if (i > 0)
             {
                 builder.Append(',');
@@ -199,6 +204,7 @@ public static class Snbt
         // IntArray の要素は接尾辞なし
         for (int i = 0; i < array.Value.Length; i++)
         {
+            // 2 つ目以降の前に区切りのカンマを置く
             if (i > 0)
             {
                 builder.Append(',');
@@ -217,6 +223,7 @@ public static class Snbt
         // LongArray の要素には L 接尾辞を付ける
         for (int i = 0; i < array.Value.Length; i++)
         {
+            // 2 つ目以降の前に区切りのカンマを置く
             if (i > 0)
             {
                 builder.Append(',');

@@ -294,10 +294,13 @@ def _require_utf8_representable(text: str, role: str) -> str:
     """
     # 対にならないサロゲートが含まれていないか調べる
     index = 0
+    # コード単位を 1 つずつ見て、サロゲート対をまとめる
     while index < len(text):
         code = ord(text[index])
 
+        # 上位サロゲートは、対になる下位サロゲートとまとめて 1 文字を成す
         if 0xD800 <= code <= 0xDBFF:
+            # 対が揃っていれば 2 コード単位を消費する。揃わなければ孤立サロゲート
             if index + 1 < len(text) and 0xDC00 <= ord(text[index + 1]) <= 0xDFFF:
                 index += 2
                 continue
@@ -364,6 +367,7 @@ class _Writer:
         return bytes(self._buffer)
 
     def _write_payload(self, tag: NbtTag) -> None:
+        # タグの型ごとに、決まったバイト表現で書き出す
         if isinstance(tag, NbtByte):
             self._buffer += struct.pack(">b", tag.value)
         elif isinstance(tag, NbtShort):
@@ -461,11 +465,13 @@ def detect_compression(data: bytes) -> Compression:
 
 
 def _decompress(data: bytes, options: NbtReadOptions) -> bytes:
+    # AUTO なら先頭バイトから圧縮方式を見分ける
     if options.compression == Compression.AUTO:
         method = detect_compression(data)
     else:
         method = options.compression
 
+    # 方式ごとに圧縮する
     if method == Compression.NONE:
         plain = data
     elif method == Compression.GZIP:

@@ -82,6 +82,7 @@ def _json_string(text: str) -> str:
 
     # コードポイントごとに、必要なら UTF-16 コード単位へ分解して書く
     for character in text:
+        # 決まった置き換えがある文字は、そのまま使う
         if character in _JSON_ESCAPES:
             parts.append(_JSON_ESCAPES[character])
             continue
@@ -122,6 +123,7 @@ def _json_tag(tag: NbtTag) -> str:
 
     import struct
 
+    # 型ごとに、正規化 JSON での表し方を変える
     if isinstance(tag, (NbtByte, NbtShort, NbtInt)):
         parts.append("%d" % tag.value)
     elif isinstance(tag, NbtLong):
@@ -147,6 +149,7 @@ def _json_tag(tag: NbtTag) -> str:
     elif isinstance(tag, NbtCompound):
         # JSON オブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
         entries = []
+        # compound はキーと値の組の配列として写す。挿入順を保つため
         for key, value in tag.items():
             entries.append("[" + _json_string(key) + "," + _json_tag(value) + "]")
         parts.append("[" + ",".join(entries) + "]")
@@ -183,6 +186,7 @@ def region_list(region: RegionFile) -> str:
     lines = ["region %d %d" % (region.region_x, region.region_z)]
     total = 0
 
+    # 存在するチャンクを順に読み、要約を組み立てる
     for position in region.chunk_positions():
         raw = region.read_chunk_raw(position.x, position.z)
 
@@ -193,6 +197,7 @@ def region_list(region: RegionFile) -> str:
         key_count = 0
         plain_length = 0
 
+        # 読めたチャンクだけを数える
         if chunk is not None:
             key_count = len(chunk)
             plain_length = len(write_bytes(
@@ -218,6 +223,7 @@ def region_rewrite(source: RegionFile, output_path: str) -> None:
         os.remove(output_path)
 
     with RegionFile.open(output_path, RegionFileMode.READ_WRITE) as destination:
+        # 読み込んだチャンクを、そのまま出力側へ詰め直す
         for position in source.chunk_positions():
             chunk = source.read_chunk(position.x, position.z)
 
@@ -249,6 +255,7 @@ def chunk_describe(chunk: Chunk) -> str:
     blocks = {}
     biomes = {}
 
+    # セクションごとにブロックとバイオームを数え上げる
     for section_y in chunk.section_ys:
         section = chunk.section(section_y)
         block_palette = 0
@@ -256,10 +263,12 @@ def chunk_describe(chunk: Chunk) -> str:
         block_bits = 0
         biome_bits = 0
 
+        # ブロックを持つセクションだけ、パレットの形を記録する
         if section.has_block_states:
             block_palette = len(section.block_states.palette)
             block_bits = section.block_states.bits_per_entry
 
+        # バイオームを持つセクションだけ、パレットの形を記録する
         if section.has_biomes:
             biome_palette = len(section.biomes.palette)
             biome_bits = section.biomes.bits_per_entry
@@ -294,6 +303,7 @@ def chunk_describe(chunk: Chunk) -> str:
     for key in sorted(blocks):
         lines.append("block %s %d" % (key, blocks[key]))
 
+    # 名前の昇順で出すので、内部の並びに関係なく同じ出力になる
     for key in sorted(biomes):
         lines.append("biome %s %d" % (key, biomes[key]))
 
@@ -363,25 +373,30 @@ def _write_text_file(path: str, content: str) -> None:
 
 
 def main(argv=None) -> int:
+    # 省略されたらコマンドライン引数を使う
     if argv is None:
         argv = sys.argv[1:]
 
+    # 引数が無ければ使い方を出して終わる
     if len(argv) == 0:
         sys.stderr.write(USAGE + "\n")
         return 2
 
     command = argv[0]
 
+    # version は入力ファイルを取らない
     if command == "version":
         sys.stdout.write(
             "python spring-nbt-library 0.1.0 target_data_version=%d\n" % TARGET_DATA_VERSION)
         return 0
 
+    # 知らないコマンドなら使い方を出して終わる
     if command not in ("decode", "encode", "snbt", "region-list", "region-rewrite",
                        "chunk-report", "chunk-edit"):
         sys.stderr.write(USAGE + "\n")
         return 2
 
+    # ここから先は入力と出力のパスが要る
     if len(argv) < 3:
         sys.stderr.write(USAGE + "\n")
         return 2
@@ -389,10 +404,12 @@ def main(argv=None) -> int:
     fmt = _parse_format(argv)
 
     try:
+        # チャンクの要約を書き出す
         if command == "chunk-report":
             _write_text_file(argv[2], chunk_describe(read_chunk_file(argv[1])))
             return 0
 
+        # 決まった手順で編集したチャンクを書き出す
         if command == "chunk-edit":
             chunk = read_chunk_file(argv[1])
             chunk_edit(chunk)
@@ -403,8 +420,10 @@ def main(argv=None) -> int:
 
             return 0
 
+        # リージョン系は NBT の読み込みを経由しない
         if command in ("region-list", "region-rewrite"):
             with RegionFile.open(argv[1], RegionFileMode.READ_ONLY) as region:
+                # チャンク一覧を書き出す
                 if command == "region-list":
                     _write_text_file(argv[2], region_list(region))
                 else:
@@ -414,6 +433,7 @@ def main(argv=None) -> int:
 
         named = read_file(argv[1], NbtReadOptions(fmt=fmt))
 
+        # 正規化 JSON を書き出す
         if command == "decode":
             _write_text_file(argv[2], normalized_json(named, fmt))
         elif command == "encode":

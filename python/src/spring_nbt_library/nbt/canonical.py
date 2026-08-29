@@ -27,6 +27,7 @@ def _special(value: float):
     if math.isnan(value):
         return "NaN"
 
+    # 無限大は符号で分ける
     if math.isinf(value):
         if value > 0:
             return "Infinity"
@@ -81,6 +82,7 @@ def _format(exponential: str) -> str:
     negative = False
     index = 0
 
+    # 先頭の符号を取り除き、数字の並びだけを読めるようにする
     if exponential[0] in "+-":
         negative = exponential[0] == "-"
         index = 1
@@ -91,6 +93,7 @@ def _format(exponential: str) -> str:
     while index < len(exponential) and exponential[index] not in "eE":
         character = exponential[index]
 
+        # 小数点は落とし、数字だけを集める
         if character.isdigit():
             digits_chars.append(character)
 
@@ -137,11 +140,13 @@ def _compose(negative: bool, digits: str, exponent: int) -> str:
         # 整数部は先頭 (exponent + 1) 桁。足りなければゼロで右詰めする
         integer_digits = exponent + 1
 
+        # 整数部が数字の並びに収まるなら、そのまま切り出す
         if len(digits) >= integer_digits:
             integer_part = digits[:integer_digits]
         else:
             integer_part = digits + ("0" * (integer_digits - len(digits)))
 
+        # 整数部で使い切らなかった数字が小数部になる
         if len(digits) > integer_digits:
             fraction = digits[integer_digits:]
         else:

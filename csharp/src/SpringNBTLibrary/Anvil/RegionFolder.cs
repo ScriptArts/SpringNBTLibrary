@@ -97,6 +97,7 @@ public sealed class RegionFolder : IDisposable
     {
         EnsureOpen();
 
+        // フォルダがまだ無いなら、リージョンは 1 つも無い
         if (!System.IO.Directory.Exists(Directory))
         {
             yield break;
@@ -109,6 +110,7 @@ public sealed class RegionFolder : IDisposable
         {
             RegionPos? position = RegionPos.FromFileName(Path.GetFileName(path));
 
+            // r.X.Z.mca として解釈できるファイルだけを拾う
             if (position is not null)
             {
                 found.Add(position.Value);
@@ -128,6 +130,7 @@ public sealed class RegionFolder : IDisposable
             return left.X.CompareTo(right.X);
         });
 
+        // 座標順に並べたものを、1 件ずつ返す
         foreach (RegionPos position in found)
         {
             yield return position;
@@ -142,6 +145,7 @@ public sealed class RegionFolder : IDisposable
         EnsureOpen();
         RegionPos position = new RegionPos(regionX, regionZ);
 
+        // 既に開いているものは、使った印を付けて使い回す
         if (cache.TryGetValue(position, out RegionFile? cached))
         {
             Touch(position);
@@ -168,6 +172,7 @@ public sealed class RegionFolder : IDisposable
     /// <summary>使ったリージョンを、最近使った列の末尾へ移す。</summary>
     private void Touch(RegionPos position)
     {
+        // 既に列にあるなら、いったん外してから末尾へ積み直す
         if (recentlyUsedNodes.TryGetValue(position, out LinkedListNode<RegionPos>? node))
         {
             recentlyUsed.Remove(node);
@@ -267,6 +272,7 @@ public sealed class RegionFolder : IDisposable
                 continue;
             }
 
+            // リージョンごとに、その中のチャンク座標を順に返す
             foreach (ChunkPos chunk in file.ChunkPositions())
             {
                 yield return chunk;
@@ -279,6 +285,7 @@ public sealed class RegionFolder : IDisposable
     {
         EnsureOpen();
 
+        // 開いているリージョンをすべて書き出す
         foreach (RegionFile file in cache.Values)
         {
             file.Flush();
@@ -293,6 +300,7 @@ public sealed class RegionFolder : IDisposable
             return;
         }
 
+        // 開いているリージョンをすべて閉じる
         foreach (RegionFile file in cache.Values)
         {
             file.Close();

@@ -222,6 +222,7 @@ class RegionFile:
         self._path = path
         self._directory = os.path.dirname(path)
 
+        # パスが階層を含まない場合、.mcc の置き場としてカレントディレクトリを使う
         if self._directory == "":
             self._directory = "."
 
@@ -251,6 +252,7 @@ class RegionFile:
             raise SpringNbtError.invalid_argument(
                 "リージョンファイル名として解釈できない: %s" % os.path.basename(path))
 
+        # 既にあるファイルは読み込み、無ければ空のヘッダだけを組み立てる
         if os.path.exists(path):
             try:
                 with open(path, "rb") as handle:
@@ -518,6 +520,7 @@ class RegionFile:
 
         # 先頭から連続した空き領域を探す
         for sector in range(_HEADER_SECTORS, total_sectors):
+            # 使用中のセクタに当たったら、空きの連続はそこで途切れる
             if used[sector]:
                 run = 0
                 continue
@@ -548,7 +551,9 @@ class RegionFile:
 
             start = self._offsets[other]
 
+            # 他のチャンクが占めるセクタに印を付ける
             for sector in range(start, start + self._sector_counts[other]):
+                # ファイル長を超える位置は既に検証で弾いているが、念のため範囲を確かめる
                 if sector < total_sectors:
                     used[sector] = True
 
@@ -571,6 +576,7 @@ class RegionFile:
             raw = self.read_chunk_raw((self.region_x * 32) + local_x,
                                       (self.region_z * 32) + local_z)
 
+            # 存在するチャンクだけを集める
             if raw is not None:
                 collected.append((index, raw))
 
@@ -583,6 +589,7 @@ class RegionFile:
 
         # 添字の昇順に、先頭から詰めて配置する
         for index, raw in collected:
+            # 外部ファイルへ退避したチャンクは、本体を持たず印だけを書く
             if raw.external:
                 payload = b""
                 scheme_byte = raw.compression.id() | 0x80
@@ -641,6 +648,7 @@ class RegionFile:
         if self._closed:
             return
 
+        # 読み書きで開いていて変更があるなら、閉じる前に書き出す
         if self._dirty and self._mode == RegionFileMode.READ_WRITE:
             self.flush()
 
@@ -692,6 +700,7 @@ def _decompress_chunk(raw: RawChunk) -> bytes:
     if raw.compression == ChunkCompression.NONE:
         return raw.data
 
+    # GZip なら展開して返す
     if raw.compression == ChunkCompression.GZIP:
         try:
             return gzip.decompress(raw.data)
@@ -699,6 +708,7 @@ def _decompress_chunk(raw: RawChunk) -> bytes:
             raise SpringNbtError(
                 ErrorCode.MALFORMED_DATA, "チャンクの圧縮データを展開できない") from error
 
+    # Zlib なら展開して返す
     if raw.compression == ChunkCompression.ZLIB:
         try:
             return zlib.decompress(raw.data)

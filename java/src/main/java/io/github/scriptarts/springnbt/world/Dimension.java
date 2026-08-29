@@ -305,6 +305,7 @@ public final class Dimension implements AutoCloseable {
             return;
         }
 
+        // 書き込みモードなら、閉じる前に変更を反映する
         if (options.writable()) {
             flush();
         }
@@ -341,6 +342,7 @@ public final class Dimension implements AutoCloseable {
         }
 
         RegionFileMode mode;
+        // ワールドを開いたモードに合わせる
         if (options.writable()) {
             mode = RegionFileMode.READ_WRITE;
         } else {

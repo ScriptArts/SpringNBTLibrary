@@ -94,6 +94,7 @@ public final class Snbt {
     }
 
     private static void writeCompound(StringBuilder builder, NbtCompound compound, int depth) {
+        // 空の compound は改行もインデントも入れず {} と書く
         if (compound.size() == 0) {
             builder.append("{}");
             return;
@@ -126,6 +127,7 @@ public final class Snbt {
     }
 
     private static void writeList(StringBuilder builder, NbtList list, int depth) {
+        // 空のリストは改行もインデントも入れず [] と書く
         if (list.size() == 0) {
             builder.append("[]");
             return;

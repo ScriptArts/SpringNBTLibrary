@@ -236,6 +236,7 @@ export class RegionFolder {
   flush(): void {
     this.#ensureOpen();
 
+    // 開いているリージョンをすべて書き出す
     for (const file of this.#cache.values()) {
       file.flush();
     }
@@ -247,6 +248,7 @@ export class RegionFolder {
       return;
     }
 
+    // 開いているリージョンをすべて閉じる
     for (const file of this.#cache.values()) {
       file.close();
     }

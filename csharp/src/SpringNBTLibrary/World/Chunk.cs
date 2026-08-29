@@ -120,6 +120,7 @@ public sealed class Chunk
         ArgumentNullException.ThrowIfNull(nbt);
 
         ChunkReadOptions effective;
+        // 省略されたら既定のオプションで読む
         if (options is null)
         {
             effective = ChunkReadOptions.Default;
@@ -194,6 +195,7 @@ public sealed class Chunk
     public NbtCompound ToNbt(ChunkWriteOptions? options = null)
     {
         ChunkWriteOptions effective;
+        // 省略されたら既定のオプションで書く
         if (options is null)
         {
             effective = ChunkWriteOptions.Default;
@@ -205,6 +207,7 @@ public sealed class Chunk
 
         int version = DataVersion;
 
+        // 対象バージョン以外のチャンクは、明示的に許可されない限り書き戻さない
         if (version != SpringNbt.TargetDataVersion && !effective.AllowForeignDataVersion)
         {
             string message = string.Create(
@@ -296,6 +299,7 @@ public sealed class Chunk
         int sectionY = y >> 4;
         ChunkSection? section = Section(sectionY);
 
+        // 本ライブラリはセクションを新規生成しないので、無ければ書き込めない
         if (section is null || !section.HasBlockStates)
         {
             string message = string.Create(
@@ -343,6 +347,7 @@ public sealed class Chunk
             // 後ろから削ると、削除しても残りの添字がずれない
             for (int position = list.Count - 1; position >= 0; position--)
             {
+                // 座標を持つ要素のうち、指定の位置を指すものだけを取り除く
                 if (list[position] is NbtCompound entry
                     && MatchesPosition(entry, absoluteX, y, absoluteZ))
                 {
@@ -435,6 +440,7 @@ public sealed class Chunk
     /// <summary>使われていないパレット要素を全セクションから取り除く。</summary>
     public void Compact()
     {
+        // 全セクションのパレットをまとめて掃除する
         foreach (ChunkSection section in sections.Values)
         {
             section.Compact();

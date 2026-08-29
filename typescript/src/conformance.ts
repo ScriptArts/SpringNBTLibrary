@@ -75,6 +75,7 @@ const JSON_ESCAPES = new Map<number, string>([
 function jsonString(text: string): string {
   let result = '"';
 
+  // コード単位ごとに、JSON として安全な形へ直す
   for (let index = 0; index < text.length; index++) {
     const unit = text.charCodeAt(index);
     const escaped = JSON_ESCAPES.get(unit);
@@ -110,6 +111,7 @@ function doubleBitsHex(value: number): string {
 function toHex(bytes: Uint8Array): string {
   let result = "";
 
+  // 1 バイトずつ 16 進 2 桁へ直す
   for (const value of bytes) {
     result += value.toString(16).padStart(2, "0");
   }
@@ -157,6 +159,7 @@ function jsonTag(tag: NbtTag): string {
       // 64bit 整数は10進文字列の配列で表す
       const items: string[] = [];
 
+      // 配列の各要素を文字列として並べる
       for (const value of tag.value) {
         items.push(jsonString(`${value}`));
       }
@@ -167,6 +170,7 @@ function jsonTag(tag: NbtTag): string {
     case TagType.List: {
       const items: string[] = [];
 
+      // リストの各要素を再帰的に写す
       for (const item of tag) {
         items.push(jsonTag(item));
       }
@@ -178,6 +182,7 @@ function jsonTag(tag: NbtTag): string {
       // JSON オブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
       const items: string[] = [];
 
+      // compound はキーと値の組の配列として写す。挿入順を保つため
       for (const [key, value] of (tag as NbtCompound).entries()) {
         items.push(`[${jsonString(key)},${jsonTag(value)}]`);
       }
@@ -217,6 +222,7 @@ function regionList(region: RegionFile): string {
   const lines: string[] = [`region ${region.regionX} ${region.regionZ}`];
   let total = 0;
 
+  // 存在するチャンクを順に読み、要約を組み立てる
   for (const position of region.chunkPositions()) {
     const raw = region.readChunkRaw(position.x, position.z);
 
@@ -260,6 +266,7 @@ function regionRewrite(source: RegionFile, outputPath: string): void {
 
   const destination = RegionFile.open(outputPath, RegionFileMode.ReadWrite);
 
+  // 読み込んだチャンクを、そのまま出力側へ詰め直す
   for (const position of source.chunkPositions()) {
     const chunk = source.readChunk(position.x, position.z);
 
@@ -295,6 +302,7 @@ function chunkDescribe(chunk: Chunk): string {
   const blocks = new Map<string, number>();
   const biomes = new Map<string, number>();
 
+  // セクションごとにブロックとバイオームを数え上げる
   for (const sectionY of chunk.sectionYs) {
     const section = chunk.section(sectionY)!;
     let blockPalette = 0;
@@ -353,6 +361,7 @@ function chunkDescribe(chunk: Chunk): string {
     lines.push(`block ${key} ${blocks.get(key)}`);
   }
 
+  // 名前の昇順で出すので、内部の並びに関係なく同じ出力になる
   for (const key of [...biomes.keys()].sort()) {
     lines.push(`biome ${key} ${biomes.get(key)}`);
   }
@@ -490,6 +499,7 @@ function main(argv: string[]): number {
     "chunk-report", "chunk-edit",
   ];
 
+  // 知らないコマンドなら使い方を出して終わる
   if (!known.includes(command)) {
     process.stderr.write(`${USAGE}\n`);
     return 2;

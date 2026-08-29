@@ -333,6 +333,7 @@ class NbtList(NbtTag):
 
         # 与えられた要素は 1 つずつ型検査しながら追加する
         if elements is not None:
+            # append を通すことで、要素型の検査も一緒にかかる
             for element in elements:
                 self.append(element)
 
@@ -423,7 +424,9 @@ class NbtCompound(NbtTag):
         # Python の dict は 3.7 以降で挿入順を保つ
         self._entries: Dict[str, NbtTag] = {}
 
+        # 初期値が与えられたら、そのまま順に入れる
         if entries is not None:
+            # set を通すことで、挿入順が保たれる
             for key, value in entries:
                 self.set(key, value)
 

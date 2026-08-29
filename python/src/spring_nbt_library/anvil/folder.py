@@ -86,6 +86,7 @@ class RegionFolder:
         for name in os.listdir(self.directory):
             position = RegionPos.from_file_name(name)
 
+            # r.X.Z.mca として解釈できるファイルだけを拾う
             if position is not None:
                 found.append(position)
 
@@ -181,6 +182,7 @@ class RegionFolder:
         """開いている全リージョンの変更を書き出す。"""
         self._ensure_open()
 
+        # 開いているリージョンをすべて書き出す
         for file in self._cache.values():
             file.flush()
 
@@ -189,6 +191,7 @@ class RegionFolder:
         if self._closed:
             return
 
+        # 開いているリージョンをすべて閉じる
         for file in self._cache.values():
             file.close()
 

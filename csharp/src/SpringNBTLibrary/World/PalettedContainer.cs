@@ -77,6 +77,7 @@ public sealed class PalettedContainer
             throw SpringNbtException.Malformed("palette が無いか空");
         }
 
+        // パレットの要素は生の NbtTag のまま持つ。並び順まで元どおりに書き戻すため
         foreach (NbtTag entry in paletteTag)
         {
             result.palette.Add(entry);
@@ -121,6 +122,7 @@ public sealed class PalettedContainer
         NbtCompound result = new NbtCompound();
         NbtList paletteTag = new NbtList();
 
+        // パレットの要素は読んだときのまま書き出す
         foreach (NbtTag entry in palette)
         {
             paletteTag.Add(entry);
@@ -208,8 +210,10 @@ public sealed class PalettedContainer
         List<NbtTag> compacted = new List<NbtTag>();
         int[] remap = new int[palette.Count];
 
+        // 使われている要素だけを詰め直し、新しい添字を割り当てる
         for (int old = 0; old < palette.Count; old++)
         {
+            // 参照されていない要素は捨てる
             if (!usedEntries[old])
             {
                 remap[old] = -1;
