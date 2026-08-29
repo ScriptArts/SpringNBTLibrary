@@ -38,3 +38,6 @@ pip install spring-nbt-library
 ## ライセンス
 
 MIT License — Copyright (c) 2026 ScriptArts
+
+- [LICENSE](../LICENSE) — 英語の原文（**法的効力を持つのはこちら**）
+- [LICENSE.ja.md](../LICENSE.ja.md) — 日本語の参考訳

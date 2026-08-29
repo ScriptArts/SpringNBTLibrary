@@ -97,4 +97,8 @@ python3 spec/tools/check_links.py
 
 MIT License — Copyright (c) 2026 ScriptArts
 
-詳細は [LICENSE](LICENSE) を参照。
+- [LICENSE](LICENSE) — 英語の原文（**法的効力を持つのはこちら**）
+- [LICENSE.ja.md](LICENSE.ja.md) — 日本語の参考訳
+
+商用利用・改変・再頒布のいずれも可能です。
+著作権表示と許諾表示を残すことだけが条件で、無保証です。
