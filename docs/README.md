@@ -1,7 +1,10 @@
 # SpringNBTLibrary ドキュメント
 
 Minecraft **Java版 26.2**（DataVersion `4903`）のワールド／NBTファイルを
-**C# / Java / TypeScript / Python / Rust の5言語**で同一に読み書きするライブラリ。
+**複数の言語で同一に**読み書きするライブラリ。
+
+対応言語は今後も追加していく。現在対応しているのは
+**C# / Java / TypeScript / Python / Rust**（→ [機能一覧](features.md)）。
 
 まずどこを読むか:
 

@@ -3,7 +3,7 @@
 このファイルの書式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に、
 バージョン番号は [セマンティックバージョニング](https://semver.org/lang/ja/) に従う。
 
-**5言語（C# / Java / TypeScript / Python / Rust）は常に同じバージョン番号で公開する。**
+**対応言語はすべて、常に同じバージョン番号で公開する。**
 
 ## [未リリース]
 
