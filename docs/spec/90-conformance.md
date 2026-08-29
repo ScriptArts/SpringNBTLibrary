@@ -140,7 +140,6 @@ python3 spec/tools/scan_world.py "<ワールドのパス>" --verbose
 
 この走査により、**[40 ワールドのディレクトリ構成](40-world-layout.md) が 26.x で大きく変わっていること**
 （`dimensions/` への集約、`players/` への改名、`level.dat` からのデータ分離）が判明し、仕様書を全面的に書き直した。
-Minecraft Wiki の記述は 1.21.x 時点のもので、そのままでは使えなかった。
 
 ---
 

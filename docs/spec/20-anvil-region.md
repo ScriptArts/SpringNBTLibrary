@@ -77,7 +77,7 @@ u8   compression     -- 圧縮方式
 | 1 | GZip (RFC 1952) | 読み書き対応 |
 | 2 | Zlib (RFC 1950) | 読み書き対応。**書き込みの既定** |
 | 3 | 無圧縮 | 読み書き対応 |
-| 4 | LZ4（lz4-java のブロックストリーム形式） | v0.1.0 では未実装。`UNSUPPORTED_FEATURE`（生バイトAPIでのみ取得可） |
+| 4 | LZ4（独自ヘッダ付きのブロック連結） | v0.1.0 では未実装。`UNSUPPORTED_FEATURE`（生バイトAPIでのみ取得可） |
 | 127 | サードパーティ製サーバのカスタム方式 | 読み込み時 `UNSUPPORTED_FEATURE`。生バイト API でのみ取得可 |
 
 上記以外のIDは `MALFORMED_DATA`。
@@ -85,8 +85,7 @@ u8   compression     -- 圧縮方式
 ### 3.1.1 圧縮ID 4 の中身
 
 **素の LZ4 ブロックでも LZ4 フレーム形式でもない。**
-Minecraft は [lz4-java](https://github.com/lz4/lz4-java) の
-`LZ4BlockOutputStream` が出す独自形式をそのまま使う。
+独自のヘッダを持つブロックの連結であり、
 これを知らずに LZ4 のデコーダへ直接渡しても読めない。
 
 データは**ブロックの連結**で、各ブロックは 21 バイトのヘッダから始まる。
@@ -116,8 +115,6 @@ Minecraft は [lz4-java](https://github.com/lz4/lz4-java) の
 3. 次のブロックへ進む。入力を使い切るまで繰り返す
 
 長さの検証（どちらかが負、または片方だけが 0）に反したら `MALFORMED_DATA`。
-
-出典: [`LZ4BlockInputStream`](https://github.com/lz4/lz4-java/blob/master/src/java/net/jpountz/lz4/LZ4BlockInputStream.java)
 
 ### 3.2 外部ファイルへの退避 (`.mcc`)
 
