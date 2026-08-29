@@ -353,7 +353,11 @@ class DocCollector:
 
         if text.startswith(self.close_tag):
             self.collecting = False
-            self.pending = clean_doc(" ".join(self.parts))
+            # 概要は 1 行目だけを使う 2 行目以降は補足なので表に載せない
+            if len(self.parts) > 0:
+                self.pending = clean_doc(self.parts[0])
+            else:
+                self.pending = ""
             return True
 
         if self.collecting:
@@ -401,12 +405,6 @@ def clean_doc(text: str) -> str:
     # 残りのタグ（<c>...</c> など）は囲みだけ落として中身を残す
     text = re.sub(r"<[^>]+>", "", text)
     text = text.replace("|", "\\|").strip()
-
-    for terminator in ("。", "\n"):
-        position = text.find(terminator)
-
-        if position >= 0:
-            text = text[:position + len(terminator)]
 
     return " ".join(text.split())
 
