@@ -13,7 +13,7 @@ Minecraft Java版 26.2（DataVersion `4903`）のワールドデータ・NBTフ�
 
 | 言語 | 必要環境 | 入手するもの | 組み込み方 |
 |---|---|---|---|
-| [C#](docs/getting-started/csharp.md) | .NET 8 / C# 12 | `SpringNBTLibrary.<版>.nupkg` | ローカルのソースに登録して `dotnet add package`（`.zip` で dll 直参照も可） |
+| [C#](docs/getting-started/csharp.md) | .NET 8 / C# 12 | `SpringNBTLibrary.<版>.nupkg` | 置き場所を `nuget.config` で教えて `dotnet add package`（`.zip` で dll 直参照も可） |
 | [Java](docs/getting-started/java.md) | Java 21 (LTS) | `spring-nbt-library-<版>.jar` | クラスパスへ追加 |
 | [TypeScript](docs/getting-started/typescript.md) | Node.js 20+ | `spring-nbt-library-<版>.tgz` | `npm install ./<ファイル>` |
 | [Python](docs/getting-started/python.md) | Python 3.10+ | `spring_nbt_library-<版>-py3-none-any.whl` | `pip install <ファイル>` |

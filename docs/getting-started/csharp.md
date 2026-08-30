@@ -12,15 +12,31 @@ C# は[基準実装](../adr/0002-idiomatic-naming.md)です。
 
 ### `.nupkg` を使う（おすすめ）
 
-`SpringNBTLibrary.<版>.nupkg` を落とし、置いたフォルダをソースとして登録します。
-NuGet へは公開していないので、この 1 手間だけが要ります。
+NuGet へは公開していないので、落としたファイルを置いたフォルダを
+ソースとして教えます。
 
-```bash
-dotnet nuget add source ./packages -n springnbt
-dotnet add package SpringNBTLibrary --version 1.0.0
-```
+1. `SpringNBTLibrary.<版>.nupkg` を、プロジェクト直下の `packages/` へ置きます
+2. `.csproj` と同じ場所に `nuget.config` を作ります
+
+   ```xml
+   <?xml version="1.0" encoding="utf-8"?>
+   <configuration>
+     <packageSources>
+       <add key="springnbt" value="packages" />
+     </packageSources>
+   </configuration>
+   ```
+
+3. 参照に足します
+
+   ```bash
+   dotnet add package SpringNBTLibrary --version 1.0.0
+   ```
 
 ドキュメントの置き場所は NuGet が面倒を見るので、補完に説明が出ます。
+`nuget.config` をプロジェクトに置くのは、この設定をリポジトリで共有できるからです
+（`dotnet nuget add source` は利用者ごとの設定を書き換えるので、
+他の人の手元では動きません）。
 
 ### `.zip` を使う
 

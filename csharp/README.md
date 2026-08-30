@@ -10,10 +10,18 @@ C# / Java / TypeScript / Python / Rust 版があり、どれも同じ仕様書�
 ## 導入
 
 [Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
-`SpringNBTLibrary.<版>.nupkg` を落とし、置いたフォルダをソースに登録します。
+`SpringNBTLibrary.<版>.nupkg` を落とし、プロジェクト直下の `packages/` へ置きます。
+`.csproj` の隣に `nuget.config` を作ってソースを教えたら、参照に足せます。
+
+```xml
+<configuration>
+  <packageSources>
+    <add key="springnbt" value="packages" />
+  </packageSources>
+</configuration>
+```
 
 ```bash
-dotnet nuget add source ./packages -n springnbt
 dotnet add package SpringNBTLibrary --version 1.0.0
 ```
 
