@@ -1,14 +1,14 @@
 # 04. ワールドと level.dat
 
-ワールド全体を開き、`level.dat` と次元を扱う。
+ワールド全体を開き、`level.dat` と次元を扱います。
 
-> コード例は基準実装の **C#**。他言語での綴りは [API 対応表](../api/world.md)。
+> コード例は基準実装の C#。他言語での綴りは [API 対応表](../api/world.md)。
 
 ---
 
 ## 1. 26.x のディレクトリ構成
 
-**1.21.x から大きく変わっている。**
+1.21.x から大きく変わっています。
 
 ```
 <ワールド名>/
@@ -35,7 +35,7 @@
     └─ data/minecraft/
 ```
 
-**変更点のまとめ**
+変更点のまとめ
 
 | 1.21.x | 26.x |
 |---|---|
@@ -58,7 +58,7 @@ Console.WriteLine(world.Level.VersionName);      // 26.2
 Console.WriteLine(world.Level.DataVersion);      // 4903
 ```
 
-**既定は読み取り専用。** 書き込むには明示的に許可する。
+既定は読み取り専用。 書き込むには明示的に許可します。
 
 ```csharp
 WorldOpenOptions options = new WorldOpenOptions { Writable = true };
@@ -67,13 +67,13 @@ using MinecraftWorld world = MinecraftWorld.Open(worldPath, options);
 
 > 書き込みで開くと `session.lock` を確認する（C# / Java / Python(POSIX) のみ）。
 > TypeScript と Rust は確認しないので、
-> **Minecraft が起動していないことを呼び出し側で担保すること**（[adr/0008](../adr/0008-session-lock.md)）。
+> Minecraft が起動していないことを呼び出し側で担保すること（[adr/0008](../adr/0008-session-lock.md)）。
 
 ---
 
 ## 3. level.dat の中身
 
-よく使う項目には名前つきの取得子がある。
+よく使う項目には名前つきの取得子があります。
 
 ```csharp
 LevelData level = world.Level;
@@ -118,8 +118,8 @@ foreach (string id in world.DimensionIds())
 Dimension? overworld = world.Dimension("minecraft:overworld");
 ```
 
-名前空間を省くと `minecraft:` を補う。`world.Dimension("overworld")` でもよい。
-存在しない次元（まだ生成されていない、など）は `null` になる。
+名前空間を省くと `minecraft:` を補う。`world.Dimension("overworld")` でも構いません。
+存在しない次元（まだ生成されていない、など）は `null` になります。
 
 カスタム次元も同じように扱える。データパックが作った
 `dimensions/mypack/mydim/` は `"mypack:mydim"` で開ける。
@@ -134,7 +134,7 @@ foreach (ChunkPos pos in overworld.ChunkPositions())
 }
 ```
 
-`entities/` と `poi/` は生の NBT として読める。
+`entities/` と `poi/` は生の NBT として読めます。
 
 ```csharp
 RegionFolder? entities = overworld.EntityFolder;
@@ -162,7 +162,7 @@ overworld.Flush();     // 変更したチャンクを書き戻す
 world.SaveLevel();     // level.dat を書き戻す
 ```
 
-`SaveLevel` は**一時ファイルへ書いてから置き換える**。
+`SaveLevel` は一時ファイルへ書いてから置き換える。
 書き込み中に落ちても `level.dat` が壊れないようにするためで、
 直前の内容は `level.dat_old` へ退避される。
 

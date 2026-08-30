@@ -5,7 +5,7 @@
 ## 1. バージョン番号
 
 [セマンティックバージョニング](https://semver.org/lang/ja/)に従う。
-**全言語で同じ番号を使う。** ある言語だけ 0.2.0 ということはしない。
+全言語で同じ番号を使う。 ある言語だけ 0.2.0 ということはしない。
 
 | 変更 | 上げる桁 |
 |---|---|
@@ -13,16 +13,16 @@
 | 機能追加、対象 Minecraft バージョンの更新 | マイナー |
 | 不具合修正のみ | パッチ |
 
-**対象 Minecraft バージョンの更新はマイナー扱い**とする。
+対象 Minecraft バージョンの更新はマイナー扱いとする。
 書き込み時の `DataVersion` が変わるため、利用者にとっては挙動の変化にあたる。
 
 ---
 
 ## 2. Minecraft の新バージョンへ対応する
 
-1. **実ワールドを用意する。** 新バージョンで新規ワールドを作り、
+1. 実ワールドを用意する。 新バージョンで新規ワールドを作り、
    ネザーとエンドにも行って各次元を生成させる
-2. **走査する。**
+2. 走査する。
 
    ```bash
    python3 spec/tools/scan_world.py "<新しいワールド>" --verbose
@@ -31,8 +31,8 @@
    ルート直下キー・セクションキー・`Status` の出現数が出るので、
    [spec/30](../spec/30-chunk-format.md) / [spec/40](../spec/40-world-layout.md)
    の記述と突き合わせる
-3. **仕様書を直す。** 構成が変わっていたら、**推測ではなく実データを根拠に**書き直す
-4. **`TARGET_DATA_VERSION` を全言語で更新する。**
+3. 仕様書を直す。 構成が変わっていたら、推測ではなく実データを根拠に書き直す
+4. `TARGET_DATA_VERSION` を全言語で更新する。
 
    ```
    csharp/src/SpringNBTLibrary/SpringNbt.cs
@@ -41,7 +41,7 @@
    python/src/spring_nbt_library/__init__.py
    rust/src/lib.rs
    ```
-5. **テストベクタを作り直す。**
+5. テストベクタを作り直す。
 
    ```bash
    python3 spec/tools/build_testdata.py
@@ -72,7 +72,7 @@ python3 spec/tools/check_docs_sync.py
 python3 spec/tools/scan_world.py "<ワールドのパス>"
 ```
 
-**すべて通ることがリリースの条件である。**
+すべて通ることがリリースの条件である。
 1 つでも落ちている状態で出すと、「全言語で挙動が同じ」という
 本ライブラリ唯一の売りが嘘になる。
 
@@ -108,7 +108,7 @@ git push origin v0.1.0
 [`release` ワークフロー](../../.github/workflows/release.yml)が動き、次を行う。
 
 1. 全対応言語のテストと[適合性検証](../spec/90-conformance.md)を通す
-   （**落ちたら公開しない**。壊れたものを配らないため）
+   （落ちたら公開しない。壊れたものを配らないため）
 2. 言語ごとの成果物を組み立てる
 3. `SHA256SUMS.txt` を作る
 4. Releases を作って成果物を添付する
@@ -123,7 +123,7 @@ git push origin v0.1.0
 | Python | `spring_nbt_library-<版>-py3-none-any.whl` / `.tar.gz` | wheel と sdist |
 | Rust | `spring-nbt-library-<版>.crate` | ソースの tar.gz |
 
-**Rust は git 参照が主な使い方になる。** Cargo は git リポジトリを直接
+Rust は git 参照が主な使い方になる。 Cargo は git リポジトリを直接
 依存にできるので、ファイルを落とす必要がない。`.crate` は
 ネットワークに繋がらない環境向けの控えである。
 

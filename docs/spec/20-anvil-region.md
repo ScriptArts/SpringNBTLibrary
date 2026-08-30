@@ -77,7 +77,7 @@ u8   compression     -- 圧縮方式
 | 1 | GZip (RFC 1952) | 読み書き対応 |
 | 2 | Zlib (RFC 1950) | 読み書き対応。**書き込みの既定** |
 | 3 | 無圧縮 | 読み書き対応 |
-| 4 | LZ4（独自ヘッダ付きのブロック連結） | v0.1.0 では未実装。`UNSUPPORTED_FEATURE`（生バイトAPIでのみ取得可） |
+| 4 | LZ4（独自ヘッダ付きのブロック連結） | 未対応。`UNSUPPORTED_FEATURE`（生バイトAPIでのみ取得可） |
 | 127 | サードパーティ製サーバのカスタム方式 | 読み込み時 `UNSUPPORTED_FEATURE`。生バイト API でのみ取得可 |
 
 上記以外のIDは `MALFORMED_DATA`。

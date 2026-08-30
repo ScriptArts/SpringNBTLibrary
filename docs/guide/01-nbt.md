@@ -1,9 +1,9 @@
 # 01. NBT の読み書き
 
 NBT (Named Binary Tag) は Minecraft のあらゆるデータの土台となる形式。
-このレイヤは**Minecraft のバージョンに一切依存しない**。
+このレイヤはMinecraft のバージョンに一切依存しません。
 
-> このガイドのコード例は基準実装の **C#** で示す。
+> このガイドのコード例は基準実装の C# で示します。
 > 他の言語での綴りは [API 対応表](../api/nbt.md) を、
 > 最初の一歩は [はじめに](../getting-started/) を参照。
 
@@ -27,10 +27,10 @@ NBT (Named Binary Tag) は Minecraft のあらゆるデータの土台となる�
 | 11 | `TAG_Int_Array` | `i32[]` |
 | 12 | `TAG_Long_Array` | `i64[]` |
 
-真偽値の専用型は無い。`TAG_Byte` の 0 / 1 で表す。
+真偽値の専用型は無い。`TAG_Byte` の 0 / 1 で表します。
 `GetBool` はこれを読みやすくするための糖衣にすぎない。
 
-数値はすべて**ビッグエンディアン**、整数はすべて**符号つき**である。
+数値はすべてビッグエンディアン、整数はすべて符号つきです。
 詳細は [spec/10](../spec/10-nbt-binary.md)。
 
 ---
@@ -42,8 +42,8 @@ NamedTag named = NbtIo.ReadFile("level.dat");
 NbtCompound root = (NbtCompound)named.Tag;
 ```
 
-圧縮方式（Gzip / Zlib / 無圧縮）は**先頭バイトから自動判定する**。
-指定したい場合だけ `NbtReadOptions.Compression` を設定する。
+圧縮方式（Gzip / Zlib / 無圧縮）は先頭バイトから自動判定します。
+指定したい場合だけ `NbtReadOptions.Compression` を設定します。
 
 ### 型付き取得子
 
@@ -52,8 +52,8 @@ int version = root.GetInt("DataVersion");     // 無い/型違いなら例外
 int? maybe  = root.OptInt("DataVersion");     // 無ければ null、型違いなら例外
 ```
 
-**「無い」と「型が違う」を区別している。** `Opt*` は前者だけを許す。
-型が違うのは常にプログラム側の想定違いなので、黙って握りつぶさない。
+「無い」と「型が違う」を区別している。 `Opt*` は前者だけを許します。
+型が違うのは常にプログラム側の想定違いなので、黙って握りつぶしません。
 
 ### 入れ子をたどる
 
@@ -76,14 +76,14 @@ root.Set("flags", new NbtByteArray(new sbyte[] { 1, 0, 1 }));
 NbtIo.WriteFile("out.nbt", new NamedTag("", root));
 ```
 
-`NbtCompound` は**挿入順を保持する**。
-これは飾りではなく、**触っていないデータを書き戻したときに
-バイト単位で元と一致させるために必要**である。
+`NbtCompound` は挿入順を保持します。
+これは飾りではありません。触っていないデータを書き戻したときに
+バイト単位で元と一致させるために必要です。
 
 ### リストは要素型が 1 つ
 
-`TAG_List` は全要素が同じ型でなければならない。
-違う型を足そうとすると `UNEXPECTED_TAG_TYPE` になる。
+`TAG_List` は全要素が同じ型でなければなりません。
+違う型を足そうとすると `UNEXPECTED_TAG_TYPE` になります。
 
 ```csharp
 NbtList list = new NbtList();
@@ -91,9 +91,9 @@ list.Add(new NbtInt(1));
 list.Add(new NbtString("x"));   // 例外
 ```
 
-空のリストは要素型 `TAG_End` で書き出す。
+空のリストは要素型 `TAG_End` で書き出します。
 ただし第三者のツールが別の要素型で空リストを書くことがあるので、
-読むときはそれも受け入れる。
+読むときはそれも受け入れます。
 
 ---
 
@@ -115,7 +115,7 @@ NbtIo.WriteFile("out.nbt", named,
 | 形式 | ルート |
 |---|---|
 | `Java`（既定） | 名前つきの Compound |
-| `Network` | **名前を持たない** Compound（1.20.2 以降） |
+| `Network` | 名前を持たない Compound（1.20.2 以降） |
 
 ```csharp
 NbtIo.ReadBytes(bytes, new NbtReadOptions { Format = NbtFormat.Network });
@@ -125,17 +125,17 @@ NbtIo.ReadBytes(bytes, new NbtReadOptions { Format = NbtFormat.Network });
 
 ## 5. 文字列は MUTF-8
 
-NBT の文字列は UTF-8 ではなく **MUTF-8**（Modified UTF-8）である。
-標準の UTF-8 と 2 点だけ違う。
+NBT の文字列は UTF-8 ではなく MUTF-8（Modified UTF-8）です。
+標準の UTF-8 と 2 点だけ違います。
 
-- `U+0000` を 1 バイトの `00` ではなく **2 バイトの `C0 80`** で書く
+- `U+0000` を 1 バイトの `00` ではなく 2 バイトの `C0 80` で書く
 - BMP 外の文字（絵文字など）を 4 バイトではなく
-  **サロゲートペア 2 つ（3 バイト × 2）**で書く
+  サロゲートペア 2 つ（3 バイト × 2）で書く
 
 この差は普通のライブラリでは見落とされやすく、
-絵文字を含む看板やアイテム名で壊れる原因になる。本ライブラリは全言語でこれを正しく扱う。
+絵文字を含む看板やアイテム名で壊れる原因になる。本ライブラリは全言語でこれを正しく扱います。
 
-長さは 2 バイトの符号なし整数で表すので、**1 つの文字列は 65535 バイトまで**。
+長さは 2 バイトの符号なし整数で表すので、1 つの文字列は 65535 バイトまで。
 
 詳細は [spec/10 2章](../spec/10-nbt-binary.md#2-文字列-mutf-8)。
 

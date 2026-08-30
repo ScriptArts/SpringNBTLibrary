@@ -95,7 +95,7 @@ JSON の出力規則（全言語で一致させるため厳密に定める）:
 | Rust | `rust/target/release/examples/conformance` |
 
 `spec/tools/run_conformance.py` が各言語のビルドと起動を引き受ける。
-**まだ実装されていない言語は自動的に検証対象から外れる**ので、
+**実装が無い言語は自動的に検証対象から外れる**ので、
 言語を 1 つずつ追加していく途中でも走らせられる。
 
 ---
@@ -143,7 +143,7 @@ python3 spec/tools/scan_world.py "<ワールドのパス>" --verbose
 
 ---
 
-## 3. ベクタ一覧（v0.1.0 で用意するもの）
+## 3. ベクタ一覧
 
 ### NBT
 
