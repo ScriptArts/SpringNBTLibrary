@@ -141,6 +141,11 @@ impl BitStorage {
         &self.data
     }
 
+    /// packed な配列を複製して返す
+    pub fn to_longs(&self) -> Vec<i64> {
+        self.data.clone()
+    }
+
     /// packed な配列を取り出す
     pub fn into_longs(self) -> Vec<i64> {
         self.data

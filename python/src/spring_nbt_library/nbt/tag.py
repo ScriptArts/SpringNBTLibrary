@@ -104,7 +104,7 @@ class NbtTag:
     # 派生クラスが上書きする
     type: TagType = TagType.END
 
-    def clone(self) -> "NbtTag":
+    def copy(self) -> "NbtTag":
         """このタグの深いコピーを作る"""
         raise NotImplementedError
 
@@ -132,7 +132,7 @@ class _ScalarTag(NbtTag):
     def _validate(self, value):
         raise NotImplementedError
 
-    def clone(self) -> "NbtTag":
+    def copy(self) -> "NbtTag":
         """同じ値を持つ新しいタグを作る"""
         return type(self)(self._value)
 
@@ -299,7 +299,7 @@ class _ArrayTag(NbtTag):
 
         return result
 
-    def clone(self) -> "NbtTag":
+    def copy(self) -> "NbtTag":
         """同じ値を持つ新しいタグを作る"""
         return type(self)(list(self._value))
 
@@ -396,13 +396,13 @@ class NbtList(NbtTag):
         """
         self._items.clear()
 
-    def clone(self) -> "NbtTag":
+    def copy(self) -> "NbtTag":
         """同じ値を持つ新しいタグを作る"""
         copy = NbtList(self._element_type)
 
         # 要素も深くコピーする
         for item in self._items:
-            copy._items.append(item.clone())
+            copy._items.append(item.copy())
 
         return copy
 
@@ -524,13 +524,13 @@ class NbtCompound(NbtTag):
         """挿入順の (キー, タグ) の並び"""
         return iter(self._entries.items())
 
-    def clone(self) -> "NbtTag":
+    def copy(self) -> "NbtTag":
         """同じ値を持つ新しいタグを作る"""
         copy = NbtCompound()
 
         # 挿入順のまま深くコピーする
         for key, value in self._entries.items():
-            copy.set(key, value.clone())
+            copy.set(key, value.copy())
 
         return copy
 

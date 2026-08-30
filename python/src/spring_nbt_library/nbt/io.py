@@ -113,6 +113,11 @@ class NbtWriteOptions:
         # 既定は GZip
         self.compression = compression
 
+    @staticmethod
+    def uncompressed() -> "NbtWriteOptions":
+        """無圧縮で書き出すオプションを作る"""
+        return NbtWriteOptions(compression=Compression.NONE)
+
 
 _DEFAULT_READ = NbtReadOptions()
 _DEFAULT_WRITE = NbtWriteOptions()

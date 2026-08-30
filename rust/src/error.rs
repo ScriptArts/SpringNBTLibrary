@@ -68,6 +68,31 @@ impl Error {
         Error { code, message: message.into(), source: Some(Box::new(source)) }
     }
 
+    /// バイト列が仕様に反する
+    pub fn malformed(message: impl Into<String>) -> Self {
+        Error::new(ErrorCode::MalformedData, message)
+    }
+
+    /// 呼び出し側の指定が不正
+    pub fn invalid_argument(message: impl Into<String>) -> Self {
+        Error::new(ErrorCode::InvalidArgument, message)
+    }
+
+    /// 期待した型と違うタグを取り出した
+    pub fn unexpected_tag_type(message: impl Into<String>) -> Self {
+        Error::new(ErrorCode::UnexpectedTagType, message)
+    }
+
+    /// 安全上限を超えた
+    pub fn limit_exceeded(message: impl Into<String>) -> Self {
+        Error::new(ErrorCode::LimitExceeded, message)
+    }
+
+    /// 仕様上は妥当だが、このビルドでは扱えない
+    pub fn unsupported_feature(message: impl Into<String>) -> Self {
+        Error::new(ErrorCode::UnsupportedFeature, message)
+    }
+
     /// エラーの分類
     pub fn code(&self) -> ErrorCode {
         self.code

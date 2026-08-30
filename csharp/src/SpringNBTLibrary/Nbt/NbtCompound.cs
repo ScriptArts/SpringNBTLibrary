@@ -153,14 +153,14 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <inheritdoc/>
-    public override NbtTag Clone()
+    public override NbtTag Copy()
     {
         NbtCompound copy = new NbtCompound();
 
         // 挿入順のまま深くコピーする
         foreach (KeyValuePair<string, NbtTag> entry in entries)
         {
-            copy.Set(entry.Key, entry.Value.Clone());
+            copy.Set(entry.Key, entry.Value.Copy());
         }
 
         return copy;

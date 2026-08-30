@@ -19,7 +19,7 @@ public sealed class NbtByteArray : NbtTag
     public override TagType Type => TagType.ByteArray;
 
     /// <inheritdoc/>
-    public override NbtTag Clone() => new NbtByteArray((sbyte[])Value.Clone());
+    public override NbtTag Copy() => new NbtByteArray((sbyte[])Value.Clone());
 
     /// <inheritdoc/>
     public override bool Equals(object? obj)
@@ -53,7 +53,7 @@ public sealed class NbtIntArray : NbtTag
     public override TagType Type => TagType.IntArray;
 
     /// <inheritdoc/>
-    public override NbtTag Clone() => new NbtIntArray((int[])Value.Clone());
+    public override NbtTag Copy() => new NbtIntArray((int[])Value.Clone());
 
     /// <inheritdoc/>
     public override bool Equals(object? obj)
@@ -87,7 +87,7 @@ public sealed class NbtLongArray : NbtTag
     public override TagType Type => TagType.LongArray;
 
     /// <inheritdoc/>
-    public override NbtTag Clone() => new NbtLongArray((long[])Value.Clone());
+    public override NbtTag Copy() => new NbtLongArray((long[])Value.Clone());
 
     /// <inheritdoc/>
     public override bool Equals(object? obj)

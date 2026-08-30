@@ -98,6 +98,46 @@ function checkRange(value: number, minimum: number, maximum: number, typeName: s
   return value;
 }
 
+//: 浮動小数点のビットパターンを取り出すための作業領域
+const BIT_VIEW = new DataView(new ArrayBuffer(8));
+
+/**
+ * binary32 のビットパターンを取り出す
+ * NaN や -0.0 を値ではなくビットで区別するために使う
+ */
+function floatBits(value: number): number {
+  BIT_VIEW.setFloat32(0, value);
+  return BIT_VIEW.getInt32(0);
+}
+
+/**
+ * binary64 のビットパターンを取り出す
+ * NaN や -0.0 を値ではなくビットで区別するために使う
+ */
+function doubleBits(value: number): bigint {
+  BIT_VIEW.setFloat64(0, value);
+  return BIT_VIEW.getBigInt64(0);
+}
+
+/** 型付き配列を要素ごとに比べる */
+function arrayEquals(
+  left: Int8Array | Int32Array | BigInt64Array,
+  right: Int8Array | Int32Array | BigInt64Array,
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  // 同じ位置の要素同士を突き合わせる
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /**
  * TAG_Byte
  * 8bit 符号付き整数
@@ -126,6 +166,11 @@ export class NbtByte {
   /** このタグの深いコピーを作る */
   copy(): NbtByte {
     return new NbtByte(this.#value);
+  }
+
+  /** 同じ型で同じ値か */
+  equals(other: unknown): boolean {
+    return other instanceof NbtByte && other.value === this.#value;
   }
 }
 
@@ -158,6 +203,11 @@ export class NbtShort {
   copy(): NbtShort {
     return new NbtShort(this.#value);
   }
+
+  /** 同じ型で同じ値か */
+  equals(other: unknown): boolean {
+    return other instanceof NbtShort && other.value === this.#value;
+  }
 }
 
 /**
@@ -188,6 +238,11 @@ export class NbtInt {
   /** このタグの深いコピーを作る */
   copy(): NbtInt {
     return new NbtInt(this.#value);
+  }
+
+  /** 同じ型で同じ値か */
+  equals(other: unknown): boolean {
+    return other instanceof NbtInt && other.value === this.#value;
   }
 }
 
@@ -226,6 +281,11 @@ export class NbtLong {
   /** このタグの深いコピーを作る */
   copy(): NbtLong {
     return new NbtLong(this.#value);
+  }
+
+  /** 同じ型で同じ値か */
+  equals(other: unknown): boolean {
+    return other instanceof NbtLong && other.value === this.#value;
   }
 
   static #check(value: bigint): bigint {
@@ -271,6 +331,14 @@ export class NbtFloat {
   copy(): NbtFloat {
     return new NbtFloat(this.#value);
   }
+
+  /**
+   * 同じ型で同じ値か
+   * NaN や -0.0 を区別するため、値ではなくビットパターンで比べる
+   */
+  equals(other: unknown): boolean {
+    return other instanceof NbtFloat && floatBits(other.value) === floatBits(this.#value);
+  }
 }
 
 /**
@@ -285,6 +353,14 @@ export class NbtDouble {
   /** このタグの深いコピーを作る */
   copy(): NbtDouble {
     return new NbtDouble(this.value);
+  }
+
+  /**
+   * 同じ型で同じ値か
+   * NaN や -0.0 を区別するため、値ではなくビットパターンで比べる
+   */
+  equals(other: unknown): boolean {
+    return other instanceof NbtDouble && doubleBits(other.value) === doubleBits(this.value);
   }
 }
 
@@ -318,6 +394,11 @@ export class NbtString {
     return new NbtString(this.#value);
   }
 
+  /** 同じ型で同じ値か */
+  equals(other: unknown): boolean {
+    return other instanceof NbtString && other.value === this.#value;
+  }
+
   static #check(value: string): string {
     const length = mutf8.byteLength(value);
 
@@ -346,6 +427,11 @@ export class NbtByteArray {
   copy(): NbtByteArray {
     return new NbtByteArray(this.value.slice());
   }
+
+  /** 同じ型で、同じ並びの配列を持つか */
+  equals(other: unknown): boolean {
+    return other instanceof NbtByteArray && arrayEquals(other.value, this.value);
+  }
 }
 
 /**
@@ -361,6 +447,11 @@ export class NbtIntArray {
   copy(): NbtIntArray {
     return new NbtIntArray(this.value.slice());
   }
+
+  /** 同じ型で、同じ並びの配列を持つか */
+  equals(other: unknown): boolean {
+    return other instanceof NbtIntArray && arrayEquals(other.value, this.value);
+  }
 }
 
 /**
@@ -375,6 +466,11 @@ export class NbtLongArray {
   /** このタグの深いコピーを作る */
   copy(): NbtLongArray {
     return new NbtLongArray(this.value.slice());
+  }
+
+  /** 同じ型で、同じ並びの配列を持つか */
+  equals(other: unknown): boolean {
+    return other instanceof NbtLongArray && arrayEquals(other.value, this.value);
   }
 }
 
@@ -463,6 +559,26 @@ export class NbtList {
     }
 
     return result;
+  }
+
+  /** 要素型と、同じ位置の要素がすべて一致するか */
+  equals(other: unknown): boolean {
+    if (!(other instanceof NbtList)) {
+      return false;
+    }
+
+    if (other.elementType !== this.#elementType || other.size !== this.#items.length) {
+      return false;
+    }
+
+    // 同じ位置の要素同士を比較する
+    for (let index = 0; index < this.#items.length; index++) {
+      if (!this.#items[index].equals(other.get(index))) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   [Symbol.iterator](): Iterator<NbtTag> {
@@ -570,6 +686,29 @@ export class NbtCompound {
     }
 
     return result;
+  }
+
+  /**
+   * キーと値がすべて一致するか
+   * 挿入順も等価性の一部として見る
+   */
+  equals(other: unknown): boolean {
+    if (!(other instanceof NbtCompound) || other.size !== this.#entries.size) {
+      return false;
+    }
+
+    const right = other.entries();
+
+    // 挿入順にキーと値を突き合わせる
+    for (const [key, value] of this.#entries) {
+      const pair = right.next();
+
+      if (pair.done === true || pair.value[0] !== key || !value.equals(pair.value[1])) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   [Symbol.iterator](): Iterator<[string, NbtTag]> {

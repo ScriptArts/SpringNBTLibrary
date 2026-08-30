@@ -8,6 +8,9 @@
 
 use crate::error::{Error, ErrorCode, Result};
 
+/// 長さフィールドが `u16` のため、1 つの文字列は符号化後 65535 バイトまで
+pub const MAX_BYTE_LENGTH: usize = 65535;
+
 /// Rust の `char` へ写せない値も表せるよう、復号結果は UTF-16 コード単位の列で返す
 ///
 /// 孤立サロゲートを含む文字列は `String` にできないため、
@@ -105,9 +108,47 @@ pub fn encode_from_utf16(units: &[u16]) -> Vec<u8> {
 }
 
 /// Rust の `str` を MUTF-8 バイト列へ符号化する
-pub fn encode_str(text: &str) -> Vec<u8> {
+pub fn encode(text: &str) -> Vec<u8> {
     let units: Vec<u16> = text.encode_utf16().collect();
     encode_from_utf16(&units)
+}
+
+/// MUTF-8 バイト列を `String` へ復号する
+///
+/// 孤立サロゲートを含む入力は `String` にできないため `MALFORMED_DATA` になる
+/// そのまま保持したい場合は [`decode_to_utf16`] を使う
+pub fn decode(bytes: &[u8]) -> Result<String> {
+    let units = decode_to_utf16(bytes)?;
+
+    match utf16_to_string(&units) {
+        Some(text) => Ok(text),
+        None => Err(Error::new(
+            ErrorCode::MalformedData,
+            "MUTF-8: 孤立サロゲートを含むため String へ写せない",
+        )),
+    }
+}
+
+/// MUTF-8 へ符号化したときのバイト数を数える
+///
+/// 実際に符号化せずに長さだけを求める
+pub fn byte_length(text: &str) -> usize {
+    let mut total = 0usize;
+
+    // コード単位ごとに 1〜3 バイトへ展開される
+    for unit in text.encode_utf16() {
+        // U+0001..U+007F だけが 1 バイト
+        // U+0000 は 2 バイトになる
+        if unit >= 0x0001 && unit <= 0x007F {
+            total += 1;
+        } else if unit == 0x0000 || unit <= 0x07FF {
+            total += 2;
+        } else {
+            total += 3;
+        }
+    }
+
+    total
 }
 
 /// UTF-16 コード単位の列を `String` へ変換する
@@ -125,7 +166,7 @@ mod tests {
 
     #[test]
     fn ascii_roundtrip() {
-        let bytes = encode_str("Bananrama");
+        let bytes = encode("Bananrama");
         assert_eq!(bytes, b"Bananrama");
         let units = decode_to_utf16(&bytes).unwrap();
         assert_eq!(utf16_to_string(&units).unwrap(), "Bananrama");
@@ -133,7 +174,7 @@ mod tests {
 
     #[test]
     fn nul_is_two_bytes() {
-        let bytes = encode_str("a\u{0000}b");
+        let bytes = encode("a\u{0000}b");
         assert_eq!(bytes, vec![b'a', 0xC0, 0x80, b'b']);
         let units = decode_to_utf16(&bytes).unwrap();
         assert_eq!(utf16_to_string(&units).unwrap(), "a\u{0000}b");
@@ -143,7 +184,7 @@ mod tests {
     fn supplementary_char_is_cesu8() {
         // U+1F600 は UTF-16 では D83D DE00
         // MUTF-8 では 3 バイト × 2 になる
-        let bytes = encode_str("\u{1F600}");
+        let bytes = encode("\u{1F600}");
         assert_eq!(bytes, vec![0xED, 0xA0, 0xBD, 0xED, 0xB8, 0x80]);
         let units = decode_to_utf16(&bytes).unwrap();
         assert_eq!(utf16_to_string(&units).unwrap(), "\u{1F600}");
@@ -159,6 +200,27 @@ mod tests {
         let units = decode_to_utf16(&bytes).unwrap();
         assert_eq!(units, original);
         assert!(utf16_to_string(&units).is_none());
+    }
+
+    #[test]
+    fn decode_returns_string() {
+        assert_eq!(decode(b"Bananrama").unwrap(), "Bananrama");
+        assert_eq!(decode(&[0x61, 0xC0, 0x80, 0x62]).unwrap(), "a\u{0000}b");
+    }
+
+    #[test]
+    fn decode_rejects_lone_surrogate() {
+        // 孤立サロゲートは String へ写せない
+        let err = decode(&[0xED, 0xA0, 0xBD]).unwrap_err();
+        assert_eq!(err.code(), ErrorCode::MalformedData);
+    }
+
+    #[test]
+    fn byte_length_matches_encoded_length() {
+        // 1〜3 バイトになる各パターンで、数えた長さと符号化結果を突き合わせる
+        for text in ["", "Bananrama", "a\u{0000}b", "あいう", "\u{1F600}"] {
+            assert_eq!(byte_length(text), encode(text).len(), "{text}");
+        }
     }
 
     #[test]

@@ -137,7 +137,144 @@ def check_types(apis, report: Report) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 2. docs/api/ の生成
+# 2. メンバの一致
+# ---------------------------------------------------------------------------
+
+#: 言語ごとに存在が変わるメンバと、その理由。メンバの一致検査から除く。
+#:
+#: 「その言語では書きようがない」「言語の作法として別の形で提供している」ものだけを
+#: 載せる。単に実装していないだけのものはここに逃がさず、実装する。
+#: 利用者から見て差が出るものは docs/features.md「言語ごとの差異」にも載せる。
+EXPECTED_MEMBER_GAPS = {
+    # Node のストリームは非同期しか無い。このライブラリは全体を同期 API で
+    # 揃えているので、TypeScript ではファイルとバイト列の入口だけを提供する
+    (MODULE_LEVEL, "read_stream"): ["typescript"],
+    (MODULE_LEVEL, "write_stream"): ["typescript"],
+
+    # Rust ではタグ型を NbtTag 列挙のバリアントが表すので、
+    # 個々の型は自分の型を答える必要がない
+    ("NbtCompound", "type"): ["rust"],
+    ("NbtList", "type"): ["rust"],
+    ("NbtString", "type"): ["rust"],
+
+    # Rust の NbtString は Text / Surrogates の 2 形態
+    # 孤立サロゲートを保持するため、単一の値では表せない
+    # （docs/spec/10-nbt-binary.md 2.3）
+    ("NbtString", "value"): ["rust"],
+
+    # C# の NbtList は IList<NbtTag> を実装するので、
+    # インターフェースの要求として値指定の Remove を持つ
+    # 他言語は位置指定の remove_at だけを提供する
+    ("NbtList", "remove"): ["java", "typescript", "python", "rust"],
+
+    # C# は添字子 list[i] で取り出すのが作法
+    ("NbtList", "get"): ["csharp"],
+
+    # TypeScript のオプションは素のオブジェクトなので、
+    # { compression: Compression.None } をそのまま書く
+    ("NbtWriteOptions", "uncompressed"): ["typescript"],
+
+    # C# / TypeScript では列挙の基底値へキャストするのが作法
+    ("ChunkCompression", "id"): ["csharp", "typescript"],
+}
+
+#: 基準実装に無いメンバを「実装漏れの疑い」として報告する下限。
+#: 他の言語のうちこの数以上が持っていれば、基準実装が取りこぼしていると見る。
+FOREIGN_MEMBER_THRESHOLD = 3
+
+
+def has_member(api, type_name: str, member: str) -> bool:
+    """その言語にメンバが存在するか。
+
+    定数や自由関数の置き場は言語で変わる（静的クラス / モジュール直下 /
+    型の関連定数）ので、置き場の違いは差異として数えない。
+    """
+    if type_name in api.members and member in api.members[type_name]:
+        return True
+
+    # モジュール直下に置いている言語がある
+    if member in api.members.get(MODULE_LEVEL, {}):
+        return True
+
+    # モジュール直下のものを、型の関連定数として持つ言語がある
+    if type_name == MODULE_LEVEL:
+        for members in api.members.values():
+            if member in members:
+                return True
+
+    return False
+
+
+def check_members(apis, report: Report) -> None:
+    """同じ型のメンバが全言語で揃っているかを見る。
+
+    論理APIの正は基準実装の C# とする（docs/adr/0002）。
+    C# にあるものは全言語に要る。逆に、C# に無いのに他の言語の多くが
+    持っているものは、基準実装の取りこぼしとして報告する。
+    """
+    reference = apis["csharp"]
+    others = [name for name in LANGUAGE_ORDER if name != "csharp"]
+
+    # 1. 基準実装にあるメンバが、他の言語にも揃っているか
+    for type_name in sorted(reference.members.keys()):
+        # 型そのものが無い言語は、メンバも比べようがない
+        without_type = EXPECTED_TYPE_GAPS.get(type_name, [])
+        targets = [name for name in others if name not in without_type]
+
+        for member in sorted(reference.members[type_name].keys()):
+            missing = [name for name in targets
+                       if not has_member(apis[name], type_name, member)]
+            expected = EXPECTED_MEMBER_GAPS.get((type_name, member), [])
+            unexpected = [name for name in missing if name not in expected]
+
+            if len(unexpected) > 0:
+                report.add(
+                    "%s.%s が %s に無い。実装漏れなら足す。言語の性質による差なら "
+                    "check_docs_sync.EXPECTED_MEMBER_GAPS へ理由つきで登録する"
+                    % (type_name, member, "/".join(unexpected)))
+
+            resolved = [name for name in expected if name not in missing]
+
+            if len(resolved) > 0:
+                report.add(
+                    "%s.%s は %s に無い想定だが実在する。"
+                    "check_docs_sync.EXPECTED_MEMBER_GAPS から外す"
+                    % (type_name, member, "/".join(resolved)))
+
+    # 2. 基準実装に無いメンバが、他の言語に広く行き渡っていないか
+    for type_name in sorted(set().union(*[set(api.members.keys()) for api in apis.values()])):
+        # 基準実装に型そのものが無いなら、メンバも比べようがない
+        if "csharp" in EXPECTED_TYPE_GAPS.get(type_name, []):
+            continue
+
+        candidates = set()
+
+        for name in others:
+            candidates |= set(apis[name].members.get(type_name, {}).keys())
+
+        for member in sorted(candidates):
+            if has_member(reference, type_name, member):
+                continue
+
+            have = [name for name in others if has_member(apis[name], type_name, member)]
+
+            if len(have) < FOREIGN_MEMBER_THRESHOLD:
+                continue
+
+            expected = EXPECTED_MEMBER_GAPS.get((type_name, member), [])
+
+            if "csharp" in expected:
+                continue
+
+            report.add(
+                "%s.%s が %s にあるのに基準実装の csharp に無い。"
+                "取りこぼしなら足す。言語の性質による差なら "
+                "check_docs_sync.EXPECTED_MEMBER_GAPS へ理由つきで登録する"
+                % (type_name, member, "/".join(have)))
+
+
+# ---------------------------------------------------------------------------
+# 3. docs/api/ の生成
 # ---------------------------------------------------------------------------
 
 def render_api_page(page_id: str, page, apis) -> str:
@@ -266,7 +403,7 @@ def check_api_coverage(apis, report: Report) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 3. docs/features.md の照合
+# 4. docs/features.md の照合
 # ---------------------------------------------------------------------------
 
 #: features.md の行と、その機能を代表する型の対応。
@@ -340,6 +477,7 @@ def main() -> int:
     report = Report()
 
     check_types(apis, report)
+    check_members(apis, report)
     check_api_coverage(apis, report)
     sync_api_pages(apis, args.write, report)
     check_features(apis, report)

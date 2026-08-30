@@ -473,10 +473,10 @@ impl Writer {
 
         // 長さフィールドは u16
         // 65535 を超えると書き出せない
-        if encoded.len() > 65535 {
+        if encoded.len() > mutf8::MAX_BYTE_LENGTH {
             return Err(Error::new(
                 ErrorCode::InvalidArgument,
-                format!("文字列が長すぎる: MUTF-8 で {} バイト (上限 65535)", encoded.len()),
+                format!("文字列が長すぎる: MUTF-8 で {} バイト (上限 {})", encoded.len(), mutf8::MAX_BYTE_LENGTH),
             ));
         }
 

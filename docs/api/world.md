@@ -26,6 +26,7 @@
 | `ignore_session_lock` | `IgnoreSessionLock` | `ignoreSessionLock()` | `ignoreSessionLock` | `ignore_session_lock` | `ignore_session_lock` | session.lock の確認を飛ばすか |
 | `writable` | `Writable` | `writable()` | `writable` | `writable` | `writable` |  |
 | **LevelData** | `LevelData` | `LevelData` | `LevelData` | `LevelData` | `LevelData` | level.dat の内容 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `data` | `Data` | `data()` | `data` | `data` | `data()` |  |
 | `data_version` | `DataVersion` | `dataVersion()` | `dataVersion()` | `data_version` | `data_version()` | チャンク構造のバージョン |
 | `difficulty` | `Difficulty` | `difficulty()` | `difficulty()` | `difficulty` | `difficulty()` | 難易度（normal など） |
@@ -52,7 +53,7 @@
 | `mark_modified` | — | — | — | — | `mark_modified()` |  |
 | `poi_folder` | `PoiFolder` | `poiFolder()` | `poiFolder()` | `poi_folder()` | `poi_folder()` |  |
 | `region_folder` | `RegionFolder` | `regionFolder()` | `regionFolder()` | `region_folder()` | `region_folder()` |  |
-| `save_chunk` | `SaveChunk()` | `saveChunk()` | `saveChunk()` | `save_chunk()` | — | チャンクを書き戻す |
+| `save_chunk` | `SaveChunk()` | `saveChunk()` | `saveChunk()` | `save_chunk()` | `save_chunk()` | チャンクを書き戻す |
 | `set_biome` | `SetBiome()` | `setBiome()` | `setBiome()` | `set_biome()` | `set_biome()` |  |
 | `set_block` | `SetBlock()` | `setBlock()` | `setBlock()` | `set_block()` | `set_block()` | 絶対座標でブロックを設定する |
 | **Chunk** | `Chunk` | `Chunk` | `Chunk` | `Chunk` | `Chunk` | チャンク 1 つ分 |
@@ -62,6 +63,7 @@
 | `blocks_per_section` | `BlocksPerSection` | `BLOCKS_PER_SECTION` | `BLOCKS_PER_SECTION` | `BLOCKS_PER_SECTION` | `BLOCKS_PER_SECTION` | セクション 1 つに入るブロック数 |
 | `clear_heightmaps` | `ClearHeightmaps()` | `clearHeightmaps()` | `clearHeightmaps()` | `clear_heightmaps()` | `clear_heightmaps()` | Heightmaps を削除し、Minecraft に再計算させる |
 | `compact` | `Compact()` | `compact()` | `compact()` | `compact()` | `compact()` | 使われていないパレット要素を全セクションから取り除く |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `data_version` | `DataVersion` | `dataVersion()` | `dataVersion()` | `data_version` | `data_version()` | チャンク構造のバージョン |
 | `from_nbt` | `FromNbt()` | `fromNbt()` | `fromNbt()` | `from_nbt()` | `from_nbt()` | NBT からチャンクを読む |
 | `get_biome` | `GetBiome()` | `getBiome()` | `getBiome()` | `get_biome()` | `get_biome()` | バイオームを取得する |
@@ -85,6 +87,7 @@
 | `block_states` | `BlockStates` | `blockStates()` | `blockStates()` | `block_states` | `block_states()` |  |
 | `block_states_mut` | — | — | — | — | `block_states_mut()` |  |
 | `compact` | `Compact()` | `compact()` | `compact()` | `compact()` | `compact()` | 使われていないパレット要素を取り除く |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `from_nbt` | `FromNbt()` | `fromNbt()` | `fromNbt()` | `from_nbt()` | `from_nbt()` | NBT からセクションを読む |
 | `has_biomes` | `HasBiomes` | `hasBiomes()` | `hasBiomes()` | `has_biomes` | `has_biomes()` | バイオームを持つか |
 | `has_block_states` | `HasBlockStates` | `hasBlockStates()` | `hasBlockStates()` | `has_block_states` | `has_block_states()` | ブロック状態を持つか |
@@ -97,11 +100,16 @@
 | `on_warning` | `OnWarning` | `onWarning()` | `onWarning` | `on_warning` | `on_warning` |  |
 | **ChunkWriteOptions** | `ChunkWriteOptions` | `ChunkWriteOptions` | `ChunkWriteOptions` | `ChunkWriteOptions` | `ChunkWriteOptions` | チャンク書き込みのオプション |
 | `allow_foreign_data_version` | `AllowForeignDataVersion` | `allowForeignDataVersion()` | `allowForeignDataVersion` | `allow_foreign_data_version` | `allow_foreign_data_version` | 対象バージョン以外の DataVersion を持つチャンクの書き戻しを許すか |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | **VersionMismatchAction** | `VersionMismatchAction` | `VersionMismatchAction` | `VersionMismatchAction` | `VersionMismatchAction` | `VersionMismatchAction` | DataVersion が対象と違ったときの動作 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `error` | `Error` | `ERROR` | `Error` | `error` | `error` | UnsupportedDataVersion の例外にする |
 | `ignore` | `Ignore` | `IGNORE` | `Ignore` | `ignore` | `ignore` | 何もしない |
 | `warn` | `Warn` | `WARN` | `Warn` | `warn` | `warn` |  |
 | **BlockState** | `BlockState` | `BlockState` | `BlockState` | `BlockState` | `BlockState` | ブロックの状態 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `from_nbt` | `FromNbt()` | `fromNbt()` | `fromNbt()` | `from_nbt()` | `from_nbt()` | パレット要素の NBT から作る |
 | `name` | `Name` | `name()` | `name()` | `name` | `name()` | ブロックID（名前空間つき） |
 | `of` | — | — | — | — | `of()` |  |
@@ -114,6 +122,7 @@
 | `bits_per_entry` | `BitsPerEntry` | `bitsPerEntry()` | `bitsPerEntry()` | `bits_per_entry` | `bits_per_entry()` |  |
 | `ceil_log2` | `CeilLog2()` | `ceilLog2()` | `ceilLog2()` | `ceil_log2()` | `ceil_log2()` |  |
 | `compact` | `Compact()` | `compact()` | `compact()` | `compact()` | `compact()` | どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `entry_count` | `EntryCount` | `entryCount()` | `entryCount()` | `entry_count` | `entry_count()` |  |
 | `fill` | `Fill()` | `fill()` | `fill()` | `fill()` | `fill()` |  |
 | `filled` | `Filled()` | `filled()` | `filled()` | `filled()` | `filled()` | 単一の値で埋めたコンテナを作る |
@@ -126,15 +135,17 @@
 | **BitStorage** | `BitStorage` | `BitStorage` | `BitStorage` | `BitStorage` | `BitStorage` | 添字を 64bit 整数の配列へ詰めた表現 |
 | `as_longs` | — | — | — | — | `as_longs()` |  |
 | `bits_per_entry` | `BitsPerEntry` | `bitsPerEntry()` | `bitsPerEntry()` | `bits_per_entry` | `bits_per_entry()` | 1 エントリあたりのビット数 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `create` | `Create()` | `create()` | `create()` | `create()` | `create()` | すべてゼロで初期化した記憶域を作る |
 | `entry_count` | `EntryCount` | `entryCount()` | `entryCount()` | `entry_count` | `entry_count()` |  |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `from_longs` | `FromLongs()` | `fromLongs()` | `fromLongs()` | `from_longs()` | `from_longs()` | 既存の i64 配列から作る |
 | `get` | `Get()` | `get()` | `get()` | `get()` | `get()` | 添字の値を取り出す |
 | `into_longs` | — | — | — | — | `into_longs()` |  |
 | `long_count` | `LongCount()` | `longCount()` | `longCount()` | `long_count()` | `long_count()` | 必要な i64 の個数を求める |
 | `resize` | `Resize()` | `resize()` | `resize()` | `resize()` | `resize()` | 別のビット幅へ詰め直した新しい記憶域を返す |
 | `set` | `Set()` | `set()` | `set()` | `set()` | `set()` | 添字の値を書き換える |
-| `to_longs` | `ToLongs()` | `toLongs()` | `toLongs()` | `to_longs()` | — |  |
+| `to_longs` | `ToLongs()` | `toLongs()` | `toLongs()` | `to_longs()` | `to_longs()` |  |
 | `values_per_long` | `ValuesPerLong` | `valuesPerLong()` | `valuesPerLong()` | `values_per_long` | `values_per_long()` | 1 つの i64 に入るエントリ数 |
 
 <!-- generated:end -->

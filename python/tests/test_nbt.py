@@ -557,3 +557,80 @@ class TestCanonicalDecimal:
             source = NbtFloat(value)
             parsed = snbt.parse(snbt.write(source))
             assert struct.pack(">f", parsed.value) == struct.pack(">f", source.value)
+
+
+class TestTagEquality:
+    """タグの等値比較と深い複製
+
+    仕様: docs/spec/10-nbt-binary.md 7.3
+    規則は全言語で同じでなければならない
+    各言語の同名テストと突き合わせて読むこと
+    """
+
+    def test_same_type_same_value_is_equal(self):
+        assert NbtInt(42) == NbtInt(42)
+        assert NbtString("あ") == NbtString("あ")
+        assert NbtByteArray([1, 2]) == NbtByteArray([1, 2])
+
+        assert NbtInt(42) != NbtInt(43)
+        assert NbtByteArray([1]) != NbtByteArray([1, 2])
+
+    def test_different_tag_type_is_not_equal(self):
+        # 値が同じでもタグの型が違えば別物
+        assert NbtInt(1) != NbtShort(1)
+        assert NbtInt(1) != 1
+        assert NbtInt(1) is not None
+
+    def test_floats_compare_by_bit_pattern(self):
+        # NaN 同士は等しく、+0.0 と -0.0 は等しくない
+        assert NbtFloat(float("nan")) == NbtFloat(float("nan"))
+        assert NbtDouble(float("nan")) == NbtDouble(float("nan"))
+        assert NbtFloat(0.0) != NbtFloat(-0.0)
+        assert NbtDouble(0.0) != NbtDouble(-0.0)
+
+    def test_list_compares_element_type_and_order(self):
+        left = NbtList()
+        left.append(NbtInt(1))
+        left.append(NbtInt(2))
+
+        same = NbtList()
+        same.append(NbtInt(1))
+        same.append(NbtInt(2))
+        assert left == same
+
+        reversed_list = NbtList()
+        reversed_list.append(NbtInt(2))
+        reversed_list.append(NbtInt(1))
+        assert left != reversed_list
+
+        # 空でも要素型が違えば別物
+        assert NbtList(TagType.INT) != NbtList(TagType.BYTE)
+
+    def test_compound_compares_insertion_order(self):
+        left = NbtCompound()
+        left.set("a", NbtInt(1))
+        left.set("b", NbtInt(2))
+
+        same = NbtCompound()
+        same.set("a", NbtInt(1))
+        same.set("b", NbtInt(2))
+        assert left == same
+
+        # 中身は同じでも挿入順が違えば別物
+        reordered = NbtCompound()
+        reordered.set("b", NbtInt(2))
+        reordered.set("a", NbtInt(1))
+        assert left != reordered
+
+    def test_copy_is_deep(self):
+        original = NbtCompound()
+        inner = NbtList()
+        inner.append(NbtInt(1))
+        original.set("l", inner)
+
+        copied = original.copy()
+        copied.get_list("l").append(NbtInt(2))
+
+        assert len(original.get_list("l")) == 1
+        assert len(copied.get_list("l")) == 2
+        assert original != copied

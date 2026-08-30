@@ -45,10 +45,6 @@ MODULE_LEVEL = "(module)"
 
 #: API 一覧から除く型。実装の都合で公開しているが、利用者向けの API ではない。
 INTERNAL_TYPES = {
-    # 拡張メソッドの置き場。論理的には元の型のメンバ
-    "ChunkCompressionExtensions",
-    "ErrorCodeExtensions",
-    "TagTypeExtensions",
     # Rust の内部実装
     "Parser",
     "Reader",
@@ -65,6 +61,10 @@ INTERNAL_TYPES = {
 TYPE_ALIASES = {
     "SpringNbtException": "SpringNbtError",
     "Error": "SpringNbtError",
+    # C# の拡張メソッドの置き場は、論理的には元の型のメンバ
+    "ChunkCompressionExtensions": "ChunkCompression",
+    "ErrorCodeExtensions": "ErrorCode",
+    "TagTypeExtensions": "TagType",
     # C# / Java の静的クラスは、他言語ではモジュール関数
     "NbtIo": MODULE_LEVEL,
     "Snbt": MODULE_LEVEL,
@@ -72,10 +72,20 @@ TYPE_ALIASES = {
     "SpringNbt": MODULE_LEVEL,
 }
 
-#: 言語の予約語を避けるために綴りを変えたメンバを、論理名へ寄せる表。
+#: 言語の作法で綴りが変わるメンバを、論理名へ寄せる表。
 MEMBER_ALIASES = {
     # Python の with は予約語
     "with_property": "with",
+    # Rust の複製は Clone トレイトの clone()
+    # copy は別の意味を持つマーカートレイトなので、その名前は使えない
+    "clone": "copy",
+    # Rust には Stream 型が無く、読み書きは Read / Write トレイトで受ける
+    "read_reader": "read_stream",
+    "write_writer": "write_stream",
+    # Rust では &str を返す変換に as_str と名づける
+    "as_str": "as_string",
+    # Rust の type は予約語
+    "tag_type": "type",
 }
 
 #: 言語ごとに存在が変わる型と、その理由。型の一致検査から除く。
@@ -97,12 +107,13 @@ EXPECTED_TYPE_GAPS = {
 }
 
 #: API 一覧から除くメンバ。言語の作法として要るが、論理APIではない。
+#:
+#: 「言語ごとに綴りが変わるだけ」のものと「言語ごとに機能そのものが変わる」ものを
+#: 混ぜないこと。等値比較や深い複製は前者なので、ここには入れず突合の対象にする。
 INTERNAL_MEMBERS = {
-    "equals",
     "hash_code",
     "to_string",
     "dispose",
-    "clone",
     "iterator",
     "get_enumerator",
     "get_hash_code",
@@ -129,8 +140,8 @@ INTERNAL_MEMBERS = {
     "index_of",
     "contains",
     "defaults",
-    # コレクションの走査・複製は言語ごとに作法が違う
-    "copy", "iter", "items", "entries", "keys", "values", "size", "push",
+    # コレクションの走査は言語ごとに作法が違う
+    "iter", "items", "entries", "keys", "values", "size", "push",
     "add", "append", "remove_at", "insert", "get_enumerator",
 }
 
@@ -170,6 +181,8 @@ class Api:
         self.type_docs = {}
         #: (論理型名, 論理メンバ名) -> 概要（1行）
         self.member_docs = {}
+        #: 論理型名 -> 継承元の型名の一覧
+        self.bases = {}
 
     def add_type(self, name: str, doc: str = "") -> None:
         """公開型を登録する。別名は論理名へ寄せる。"""
@@ -182,8 +195,12 @@ class Api:
             self.members[logical] = {}
 
         # モジュール扱いの静的クラスは、実名を持たせない
+        #
+        # 拡張メソッドの置き場のように別名で寄せた型は、
+        # 論理名と同じ綴りの本体が現れたらそちらを実名に採る
         if logical != MODULE_LEVEL:
-            self.type_names[logical] = name
+            if logical not in self.type_names or name == logical:
+                self.type_names[logical] = name
 
         if len(doc) > 0 and logical not in self.type_docs:
             self.type_docs[logical] = doc
@@ -259,6 +276,46 @@ class Api:
                 return members[member]
 
         return ""
+
+    def add_base(self, type_name: str, base_name: str) -> None:
+        """継承関係を記録する。"""
+        logical = TYPE_ALIASES.get(type_name, type_name)
+
+        if logical in INTERNAL_TYPES:
+            return
+
+        self.bases.setdefault(logical, [])
+
+        if base_name not in self.bases[logical]:
+            self.bases[logical].append(base_name)
+
+    def resolve_inheritance(self) -> None:
+        """継承元のメンバを継承先へ写し、内部専用の基底型を落とす。
+
+        `_ScalarTag` のように利用者へ見せない基底へメンバをまとめている言語がある。
+        論理APIとしては継承先が持っているのと同じなので、写してから基底を消す。
+        """
+        # 継承の連鎖をたどるため、変化がなくなるまで繰り返す
+        changed = True
+
+        while changed:
+            changed = False
+
+            for type_name, bases in self.bases.items():
+                if type_name not in self.members:
+                    continue
+
+                # 継承元のメンバのうち、まだ持っていないものを写す
+                for base in bases:
+                    for member, actual in self.members.get(base, {}).items():
+                        if member not in self.members[type_name]:
+                            self.members[type_name][member] = actual
+                            changed = True
+
+        # 内部専用の基底は公開APIではないので落とす
+        for type_name in [name for name in self.members if name.startswith("_")]:
+            del self.members[type_name]
+            self.type_names.pop(type_name, None)
 
     def merge_setters(self) -> None:
         """`set_foo` と `foo` が両方ある型では、`set_foo` を落とす。
@@ -422,6 +479,15 @@ CSHARP_MEMBER = re.compile(
     r"readonly\s+|const\s+|new\s+|partial\s+)*"
     r"(?:[A-Za-z0-9_<>,\[\]\?\. ]+?)\s+([A-Za-z0-9_]+)\s*[\(\{=;]")
 
+#: `class NbtByte : NbtTag` の継承元。
+CSHARP_BASE = re.compile(r":\s*([A-Za-z0-9_<>,\s\.]+?)\s*$")
+
+#: 本体の `{` を次の行に置くプロパティ（`public string Value` だけの行）。
+CSHARP_MEMBER_BLOCK = re.compile(
+    r"^\s{4}public\s+(?:static\s+|virtual\s+|override\s+|abstract\s+|sealed\s+|"
+    r"readonly\s+|new\s+)*"
+    r"(?:[A-Za-z0-9_<>,\[\]\?\.]+)\s+([A-Za-z0-9_]+)\s*$")
+
 CSHARP_CONSTRUCTOR = re.compile(r"^\s{4}public\s+([A-Z][A-Za-z0-9_]*)\s*\(")
 
 CSHARP_ENUM_VALUE = re.compile(r"^\s{4}([A-Z][A-Za-z0-9_]*)\s*(?:=\s*[^,]+)?,?\s*$")
@@ -465,6 +531,18 @@ def extract_csharp() -> Api:
                     summary = ""
 
                 api.add_type(current, summary)
+
+                # record は値としての等値比較を自動で持つ
+                if " record " in line:
+                    api.add_member(current, "equals", "Equals()")
+
+                # 継承元のメンバも論理的にはこの型が持っている
+                base_match = CSHARP_BASE.search(line)
+
+                if base_match is not None:
+                    for base in base_match.group(1).split(","):
+                        api.add_base(current, base.strip())
+
                 continue
 
             if current is None:
@@ -488,6 +566,10 @@ def extract_csharp() -> Api:
 
             member_match = CSHARP_MEMBER.match(line)
 
+            # 本体の { を次の行に置くプロパティも拾う
+            if member_match is None:
+                member_match = CSHARP_MEMBER_BLOCK.match(line)
+
             if member_match is not None:
                 name = member_match.group(1)
                 api.add_member(current, normalize_member(name), with_parens(line, name),
@@ -510,6 +592,13 @@ JAVA_MEMBER = re.compile(
     r"^\s{4}public\s+(?:static\s+|final\s+|abstract\s+|synchronized\s+)*"
     r"(?:[A-Za-z0-9_<>,\[\]\?\. ]+?)\s+([A-Za-z0-9_]+)\s*[\(=;]")
 
+#: `class NbtByte implements NbtTag` / `extends X` の継承元。
+JAVA_BASE = re.compile(r"\b(?:extends|implements)\s+([A-Za-z0-9_<>,\s\.]+?)\s*(?:\{|$)")
+
+#: interface のメソッド宣言。暗黙に public なので修飾子が無い。
+JAVA_INTERFACE_MEMBER = re.compile(
+    r"^\s{4}(?:[A-Za-z0-9_<>,\[\]\?\.]+)\s+([a-z][A-Za-z0-9_]*)\s*\(")
+
 JAVA_CONSTRUCTOR = re.compile(r"^\s{4}public\s+([A-Z][A-Za-z0-9_]*)\s*\(")
 
 JAVA_ENUM_VALUE = re.compile(r"^\s{4}([A-Z][A-Z0-9_]*)\s*(?:\([^)]*\))?\s*[,;]?\s*$")
@@ -525,12 +614,22 @@ def extract_java() -> Api:
 
     for path in source_files(root, ".java"):
         current = None
+        in_interface = False
 
         for line in read_lines(path):
             type_match = JAVA_TYPE.match(line)
 
             if type_match is not None:
                 current = type_match.group(1)
+                in_interface = " interface " in line
+
+                # 継承元のメンバも論理的にはこの型が持っている
+                base_match = JAVA_BASE.search(line)
+
+                if base_match is not None:
+                    for base in base_match.group(1).split(","):
+                        api.add_base(current, base.strip())
+
                 api.add_type(current)
 
                 # record は括弧の中のコンポーネントがそのままアクセサになる
@@ -539,6 +638,9 @@ def extract_java() -> Api:
                 if record_match is not None:
                     for component in split_parameters(record_match.group(1)):
                         api.add_member(current, to_snake(component), component + "()")
+
+                    # record は値としての等値比較を自動で持つ
+                    api.add_member(current, "equals", "equals()")
 
                 continue
 
@@ -558,6 +660,10 @@ def extract_java() -> Api:
 
             member_match = JAVA_MEMBER.match(line)
 
+            # interface のメソッドは暗黙に public なので修飾子が無い
+            if member_match is None and in_interface:
+                member_match = JAVA_INTERFACE_MEMBER.match(line)
+
             if member_match is not None:
                 name = member_match.group(1)
                 api.add_member(current, normalize_member(name), with_parens(line, name))
@@ -572,6 +678,12 @@ def extract_java() -> Api:
 TS_TYPE = re.compile(
     r"^export\s+(?:abstract\s+)?(?:class|interface|enum)\s+([A-Za-z0-9_]+)")
 
+#: `export class X extends Y` の継承元。
+TS_BASE = re.compile(r"\bextends\s+([A-Za-z0-9_]+)")
+
+#: 列挙のメソッド代わりに、型名を接頭辞に付けたモジュール関数を置いている型。
+TS_ENUM_HELPER_OWNERS = ("ChunkCompression", "ErrorCode", "TagType")
+
 TS_FUNCTION = re.compile(r"^export\s+function\s+([A-Za-z0-9_]+)")
 
 TS_CONST = re.compile(r"^export\s+const\s+([A-Za-z0-9_]+)")
@@ -584,7 +696,12 @@ TS_ENUM_VALUE = re.compile(r"^  ([A-Za-z0-9_]+)\s*=")
 TS_INTERFACE_FIELD = re.compile(r"^  ([A-Za-z0-9_]+)\??\s*:")
 
 #: constructor(readonly foo: T, ...) の形で公開されるフィールド。
-TS_PARAMETER_PROPERTY = re.compile(r"^    (?:public\s+)?readonly\s+([A-Za-z0-9_]+)\s*:")
+TS_PARAMETER_PROPERTY = re.compile(
+    r"^    (?:public\s+readonly\s+|readonly\s+|public\s+)([A-Za-z0-9_]+)\s*:")
+
+#: `constructor(public value: Int8Array)` のように 1 行に収めた引数プロパティ。
+TS_INLINE_PARAMETER_PROPERTY = re.compile(
+    r"^(?:public\s+readonly\s+|readonly\s+|public\s+)([A-Za-z0-9_]+)\s*:")
 
 #: クラス直下の公開フィールド（`readonly type = TagType.Byte as const;`）。
 TS_CLASS_FIELD = re.compile(r"^  (?:public\s+)?readonly\s+([A-Za-z0-9_]+)\s*=")
@@ -610,6 +727,13 @@ def extract_typescript() -> Api:
                 in_interface = line.lstrip().startswith("export interface")
                 in_constructor = False
                 api.add_type(current)
+
+                # 継承元のメンバも論理的にはこの型が持っている
+                base_match = TS_BASE.search(line)
+
+                if base_match is not None:
+                    api.add_base(current, base_match.group(1))
+
                 continue
 
             function_match = TS_FUNCTION.match(line)
@@ -617,7 +741,21 @@ def extract_typescript() -> Api:
             if function_match is not None:
                 current = None
                 name = function_match.group(1)
-                api.add_member(MODULE_LEVEL, normalize_member(name), name + "()")
+                logical = normalize_member(name)
+                owner = MODULE_LEVEL
+
+                # TypeScript の列挙にはメソッドを持たせられないので、
+                # `tagTypeAsString` のように型名を接頭辞に付けた関数で代用している
+                # 論理的にはその型のメンバなので、型のほうへ寄せる
+                for type_name in TS_ENUM_HELPER_OWNERS:
+                    prefix = to_snake(type_name) + "_"
+
+                    if logical.startswith(prefix):
+                        owner = type_name
+                        logical = logical[len(prefix):]
+                        break
+
+                api.add_member(owner, logical, name + "()")
                 continue
 
             const_match = TS_CONST.match(line)
@@ -653,6 +791,17 @@ def extract_typescript() -> Api:
             # constructor の引数に readonly を付けたものは公開フィールドになる。
             # private constructor でも引数プロパティは公開なので、除外より先に見る
             if line.startswith("  constructor") or line.startswith("  private constructor"):
+                # 引数リストが同じ行に収まっている場合は、その場で引数プロパティを拾う
+                if ")" in line:
+                    inline = line[line.index("(") + 1:line.rindex(")")]
+
+                    for parameter in inline.split(","):
+                        inline_match = TS_INLINE_PARAMETER_PROPERTY.match(parameter.strip())
+
+                        if inline_match is not None:
+                            name = inline_match.group(1)
+                            api.add_member(current, normalize_member(name), name)
+
                 # 同じ行で引数リストが閉じているなら、次の行から通常のメンバに戻る
                 in_constructor = ")" not in line
                 continue
@@ -694,13 +843,18 @@ def extract_typescript() -> Api:
 # Python
 # ---------------------------------------------------------------------------
 
-PY_CLASS = re.compile(r"^class\s+([A-Za-z0-9_]+)")
+PY_CLASS = re.compile(r"^class\s+([A-Za-z0-9_]+)\s*(?:\(([^)]*)\))?")
 PY_METHOD = re.compile(r"^    def\s+([A-Za-z0-9_]+)")
 PY_FUNCTION = re.compile(r"^def\s+([A-Za-z0-9_]+)")
 PY_ENUM_VALUE = re.compile(r"^    ([A-Z][A-Z0-9_]*)\s*=")
 PY_CLASS_FIELD = re.compile(r"^    ([a-z][A-Za-z0-9_]*)\s*[:=]")
 PY_MODULE_CONST = re.compile(r"^([A-Z][A-Z0-9_]*)\s*[:=]")
 PY_ATTRIBUTE = re.compile(r"^\s{8,}self\.([a-z][A-Za-z0-9_]*)\s*[:=]")
+
+#: 論理APIにあたる特殊メソッドと、その論理名。
+PY_DUNDER_MEMBERS = {
+    "__eq__": "equals",
+}
 
 
 def extract_python() -> Api:
@@ -722,12 +876,15 @@ def extract_python() -> Api:
 
             if class_match is not None:
                 current = class_match.group(1)
+                api.add_type(current)
 
-                # 先頭がアンダースコアなら内部のもの
-                if current.startswith("_"):
-                    current = None
-                else:
-                    api.add_type(current)
+                # 継承元のメンバも論理的にはこの型が持っている
+                # 内部専用の基底は継承を解いたあとで落とす
+                bases = class_match.group(2)
+
+                if bases is not None:
+                    for base in bases.split(","):
+                        api.add_base(current, base.strip())
 
                 continue
 
@@ -760,6 +917,12 @@ def extract_python() -> Api:
                 continue
 
             method_match = PY_METHOD.match(line)
+
+            # 等値比較は __eq__ で書くのが Python の作法
+            if method_match is not None and method_match.group(1) in PY_DUNDER_MEMBERS:
+                api.add_member(current, PY_DUNDER_MEMBERS[method_match.group(1)], "==")
+                is_property = False
+                continue
 
             if method_match is not None and not method_match.group(1).startswith("_"):
                 name = method_match.group(1)
@@ -811,6 +974,20 @@ RS_CONST = re.compile(r"^pub\s+const\s+([A-Z][A-Z0-9_]*)\s*:")
 RS_ACCESSOR_MACRO = re.compile(
     r"^([a-z_]+_accessors)!\(\s*([a-z_0-9]+)\s*,\s*([a-z_0-9]+)\s*,")
 
+RS_DERIVE = re.compile(r"^#\[derive\(([^)]*)\)\]")
+
+RS_TRAIT_IMPL_NAMED = re.compile(
+    r"^impl(?:<[^>]*>)?\s+([A-Za-z0-9_]+)(?:<[^>]*>)?\s+for\s+([A-Za-z0-9_]+)")
+
+#: derive / trait 実装で得られる論理メンバと、その Rust での書き方。
+#:
+#: Rust では等値比較も複製もトレイトで与えるので、`pub fn` としては現れない。
+#: 他言語の `equals` / `copy` と同じ機能なので、ここで論理APIへ写す。
+RS_TRAIT_MEMBERS = {
+    "Clone": ("copy", "clone()"),
+    "PartialEq": ("equals", "=="),
+}
+
 
 def extract_rust() -> Api:
     """Rust のソースから公開APIを抜き出す。"""
@@ -821,17 +998,43 @@ def extract_rust() -> Api:
     for path in source_files(root, ".rs"):
         current = None
         in_enum = False
+        derives = set()
 
         for line in read_lines(path):
+            derive_match = RS_DERIVE.match(line)
+
+            # derive は直後の型定義にかかるので、いったん覚えておく
+            if derive_match is not None:
+                derives = {name.strip() for name in derive_match.group(1).split(",")}
+                continue
+
             type_match = RS_TYPE.match(line)
 
             if type_match is not None:
                 current = type_match.group(1)
                 in_enum = line.startswith("pub enum")
                 api.add_type(current)
+
+                # derive で与えられる equals / copy を論理APIに数える
+                for trait, (member, actual) in RS_TRAIT_MEMBERS.items():
+                    if trait in derives:
+                        api.add_member(current, member, actual)
+
+                derives = set()
                 continue
 
-            # trait 実装は言語の作法なので論理APIに数えない
+            derives = set()
+            trait_match = RS_TRAIT_IMPL_NAMED.match(line)
+
+            # 手書きの trait 実装からも equals / copy を拾う
+            if trait_match is not None and trait_match.group(1) in RS_TRAIT_MEMBERS:
+                member, actual = RS_TRAIT_MEMBERS[trait_match.group(1)]
+                api.add_member(trait_match.group(2), member, actual)
+                current = None
+                in_enum = False
+                continue
+
+            # そのほかの trait 実装は言語の作法なので論理APIに数えない
             if RS_TRAIT_IMPL.match(line) is not None:
                 current = None
                 in_enum = False
@@ -950,6 +1153,7 @@ def extract_all(languages):
 
     for language in languages:
         api = EXTRACTORS[language]()
+        api.resolve_inheritance()
         api.merge_setters()
         result[language] = api
 

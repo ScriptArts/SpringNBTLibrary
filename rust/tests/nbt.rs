@@ -93,14 +93,14 @@ fn build_nested_compound(depth: usize) -> Vec<u8> {
 #[test]
 fn mutf8_roundtrips_and_rejects_invalid_input() {
     // ASCII
-    assert_eq!(mutf8::encode_str("Bananrama"), b"Bananrama");
+    assert_eq!(mutf8::encode("Bananrama"), b"Bananrama");
 
     // U+0000 は C0 80 の 2 バイトになる
-    assert_eq!(mutf8::encode_str("a\u{0000}b"), vec![0x61, 0xC0, 0x80, 0x62]);
+    assert_eq!(mutf8::encode("a\u{0000}b"), vec![0x61, 0xC0, 0x80, 0x62]);
 
     // 補助文字は CESU-8 になる
     assert_eq!(
-        mutf8::encode_str("\u{1F600}"),
+        mutf8::encode("\u{1F600}"),
         vec![0xED, 0xA0, 0xBD, 0xED, 0xB8, 0x80]
     );
 
@@ -688,4 +688,99 @@ fn every_formatted_value_parses_back_to_the_same_bits() {
             other => panic!("Float ではない: {other:?}"),
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// タグの等値比較と深い複製
+//
+// 仕様: docs/spec/10-nbt-binary.md 7.3
+// 規則は全言語で同じでなければならない
+// 各言語の同名テストと突き合わせて読むこと
+// ---------------------------------------------------------------------------
+
+#[test]
+fn same_type_same_value_is_equal() {
+    assert_eq!(NbtTag::Int(42), NbtTag::Int(42));
+    assert_eq!(
+        NbtTag::String(NbtString::from("あ")),
+        NbtTag::String(NbtString::from("あ"))
+    );
+    assert_eq!(NbtTag::ByteArray(vec![1, 2]), NbtTag::ByteArray(vec![1, 2]));
+
+    assert_ne!(NbtTag::Int(42), NbtTag::Int(43));
+    assert_ne!(NbtTag::ByteArray(vec![1]), NbtTag::ByteArray(vec![1, 2]));
+}
+
+#[test]
+fn different_tag_type_is_not_equal() {
+    // 値が同じでもタグの型が違えば別物
+    assert_ne!(NbtTag::Int(1), NbtTag::Short(1));
+}
+
+#[test]
+fn floats_compare_by_bit_pattern() {
+    // NaN 同士は等しく、+0.0 と -0.0 は等しくない
+    assert_eq!(NbtTag::Float(f32::NAN), NbtTag::Float(f32::NAN));
+    assert_eq!(NbtTag::Double(f64::NAN), NbtTag::Double(f64::NAN));
+    assert_ne!(NbtTag::Float(0.0), NbtTag::Float(-0.0));
+    assert_ne!(NbtTag::Double(0.0), NbtTag::Double(-0.0));
+}
+
+#[test]
+fn list_compares_element_type_and_order() {
+    let mut left = NbtList::new();
+    left.push(NbtTag::Int(1)).unwrap();
+    left.push(NbtTag::Int(2)).unwrap();
+
+    let mut same = NbtList::new();
+    same.push(NbtTag::Int(1)).unwrap();
+    same.push(NbtTag::Int(2)).unwrap();
+    assert_eq!(left, same);
+
+    let mut reversed = NbtList::new();
+    reversed.push(NbtTag::Int(2)).unwrap();
+    reversed.push(NbtTag::Int(1)).unwrap();
+    assert_ne!(left, reversed);
+
+    // 空でも要素型が違えば別物
+    assert_ne!(
+        NbtList::with_element_type(TagType::Int),
+        NbtList::with_element_type(TagType::Byte)
+    );
+}
+
+#[test]
+fn compound_compares_insertion_order() {
+    let mut left = NbtCompound::new();
+    left.set("a", NbtTag::Int(1));
+    left.set("b", NbtTag::Int(2));
+
+    let mut same = NbtCompound::new();
+    same.set("a", NbtTag::Int(1));
+    same.set("b", NbtTag::Int(2));
+    assert_eq!(left, same);
+
+    // 中身は同じでも挿入順が違えば別物
+    let mut reordered = NbtCompound::new();
+    reordered.set("b", NbtTag::Int(2));
+    reordered.set("a", NbtTag::Int(1));
+    assert_ne!(left, reordered);
+}
+
+#[test]
+fn clone_is_deep() {
+    let mut original = NbtCompound::new();
+    let mut inner = NbtList::new();
+    inner.push(NbtTag::Int(1)).unwrap();
+    original.set("l", NbtTag::List(inner));
+
+    // 複製したほうのリストだけを差し替える
+    let mut copied = original.clone();
+    let mut inner = copied.get_list("l").unwrap().clone();
+    inner.push(NbtTag::Int(2)).unwrap();
+    copied.set("l", NbtTag::List(inner));
+
+    assert_eq!(original.get_list("l").unwrap().len(), 1);
+    assert_eq!(copied.get_list("l").unwrap().len(), 2);
+    assert_ne!(original, copied);
 }

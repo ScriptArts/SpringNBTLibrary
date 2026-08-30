@@ -122,14 +122,14 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <inheritdoc/>
-    public override NbtTag Clone()
+    public override NbtTag Copy()
     {
         NbtList copy = new NbtList(ElementType);
 
         // 要素も深くコピーする
         foreach (NbtTag item in items)
         {
-            copy.items.Add(item.Clone());
+            copy.items.Add(item.Copy());
         }
 
         return copy;

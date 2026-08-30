@@ -272,6 +272,39 @@ impl Dimension {
         self.modified.insert((chunk_x, chunk_z));
     }
 
+    /// チャンクをその場で書き戻す
+    ///
+    /// `flush` を待たずに反映したいときに使う
+    pub fn save_chunk(&mut self, chunk: &Chunk) -> Result<()> {
+        self.ensure_open()?;
+
+        // 読み取り専用で開いた次元には書き込めない
+        if !self.writable {
+            return Err(Error::new(
+                ErrorCode::InvalidArgument,
+                "読み取り専用で開いた次元には書き込めない",
+            ));
+        }
+
+        let chunk_x = chunk.x()?;
+        let chunk_z = chunk.z()?;
+        let nbt = chunk.to_nbt(&self.chunk_write)?;
+
+        // 地形のフォルダが無ければ書き込めない
+        match self.region_folder()? {
+            Some(folder) => folder.write_chunk_nbt(chunk_x, chunk_z, &nbt)?,
+            None => {
+                return Err(Error::new(
+                    ErrorCode::InvalidArgument,
+                    "region/ が無い次元には書き込めない",
+                ))
+            }
+        }
+
+        self.modified.remove(&(chunk_x, chunk_z));
+        Ok(())
+    }
+
     /// 絶対座標でブロックを取得する
     /// チャンクが無ければ `None`
     pub fn get_block(&mut self, x: i32, y: i32, z: i32) -> Result<Option<BlockState>> {

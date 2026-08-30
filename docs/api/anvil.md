@@ -43,9 +43,13 @@
 | `write_chunk` | `WriteChunk()` | `writeChunk()` | `writeChunk()` | `write_chunk()` | `write_chunk()` | チャンクを NBT として書き込む |
 | `write_chunk_nbt` | — | — | — | — | `write_chunk_nbt()` |  |
 | **RegionFileMode** | `RegionFileMode` | `RegionFileMode` | `RegionFileMode` | `RegionFileMode` | `RegionFileMode` | リージョンファイルを開くときの動作 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `read_only` | `ReadOnly` | `READ_ONLY` | `ReadOnly` | `read_only` | `read_only` |  |
 | `read_write` | `ReadWrite` | `READ_WRITE` | `ReadWrite` | `read_write` | `read_write` |  |
 | **ChunkPos** | `ChunkPos` | `ChunkPos` | `ChunkPos` | `ChunkPos` | `ChunkPos` | チャンクの絶対座標 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `index` | `Index` | `index()` | `index()` | `index()` | `index()` | ロケーションテーブル内の添字 (0..1023) |
 | `local_x` | `LocalX` | `localX()` | `localX()` | `local_x()` | `local_x()` | リージョン内でのX位置 (0..31) |
 | `local_z` | `LocalZ` | `localZ()` | `localZ()` | `local_z()` | `local_z()` | リージョン内でのZ位置 (0..31) |
@@ -53,16 +57,19 @@
 | `x` | `X` | `x()` | `x` | `x` | `x` | 絶対チャンクX座標 |
 | `z` | `Z` | `z()` | `z` | `z` | `z` | 絶対チャンクZ座標 |
 | **RegionPos** | `RegionPos` | `RegionPos` | `RegionPos` | `RegionPos` | `RegionPos` | リージョンの座標 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `file_name` | `FileName` | `fileName()` | `fileName()` | `file_name()` | `file_name()` | このリージョンのファイル名（r.X.Z.mca） |
 | `from_file_name` | `FromFileName()` | `fromFileName()` | `fromFileName()` | `from_file_name()` | `from_file_name()` | r.X.Z.mca 形式のファイル名から座標を得る |
 | `key` | — | — | `key()` | — | — |  |
 | `x` | `X` | `x()` | `x` | `x` | `x` | リージョンX座標 |
 | `z` | `Z` | `z()` | `z` | `z` | `z` | リージョンZ座標 |
 | **ChunkCompression** | `ChunkCompression` | `ChunkCompression` | `ChunkCompression` | `ChunkCompression` | `ChunkCompression` | リージョンファイル内でチャンクに使われる圧縮方式 |
-| `as_str` | — | — | — | — | `as_str()` |  |
-| `as_string` | — | `asString()` | — | `as_string()` | — |  |
+| `as_string` | `AsString()` | `asString()` | `chunkCompressionAsString()` | `as_string()` | `as_str()` | 適合性テストで言語間比較に使う識別子を返す |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `custom` | `Custom` | `CUSTOM` | `Custom` | `custom` | `custom` |  |
-| `from_id` | — | `fromId()` | — | `from_id()` | `from_id()` |  |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `from_id` | `FromId()` | `fromId()` | `chunkCompressionFromId()` | `from_id()` | `from_id()` | 圧縮方式IDから ChunkCompression を得る |
 | `gzip` | `Gzip` | `GZIP` | `Gzip` | `gzip` | `gzip` |  |
 | `id` | `Id` | `id()` | `id` | `id()` | `id()` |  |
 | `lz4` | `Lz4` | `LZ4` | `Lz4` | `lz4` | `lz4` |  |
@@ -70,7 +77,9 @@
 | `zlib` | `Zlib` | `ZLIB` | `Zlib` | `zlib` | `zlib` |  |
 | **RawChunk** | `RawChunk` | `RawChunk` | `RawChunk` | `RawChunk` | `RawChunk` | リージョンファイルに格納されたままの、圧縮済みチャンクデータ |
 | `compression` | `Compression` | `compression()` | `compression` | `compression` | `compression` | この本体に使われている圧縮方式 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `data` | `Data` | `data()` | `data` | `data` | `data` | 圧縮されたままの本体 |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `external` | `External` | `external()` | `external` | `external` | `external` | 外部ファイル c.X.Z.mcc に格納されていたか |
 
 <!-- generated:end -->

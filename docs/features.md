@@ -118,4 +118,5 @@
 | 例外 / 戻り値 | Rust のみ `Result<T, Error>` | 他4言語は例外。`ErrorCode` の集合は一致（[adr/0005](adr/0005-unified-error-model.md)） |
 | Java の検査例外 | 使わない | シグネチャを他言語と揃えるため（[adr/0005](adr/0005-unified-error-model.md)） |
 | Python の再帰上限 | 読み書き時に一時的に引き上げる | 既定の上限 1000 が仕様の深さ上限 512 に届かないため |
+| ストリーム入出力 | TypeScript には無い | Node のストリームは非同期しか無く、同期 API で揃えられないため。ファイルとバイト列の入口は同じ |
 | `session.lock` の確認 | C# / Java / Python(POSIX) のみ実施 | 標準ライブラリでファイルの排他ロックを扱えない言語があるため（[adr/0008](adr/0008-session-lock.md)） |

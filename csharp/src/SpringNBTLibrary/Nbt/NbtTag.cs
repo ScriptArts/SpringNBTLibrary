@@ -22,7 +22,7 @@ public abstract class NbtTag
     public abstract TagType Type { get; }
 
     /// <summary>このタグの深いコピーを作る</summary>
-    public abstract NbtTag Clone();
+    public abstract NbtTag Copy();
 }
 
 /// <summary>TAG_Byte
@@ -42,7 +42,7 @@ public sealed class NbtByte : NbtTag
     public override TagType Type => TagType.Byte;
 
     /// <inheritdoc/>
-    public override NbtTag Clone() => new NbtByte(Value);
+    public override NbtTag Copy() => new NbtByte(Value);
 
     /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is NbtByte other && other.Value == Value;
@@ -71,7 +71,7 @@ public sealed class NbtShort : NbtTag
     public override TagType Type => TagType.Short;
 
     /// <inheritdoc/>
-    public override NbtTag Clone() => new NbtShort(Value);
+    public override NbtTag Copy() => new NbtShort(Value);
 
     /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is NbtShort other && other.Value == Value;
@@ -100,7 +100,7 @@ public sealed class NbtInt : NbtTag
     public override TagType Type => TagType.Int;
 
     /// <inheritdoc/>
-    public override NbtTag Clone() => new NbtInt(Value);
+    public override NbtTag Copy() => new NbtInt(Value);
 
     /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is NbtInt other && other.Value == Value;
@@ -129,7 +129,7 @@ public sealed class NbtLong : NbtTag
     public override TagType Type => TagType.Long;
 
     /// <inheritdoc/>
-    public override NbtTag Clone() => new NbtLong(Value);
+    public override NbtTag Copy() => new NbtLong(Value);
 
     /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is NbtLong other && other.Value == Value;
@@ -158,7 +158,7 @@ public sealed class NbtFloat : NbtTag
     public override TagType Type => TagType.Float;
 
     /// <inheritdoc/>
-    public override NbtTag Clone() => new NbtFloat(Value);
+    public override NbtTag Copy() => new NbtFloat(Value);
 
     /// <inheritdoc/>
     /// <remarks>NaN や -0.0 を区別するため、値ではなくビットパターンで比較する</remarks>
@@ -192,7 +192,7 @@ public sealed class NbtDouble : NbtTag
     public override TagType Type => TagType.Double;
 
     /// <inheritdoc/>
-    public override NbtTag Clone() => new NbtDouble(Value);
+    public override NbtTag Copy() => new NbtDouble(Value);
 
     /// <inheritdoc/>
     /// <remarks>NaN や -0.0 を区別するため、値ではなくビットパターンで比較する</remarks>
@@ -245,7 +245,7 @@ public sealed class NbtString : NbtTag
     public override TagType Type => TagType.String;
 
     /// <inheritdoc/>
-    public override NbtTag Clone() => new NbtString(value);
+    public override NbtTag Copy() => new NbtString(value);
 
     /// <inheritdoc/>
     public override bool Equals(object? obj)

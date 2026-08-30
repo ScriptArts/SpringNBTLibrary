@@ -567,6 +567,81 @@ test("書き出した表記を読み戻すとビットが一致する", () => {
   }
 });
 
+test("equals: 同じ型で同じ値なら等しい", () => {
+  assert.ok(new NbtInt(42).equals(new NbtInt(42)));
+  assert.ok(new NbtLong(42n).equals(new NbtLong(42n)));
+  assert.ok(new NbtString("あ").equals(new NbtString("あ")));
+  assert.ok(new NbtByteArray(Int8Array.from([1, 2])).equals(new NbtByteArray(Int8Array.from([1, 2]))));
+
+  assert.ok(!new NbtInt(42).equals(new NbtInt(43)));
+  assert.ok(!new NbtByteArray(Int8Array.from([1])).equals(new NbtByteArray(Int8Array.from([1, 2]))));
+});
+
+test("equals: 型が違えば等しくない", () => {
+  // 値が同じでもタグの型が違えば別物
+  assert.ok(!new NbtInt(1).equals(new NbtShort(1)));
+  assert.ok(!new NbtInt(1).equals(1));
+  assert.ok(!new NbtInt(1).equals(undefined));
+});
+
+test("equals: 浮動小数点はビットパターンで比べる", () => {
+  // NaN 同士は等しく、+0.0 と -0.0 は等しくない
+  assert.ok(new NbtFloat(NaN).equals(new NbtFloat(NaN)));
+  assert.ok(new NbtDouble(NaN).equals(new NbtDouble(NaN)));
+  assert.ok(!new NbtFloat(0).equals(new NbtFloat(-0)));
+  assert.ok(!new NbtDouble(0).equals(new NbtDouble(-0)));
+});
+
+test("equals: リストは要素型と並びを見る", () => {
+  const left = new NbtList();
+  left.add(new NbtInt(1));
+  left.add(new NbtInt(2));
+
+  const right = new NbtList();
+  right.add(new NbtInt(1));
+  right.add(new NbtInt(2));
+  assert.ok(left.equals(right));
+
+  const reversed = new NbtList();
+  reversed.add(new NbtInt(2));
+  reversed.add(new NbtInt(1));
+  assert.ok(!left.equals(reversed));
+
+  // 空でも要素型が違えば別物
+  assert.ok(!new NbtList(TagType.Int).equals(new NbtList(TagType.Byte)));
+});
+
+test("equals: Compound はキーの並び順も見る", () => {
+  const left = new NbtCompound();
+  left.set("a", new NbtInt(1));
+  left.set("b", new NbtInt(2));
+
+  const same = new NbtCompound();
+  same.set("a", new NbtInt(1));
+  same.set("b", new NbtInt(2));
+  assert.ok(left.equals(same));
+
+  // 中身は同じでも挿入順が違えば別物
+  const reordered = new NbtCompound();
+  reordered.set("b", new NbtInt(2));
+  reordered.set("a", new NbtInt(1));
+  assert.ok(!left.equals(reordered));
+});
+
+test("copy: 深いコピーになっている", () => {
+  const original = new NbtCompound();
+  const inner = new NbtList();
+  inner.add(new NbtInt(1));
+  original.set("l", inner);
+
+  const copied = original.copy();
+  copied.getList("l").add(new NbtInt(2));
+
+  assert.equal(original.getList("l").size, 1);
+  assert.equal(copied.getList("l").size, 2);
+  assert.ok(!original.equals(copied));
+});
+
 /** 型が推論できることを確かめるだけの参照（未使用変数の警告を避ける）。 */
 const _tagTypeReference: NbtTag | undefined = undefined;
 void _tagTypeReference;
