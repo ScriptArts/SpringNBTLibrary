@@ -8,7 +8,8 @@ use spring_nbt_library::error::ErrorCode;
 use spring_nbt_library::nbt::snbt;
 use spring_nbt_library::nbt::tag::{NbtCompound, NbtList, NbtString, NbtTag, TagType};
 use spring_nbt_library::nbt::{
-    detect_compression, mutf8, read_bytes, write_bytes, Compression, NamedTag, NbtFormat,
+    detect_compression, mutf8, read_bytes, read_bytes_all, read_bytes_at, write_bytes,
+    Compression, NamedTag, NbtFormat,
     NbtReadOptions, NbtWriteOptions,
 };
 
@@ -783,4 +784,65 @@ fn clone_is_deep() {
     assert_eq!(original.get_list("l").unwrap().len(), 1);
     assert_eq!(copied.get_list("l").unwrap().len(), 2);
     assert_ne!(original, copied);
+}
+
+// ---------------------------------------------------------------------------
+// 連なった NBT の読み込み
+//
+// 仕様: docs/spec/10-nbt-binary.md 3.1章
+// ---------------------------------------------------------------------------
+
+#[test]
+fn reads_concatenated_nbt_one_by_one() {
+    let mut joined: Vec<u8> = Vec::new();
+
+    // 同じ NBT を 3 つ続けて並べる
+    for _ in 0..3 {
+        joined.extend_from_slice(&hello_world_bytes());
+    }
+
+    let mut offset = 0usize;
+    let mut count = 0;
+
+    // 直前の終了位置を次の開始位置にして読み進める
+    while offset < joined.len() {
+        let result = read_bytes_at(&joined, offset, &uncompressed_read()).unwrap();
+        assert_eq!(result.tag.name, "hello world");
+        assert_eq!(result.tag.tag.get_string("name").unwrap(), "Bananrama");
+        offset = result.end;
+        count += 1;
+    }
+
+    assert_eq!(count, 3);
+    assert_eq!(offset, joined.len());
+}
+
+#[test]
+fn reads_every_concatenated_nbt_at_once() {
+    let mut joined = hello_world_bytes();
+    joined.extend_from_slice(&hello_world_bytes());
+
+    let tags = read_bytes_all(&joined, &uncompressed_read()).unwrap();
+    assert_eq!(tags.len(), 2);
+    assert_eq!(tags[0].name, "hello world");
+    assert_eq!(tags[1].name, "hello world");
+}
+
+#[test]
+fn reads_nothing_from_empty_input() {
+    assert!(read_bytes_all(&[], &uncompressed_read()).unwrap().is_empty());
+}
+
+#[test]
+fn rejects_offset_out_of_range() {
+    let bytes = hello_world_bytes();
+    let error = read_bytes_at(&bytes, bytes.len() + 1, &uncompressed_read()).unwrap_err();
+    assert_eq!(error.code(), ErrorCode::InvalidArgument);
+}
+
+#[test]
+fn rejects_compression_when_reading_at_offset() {
+    let options = NbtReadOptions { compression: Compression::Gzip, ..NbtReadOptions::default() };
+    let error = read_bytes_at(&hello_world_bytes(), 0, &options).unwrap_err();
+    assert_eq!(error.code(), ErrorCode::InvalidArgument);
 }

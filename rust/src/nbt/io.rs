@@ -113,6 +113,20 @@ impl NbtWriteOptions {
 // 読み込み
 // ---------------------------------------------------------------------------
 
+/// 位置を指定した読み込みの結果
+///
+/// 読んだタグと、その直後の位置を持つ
+/// 続けて読むときは `end` を次の開始位置として渡す
+///
+/// 仕様: `docs/spec/10-nbt-binary.md` 3.1章
+#[derive(Debug, Clone, PartialEq)]
+pub struct NbtReadResult {
+    /// 読んだタグ
+    pub tag: NamedTag,
+    /// 読み終わった直後の位置
+    pub end: usize,
+}
+
 /// 展開済みのバイト列から NBT を読み出す
 ///
 /// 入力全体をあらかじめメモリに持つ設計にしている
@@ -128,11 +142,36 @@ impl<'a> Reader<'a> {
         Reader { data, max_depth, position: 0 }
     }
 
+    fn at(data: &'a [u8], max_depth: i32, start: usize) -> Reader<'a> {
+        Reader { data, max_depth, position: start }
+    }
+
     fn remaining(&self) -> usize {
         self.data.len() - self.position
     }
 
+    fn has_more(&self) -> bool {
+        self.remaining() > 0
+    }
+
+    /// ルートタグを読み、末尾に余りが無いことを確かめる
     fn read_root(&mut self, format: NbtFormat) -> Result<NamedTag> {
+        let tag = self.read_root_tag(format)?;
+
+        // 末尾に余分なバイトが残っていたら、読み違えている可能性が高い
+        if self.remaining() != 0 {
+            return Err(Error::malformed(format!(
+                "ルートタグの後に {} バイトの余分な入力がある",
+                self.remaining()
+            )));
+        }
+
+        Ok(tag)
+    }
+
+    /// ルートタグを 1 つ読む
+    /// 末尾の余りは見ない
+    fn read_root_tag(&mut self, format: NbtFormat) -> Result<NamedTag> {
         let tag_type = TagType::from_id(self.read_byte()?)?;
 
         // Java版のファイル形式でもネットワーク形式でも、ルートは必ず TAG_Compound
@@ -163,15 +202,6 @@ impl<'a> Reader<'a> {
         };
 
         let root = self.read_compound_payload(1)?;
-
-        // 末尾に余分なバイトが残っていたら、読み違えている可能性が高い
-        if self.remaining() != 0 {
-            return Err(Error::new(
-                ErrorCode::MalformedData,
-                format!("ルートタグの後に {} バイトの余分な入力がある", self.remaining()),
-            ));
-        }
-
         Ok(NamedTag { name, tag: root })
     }
 
@@ -626,6 +656,68 @@ fn compress(plain: Vec<u8>, method: Compression) -> Result<Vec<u8>> {
 pub fn read_bytes(bytes: &[u8], options: &NbtReadOptions) -> Result<NamedTag> {
     let plain = decompress(bytes, options)?;
     Reader::new(&plain, options.max_depth).read_root(options.format)
+}
+
+/// バイト列の指定した位置から NBT を 1 つ読む
+///
+/// 複数の NBT が連なっているデータを、先頭から順に読み進めるために使う
+/// 戻り値の `end` が次の開始位置になる
+///
+/// 位置は渡したバイト列そのものを指すので、圧縮されたデータは扱えない
+pub fn read_bytes_at(
+    bytes: &[u8],
+    offset: usize,
+    options: &NbtReadOptions,
+) -> Result<NbtReadResult> {
+    require_plain_input(options)?;
+
+    if offset > bytes.len() {
+        return Err(Error::invalid_argument(format!(
+            "読み始める位置が範囲外: {} (長さ {})",
+            offset,
+            bytes.len()
+        )));
+    }
+
+    let mut reader = Reader::at(bytes, options.max_depth, offset);
+    let tag = reader.read_root_tag(options.format)?;
+    Ok(NbtReadResult { tag, end: reader.position })
+}
+
+/// バイト列に連なっている NBT をすべて読む
+///
+/// 入力を使い切るまで読み続ける
+/// 空のバイト列なら空の一覧を返す
+///
+/// 圧縮は入力全体に 1 回かかっているものとして扱う
+pub fn read_bytes_all(bytes: &[u8], options: &NbtReadOptions) -> Result<Vec<NamedTag>> {
+    let mut tags: Vec<NamedTag> = Vec::new();
+
+    // 空の入力は「0 個」であってエラーではない
+    if bytes.is_empty() {
+        return Ok(tags);
+    }
+
+    let plain = decompress(bytes, options)?;
+    let mut reader = Reader::new(&plain, options.max_depth);
+
+    // 入力を使い切るまでルートタグを読み続ける
+    while reader.has_more() {
+        tags.push(reader.read_root_tag(options.format)?);
+    }
+
+    Ok(tags)
+}
+
+/// 位置を指定する読み込みは、展開済みのバイト列だけを扱う
+fn require_plain_input(options: &NbtReadOptions) -> Result<()> {
+    if options.compression == Compression::Gzip || options.compression == Compression::Zlib {
+        return Err(Error::invalid_argument(
+            "位置を指定した読み込みでは圧縮を扱えない。展開してから渡すこと",
+        ));
+    }
+
+    Ok(())
 }
 
 /// ファイルから NBT を読む

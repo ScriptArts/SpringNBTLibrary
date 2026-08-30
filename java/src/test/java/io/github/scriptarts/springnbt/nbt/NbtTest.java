@@ -625,4 +625,79 @@ class NbtTest {
 
         return out.toByteArray();
     }
+    @Nested
+    @DisplayName("連なった NBT の読み込み")
+    class ConcatenatedNbt {
+
+        @Test
+        @DisplayName("位置を指定して順に読み進められる")
+        void readsConcatenatedNbtOneByOne() {
+            byte[] joined = concat(helloWorldBytes(), helloWorldBytes(), helloWorldBytes());
+            int offset = 0;
+            int count = 0;
+
+            // 直前の終了位置を次の開始位置にして読み進める
+            while (offset < joined.length) {
+                NbtReadResult result = NbtIo.readBytesAt(joined, offset, uncompressedRead());
+                assertEquals("hello world", result.tag().name());
+                assertEquals("Bananrama", result.tag().tag().getString("name"));
+                offset = result.end();
+                count++;
+            }
+
+            assertEquals(3, count);
+            assertEquals(joined.length, offset);
+        }
+
+        @Test
+        @DisplayName("連なった NBT をまとめて読める")
+        void readsEveryConcatenatedNbtAtOnce() {
+            byte[] joined = concat(helloWorldBytes(), helloWorldBytes());
+            List<NamedTag> tags = NbtIo.readBytesAll(joined, uncompressedRead());
+
+            assertEquals(2, tags.size());
+            assertEquals("hello world", tags.get(0).name());
+            assertEquals("hello world", tags.get(1).name());
+        }
+
+        @Test
+        @DisplayName("空の入力からは 0 個読める")
+        void readsNothingFromEmptyInput() {
+            assertTrue(NbtIo.readBytesAll(new byte[0], uncompressedRead()).isEmpty());
+        }
+
+        @Test
+        @DisplayName("範囲外の位置を弾く")
+        void rejectsOffsetOutOfRange() {
+            byte[] bytes = helloWorldBytes();
+            SpringNbtException error = assertThrows(
+                    SpringNbtException.class,
+                    () -> NbtIo.readBytesAt(bytes, bytes.length + 1, uncompressedRead()));
+            assertEquals(ErrorCode.INVALID_ARGUMENT, error.code());
+        }
+
+        @Test
+        @DisplayName("位置を指定した読み込みでは圧縮を扱えない")
+        void rejectsCompressionWhenReadingAtOffset() {
+            byte[] bytes = helloWorldBytes();
+            NbtReadOptions options = NbtReadOptions.defaults().setCompression(Compression.GZIP);
+            SpringNbtException error = assertThrows(
+                    SpringNbtException.class,
+                    () -> NbtIo.readBytesAt(bytes, 0, options));
+            assertEquals(ErrorCode.INVALID_ARGUMENT, error.code());
+        }
+
+        /** 複数のバイト列をつなぐ */
+        private byte[] concat(byte[]... parts) {
+            ByteArrayOutputStream joined = new ByteArrayOutputStream();
+
+            // 与えられた順にそのままつなぐ
+            for (byte[] part : parts) {
+                joined.writeBytes(part);
+            }
+
+            return joined.toByteArray();
+        }
+    }
+
 }

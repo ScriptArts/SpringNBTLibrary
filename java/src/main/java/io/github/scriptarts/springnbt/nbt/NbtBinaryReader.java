@@ -18,9 +18,13 @@ final class NbtBinaryReader {
     private int position;
 
     NbtBinaryReader(byte[] data, int maxDepth) {
+        this(data, maxDepth, 0);
+    }
+
+    NbtBinaryReader(byte[] data, int maxDepth, int start) {
         this.data = data;
         this.maxDepth = maxDepth;
-        this.position = 0;
+        this.position = start;
     }
 
     /** 残っている入力バイト数 */
@@ -28,8 +32,34 @@ final class NbtBinaryReader {
         return data.length - position;
     }
 
-    /** ルートタグを読む */
+    /** 次に読む位置 */
+    int position() {
+        return position;
+    }
+
+    /** まだ読んでいないバイトが残っているか */
+    boolean hasMore() {
+        return remaining() > 0;
+    }
+
+    /** ルートタグを読み、末尾に余りが無いことを確かめる */
     NamedTag readRoot(NbtFormat format) {
+        NamedTag tag = readRootTag(format);
+
+        // 末尾に余分なバイトが残っていたら、読み違えている可能性が高い
+        if (remaining() != 0) {
+            throw SpringNbtException.malformed(
+                    "ルートタグの後に " + remaining() + " バイトの余分な入力がある");
+        }
+
+        return tag;
+    }
+
+    /**
+     * ルートタグを 1 つ読む
+     * 末尾の余りは見ない
+     */
+    NamedTag readRootTag(NbtFormat format) {
         TagType type = TagType.fromId(readByteRaw() & 0xFF);
 
         // Java版のファイル形式でもネットワーク形式でも、ルートは必ず TAG_Compound
@@ -48,13 +78,6 @@ final class NbtBinaryReader {
         }
 
         NbtCompound root = readCompoundPayload(1);
-
-        // 末尾に余分なバイトが残っていたら、読み違えている可能性が高い
-        if (remaining() != 0) {
-            throw SpringNbtException.malformed(
-                    "ルートタグの後に " + remaining() + " バイトの余分な入力がある");
-        }
-
         return new NamedTag(name, root);
     }
 

@@ -177,6 +177,11 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `format` | `Format` | `format()` | `format` | `format` | `format` |  |
 | `max_decompressed_size` | `MaxDecompressedSize` | `maxDecompressedSize()` | `maxDecompressedSize` | `max_decompressed_size` | `max_decompressed_size` |  |
 | `max_depth` | `MaxDepth` | `maxDepth()` | `maxDepth` | `max_depth` | `max_depth` |  |
+| **NbtReadResult** | `NbtReadResult` | `NbtReadResult` | `NbtReadResult` | `NbtReadResult` | `NbtReadResult` | 位置を指定した読み込みの結果 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
+| `end` | `End` | `end()` | `end` | `end` | `end` | 読み終わった直後の位置 |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `tag` | `Tag` | `tag()` | `tag` | `tag` | `tag` | 読んだタグ |
 | **NbtWriteOptions** | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | NBT 書き込みのオプション |
 | `compression` | `Compression` | `compression()` | `compression` | `compression` | `compression` |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
@@ -211,6 +216,8 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `parse` | `Parse()` | `parse()` | `parse()` | `parse()` | `parse()` | SNBT 文字列をタグへ変換する |
 | `parse_compound` | `ParseCompound()` | `parseCompound()` | `parseCompound()` | `parse_compound()` | `parse_compound()` | SNBT 文字列を Compound へ変換する |
 | `read_bytes` | `ReadBytes()` | `readBytes()` | `readBytes()` | `read_bytes()` | `read_bytes()` | バイト列から NBT を読む |
+| `read_bytes_all` | `ReadBytesAll()` | `readBytesAll()` | `readBytesAll()` | `read_bytes_all()` | `read_bytes_all()` | バイト列に連なっている NBT をすべて読む |
+| `read_bytes_at` | `ReadBytesAt()` | `readBytesAt()` | `readBytesAt()` | `read_bytes_at()` | `read_bytes_at()` | バイト列の指定した位置から NBT を 1 つ読む |
 | `read_file` | `ReadFile()` | `readFile()` | `readFile()` | `read_file()` | `read_file()` | ファイルから NBT を読む |
 | `read_stream` | `ReadStream()` | `readStream()` | — | `read_stream()` | `read_reader()` |  |
 | `sector_size` | `SectorSize` | `SECTOR_SIZE` | `SECTOR_SIZE` | `SECTOR_SIZE` | `SECTOR_SIZE` |  |

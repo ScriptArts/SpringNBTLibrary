@@ -54,6 +54,90 @@ public static class NbtIo
         return reader.ReadRoot(effective.Format);
     }
 
+    /// <summary>バイト列の指定した位置から NBT を 1 つ読む</summary>
+    /// <remarks>
+    /// <para>
+    /// 複数の NBT が連なっているデータを、先頭から順に読み進めるために使う
+    /// 戻り値の <see cref="NbtReadResult.End"/> が次の開始位置になる
+    /// </para>
+    /// <para>
+    /// 位置は渡したバイト列そのものを指すので、圧縮されたデータは扱えない
+    /// </para>
+    /// </remarks>
+    /// <exception cref="SpringNbtException">読み込みに失敗した場合</exception>
+    public static NbtReadResult ReadBytesAt(byte[] bytes, int offset,
+                                            NbtReadOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+
+        NbtReadOptions effective = EffectiveOptions(options);
+        RequirePlainInput(effective);
+
+        if (offset < 0 || offset > bytes.Length)
+        {
+            throw SpringNbtException.InvalidArgument(
+                $"読み始める位置が範囲外: {offset} (長さ {bytes.Length})");
+        }
+
+        NbtBinaryReader reader = new NbtBinaryReader(bytes, effective.MaxDepth, offset);
+        NamedTag tag = reader.ReadRootTag(effective.Format);
+        return new NbtReadResult(tag, reader.Position);
+    }
+
+    /// <summary>バイト列に連なっている NBT をすべて読む</summary>
+    /// <remarks>
+    /// <para>入力を使い切るまで読み続ける</para>
+    /// <para>空のバイト列なら空の一覧を返す</para>
+    /// <para>圧縮は入力全体に 1 回かかっているものとして扱う</para>
+    /// </remarks>
+    /// <exception cref="SpringNbtException">読み込みに失敗した場合</exception>
+    public static IReadOnlyList<NamedTag> ReadBytesAll(byte[] bytes,
+                                                       NbtReadOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+
+        NbtReadOptions effective = EffectiveOptions(options);
+        List<NamedTag> tags = new List<NamedTag>();
+
+        // 空の入力は「0 個」であってエラーではない
+        if (bytes.Length == 0)
+        {
+            return tags;
+        }
+
+        byte[] plain = Decompress(bytes, effective);
+        NbtBinaryReader reader = new NbtBinaryReader(plain, effective.MaxDepth);
+
+        // 入力を使い切るまでルートタグを読み続ける
+        while (reader.HasMore)
+        {
+            tags.Add(reader.ReadRootTag(effective.Format));
+        }
+
+        return tags;
+    }
+
+    /// <summary>省略されたオプションを既定で埋める</summary>
+    private static NbtReadOptions EffectiveOptions(NbtReadOptions? options)
+    {
+        if (options is null)
+        {
+            return NbtReadOptions.Default;
+        }
+
+        return options;
+    }
+
+    /// <summary>位置を指定する読み込みは、展開済みのバイト列だけを扱う</summary>
+    private static void RequirePlainInput(NbtReadOptions options)
+    {
+        if (options.Compression == Compression.Gzip || options.Compression == Compression.Zlib)
+        {
+            throw SpringNbtException.InvalidArgument(
+                "位置を指定した読み込みでは圧縮を扱えない。展開してから渡すこと");
+        }
+    }
+
     /// <summary>ストリームから NBT を読む
     /// ストリームは最後まで読み切る</summary>
     /// <exception cref="SpringNbtException">読み込みに失敗した場合</exception>

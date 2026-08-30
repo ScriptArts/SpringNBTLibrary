@@ -9,7 +9,7 @@ import enum
 import gzip
 import struct
 import zlib
-from typing import Optional
+from typing import Optional, List
 
 from ..errors import ErrorCode, SpringNbtError
 from . import _recursion, mutf8
@@ -35,9 +35,12 @@ __all__ = [
     "Compression",
     "NamedTag",
     "NbtReadOptions",
+    "NbtReadResult",
     "NbtWriteOptions",
     "read_file",
     "read_bytes",
+    "read_bytes_at",
+    "read_bytes_all",
     "read_stream",
     "write_file",
     "write_bytes",
@@ -56,6 +59,27 @@ class NbtFormat(enum.Enum):
     #: ネットワーク形式 (1.20.2 以降)
     # ルートに名前が付かない
     NETWORK = "network"
+
+
+class NbtReadResult:
+    """位置を指定した読み込みの結果
+
+    読んだタグと、その直後の位置を持つ
+    続けて読むときは end を次の開始位置として渡す
+
+    仕様: docs/spec/10-nbt-binary.md 3.1章
+    """
+
+    __slots__ = ("tag", "end")
+
+    def __init__(self, tag: "NamedTag", end: int) -> None:
+        #: 読んだタグ
+        self.tag = tag
+        #: 読み終わった直後の位置
+        self.end = end
+
+    def __repr__(self) -> str:
+        return "NbtReadResult(%r, %d)" % (self.tag, self.end)
 
 
 class Compression(enum.Enum):
@@ -136,18 +160,40 @@ class _Reader:
     「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため
     """
 
-    def __init__(self, data: bytes, max_depth: int) -> None:
+    def __init__(self, data: bytes, max_depth: int, start: int = 0) -> None:
         self._data = data
         self._max_depth = max_depth
-        self._position = 0
+        self._position = start
 
     @property
     def _remaining(self) -> int:
         return len(self._data) - self._position
 
+    @property
+    def position(self) -> int:
+        """次に読む位置"""
+        return self._position
+
+    @property
+    def has_more(self) -> bool:
+        """まだ読んでいないバイトが残っているか"""
+        return self._remaining > 0
+
     def read_root(self, fmt: NbtFormat) -> NamedTag:
+        """ルートタグを読み、末尾に余りが無いことを確かめる"""
+        tag = self.read_root_tag(fmt)
+
+        # 末尾に余分なバイトが残っていたら、読み違えている可能性が高い
+        if self._remaining != 0:
+            raise SpringNbtError.malformed(
+                "ルートタグの後に %d バイトの余分な入力がある" % self._remaining)
+
+        return tag
+
+    def read_root_tag(self, fmt: NbtFormat) -> NamedTag:
         """ルートタグを 1 つ読む
         形式によって名前の有無が変わる
+        末尾の余りは見ない
         """
         tag_type = TagType.from_id(self._read_byte())
 
@@ -164,11 +210,6 @@ class _Reader:
             name = ""
 
         root = self._read_compound_payload(1)
-
-        # 末尾に余分なバイトが残っていたら、読み違えている可能性が高い
-        if self._remaining != 0:
-            raise SpringNbtError.malformed("ルートタグの後に %d バイトの余分な入力がある" % self._remaining)
-
         return NamedTag(name, root)
 
     def _read_payload(self, tag_type: TagType, depth: int) -> NbtTag:
@@ -547,6 +588,77 @@ def read_bytes(data: bytes, options: Optional[NbtReadOptions] = None) -> NamedTa
     # Python は既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
     with _recursion.guard(effective.max_depth, "ネストが深すぎて読み込めない"):
         return reader.read_root(effective.format)
+
+
+def read_bytes_at(data: bytes, offset: int,
+                  options: Optional[NbtReadOptions] = None) -> "NbtReadResult":
+    """バイト列の指定した位置から NBT を 1 つ読む
+
+    複数の NBT が連なっているデータを、先頭から順に読み進めるために使う
+    戻り値の end が次の開始位置になる
+
+    位置は渡したバイト列そのものを指すので、圧縮されたデータは扱えない
+
+    :raises SpringNbtError: 読み込みに失敗した場合
+    """
+    effective = _effective_read_options(options)
+    _require_plain_input(effective)
+
+    if offset < 0 or offset > len(data):
+        raise SpringNbtError.invalid_argument(
+            "読み始める位置が範囲外: %d (長さ %d)" % (offset, len(data)))
+
+    reader = _Reader(data, effective.max_depth, offset)
+
+    # Python は既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
+    with _recursion.guard(effective.max_depth, "ネストが深すぎて読み込めない"):
+        tag = reader.read_root_tag(effective.format)
+
+    return NbtReadResult(tag, reader.position)
+
+
+def read_bytes_all(data: bytes,
+                   options: Optional[NbtReadOptions] = None) -> List[NamedTag]:
+    """バイト列に連なっている NBT をすべて読む
+
+    入力を使い切るまで読み続ける
+    空のバイト列なら空の一覧を返す
+
+    圧縮は入力全体に 1 回かかっているものとして扱う
+
+    :raises SpringNbtError: 読み込みに失敗した場合
+    """
+    effective = _effective_read_options(options)
+    tags: List[NamedTag] = []
+
+    # 空の入力は「0 個」であってエラーではない
+    if len(data) == 0:
+        return tags
+
+    reader = _Reader(_decompress(data, effective), effective.max_depth)
+
+    # Python は既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
+    with _recursion.guard(effective.max_depth, "ネストが深すぎて読み込めない"):
+        # 入力を使い切るまでルートタグを読み続ける
+        while reader.has_more:
+            tags.append(reader.read_root_tag(effective.format))
+
+    return tags
+
+
+def _effective_read_options(options: Optional[NbtReadOptions]) -> NbtReadOptions:
+    """省略されたオプションを既定で埋める"""
+    if options is None:
+        return _DEFAULT_READ
+
+    return options
+
+
+def _require_plain_input(options: NbtReadOptions) -> None:
+    """位置を指定する読み込みは、展開済みのバイト列だけを扱う"""
+    if options.compression in (Compression.GZIP, Compression.ZLIB):
+        raise SpringNbtError.invalid_argument(
+            "位置を指定した読み込みでは圧縮を扱えない。展開してから渡すこと")
 
 
 def read_file(path: str, options: Optional[NbtReadOptions] = None) -> NamedTag:

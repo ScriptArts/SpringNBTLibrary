@@ -11,6 +11,80 @@ namespace SpringNBTLibrary.Tests;
 /// </remarks>
 public class NbtIoTests
 {
+    [Fact]
+    public void ReadsConcatenatedNbtOneByOne()
+    {
+        byte[] joined = Concat(HelloWorldBytes(), HelloWorldBytes(), HelloWorldBytes());
+
+        int offset = 0;
+        int count = 0;
+
+        // 直前の終了位置を次の開始位置にして読み進める
+        while (offset < joined.Length)
+        {
+            NbtReadResult result = NbtIo.ReadBytesAt(joined, offset, UncompressedRead());
+            Assert.Equal("hello world", result.Tag.Name);
+            Assert.Equal("Bananrama", ((NbtCompound)result.Tag.Tag).GetString("name"));
+            offset = result.End;
+            count++;
+        }
+
+        Assert.Equal(3, count);
+        Assert.Equal(joined.Length, offset);
+    }
+
+    [Fact]
+    public void ReadsEveryConcatenatedNbtAtOnce()
+    {
+        byte[] joined = Concat(HelloWorldBytes(), HelloWorldBytes());
+        IReadOnlyList<NamedTag> tags = NbtIo.ReadBytesAll(joined, UncompressedRead());
+
+        Assert.Equal(2, tags.Count);
+        Assert.Equal("hello world", tags[0].Name);
+        Assert.Equal("hello world", tags[1].Name);
+    }
+
+    [Fact]
+    public void ReadsNothingFromEmptyInput()
+    {
+        Assert.Empty(NbtIo.ReadBytesAll(Array.Empty<byte>(), UncompressedRead()));
+    }
+
+    [Fact]
+    public void RejectsOffsetOutOfRange()
+    {
+        byte[] bytes = HelloWorldBytes();
+
+        SpringNbtException error = Assert.Throws<SpringNbtException>(
+            () => NbtIo.ReadBytesAt(bytes, bytes.Length + 1, UncompressedRead()));
+        Assert.Equal(ErrorCode.InvalidArgument, error.Code);
+    }
+
+    [Fact]
+    public void RejectsCompressionWhenReadingAtOffset()
+    {
+        byte[] bytes = HelloWorldBytes();
+        NbtReadOptions options = new NbtReadOptions { Compression = Compression.Gzip };
+
+        SpringNbtException error = Assert.Throws<SpringNbtException>(
+            () => NbtIo.ReadBytesAt(bytes, 0, options));
+        Assert.Equal(ErrorCode.InvalidArgument, error.Code);
+    }
+
+    /// <summary>複数のバイト列をつなぐ。</summary>
+    private static byte[] Concat(params byte[][] parts)
+    {
+        List<byte> joined = new List<byte>();
+
+        // 与えられた順にそのままつなぐ
+        foreach (byte[] part in parts)
+        {
+            joined.AddRange(part);
+        }
+
+        return joined.ToArray();
+    }
+
     /// <summary>
     /// 仕様書どおりに組んだ最小の NBT。
     /// ルート名 "hello world" の Compound に、文字列 "Bananrama" が入っている。

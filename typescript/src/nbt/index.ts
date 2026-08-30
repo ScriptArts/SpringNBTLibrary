@@ -35,8 +35,10 @@ export {
   NbtFormat,
   detectCompression,
   readBytes,
+  readBytesAll,
+  readBytesAt,
   readFile,
   writeBytes,
   writeFile,
 } from "./io.js";
-export type { NbtReadOptions, NbtWriteOptions } from "./io.js";
+export type { NbtReadOptions, NbtReadResult, NbtWriteOptions } from "./io.js";

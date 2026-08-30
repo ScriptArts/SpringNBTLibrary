@@ -184,6 +184,10 @@ def run_vector(runner, vector, workdir, report, outputs):
         run_world_vector(runner, vector, workdir, report, outputs)
         return
 
+    if vector.get("kind") == "concat":
+        run_concat_vector(runner, vector, workdir, report, outputs)
+        return
+
     vector_id = vector["id"]
     input_path = os.path.join(TESTDATA, vector["input"])
     prefix = os.path.join(workdir, "%s_%s" % (runner.name, vector_id.replace("/", "_")))
@@ -264,6 +268,30 @@ def run_vector(runner, vector, workdir, report, outputs):
 
 
 
+
+
+def run_concat_vector(runner, vector, workdir, report, outputs):
+    """連なった NBT のベクタを検証する。
+
+    期待値ファイルは持たず、言語間の一致だけを見る。
+    出力には位置を指定した読み込みの結果も含めるので、
+    「どこで区切ったか」まで揃っていることが確かめられる。
+    """
+    vector_id = vector["id"]
+    input_path = os.path.join(TESTDATA, vector["input"])
+    prefix = os.path.join(workdir, "%s_%s" % (runner.name, vector_id.replace("/", "_")))
+    list_path = prefix + ".txt"
+
+    code, stderr = runner.run(["nbt-list", input_path, list_path])
+
+    if code != 0:
+        report.fail("%s / %s: nbt-list に失敗した -> %s"
+                    % (runner.name, vector_id, stderr.strip()))
+        return
+
+    outputs.setdefault(vector_id, {}).setdefault("nbt_list", {})[runner.name] = \
+        read_text(list_path)
+    report.ok()
 
 
 def run_world_vector(runner, vector, workdir, report, outputs):
@@ -460,8 +488,8 @@ def generate_expect(runner, vectors, report):
         if vector.get("expect_error") is not None:
             continue
 
-        # Anvil / World ベクタは正規化JSON の期待値を持たない
-        if vector.get("kind") in ("anvil", "world"):
+        # Anvil / World / 連結 のベクタは正規化JSON の期待値を持たない
+        if vector.get("kind") in ("anvil", "world", "concat"):
             continue
 
         input_path = os.path.join(TESTDATA, vector["input"])

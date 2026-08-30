@@ -9,6 +9,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -71,6 +73,90 @@ public final class NbtIo {
 
         byte[] plain = decompress(bytes, effective);
         return new NbtBinaryReader(plain, effective.maxDepth()).readRoot(effective.format());
+    }
+
+    /**
+     * バイト列の指定した位置から NBT を 1 つ読む
+     *
+     * <p>複数の NBT が連なっているデータを、先頭から順に読み進めるために使う
+     * 戻り値の {@code end} が次の開始位置になる
+     *
+     * <p>位置は渡したバイト列そのものを指すので、圧縮されたデータは扱えない
+     *
+     * @param bytes 入力
+     * @param offset 読み始める位置
+     * @param options オプション。null なら既定
+     * @return 読んだタグと、その直後の位置
+     * @throws SpringNbtException 読み込みに失敗した場合
+     */
+    public static NbtReadResult readBytesAt(byte[] bytes, int offset, NbtReadOptions options) {
+        Objects.requireNonNull(bytes, "bytes");
+
+        NbtReadOptions effective = effectiveOptions(options);
+        requirePlainInput(effective);
+
+        if (offset < 0 || offset > bytes.length) {
+            throw SpringNbtException.invalidArgument(
+                    "読み始める位置が範囲外: " + offset + " (長さ " + bytes.length + ")");
+        }
+
+        NbtBinaryReader reader = new NbtBinaryReader(bytes, effective.maxDepth(), offset);
+        NamedTag tag = reader.readRootTag(effective.format());
+        return new NbtReadResult(tag, reader.position());
+    }
+
+    /**
+     * バイト列に連なっている NBT をすべて読む
+     *
+     * <p>入力を使い切るまで読み続ける
+     * 空のバイト列なら空の一覧を返す
+     *
+     * <p>圧縮は入力全体に 1 回かかっているものとして扱う
+     *
+     * @param bytes 入力
+     * @param options オプション。null なら既定
+     * @return 読んだタグの一覧
+     * @throws SpringNbtException 読み込みに失敗した場合
+     */
+    public static List<NamedTag> readBytesAll(byte[] bytes, NbtReadOptions options) {
+        Objects.requireNonNull(bytes, "bytes");
+
+        NbtReadOptions effective = effectiveOptions(options);
+        List<NamedTag> tags = new ArrayList<>();
+
+        // 空の入力は「0 個」であってエラーではない
+        if (bytes.length == 0) {
+            return tags;
+        }
+
+        byte[] plain = decompress(bytes, effective);
+        NbtBinaryReader reader = new NbtBinaryReader(plain, effective.maxDepth());
+
+        // 入力を使い切るまでルートタグを読み続ける
+        while (reader.hasMore()) {
+            tags.add(reader.readRootTag(effective.format()));
+        }
+
+        return tags;
+    }
+
+    /** 省略されたオプションを既定で埋める */
+    private static NbtReadOptions effectiveOptions(NbtReadOptions options) {
+        if (options == null) {
+            return NbtReadOptions.defaults();
+        }
+
+        return options;
+    }
+
+    /** 位置を指定する読み込みは、展開済みのバイト列だけを扱う */
+    private static void requirePlainInput(NbtReadOptions options) {
+        // 圧縮を指定していたら、位置の意味が変わってしまう
+        if (options.compression() == Compression.GZIP
+                || options.compression() == Compression.ZLIB) {
+            throw SpringNbtException.invalidArgument(
+                    "位置を指定した読み込みでは圧縮を扱えない。展開してから渡すこと");
+        }
     }
 
     /**

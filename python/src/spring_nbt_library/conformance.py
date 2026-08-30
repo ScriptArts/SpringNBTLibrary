@@ -36,15 +36,39 @@ from .nbt import (
     NbtTag,
     NbtWriteOptions,
     mutf8,
+    read_bytes_all,
+    read_bytes_at,
     read_file,
     write_bytes,
 )
 from .nbt import snbt as snbt_module
 
+def nbt_list(data: bytes, fmt) -> str:
+    """連なった NBT を、位置を追いながら一覧として書き出す"""
+    options = NbtReadOptions(fmt=fmt, compression=Compression.NONE)
+    all_tags = read_bytes_all(data, options)
+    lines = ["count %d" % len(all_tags)]
+
+    offset = 0
+    index = 0
+
+    # 位置を指定した読み込みでも同じ並びになることを確かめる
+    while offset < len(data):
+        result = read_bytes_at(data, offset, options)
+        lines.append("%d %d %d %s %d"
+                     % (index, offset, result.end, result.tag.name, len(result.tag.tag)))
+        offset = result.end
+        index += 1
+
+    lines.append("total %d %d" % (index, offset))
+    return "\n".join(lines) + "\n"
+
+
 USAGE = """使い方:
   python -m spring_nbt_library.conformance decode  <入力パス> <出力JSONパス> [--format network]
   python -m spring_nbt_library.conformance encode  <入力パス> <出力バイナリパス> [--format network]
   python -m spring_nbt_library.conformance snbt    <入力パス> <出力SNBTパス> [--format network]
+  python -m spring_nbt_library.conformance nbt-list <入力パス> <出力テキストパス> [--format network]
   python -m spring_nbt_library.conformance region-list    <入力mcaパス> <出力テキストパス>
   python -m spring_nbt_library.conformance region-rewrite <入力mcaパス> <出力mcaパス>
   python -m spring_nbt_library.conformance chunk-report   <入力チャンクnbt> <出力テキストパス>
@@ -400,7 +424,8 @@ def main(argv=None) -> int:
         return 0
 
     # 知らないコマンドなら使い方を出して終わる
-    if command not in ("decode", "encode", "snbt", "region-list", "region-rewrite",
+    if command not in ("decode", "encode", "snbt", "nbt-list",
+                       "region-list", "region-rewrite",
                        "chunk-report", "chunk-edit"):
         sys.stderr.write(USAGE + "\n")
         return 2
@@ -427,6 +452,14 @@ def main(argv=None) -> int:
             with open(argv[2], "wb") as handle:
                 handle.write(write_bytes(NamedTag("", chunk.to_nbt()), options))
 
+            return 0
+
+        # 連なった NBT を一覧にする
+        if command == "nbt-list":
+            with open(argv[1], "rb") as handle:
+                data = handle.read()
+
+            _write_text_file(argv[2], nbt_list(data, fmt))
             return 0
 
         # リージョン系は NBT の読み込みを経由しない

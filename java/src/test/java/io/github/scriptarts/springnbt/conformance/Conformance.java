@@ -9,6 +9,7 @@ import io.github.scriptarts.springnbt.nbt.NamedTag;
 import io.github.scriptarts.springnbt.nbt.NbtFormat;
 import io.github.scriptarts.springnbt.nbt.NbtIo;
 import io.github.scriptarts.springnbt.nbt.NbtReadOptions;
+import io.github.scriptarts.springnbt.nbt.NbtReadResult;
 import io.github.scriptarts.springnbt.nbt.NbtWriteOptions;
 import io.github.scriptarts.springnbt.nbt.Snbt;
 import io.github.scriptarts.springnbt.world.Chunk;
@@ -18,6 +19,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * 適合性検証ツール。4言語すべてが同じインターフェースで同じ出力を出す。
@@ -53,6 +55,7 @@ public final class Conformance {
                 case "decode" -> runDecode(args);
                 case "encode" -> runEncode(args);
                 case "snbt" -> runSnbt(args);
+                case "nbt-list" -> runNbtList(args);
                 case "region-list" -> runRegionList(args);
                 case "region-rewrite" -> runRegionRewrite(args);
                 case "chunk-report" -> runChunkReport(args);
@@ -118,6 +121,40 @@ public final class Conformance {
         NamedTag named = NbtIo.readFile(Path.of(args[1]), NbtReadOptions.defaults().setFormat(format));
 
         writeTextFile(args[2], Snbt.write(named.tag()) + "\n");
+        return 0;
+    }
+
+    /** 連なった NBT を、位置を追いながら一覧として書き出す。 */
+    private static int runNbtList(String[] args) throws IOException {
+        if (args.length < 3) {
+            System.err.println(usage());
+            return 2;
+        }
+
+        NbtFormat format = parseFormat(args);
+        NbtReadOptions options =
+                NbtReadOptions.defaults().setFormat(format).setCompression(Compression.NONE);
+
+        byte[] bytes = Files.readAllBytes(Path.of(args[1]));
+        List<NamedTag> all = NbtIo.readBytesAll(bytes, options);
+        StringBuilder builder = new StringBuilder();
+        builder.append("count ").append(all.size()).append("\n");
+
+        int offset = 0;
+        int index = 0;
+
+        // 位置を指定した読み込みでも同じ並びになることを確かめる
+        while (offset < bytes.length) {
+            NbtReadResult result = NbtIo.readBytesAt(bytes, offset, options);
+            builder.append(index).append(" ").append(offset).append(" ").append(result.end())
+                    .append(" ").append(result.tag().name())
+                    .append(" ").append(result.tag().tag().size()).append("\n");
+            offset = result.end();
+            index++;
+        }
+
+        builder.append("total ").append(index).append(" ").append(offset).append("\n");
+        writeTextFile(args[2], builder.toString());
         return 0;
     }
 
@@ -247,6 +284,7 @@ public final class Conformance {
                   Conformance decode  <入力パス> <出力JSONパス> [--format network]
                   Conformance encode  <入力パス> <出力バイナリパス> [--format network]
                   Conformance snbt    <入力パス> <出力SNBTパス> [--format network]
+                  Conformance nbt-list <入力パス> <出力テキストパス> [--format network]
                   Conformance region-list    <入力mcaパス> <出力テキストパス>
                   Conformance region-rewrite <入力mcaパス> <出力mcaパス>
                   Conformance chunk-report   <入力チャンクnbt> <出力テキストパス>

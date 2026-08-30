@@ -8,7 +8,7 @@
  * 仕様: `docs/spec/90-conformance.md` 2.3章
  */
 
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import process from "node:process";
 
 import {
@@ -31,16 +31,42 @@ import {
   NbtList,
   NbtTag,
   TagType,
+  readBytesAll,
+  readBytesAt,
   readFile,
   tagTypeAsString,
   writeBytes,
 } from "./nbt/index.js";
 import { NbtCompound as NbtCompoundClass } from "./nbt/index.js";
 
+/** 連なった NBT を、位置を追いながら一覧として書き出す。 */
+function nbtList(raw: Buffer, format: NbtFormat): string {
+  const bytes = new Uint8Array(raw);
+  const options = { format, compression: Compression.None };
+  const all = readBytesAll(bytes, options);
+  const lines = [`count ${all.length}`];
+
+  let offset = 0;
+  let index = 0;
+
+  // 位置を指定した読み込みでも同じ並びになることを確かめる
+  while (offset < bytes.length) {
+    const result = readBytesAt(bytes, offset, options);
+    const root = result.tag.tag as NbtCompound;
+    lines.push(`${index} ${offset} ${result.end} ${result.tag.name} ${root.size}`);
+    offset = result.end;
+    index++;
+  }
+
+  lines.push(`total ${index} ${offset}`);
+  return lines.join("\n") + "\n";
+}
+
 const USAGE = `使い方:
   conformance decode  <入力パス> <出力JSONパス> [--format network]
   conformance encode  <入力パス> <出力バイナリパス> [--format network]
   conformance snbt    <入力パス> <出力SNBTパス> [--format network]
+  conformance nbt-list <入力パス> <出力テキストパス> [--format network]
   conformance region-list    <入力mcaパス> <出力テキストパス>
   conformance region-rewrite <入力mcaパス> <出力mcaパス>
   conformance chunk-report   <入力チャンクnbt> <出力テキストパス>
@@ -507,6 +533,7 @@ function main(argv: string[]): number {
 
   const known = [
     "decode", "encode", "snbt",
+    "nbt-list",
     "region-list", "region-rewrite",
     "chunk-report", "chunk-edit",
   ];
@@ -537,6 +564,11 @@ function main(argv: string[]): number {
         argv[2],
         writeNbtBytes(new NamedTag("", chunk.toNbt()), { compression: Compression.None }),
       );
+      return 0;
+    }
+
+    if (command === "nbt-list") {
+      writeTextFile(argv[2], nbtList(readFileSync(argv[1]), format));
       return 0;
     }
 

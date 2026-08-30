@@ -20,17 +20,43 @@ internal sealed class NbtBinaryReader
     private int position;
 
     internal NbtBinaryReader(byte[] data, int maxDepth)
+        : this(data, maxDepth, 0)
+    {
+    }
+
+    internal NbtBinaryReader(byte[] data, int maxDepth, int start)
     {
         this.data = data;
         this.maxDepth = maxDepth;
-        this.position = 0;
+        this.position = start;
     }
 
     /// <summary>残っている入力バイト数</summary>
     private int Remaining => data.Length - position;
 
-    /// <summary>ルートタグを読む</summary>
+    /// <summary>次に読む位置</summary>
+    internal int Position => position;
+
+    /// <summary>まだ読んでいないバイトが残っているか</summary>
+    internal bool HasMore => Remaining > 0;
+
+    /// <summary>ルートタグを読み、末尾に余りが無いことを確かめる</summary>
     internal NamedTag ReadRoot(NbtFormat format)
+    {
+        NamedTag tag = ReadRootTag(format);
+
+        // 末尾に余分なバイトが残っていたら、読み違えている可能性が高い
+        if (Remaining != 0)
+        {
+            throw SpringNbtException.Malformed($"ルートタグの後に {Remaining} バイトの余分な入力がある");
+        }
+
+        return tag;
+    }
+
+    /// <summary>ルートタグを 1 つ読む
+    /// 末尾の余りは見ない</summary>
+    internal NamedTag ReadRootTag(NbtFormat format)
     {
         byte id = ReadByteRaw();
         TagType type = TagTypeExtensions.FromId(id);
@@ -55,13 +81,6 @@ internal sealed class NbtBinaryReader
         }
 
         NbtCompound root = ReadCompoundPayload(1);
-
-        // 末尾に余分なバイトが残っていたら、読み違えている可能性が高い
-        if (Remaining != 0)
-        {
-            throw SpringNbtException.Malformed($"ルートタグの後に {Remaining} バイトの余分な入力がある");
-        }
-
         return new NamedTag(name, root);
     }
 

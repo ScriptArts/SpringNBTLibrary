@@ -291,6 +291,24 @@ def region_contents(data):
     return b"\x00".join(parts)
 
 
+def add_concat_vector(vector_id, filename, data, description):
+    """連なった NBT のベクタを 1 件登録する。
+
+    期待値ファイルは持たず、言語間で出力が一致することだけを見る。
+    """
+    write_if_changed(os.path.join(TESTDATA, filename), data)
+
+    VECTORS.append({
+        "id": vector_id,
+        "kind": vector_id.split("/")[0],
+        "input": filename,
+        "format": "java",
+        "compression": "none",
+        "description": description,
+        "roundtrip": False,
+    })
+
+
 def add_vector(vector_id, filename, data, description,
                fmt="java", compression="none", roundtrip=True, expect_error=None):
     """ベクタを 1 件登録し、ファイルへ書き出す。"""
@@ -719,6 +737,27 @@ def sample_chunk(x, z, extra=None):
     return to_java_file("", t_compound(entries))
 
 
+def build_concat():
+    """連なった NBT のテストベクタを組み立てる。"""
+    hello = to_java_file("hello world", hello_world_tag())
+
+    # 同じ NBT が 3 つ並んでいるだけのもの
+    add_concat_vector(
+        "concat/three_tags", "concat/three_tags.nbt", hello * 3,
+        "同じ NBT が 3 つ連なっている")
+
+    # 大きさの違う NBT が混ざっているもの
+    mixed = hello + to_java_file("all", all_tags_tag()) + hello
+    add_concat_vector(
+        "concat/mixed", "concat/mixed.nbt", mixed,
+        "大きさの違う NBT が 3 つ連なっている")
+
+    # 1 つだけでも同じ入口で読める
+    add_concat_vector(
+        "concat/single", "concat/single.nbt", hello,
+        "NBT が 1 つだけ")
+
+
 def build_anvil():
     """Anvil のテストベクタを組み立てる。"""
     # 空のリージョン（ヘッダだけ）
@@ -1118,6 +1157,7 @@ def write_handwritten_expectations():
 
 def main():
     build_all()
+    build_concat()
     build_anvil()
     build_world()
     write_manifest()

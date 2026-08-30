@@ -55,6 +55,32 @@ int? maybe  = root.OptInt("DataVersion");     // 無ければ null、型違い�
 「無い」と「型が違う」は区別しています。`Opt*` が許すのは前者だけです。
 型が違うのは常にプログラム側の想定違いなので、黙って握りつぶしません。
 
+### 連なった NBT を読む
+
+`ReadBytes` は入力を 1 つの NBT として読みます。
+後ろにバイトが残っていたらエラーです。読み違えを見逃さないためです。
+
+1 つのバイト列に NBT が複数並んでいるなら、位置を指定して読み進めます。
+
+```csharp
+int offset = 0;
+
+while (offset < bytes.Length)
+{
+    NbtReadResult result = NbtIo.ReadBytesAt(bytes, offset);
+    Use(result.Tag);
+    offset = result.End;   // 次はここから
+}
+```
+
+全部まとめて受け取ることもできます。
+
+```csharp
+IReadOnlyList<NamedTag> tags = NbtIo.ReadBytesAll(bytes);
+```
+
+位置は渡したバイト列そのものを指すので、`ReadBytesAt` は圧縮されたデータを扱えません。
+
 ### 入れ子をたどる
 
 ```csharp

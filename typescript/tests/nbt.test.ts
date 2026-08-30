@@ -31,6 +31,8 @@ import {
   detectCompression,
   mutf8,
   readBytes,
+  readBytesAll,
+  readBytesAt,
   snbt,
   writeBytes,
 } from "../src/nbt/index.js";
@@ -641,6 +643,74 @@ test("copy: 深いコピーになっている", () => {
   assert.equal(copied.getList("l").size, 2);
   assert.ok(!original.equals(copied));
 });
+
+test("連なった NBT を位置指定で順に読み進められる", () => {
+  const joined = concat(helloWorldBytes(), helloWorldBytes(), helloWorldBytes());
+  let offset = 0;
+  let count = 0;
+
+  // 直前の終了位置を次の開始位置にして読み進める
+  while (offset < joined.length) {
+    const result = readBytesAt(joined, offset, UNCOMPRESSED_READ);
+    assert.equal(result.tag.name, "hello world");
+    assert.equal((result.tag.tag as NbtCompound).getString("name"), "Bananrama");
+    offset = result.end;
+    count++;
+  }
+
+  assert.equal(count, 3);
+  assert.equal(offset, joined.length);
+});
+
+test("連なった NBT をまとめて読める", () => {
+  const joined = concat(helloWorldBytes(), helloWorldBytes());
+  const tags = readBytesAll(joined, UNCOMPRESSED_READ);
+
+  assert.equal(tags.length, 2);
+  assert.equal(tags[0].name, "hello world");
+  assert.equal(tags[1].name, "hello world");
+});
+
+test("空の入力からは 0 個読める", () => {
+  assert.deepEqual(readBytesAll(new Uint8Array(0), UNCOMPRESSED_READ), []);
+});
+
+test("範囲外の位置を弾く", () => {
+  const bytes = helloWorldBytes();
+
+  assert.throws(
+    () => readBytesAt(bytes, bytes.length + 1, UNCOMPRESSED_READ),
+    (error: SpringNbtError) => error.code === ErrorCode.InvalidArgument,
+  );
+});
+
+test("位置を指定した読み込みでは圧縮を扱えない", () => {
+  assert.throws(
+    () => readBytesAt(helloWorldBytes(), 0, { compression: Compression.Gzip }),
+    (error: SpringNbtError) => error.code === ErrorCode.InvalidArgument,
+  );
+});
+
+/** 複数のバイト列をつなぐ。 */
+function concat(...parts: Uint8Array[]): Uint8Array {
+  let total = 0;
+
+  // まず全体の長さを数える
+  for (const part of parts) {
+    total += part.length;
+  }
+
+  const joined = new Uint8Array(total);
+  let written = 0;
+
+  // 与えられた順にそのままつなぐ
+  for (const part of parts) {
+    joined.set(part, written);
+    written += part.length;
+  }
+
+  return joined;
+}
 
 /** 型が推論できることを確かめるだけの参照（未使用変数の警告を避ける）。 */
 const _tagTypeReference: NbtTag | undefined = undefined;

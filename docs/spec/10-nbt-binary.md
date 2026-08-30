@@ -139,6 +139,48 @@ NbtIo.write_bytes(named_tag, options) -> bytes
 NamedTag { name: String, tag: NbtCompound }
 ```
 
+`read_bytes` は入力を 1 つの NBT として読む。
+ルートタグの後にバイトが残っていたら `MALFORMED_DATA` とする。
+読み違えを黙って見逃さないためである。
+
+### 3.1 連なった NBT を読む
+
+1 つのバイト列に NBT が複数並んでいることがある。
+この形は `read_bytes` では読めないので、専用の入口を用意する。
+
+```
+NbtIo.read_bytes_at(bytes, offset, options)  -> NbtReadResult
+NbtIo.read_bytes_all(bytes, options)         -> NamedTag の一覧
+
+NbtReadResult { tag: NamedTag, end: 整数 }
+```
+
+`read_bytes_at` は `offset` から NBT を 1 つ読み、
+読み終わった直後の位置を `end` に入れて返す。
+`end` を次の `offset` として渡せば、順に読み進められる。
+
+```
+offset = 0
+while offset < len(bytes):
+    result = read_bytes_at(bytes, offset)
+    使う(result.tag)
+    offset = result.end
+```
+
+`read_bytes_all` は入力を使い切るまで読み、読んだ順に並べて返す。
+空のバイト列は「0 個」であってエラーではない。
+
+| 条件 | 結果 |
+|---|---|
+| `offset` が負、または入力長を超える | `INVALID_ARGUMENT` |
+| `read_bytes_at` に圧縮を指定した | `INVALID_ARGUMENT` |
+| 途中で入力が尽きた | `MALFORMED_DATA` |
+
+**`read_bytes_at` の位置は、渡したバイト列そのものを指す。**
+展開すると位置が変わってしまうので、圧縮されたデータは扱えない。
+`read_bytes_all` は位置を返さないので、
+入力全体に 1 回かかった圧縮であれば展開してから読む。
+
 ---
 
 ## 4. 圧縮

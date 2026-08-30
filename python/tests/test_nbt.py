@@ -34,6 +34,8 @@ from spring_nbt_library.nbt import (
     detect_compression,
     mutf8,
     read_bytes,
+    read_bytes_all,
+    read_bytes_at,
     snbt,
     write_bytes,
 )
@@ -634,3 +636,51 @@ class TestTagEquality:
         assert len(original.get_list("l")) == 1
         assert len(copied.get_list("l")) == 2
         assert original != copied
+
+
+class TestConcatenatedNbt:
+    """連なった NBT の読み込み
+
+    仕様: docs/spec/10-nbt-binary.md 3.1章
+    """
+
+    def test_reads_concatenated_nbt_one_by_one(self):
+        joined = hello_world_bytes() * 3
+        offset = 0
+        count = 0
+
+        # 直前の終了位置を次の開始位置にして読み進める
+        while offset < len(joined):
+            result = read_bytes_at(joined, offset, uncompressed_read())
+            assert result.tag.name == "hello world"
+            assert result.tag.tag.get_string("name") == "Bananrama"
+            offset = result.end
+            count += 1
+
+        assert count == 3
+        assert offset == len(joined)
+
+    def test_reads_every_concatenated_nbt_at_once(self):
+        tags = read_bytes_all(hello_world_bytes() * 2, uncompressed_read())
+
+        assert len(tags) == 2
+        assert [tag.name for tag in tags] == ["hello world", "hello world"]
+
+    def test_reads_nothing_from_empty_input(self):
+        assert read_bytes_all(b"", uncompressed_read()) == []
+
+    def test_rejects_offset_out_of_range(self):
+        data = hello_world_bytes()
+
+        with pytest.raises(SpringNbtError) as error:
+            read_bytes_at(data, len(data) + 1, uncompressed_read())
+
+        assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+    def test_rejects_compression_when_reading_at_offset(self):
+        options = NbtReadOptions(compression=Compression.GZIP)
+
+        with pytest.raises(SpringNbtError) as error:
+            read_bytes_at(hello_world_bytes(), 0, options)
+
+        assert error.value.code == ErrorCode.INVALID_ARGUMENT

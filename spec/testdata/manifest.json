@@ -232,6 +232,33 @@
       "roundtrip": false
     },
     {
+      "id": "concat/three_tags",
+      "kind": "concat",
+      "input": "concat/three_tags.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "同じ NBT が 3 つ連なっている",
+      "roundtrip": false
+    },
+    {
+      "id": "concat/mixed",
+      "kind": "concat",
+      "input": "concat/mixed.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "大きさの違う NBT が 3 つ連なっている",
+      "roundtrip": false
+    },
+    {
+      "id": "concat/single",
+      "kind": "concat",
+      "input": "concat/single.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "NBT が 1 つだけ",
+      "roundtrip": false
+    },
+    {
       "id": "anvil/empty",
       "kind": "anvil",
       "input": "anvil/empty/r.0.0.mca",

@@ -37,6 +37,8 @@ internal static class Program
                     return RunEncode(args);
                 case "snbt":
                     return RunSnbt(args);
+                case "nbt-list":
+                    return RunNbtList(args);
                 case "region-list":
                     return RunRegionList(args);
                 case "region-rewrite":
@@ -112,6 +114,48 @@ internal static class Program
         NamedTag named = NbtIo.ReadFile(args[1], new NbtReadOptions { Format = format });
 
         WriteTextFile(args[2], Snbt.Write(named.Tag) + "\n");
+        return 0;
+    }
+
+    /// <summary>連なった NBT を、位置を追いながら一覧として書き出す。</summary>
+    private static int RunNbtList(string[] args)
+    {
+        if (args.Length < 3)
+        {
+            Console.Error.WriteLine(Usage());
+            return 2;
+        }
+
+        NbtFormat format = ParseFormat(args);
+        NbtReadOptions options = new NbtReadOptions
+        {
+            Format = format,
+            Compression = Compression.None,
+        };
+
+        byte[] bytes = File.ReadAllBytes(args[1]);
+        IReadOnlyList<NamedTag> all = NbtIo.ReadBytesAll(bytes, options);
+        StringBuilder builder = new StringBuilder();
+        builder.Append(CultureInfo.InvariantCulture, $"count {all.Count}\n");
+
+        int offset = 0;
+        int index = 0;
+
+        // 位置を指定した読み込みでも同じ並びになることを確かめる
+        while (offset < bytes.Length)
+        {
+            NbtReadResult result = NbtIo.ReadBytesAt(bytes, offset, options);
+            NbtCompound root = (NbtCompound)result.Tag.Tag;
+
+            builder.Append(CultureInfo.InvariantCulture,
+                $"{index} {offset} {result.End} {result.Tag.Name} {root.Count}\n");
+
+            offset = result.End;
+            index++;
+        }
+
+        builder.Append(CultureInfo.InvariantCulture, $"total {index} {offset}\n");
+        WriteTextFile(args[2], builder.ToString());
         return 0;
     }
 
@@ -222,6 +266,7 @@ internal static class Program
               springnbt-conformance decode  <入力パス> <出力JSONパス> [--format network]
               springnbt-conformance encode  <入力パス> <出力バイナリパス> [--format network]
               springnbt-conformance snbt    <入力パス> <出力SNBTパス> [--format network]
+              springnbt-conformance nbt-list <入力パス> <出力テキストパス> [--format network]
               springnbt-conformance region-list    <入力mcaパス> <出力テキストパス>
               springnbt-conformance region-rewrite <入力mcaパス> <出力mcaパス>
               springnbt-conformance chunk-report   <入力チャンクnbt> <出力テキストパス>

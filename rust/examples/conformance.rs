@@ -15,7 +15,7 @@ use spring_nbt_library::world::{
 use spring_nbt_library::nbt::snbt;
 use spring_nbt_library::nbt::tag::{NbtCompound, NbtTag};
 use spring_nbt_library::nbt::{
-    read_file, write_bytes, Compression, NamedTag, NbtFormat, NbtReadOptions, NbtWriteOptions,
+    read_bytes_all, read_bytes_at, read_file, write_bytes, Compression, NamedTag, NbtFormat, NbtReadOptions, NbtWriteOptions,
 };
 use spring_nbt_library::TARGET_DATA_VERSION;
 
@@ -24,6 +24,7 @@ const USAGE: &str = "\
   conformance decode  <入力パス> <出力JSONパス> [--format network]
   conformance encode  <入力パス> <出力バイナリパス> [--format network]
   conformance snbt    <入力パス> <出力SNBTパス> [--format network]
+  conformance nbt-list <入力パス> <出力テキストパス> [--format network]
   conformance region-list    <入力mcaパス> <出力テキストパス>
   conformance region-rewrite <入力mcaパス> <出力mcaパス>
   conformance chunk-report   <入力チャンクnbt> <出力テキストパス>
@@ -43,8 +44,8 @@ fn main() -> ExitCode {
             print!("rust spring-nbt-library 0.1.0 target_data_version={TARGET_DATA_VERSION}\n");
             ExitCode::SUCCESS
         }
-        "decode" | "encode" | "snbt" | "region-list" | "region-rewrite" | "chunk-report"
-        | "chunk-edit" => match run(&args) {
+        "decode" | "encode" | "snbt" | "nbt-list" | "region-list" | "region-rewrite"
+        | "chunk-report" | "chunk-edit" => match run(&args) {
             Ok(code) => code,
             Err(error) => {
                 // 4言語で同じ ErrorCode を出すことが検証対象なので、コードを機械可読な形で出す
@@ -57,6 +58,35 @@ fn main() -> ExitCode {
             ExitCode::from(2)
         }
     }
+}
+
+/// 連なった NBT を、位置を追いながら一覧として書き出す
+fn nbt_list(data: &[u8], format: NbtFormat) -> Result<String> {
+    let options =
+        NbtReadOptions { format, compression: Compression::None, ..NbtReadOptions::default() };
+    let all = read_bytes_all(data, &options)?;
+    let mut lines = vec![format!("count {}", all.len())];
+
+    let mut offset = 0usize;
+    let mut index = 0usize;
+
+    // 位置を指定した読み込みでも同じ並びになることを確かめる
+    while offset < data.len() {
+        let result = read_bytes_at(data, offset, &options)?;
+        lines.push(format!(
+            "{} {} {} {} {}",
+            index,
+            offset,
+            result.end,
+            result.tag.name,
+            result.tag.tag.len()
+        ));
+        offset = result.end;
+        index += 1;
+    }
+
+    lines.push(format!("total {index} {offset}"));
+    Ok(lines.join("\n") + "\n")
 }
 
 fn run(args: &[String]) -> Result<ExitCode> {
@@ -77,6 +107,13 @@ fn run(args: &[String]) -> Result<ExitCode> {
             std::fs::write(&args[2], write_bytes(&named, &NbtWriteOptions::uncompressed())?)?;
         }
 
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    // 連なった NBT を一覧にする
+    if args[0] == "nbt-list" {
+        let bytes = std::fs::read(&args[1])?;
+        std::fs::write(&args[2], nbt_list(&bytes, parse_format(args))?)?;
         return Ok(ExitCode::SUCCESS);
     }
 

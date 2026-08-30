@@ -110,6 +110,21 @@ export interface NbtWriteOptions {
   compression?: Compression;
 }
 
+/**
+ * 位置を指定した読み込みの結果
+ *
+ * 読んだタグと、その直後の位置を持つ
+ * 続けて読むときは `end` を次の開始位置として渡す
+ *
+ * 仕様: `docs/spec/10-nbt-binary.md` 3.1章
+ */
+export interface NbtReadResult {
+  /** 読んだタグ */
+  tag: NamedTag;
+  /** 読み終わった直後の位置 */
+  end: number;
+}
+
 const DEFAULT_MAX_DEPTH = 512;
 
 // ---------------------------------------------------------------------------
@@ -128,21 +143,46 @@ class Reader {
   readonly #maxDepth: number;
   #position = 0;
 
-  constructor(data: Uint8Array, maxDepth: number) {
+  constructor(data: Uint8Array, maxDepth: number, start = 0) {
     this.#data = data;
     this.#view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     this.#maxDepth = maxDepth;
+    this.#position = start;
   }
 
   get #remaining(): number {
     return this.#data.length - this.#position;
   }
 
+  /** 次に読む位置 */
+  get position(): number {
+    return this.#position;
+  }
+
+  /** まだ読んでいないバイトが残っているか */
+  get hasMore(): boolean {
+    return this.#remaining > 0;
+  }
+
+  /** ルートタグを読み、末尾に余りが無いことを確かめる */
+  readRoot(format: NbtFormat): NamedTag {
+    const tag = this.readRootTag(format);
+
+    // 末尾に余分なバイトが残っていたら、読み違えている可能性が高い
+    if (this.#remaining !== 0) {
+      throw SpringNbtError.malformed(
+        `ルートタグの後に ${this.#remaining} バイトの余分な入力がある`,
+      );
+    }
+
+    return tag;
+  }
+
   /**
    * ルートタグを 1 つ読む
    * 形式によって名前の有無が変わる
    */
-  readRoot(format: NbtFormat): NamedTag {
+  readRootTag(format: NbtFormat): NamedTag {
     const type = tagTypeFromId(this.#readByte());
 
     // Java版のファイル形式でもネットワーク形式でも、ルートは必ず TAG_Compound
@@ -162,14 +202,6 @@ class Reader {
     }
 
     const root = this.#readCompoundPayload(1);
-
-    // 末尾に余分なバイトが残っていたら、読み違えている可能性が高い
-    if (this.#remaining !== 0) {
-      throw SpringNbtError.malformed(
-        `ルートタグの後に ${this.#remaining} バイトの余分な入力がある`,
-      );
-    }
-
     return new NamedTag(name, root);
   }
 
@@ -726,6 +758,74 @@ export function readBytes(bytes: Uint8Array, options?: NbtReadOptions): NamedTag
   const effective = fillReadOptions(options);
   const plain = decompress(bytes, effective);
   return new Reader(plain, effective.maxDepth).readRoot(effective.format);
+}
+
+/**
+ * バイト列の指定した位置から NBT を 1 つ読む
+ *
+ * 複数の NBT が連なっているデータを、先頭から順に読み進めるために使う
+ * 戻り値の `end` が次の開始位置になる
+ *
+ * 位置は渡したバイト列そのものを指すので、圧縮されたデータは扱えない
+ *
+ * @throws {SpringNbtError} 読み込みに失敗した場合
+ */
+export function readBytesAt(
+  bytes: Uint8Array,
+  offset: number,
+  options?: NbtReadOptions,
+): NbtReadResult {
+  const effective = fillReadOptions(options);
+  requirePlainInput(effective);
+
+  if (offset < 0 || offset > bytes.length) {
+    throw SpringNbtError.invalidArgument(
+      `読み始める位置が範囲外: ${offset} (長さ ${bytes.length})`,
+    );
+  }
+
+  const reader = new Reader(bytes, effective.maxDepth, offset);
+  const tag = reader.readRootTag(effective.format);
+  return { tag, end: reader.position };
+}
+
+/**
+ * バイト列に連なっている NBT をすべて読む
+ *
+ * 入力を使い切るまで読み続ける
+ * 空のバイト列なら空の一覧を返す
+ *
+ * 圧縮は入力全体に 1 回かかっているものとして扱う
+ *
+ * @throws {SpringNbtError} 読み込みに失敗した場合
+ */
+export function readBytesAll(bytes: Uint8Array, options?: NbtReadOptions): NamedTag[] {
+  const effective = fillReadOptions(options);
+  const tags: NamedTag[] = [];
+
+  // 空の入力は「0 個」であってエラーではない
+  if (bytes.length === 0) {
+    return tags;
+  }
+
+  const plain = decompress(bytes, effective);
+  const reader = new Reader(plain, effective.maxDepth);
+
+  // 入力を使い切るまでルートタグを読み続ける
+  while (reader.hasMore) {
+    tags.push(reader.readRootTag(effective.format));
+  }
+
+  return tags;
+}
+
+/** 位置を指定する読み込みは、展開済みのバイト列だけを扱う */
+function requirePlainInput(options: Required<NbtReadOptions>): void {
+  if (options.compression === Compression.Gzip || options.compression === Compression.Zlib) {
+    throw SpringNbtError.invalidArgument(
+      "位置を指定した読み込みでは圧縮を扱えない。展開してから渡すこと",
+    );
+  }
 }
 
 /** ファイルから NBT を読む */
