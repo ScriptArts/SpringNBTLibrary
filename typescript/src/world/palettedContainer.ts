@@ -33,30 +33,34 @@ export class PalettedContainer {
     this.#minBits = minBits;
   }
 
-  /** エントリ数
-  /** ブロックなら 4096、バイオームなら 64
-  /** */
+  /**
+   * エントリ数
+   * ブロックなら 4096、バイオームなら 64
+   */
   get entryCount(): number {
     return this.#entryCount;
   }
 
-  /** ビット幅の下限
-  /** ブロックなら 4、バイオームなら 1
-  /** */
+  /**
+   * ビット幅の下限
+   * ブロックなら 4、バイオームなら 1
+   */
   get minBits(): number {
     return this.#minBits;
   }
 
-  /** パレット
-  /** 読み取り専用
-  /** */
+  /**
+   * パレット
+   * 読み取り専用
+   */
   get palette(): readonly NbtTag[] {
     return this.#palette;
   }
 
-  /** 現在のビット幅
-  /** パレットが 1 要素なら 0（記憶域を持たない）
-  /** */
+  /**
+   * 現在のビット幅
+   * パレットが 1 要素なら 0（記憶域を持たない）
+   */
   get bitsPerEntry(): number {
     if (this.#storage === undefined) {
       return 0;
@@ -65,16 +69,14 @@ export class PalettedContainer {
     return this.#storage.bitsPerEntry;
   }
 
-  /** 単一の値で埋めたコンテナを作る
-  /** */
+  /** 単一の値で埋めたコンテナを作る */
   static filled(value: NbtTag, entryCount: number, minBits: number): PalettedContainer {
     const result = new PalettedContainer(entryCount, minBits);
     result.#palette.push(value);
     return result;
   }
 
-  /** NBT から読み込む
-  /** */
+  /** NBT から読み込む */
   static fromNbt(
     nbt: NbtCompound,
     entryCount: number,
@@ -125,8 +127,7 @@ export class PalettedContainer {
     return result;
   }
 
-  /** NBT へ変換する
-  /** */
+  /** NBT へ変換する */
   toNbt(): NbtCompound {
     const result = new NbtCompound();
     const paletteTag = new NbtList();
@@ -146,8 +147,7 @@ export class PalettedContainer {
     return result;
   }
 
-  /** 添字の値を取り出す
-  /** */
+  /** 添字の値を取り出す */
   get(index: number): NbtTag {
     this.#checkIndex(index);
 
@@ -159,9 +159,10 @@ export class PalettedContainer {
     return this.#palette[this.#storage.get(index)];
   }
 
-  /** 添字の値を書き換える
-  /** パレットに無ければ追加する
-  /** */
+  /**
+   * 添字の値を書き換える
+   * パレットに無ければ追加する
+   */
   set(index: number, value: NbtTag): void {
     this.#checkIndex(index);
     const paletteIndex = this.#indexOfOrAdd(value);
@@ -175,9 +176,10 @@ export class PalettedContainer {
     this.#storage!.set(index, paletteIndex);
   }
 
-  /** 全エントリを 1 つの値で埋める
-  /** パレットもその 1 要素だけにする
-  /** */
+  /**
+   * 全エントリを 1 つの値で埋める
+   * パレットもその 1 要素だけにする
+   */
   fill(value: NbtTag): void {
     this.#palette.length = 0;
     this.#palette.push(value);
@@ -238,9 +240,10 @@ export class PalettedContainer {
     }
   }
 
-  /** パレット内の位置を返す
-  /** 無ければ末尾へ追加する
-  /** */
+  /**
+   * パレット内の位置を返す
+   * 無ければ末尾へ追加する
+   */
   #indexOfOrAdd(value: NbtTag): number {
     // パレットは高々 4096 要素なので線形探索で足りる
     for (let index = 0; index < this.#palette.length; index++) {
@@ -253,8 +256,7 @@ export class PalettedContainer {
     return this.#palette.length - 1;
   }
 
-  /** 現在のパレット長に合うビット幅の記憶域を用意する
-  /** */
+  /** 現在のパレット長に合うビット幅の記憶域を用意する */
   #ensureStorage(): void {
     const required = Math.max(this.#minBits, ceilLog2(this.#palette.length));
 
@@ -281,9 +283,10 @@ export class PalettedContainer {
   }
 }
 
-/** `count` 個の値を表すのに必要な最小ビット数
-/** 1 なら 0
-/** */
+/**
+ * `count` 個の値を表すのに必要な最小ビット数
+ * 1 なら 0
+ */
 export function ceilLog2(count: number): number {
   let bits = 0;
 

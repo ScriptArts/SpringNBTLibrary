@@ -142,6 +142,11 @@ PUBLIC_TYPE = {
     "rust": re.compile(r"^pub\s+(?:struct|enum|trait)\s"),
 }
 
+#: 本文を載せたまま閉じていない doc コメントの開始行。
+#: 複数行の doc コメントは本文の無い `/**` で始める決まりなので、
+#: この形は整形が壊れた跡とみなす。
+BROKEN_DOC = re.compile(r"^\s*/\*\*\s*\S")
+
 #: ガード節とみなす本体。これだけで終わる分岐にはコメントを求めない。
 GUARD_BODY = re.compile(
     r"^\s*(throw|return|continue|break|raise)\b|^\s*\{?\s*$")
@@ -408,6 +413,11 @@ def check_language(language: str):
                 # 三重引用符の数が奇数なら、docstring の出入りが切り替わる
                 if stripped.count('"""') % 2 == 1:
                     in_docstring = not in_docstring
+
+            # 閉じ忘れた doc コメントは、この行だけで判別できる
+            if BROKEN_DOC.match(line) and not stripped.endswith("*/"):
+                findings.append(Finding(language, relative, number,
+                                        "doc コメントの整形が壊れている", line))
 
             # ブロックコメントの中は検査しない
             if stripped.startswith("/*"):

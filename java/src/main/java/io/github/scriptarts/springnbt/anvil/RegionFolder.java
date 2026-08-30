@@ -47,9 +47,10 @@ public final class RegionFolder implements AutoCloseable {
 
     private final Map<RegionPos, RegionFile> cache = new HashMap<>();
 
-    /** 最近使った順のリージョン座標
-    /** 末尾がいちばん新しい
-    /** */
+    /**
+     * 最近使った順のリージョン座標
+     * 末尾がいちばん新しい
+     */
     private final LinkedList<RegionPos> recentlyUsed = new LinkedList<>();
 
     private final Path directory;
@@ -205,15 +206,13 @@ public final class RegionFolder implements AutoCloseable {
         return opened;
     }
 
-    /** 使ったリージョンを、最近使った列の末尾へ移す
-    /** */
+    /** 使ったリージョンを、最近使った列の末尾へ移す */
     private void touch(RegionPos position) {
         recentlyUsed.remove(position);
         recentlyUsed.addLast(position);
     }
 
-    /** 新しく 1 件開けるよう、上限を下回るまで古いものを閉じる
-    /** */
+    /** 新しく 1 件開けるよう、上限を下回るまで古いものを閉じる */
     private void evictUntilBelowLimit() {
         // 上限に達している間、いちばん長く使っていないものから閉じる
         while (cache.size() >= maxCachedRegions && !recentlyUsed.isEmpty()) {
@@ -320,8 +319,7 @@ public final class RegionFolder implements AutoCloseable {
         return result;
     }
 
-    /** 開いている全リージョンの変更を書き出す
-    /** */
+    /** 開いている全リージョンの変更を書き出す */
     public void flush() {
         ensureOpen();
 
@@ -331,8 +329,7 @@ public final class RegionFolder implements AutoCloseable {
         }
     }
 
-    /** 開いている全リージョンを閉じる
-    /** */
+    /** 開いている全リージョンを閉じる */
     @Override
     public void close() {
         if (closed) {

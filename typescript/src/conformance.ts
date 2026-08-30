@@ -201,9 +201,10 @@ function jsonTag(tag: NbtTag): string {
   return `${result}}`;
 }
 
-/** ルートを含む全体を JSON 文字列へ変換する
-/** 末尾に改行を1つ付ける
-/** */
+/**
+ * ルートを含む全体を JSON 文字列へ変換する
+ * 末尾に改行を1つ付ける
+ */
 function normalizedJson(named: NamedTag, format: NbtFormat): string {
   return (
     `{"format":${jsonString(format)}` +
@@ -408,9 +409,10 @@ function chunkEdit(chunk: Chunk): void {
   chunk.invalidateLighting();
 }
 
-/** 集計表から現在の件数を取り出す
-/** まだ無ければ 0
-/** */
+/**
+ * 集計表から現在の件数を取り出す
+ * まだ無ければ 0
+ */
 function countOf(counts: Map<string, number>, key: string): number {
   const current = counts.get(key);
 
@@ -421,8 +423,7 @@ function countOf(counts: Map<string, number>, key: string): number {
   return current;
 }
 
-/** チャンク NBT のファイルを読む
-/** */
+/** チャンク NBT のファイルを読む */
 function readChunkFile(path: string): Chunk {
   // 検証では DataVersion の違いを警告にせず、そのまま読む
   return Chunk.fromNbt(readFile(path).tag, {
@@ -434,8 +435,7 @@ function readChunkFile(path: string): Chunk {
 // コマンド
 // ---------------------------------------------------------------------------
 
-/** `--format network` が指定されていればネットワーク形式として読む
-/** */
+/** `--format network` が指定されていればネットワーク形式として読む */
 function parseFormat(args: string[]): NbtFormat {
   // 3 番目以降の引数からオプションを探す
   for (let index = 3; index < args.length - 1; index++) {

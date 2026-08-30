@@ -9,18 +9,15 @@
  * 仕様: `docs/spec/11-snbt.md` 5.1章
  */
 
-/** 固定小数点表記を使う10進指数の下限
-/** */
+/** 固定小数点表記を使う10進指数の下限 */
 const MIN_FIXED_EXPONENT = -4;
 
-/** 固定小数点表記を使う10進指数の上限
-/** */
+/** 固定小数点表記を使う10進指数の上限 */
 const MAX_FIXED_EXPONENT = 16;
 
 const scratch = new DataView(new ArrayBuffer(8));
 
-/** 特殊値なら文字列を、そうでなければ undefined を返す
-/** */
+/** 特殊値なら文字列を、そうでなければ undefined を返す */
 function special(value: number): string | undefined {
   if (Number.isNaN(value)) {
     return "NaN";
@@ -37,22 +34,19 @@ function special(value: number): string | undefined {
   return undefined;
 }
 
-/** binary32 のビットパターンを取り出す
-/** */
+/** binary32 のビットパターンを取り出す */
 function floatBits(value: number): number {
   scratch.setFloat32(0, value, false);
   return scratch.getUint32(0, false);
 }
 
-/** binary64 のビットパターンを取り出す
-/** */
+/** binary64 のビットパターンを取り出す */
 function doubleBits(value: number): bigint {
   scratch.setFloat64(0, value, false);
   return scratch.getBigUint64(0, false);
 }
 
-/** binary32 を正準10進表記へ変換する
-/** */
+/** binary32 を正準10進表記へ変換する */
 export function fromFloat(value: number): string {
   const specialText = special(value);
 
@@ -76,8 +70,7 @@ export function fromFloat(value: number): string {
   return formatExponential(value.toExponential(8), negative);
 }
 
-/** binary64 を正準10進表記へ変換する
-/** */
+/** binary64 を正準10進表記へ変換する */
 export function fromDouble(value: number): string {
   const specialText = special(value);
 
@@ -116,8 +109,7 @@ function isNegative(value: number): boolean {
   return Object.is(value, -0);
 }
 
-/** 指数表記の文字列（例 `"7.5e-1"`）から、仕様が定める正準表記を組み立てる
-/** */
+/** 指数表記の文字列（例 `"7.5e-1"`）から、仕様が定める正準表記を組み立てる */
 function formatExponential(exponential: string, negative: boolean): string {
   let index = 0;
 
@@ -143,9 +135,10 @@ function formatExponential(exponential: string, negative: boolean): string {
   return compose(negative, trimTrailingZeros(digits), exponent);
 }
 
-/** 末尾のゼロを取り除く
-/** すべてゼロなら "0" を残す
-/** */
+/**
+ * 末尾のゼロを取り除く
+ * すべてゼロなら "0" を残す
+ */
 function trimTrailingZeros(digits: string): string {
   let end = digits.length;
 
@@ -157,8 +150,7 @@ function trimTrailingZeros(digits: string): string {
   return digits.slice(0, end);
 }
 
-/** 数字列と10進指数から最終的な文字列を組み立てる
-/** */
+/** 数字列と10進指数から最終的な文字列を組み立てる */
 function compose(negative: boolean, digits: string, exponent: number): string {
   let sign = "";
 

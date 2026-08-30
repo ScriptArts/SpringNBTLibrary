@@ -1,8 +1,9 @@
 package io.github.scriptarts.springnbt.nbt;
 
-/** TAG_Byte
-/** 8bit 符号付き整数
-/** */
+/**
+ * TAG_Byte
+ * 8bit 符号付き整数
+ */
 public final class NbtByte implements NbtTag {
 
     private byte value;

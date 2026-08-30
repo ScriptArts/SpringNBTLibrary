@@ -212,8 +212,7 @@ public final class BlockState {
         return result;
     }
 
-    /** 名前空間が省略されていたら {@code minecraft:} を補う
-    /** */
+    /** 名前空間が省略されていたら {@code minecraft:} を補う */
     private static String normalize(String name) {
         if (name.indexOf(':') >= 0) {
             return name;

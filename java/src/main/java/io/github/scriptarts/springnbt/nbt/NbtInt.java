@@ -1,8 +1,9 @@
 package io.github.scriptarts.springnbt.nbt;
 
-/** TAG_Int
-/** 32bit 符号付き整数
-/** */
+/**
+ * TAG_Int
+ * 32bit 符号付き整数
+ */
 public final class NbtInt implements NbtTag {
 
     private int value;

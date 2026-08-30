@@ -3,9 +3,10 @@ package io.github.scriptarts.springnbt.nbt;
 import io.github.scriptarts.springnbt.SpringNbtException;
 import java.util.Objects;
 
-/** TAG_String
-/** MUTF-8 で符号化される文字列
-/** */
+/**
+ * TAG_String
+ * MUTF-8 で符号化される文字列
+ */
 public final class NbtString implements NbtTag {
 
     private String value;
@@ -64,8 +65,7 @@ public final class NbtString implements NbtTag {
         return value;
     }
 
-    /** 長さフィールドが u16 のため、符号化後 65535 バイトを超える文字列は保持できない
-    /** */
+    /** 長さフィールドが u16 のため、符号化後 65535 バイトを超える文字列は保持できない */
     private static String validate(String candidate) {
         Objects.requireNonNull(candidate, "value");
         int byteLength = Mutf8.byteLength(candidate);

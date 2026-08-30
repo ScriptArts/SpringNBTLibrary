@@ -5,8 +5,7 @@
  * 対象バージョンは Java版 26.2 (DataVersion 4903)
  */
 
-/** 本ライブラリが対象とする Minecraft Java版の DataVersion (26.2)
-/** */
+/** 本ライブラリが対象とする Minecraft Java版の DataVersion (26.2) */
 export const TARGET_DATA_VERSION = 4903;
 
 export { ErrorCode, SpringNbtError, errorCodeAsString } from "./errors.js";

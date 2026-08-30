@@ -17,8 +17,7 @@ import java.util.Objects;
  */
 public record RawChunk(ChunkCompression compression, byte[] data, boolean external) {
 
-    /** 引数を検証する
-    /** */
+    /** 引数を検証する */
     public RawChunk {
         Objects.requireNonNull(compression, "compression");
         Objects.requireNonNull(data, "data");

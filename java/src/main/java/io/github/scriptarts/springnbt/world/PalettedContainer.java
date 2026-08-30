@@ -277,9 +277,10 @@ public final class PalettedContainer {
         }
     }
 
-    /** パレット内の位置を返す
-    /** 無ければ末尾へ追加する
-    /** */
+    /**
+     * パレット内の位置を返す
+     * 無ければ末尾へ追加する
+     */
     private int indexOfOrAdd(NbtTag value) {
         // パレットは高々 4096 要素なので線形探索で足りる
         for (int index = 0; index < palette.size(); index++) {
@@ -292,8 +293,7 @@ public final class PalettedContainer {
         return palette.size() - 1;
     }
 
-    /** 現在のパレット長に合うビット幅の記憶域を用意する
-    /** */
+    /** 現在のパレット長に合うビット幅の記憶域を用意する */
     private void ensureStorage() {
         int required = Math.max(minBits, ceilLog2(palette.size()));
 

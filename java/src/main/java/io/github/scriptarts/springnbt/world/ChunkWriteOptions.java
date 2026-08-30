@@ -1,7 +1,6 @@
 package io.github.scriptarts.springnbt.world;
 
-/** チャンク書き込みのオプション
-/** */
+/** チャンク書き込みのオプション */
 public final class ChunkWriteOptions {
 
     private boolean allowForeignDataVersion;

@@ -61,8 +61,7 @@ public sealed class ChunkWriteOptions
 /// </summary>
 /// <remarks>
 /// <para>
-/// **読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
-/// **
+/// 読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
 /// 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
 /// </para>
 /// <para>仕様: <c>docs/spec/30-chunk-format.md</c></para>

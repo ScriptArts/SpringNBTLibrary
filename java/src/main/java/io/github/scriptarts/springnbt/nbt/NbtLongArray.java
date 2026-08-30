@@ -3,9 +3,10 @@ package io.github.scriptarts.springnbt.nbt;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** TAG_Long_Array
-/** 64bit 符号付き整数の配列
-/** */
+/**
+ * TAG_Long_Array
+ * 64bit 符号付き整数の配列
+ */
 public final class NbtLongArray implements NbtTag {
 
     private long[] value;

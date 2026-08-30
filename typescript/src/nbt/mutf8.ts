@@ -13,8 +13,7 @@
 
 import { SpringNbtError } from "../errors.js";
 
-/** MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため）
-/** */
+/** MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため） */
 export const MAX_BYTE_LENGTH = 65535;
 
 /**
@@ -137,9 +136,10 @@ export function encode(text: string): Uint8Array {
   return buffer;
 }
 
-/** 文字列を MUTF-8 で符号化したときのバイト長を求める
-/** 実際に符号化はしない
-/** */
+/**
+ * 文字列を MUTF-8 で符号化したときのバイト長を求める
+ * 実際に符号化はしない
+ */
 export function byteLength(text: string): number {
   let length = 0;
 

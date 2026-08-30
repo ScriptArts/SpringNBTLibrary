@@ -1,7 +1,6 @@
 package io.github.scriptarts.springnbt.world;
 
-/** ワールドを開くときの動作
-/** */
+/** ワールドを開くときの動作 */
 public final class WorldOpenOptions {
 
     private boolean writable;

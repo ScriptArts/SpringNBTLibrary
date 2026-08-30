@@ -23,14 +23,12 @@ final class NbtBinaryReader {
         this.position = 0;
     }
 
-    /** 残っている入力バイト数
-    /** */
+    /** 残っている入力バイト数 */
     private int remaining() {
         return data.length - position;
     }
 
-    /** ルートタグを読む
-    /** */
+    /** ルートタグを読む */
     NamedTag readRoot(NbtFormat format) {
         TagType type = TagType.fromId(readByteRaw() & 0xFF);
 
@@ -60,8 +58,7 @@ final class NbtBinaryReader {
         return new NamedTag(name, root);
     }
 
-    /** 指定した型のペイロードを読む
-    /** */
+    /** 指定した型のペイロードを読む */
     private NbtTag readPayload(TagType type, int depth) {
         // 深さ上限は再帰する型に入る手前で検査する
         if (depth > maxDepth) {
@@ -85,8 +82,7 @@ final class NbtBinaryReader {
         };
     }
 
-    /** TAG_Compound のペイロード（名前付きタグの並び + TAG_End）を読む
-    /** */
+    /** TAG_Compound のペイロード（名前付きタグの並び + TAG_End）を読む */
     private NbtCompound readCompoundPayload(int depth) {
         NbtCompound compound = new NbtCompound();
 
@@ -103,8 +99,7 @@ final class NbtBinaryReader {
         }
     }
 
-    /** TAG_List のペイロードを読む
-    /** */
+    /** TAG_List のペイロードを読む */
     private NbtList readListPayload(int depth) {
         TagType elementType = TagType.fromId(readByteRaw() & 0xFF);
         int count = readLength();
@@ -170,8 +165,7 @@ final class NbtBinaryReader {
         return result;
     }
 
-    /** MUTF-8 の文字列（u16 の長さ + 本体）を読む
-    /** */
+    /** MUTF-8 の文字列（u16 の長さ + 本体）を読む */
     private String readString() {
         int length = (int) readUnsigned(2);
         ensureAvailable(length);
@@ -181,9 +175,10 @@ final class NbtBinaryReader {
         return text;
     }
 
-    /** 配列・リストの長さフィールドを読む
-    /** 負値は不正
-    /** */
+    /**
+     * 配列・リストの長さフィールドを読む
+     * 負値は不正
+     */
     private int readLength() {
         int length = (int) readUnsigned(4);
 
@@ -202,8 +197,7 @@ final class NbtBinaryReader {
         return value;
     }
 
-    /** 指定バイト数をビッグエンディアンで読み進める
-    /** */
+    /** 指定バイト数をビッグエンディアンで読み進める */
     private long readUnsigned(int count) {
         ensureAvailable(count);
         long value = 0;
@@ -217,9 +211,10 @@ final class NbtBinaryReader {
         return value;
     }
 
-    /** 残り入力が必要バイト数を満たすか検査する
-    /** メモリを確保する前に呼ぶ
-    /** */
+    /**
+     * 残り入力が必要バイト数を満たすか検査する
+     * メモリを確保する前に呼ぶ
+     */
     private void ensureAvailable(long required) {
         if (required > remaining()) {
             throw SpringNbtException.malformed(
@@ -256,9 +251,10 @@ final class NbtBinaryReader {
         return text;
     }
 
-    /** その型のペイロードが最低何バイトになるかを返す
-    /** 長さの先行検証に使う
-    /** */
+    /**
+     * その型のペイロードが最低何バイトになるかを返す
+     * 長さの先行検証に使う
+     */
     private static int minimumPayloadSize(TagType type) {
         return switch (type) {
             case BYTE -> 1;

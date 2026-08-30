@@ -3,9 +3,10 @@ package io.github.scriptarts.springnbt.nbt;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** TAG_Int_Array
-/** 32bit 符号付き整数の配列
-/** */
+/**
+ * TAG_Int_Array
+ * 32bit 符号付き整数の配列
+ */
 public final class NbtIntArray implements NbtTag {
 
     private int[] value;

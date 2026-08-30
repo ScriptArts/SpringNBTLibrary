@@ -14,20 +14,17 @@ import java.util.Locale;
  */
 final class CanonicalDecimal {
 
-    /** 固定小数点表記を使う10進指数の下限
-    /** */
+    /** 固定小数点表記を使う10進指数の下限 */
     private static final int MIN_FIXED_EXPONENT = -4;
 
-    /** 固定小数点表記を使う10進指数の上限
-    /** */
+    /** 固定小数点表記を使う10進指数の上限 */
     private static final int MAX_FIXED_EXPONENT = 16;
 
     private CanonicalDecimal() {
         // ユーティリティクラス
     }
 
-    /** binary32 を正準10進表記へ変換する
-    /** */
+    /** binary32 を正準10進表記へ変換する */
     static String fromFloat(float value) {
         if (Float.isNaN(value)) {
             return "NaN";
@@ -56,8 +53,7 @@ final class CanonicalDecimal {
         return format(String.format(Locale.ROOT, "%.8e", value));
     }
 
-    /** binary64 を正準10進表記へ変換する
-    /** */
+    /** binary64 を正準10進表記へ変換する */
     static String fromDouble(double value) {
         if (Double.isNaN(value)) {
             return "NaN";
@@ -86,8 +82,7 @@ final class CanonicalDecimal {
         return format(String.format(Locale.ROOT, "%.16e", value));
     }
 
-    /** 指数表記の文字列（例 {@code "7.5e-01"}）から、仕様が定める正準表記を組み立てる
-    /** */
+    /** 指数表記の文字列（例 {@code "7.5e-01"}）から、仕様が定める正準表記を組み立てる */
     private static String format(String exponential) {
         boolean negative = false;
         int index = 0;
@@ -118,8 +113,7 @@ final class CanonicalDecimal {
         return compose(negative, digits, exponent);
     }
 
-    /** {@code Integer.parseInt} は先頭の "+" を受け付けるが、環境差を避けるため明示的に外す
-    /** */
+    /** {@code Integer.parseInt} は先頭の "+" を受け付けるが、環境差を避けるため明示的に外す */
     private static String stripPlus(String text) {
         if (text.startsWith("+")) {
             return text.substring(1);
@@ -128,9 +122,10 @@ final class CanonicalDecimal {
         return text;
     }
 
-    /** 末尾のゼロを取り除く
-    /** すべてゼロなら "0" を残す
-    /** */
+    /**
+     * 末尾のゼロを取り除く
+     * すべてゼロなら "0" を残す
+     */
     private static String trimTrailingZeros(String digits) {
         int end = digits.length();
 
@@ -142,8 +137,7 @@ final class CanonicalDecimal {
         return digits.substring(0, end);
     }
 
-    /** 数字列と10進指数から最終的な文字列を組み立てる
-    /** */
+    /** 数字列と10進指数から最終的な文字列を組み立てる */
     private static String compose(boolean negative, String digits, int exponent) {
         StringBuilder builder = new StringBuilder();
 

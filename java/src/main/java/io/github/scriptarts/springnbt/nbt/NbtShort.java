@@ -1,8 +1,9 @@
 package io.github.scriptarts.springnbt.nbt;
 
-/** TAG_Short
-/** 16bit 符号付き整数
-/** */
+/**
+ * TAG_Short
+ * 16bit 符号付き整数
+ */
 public final class NbtShort implements NbtTag {
 
     private short value;

@@ -23,9 +23,10 @@ final class SnbtParser {
         this.position = 0;
     }
 
-    /** 入力全体を 1 つの値として読む
-    /** 末尾に余りがあれば例外
-    /** */
+    /**
+     * 入力全体を 1 つの値として読む
+     * 末尾に余りがあれば例外
+     */
     NbtTag parseWhole() {
         NbtTag value = parseValue();
         skipWhitespace();
@@ -240,9 +241,10 @@ final class SnbtParser {
         return new NbtLongArray(result);
     }
 
-    /** 整数タグから値を取り出す
-    /** 整数以外なら例外
-    /** */
+    /**
+     * 整数タグから値を取り出す
+     * 整数以外なら例外
+     */
     private long toIntegral(NbtTag tag) {
         return switch (tag) {
             case NbtByte value -> value.value();
@@ -355,8 +357,7 @@ final class SnbtParser {
         builder.appendCodePoint((int) codePoint);
     }
 
-    /** Unicode 文字名によるエスケープ {@code \N{...}} を読む
-    /** */
+    /** Unicode 文字名によるエスケープ {@code \N{...}} を読む */
     private void appendNamedCharacter(StringBuilder builder) {
         expect('{');
         int start = position;
@@ -448,9 +449,10 @@ final class SnbtParser {
         });
     }
 
-    /** 数値トークンを解釈する
-    /** 数値として読めなければ null を返す（文字列として扱われる）
-    /** */
+    /**
+     * 数値トークンを解釈する
+     * 数値として読めなければ null を返す（文字列として扱われる）
+     */
     private NbtTag tryParseNumber(String token) {
         boolean negative = false;
         int start = 0;
@@ -719,8 +721,7 @@ final class SnbtParser {
         return text.substring(start, position);
     }
 
-    /** 引用符なしで書ける文字か
-    /** */
+    /** 引用符なしで書ける文字か */
     static boolean isBareChar(char c) {
         if (c >= 'a' && c <= 'z') {
             return true;
@@ -752,9 +753,10 @@ final class SnbtParser {
         return text.charAt(position);
     }
 
-    /** 末尾でも例外にしない先読み
-    /** 入力が尽きていれば NUL を返す
-    /** */
+    /**
+     * 末尾でも例外にしない先読み
+     * 入力が尽きていれば NUL を返す
+     */
     private char peekOrNul() {
         if (position >= text.length()) {
             return '\0';

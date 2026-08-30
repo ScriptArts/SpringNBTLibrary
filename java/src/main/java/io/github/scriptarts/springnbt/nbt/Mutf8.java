@@ -21,8 +21,7 @@ import io.github.scriptarts.springnbt.SpringNbtException;
  */
 public final class Mutf8 {
 
-    /** MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため）
-    /** */
+    /** MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため） */
     public static final int MAX_BYTE_LENGTH = 65535;
 
     private Mutf8() {

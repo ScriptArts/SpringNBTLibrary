@@ -7,8 +7,7 @@ package io.github.scriptarts.springnbt.nbt;
  */
 public final class NbtReadOptions {
 
-    /** ネストの深さ上限の既定値
-    /** */
+    /** ネストの深さ上限の既定値 */
     public static final int DEFAULT_MAX_DEPTH = 512;
 
     private NbtFormat format = NbtFormat.JAVA;

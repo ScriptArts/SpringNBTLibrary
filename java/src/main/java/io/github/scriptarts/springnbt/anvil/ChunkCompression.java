@@ -13,33 +13,38 @@ import io.github.scriptarts.springnbt.SpringNbtException;
  */
 public enum ChunkCompression {
 
-    /** GZip (RFC 1952)
-    /** ID=1
-    /** 実データではほぼ使われない
-    /** */
+    /**
+     * GZip (RFC 1952)
+     * ID=1
+     * 実データではほぼ使われない
+     */
     GZIP(1, "gzip"),
 
-    /** Zlib (RFC 1950)
-    /** ID=2
-    /** Minecraft が実際に書き出す方式
-    /** */
+    /**
+     * Zlib (RFC 1950)
+     * ID=2
+     * Minecraft が実際に書き出す方式
+     */
     ZLIB(2, "zlib"),
 
-    /** 無圧縮
-    /** ID=3
-    /** */
+    /**
+     * 無圧縮
+     * ID=3
+     */
     NONE(3, "none"),
 
-    /** LZ4（ブロック形式）
-    /** ID=4
-    /** 任意依存
-    /** */
+    /**
+     * LZ4（ブロック形式）
+     * ID=4
+     * 任意依存
+     */
     LZ4(4, "lz4"),
 
-    /** サードパーティ製サーバのカスタム方式
-    /** ID=127
-    /** 中身は解釈できない
-    /** */
+    /**
+     * サードパーティ製サーバのカスタム方式
+     * ID=127
+     * 中身は解釈できない
+     */
     CUSTOM(127, "custom");
 
     private final int id;

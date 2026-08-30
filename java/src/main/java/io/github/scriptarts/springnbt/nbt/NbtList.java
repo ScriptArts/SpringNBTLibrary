@@ -22,9 +22,10 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
     private final List<NbtTag> items = new ArrayList<>();
     private TagType elementType;
 
-    /** 空のリストを作る
-    /** 要素型は未確定
-    /** */
+    /**
+     * 空のリストを作る
+     * 要素型は未確定
+     */
     public NbtList() {
         this.elementType = TagType.END;
     }
@@ -111,9 +112,10 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
         items.remove(index);
     }
 
-    /** 全要素を削除する
-    /** 確定済みの要素型は維持する
-    /** */
+    /**
+     * 全要素を削除する
+     * 確定済みの要素型は維持する
+     */
     public void clear() {
         items.clear();
     }

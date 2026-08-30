@@ -3,9 +3,10 @@ package io.github.scriptarts.springnbt.nbt;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** TAG_Byte_Array
-/** 8bit 符号付き整数の配列
-/** */
+/**
+ * TAG_Byte_Array
+ * 8bit 符号付き整数の配列
+ */
 public final class NbtByteArray implements NbtTag {
 
     private byte[] value;

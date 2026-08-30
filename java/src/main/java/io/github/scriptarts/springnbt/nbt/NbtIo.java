@@ -201,8 +201,7 @@ public final class NbtIo {
                 String.format("圧縮方式を判定できない (先頭バイト 0x%02X)", bytes[0] & 0xFF));
     }
 
-    /** 指定された方式で展開する
-    /** */
+    /** 指定された方式で展開する */
     private static byte[] decompress(byte[] bytes, NbtReadOptions options) {
         Compression method;
         // AUTO なら先頭バイトから圧縮方式を見分ける
@@ -226,8 +225,7 @@ public final class NbtIo {
         }
     }
 
-    /** 指定された方式で圧縮する
-    /** */
+    /** 指定された方式で圧縮する */
     private static byte[] compress(byte[] plain, Compression method) {
         if (method == Compression.NONE) {
             return plain;
@@ -271,8 +269,7 @@ public final class NbtIo {
         throw SpringNbtException.invalidArgument("圧縮できない方式: " + method);
     }
 
-    /** 展開後のサイズ上限を見ながらコピーする
-    /** */
+    /** 展開後のサイズ上限を見ながらコピーする */
     private static void copyWithLimit(InputStream source, OutputStream destination, long maxSize)
             throws IOException {
         byte[] chunk = new byte[81920];

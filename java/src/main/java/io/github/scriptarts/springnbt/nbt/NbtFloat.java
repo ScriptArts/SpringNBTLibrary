@@ -1,8 +1,9 @@
 package io.github.scriptarts.springnbt.nbt;
 
-/** TAG_Float
-/** IEEE 754 binary32
-/** */
+/**
+ * TAG_Float
+ * IEEE 754 binary32
+ */
 public final class NbtFloat implements NbtTag {
 
     private float value;

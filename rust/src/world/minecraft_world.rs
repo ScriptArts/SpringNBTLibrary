@@ -24,8 +24,8 @@ pub struct WorldOpenOptions {
     pub writable: bool,
     /// `session.lock` の確認を飛ばすか
     ///
-    /// **Rust 版はこの確認を行わない
-    /// ** 標準ライブラリだけでは
+    /// Rust 版はこの確認を行わない
+    /// 標準ライブラリだけでは
     /// ファイルの排他ロックを扱えないため（`docs/adr/0008-session-lock.md`）
     /// 他言語版との API を揃えるためにフィールドだけ用意してある
     ///

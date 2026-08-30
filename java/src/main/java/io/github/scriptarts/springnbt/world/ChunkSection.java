@@ -128,8 +128,7 @@ public final class ChunkSection {
         return raw;
     }
 
-    /** 使われていないパレット要素を取り除く
-    /** */
+    /** 使われていないパレット要素を取り除く */
     public void compact() {
         if (blockStates != null) {
             blockStates.compact();

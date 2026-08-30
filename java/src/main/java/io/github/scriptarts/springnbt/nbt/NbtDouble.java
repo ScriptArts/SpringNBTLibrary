@@ -1,8 +1,9 @@
 package io.github.scriptarts.springnbt.nbt;
 
-/** TAG_Double
-/** IEEE 754 binary64
-/** */
+/**
+ * TAG_Double
+ * IEEE 754 binary64
+ */
 public final class NbtDouble implements NbtTag {
 
     private double value;

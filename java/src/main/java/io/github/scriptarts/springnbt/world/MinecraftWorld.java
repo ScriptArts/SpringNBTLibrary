@@ -108,8 +108,7 @@ public final class MinecraftWorld implements AutoCloseable {
         return open(directory, null);
     }
 
-    /** {@code session.lock} を排他で開けるか確かめる
-    /** */
+    /** {@code session.lock} を排他で開けるか確かめる */
     private static void checkSessionLock(Path directory) {
         Path lockPath = directory.resolve("session.lock");
 
@@ -307,8 +306,7 @@ public final class MinecraftWorld implements AutoCloseable {
         }
     }
 
-    /** 開いている次元をすべて閉じる
-    /** */
+    /** 開いている次元をすべて閉じる */
     @Override
     public void close() {
         if (closed) {
@@ -330,8 +328,7 @@ public final class MinecraftWorld implements AutoCloseable {
         }
     }
 
-    /** 名前空間が省略されていたら {@code minecraft:} を補う
-    /** */
+    /** 名前空間が省略されていたら {@code minecraft:} を補う */
     private static String normalizeDimensionId(String dimensionId) {
         if (dimensionId.indexOf(':') >= 0) {
             return dimensionId;

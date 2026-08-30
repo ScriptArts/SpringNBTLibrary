@@ -277,8 +277,7 @@ public final class Dimension implements AutoCloseable {
         modifiedChunks.add(chunkKey(chunkX, chunkZ));
     }
 
-    /** 変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する
-    /** */
+    /** 変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する */
     public void flush() {
         ensureOpen();
 
@@ -310,8 +309,7 @@ public final class Dimension implements AutoCloseable {
         }
     }
 
-    /** 変更を書き戻してから閉じる
-    /** */
+    /** 変更を書き戻してから閉じる */
     @Override
     public void close() {
         if (closed) {
@@ -339,9 +337,10 @@ public final class Dimension implements AutoCloseable {
         closed = true;
     }
 
-    /** フォルダを遅延して開く
-    /** 存在しなければ null のまま
-    /** */
+    /**
+     * フォルダを遅延して開く
+     * 存在しなければ null のまま
+     */
     private RegionFolder folder(RegionFolder slot, String name) {
         ensureOpen();
 
@@ -379,8 +378,7 @@ public final class Dimension implements AutoCloseable {
         }
     }
 
-    /** チャンク座標を 1 つの long に詰めてキャッシュの鍵にする
-    /** */
+    /** チャンク座標を 1 つの long に詰めてキャッシュの鍵にする */
     private static long chunkKey(int chunkX, int chunkZ) {
         return ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
     }

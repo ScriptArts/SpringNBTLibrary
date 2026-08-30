@@ -16,8 +16,7 @@ final class NbtBinaryWriter {
 
     private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 
-    /** ルートタグを書き出し、結果のバイト列を返す
-    /** */
+    /** ルートタグを書き出し、結果のバイト列を返す */
     byte[] writeRoot(NamedTag named, NbtFormat format) {
         buffer.write(TagType.COMPOUND.id());
 
@@ -107,8 +106,7 @@ final class NbtBinaryWriter {
         buffer.writeBytes(encoded);
     }
 
-    /** 値をビッグエンディアンで指定バイト数ぶん書く
-    /** */
+    /** 値をビッグエンディアンで指定バイト数ぶん書く */
     private void writeUnsigned(long value, int count) {
         // 上位バイトから順に取り出す
         for (int index = count - 1; index >= 0; index--) {

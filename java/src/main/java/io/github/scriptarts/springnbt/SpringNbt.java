@@ -8,8 +8,7 @@ package io.github.scriptarts.springnbt;
  */
 public final class SpringNbt {
 
-    /** 本ライブラリが対象とする Minecraft Java版の DataVersion (26.2)
-    /** */
+    /** 本ライブラリが対象とする Minecraft Java版の DataVersion (26.2) */
     public static final int TARGET_DATA_VERSION = 4903;
 
     private SpringNbt() {

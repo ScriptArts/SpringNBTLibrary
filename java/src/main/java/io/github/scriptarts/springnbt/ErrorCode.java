@@ -8,32 +8,25 @@ package io.github.scriptarts.springnbt;
  */
 public enum ErrorCode {
 
-    /** 下位の入出力失敗
-    /** */
+    /** 下位の入出力失敗 */
     IO,
 
-    /** バイト列が仕様に反する
-    /** */
+    /** バイト列が仕様に反する */
     MALFORMED_DATA,
 
-    /** 期待した型と違うタグを取り出した
-    /** */
+    /** 期待した型と違うタグを取り出した */
     UNEXPECTED_TAG_TYPE,
 
-    /** 仕様上は妥当だが、このビルドでは扱えない
-    /** */
+    /** 仕様上は妥当だが、このビルドでは扱えない */
     UNSUPPORTED_FEATURE,
 
-    /** 安全上限を超えた
-    /** */
+    /** 安全上限を超えた */
     LIMIT_EXCEEDED,
 
-    /** 呼び出し側の引数が不正
-    /** */
+    /** 呼び出し側の引数が不正 */
     INVALID_ARGUMENT,
 
-    /** 対象バージョン外のデータ
-    /** */
+    /** 対象バージョン外のデータ */
     UNSUPPORTED_DATA_VERSION;
 
     /**

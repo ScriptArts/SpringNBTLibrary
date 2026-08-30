@@ -25,8 +25,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
 
     private final Map<String, NbtTag> entries = new LinkedHashMap<>();
 
-    /** 空の Compound を作る
-    /** */
+    /** 空の Compound を作る */
     public NbtCompound() {
         // 既定の状態で空
     }
@@ -116,8 +115,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
         return entries.remove(key) != null;
     }
 
-    /** 全要素を削除する
-    /** */
+    /** 全要素を削除する */
     public void clear() {
         entries.clear();
     }
@@ -533,9 +531,10 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
         return require(key, NbtCompound.class);
     }
 
-    /** キーに対応するタグを目的の型として取り出す
-    /** キーが無ければ null、型が違えば例外
-    /** */
+    /**
+     * キーに対応するタグを目的の型として取り出す
+     * キーが無ければ null、型が違えば例外
+     */
     private <T extends NbtTag> T cast(String key, Class<T> expected) {
         NbtTag tag = entries.get(key);
 
@@ -552,9 +551,10 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
                         + expected.getSimpleName() + " として取り出そうとした");
     }
 
-    /** キーに対応するタグを目的の型として取り出す
-    /** キーが無くても型が違っても例外
-    /** */
+    /**
+     * キーに対応するタグを目的の型として取り出す
+     * キーが無くても型が違っても例外
+     */
     private <T extends NbtTag> T require(String key, Class<T> expected) {
         T tag = cast(key, expected);
 

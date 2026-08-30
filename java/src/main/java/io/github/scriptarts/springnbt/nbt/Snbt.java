@@ -76,9 +76,10 @@ public final class Snbt {
         return builder.toString();
     }
 
-    /** タグを書き出す
-    /** {@code depth} が負なら 1 行、0 以上なら整形して出力する
-    /** */
+    /**
+     * タグを書き出す
+     * {@code depth} が負なら 1 行、0 以上なら整形して出力する
+     */
     private static void writeTag(StringBuilder builder, NbtTag tag, int depth) {
         switch (tag) {
             case NbtByte value -> builder.append(value.value()).append('b');
@@ -200,8 +201,7 @@ public final class Snbt {
         builder.append(']');
     }
 
-    /** 整形出力なら改行とインデントを、1 行出力なら何も入れない
-    /** */
+    /** 整形出力なら改行とインデントを、1 行出力なら何も入れない */
     private static void appendSeparator(StringBuilder builder, int depth) {
         if (depth < 0) {
             return;
@@ -215,8 +215,7 @@ public final class Snbt {
         }
     }
 
-    /** 整形出力のときだけ深さを 1 段進める
-    /** */
+    /** 整形出力のときだけ深さを 1 段進める */
     private static int nextDepth(int depth) {
         if (depth < 0) {
             return -1;
@@ -225,9 +224,10 @@ public final class Snbt {
         return depth + 1;
     }
 
-    /** キーを出力する
-    /** 引用符なしで書ける場合はそのまま出す
-    /** */
+    /**
+     * キーを出力する
+     * 引用符なしで書ける場合はそのまま出す
+     */
     private static String quoteKey(String key) {
         if (isBareWritable(key)) {
             return key;
@@ -251,8 +251,7 @@ public final class Snbt {
         return true;
     }
 
-    /** 文字列を二重引用符で囲み、必要な文字だけエスケープする
-    /** */
+    /** 文字列を二重引用符で囲み、必要な文字だけエスケープする */
     private static String quoteString(String text) {
         StringBuilder builder = new StringBuilder(text.length() + 2);
         builder.append('"');

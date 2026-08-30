@@ -2,8 +2,7 @@
  * チャンク 1 つ分
  * 地形の読み書きの入口
  *
- * **読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
- * **
+ * 読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
  * 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
  *
  * 仕様: `docs/spec/30-chunk-format.md`
@@ -23,21 +22,19 @@ import {
 import { BlockState } from "./blockState.js";
 import { PalettedContainer } from "./palettedContainer.js";
 
-/** セクション 1 つに入るブロック数
-/** */
+/** セクション 1 つに入るブロック数 */
 export const BLOCKS_PER_SECTION = 4096;
 
-/** セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）
-/** */
+/** セクション 1 つに入るバイオームのエントリ数（4×4×4 単位） */
 export const BIOMES_PER_SECTION = 64;
 
-/** ブロックに紐づく付随データのキー
-/** ブロックを置き換えたら整合が崩れる
-/** */
+/**
+ * ブロックに紐づく付随データのキー
+ * ブロックを置き換えたら整合が崩れる
+ */
 const BLOCK_DATA_KEYS = ["block_entities", "block_ticks", "fluid_ticks"] as const;
 
-/** 付随データの要素が、指定の絶対座標を指しているか
-/** */
+/** 付随データの要素が、指定の絶対座標を指しているか */
 function matchesPosition(entry: NbtCompound, x: number, y: number, z: number): boolean {
   const entryX = entry.optInt("x");
   const entryY = entry.optInt("y");
@@ -51,38 +48,33 @@ function matchesPosition(entry: NbtCompound, x: number, y: number, z: number): b
   return entryX === x && entryY === y && entryZ === z;
 }
 
-/** DataVersion が対象と違ったときの動作
-/** */
+/** DataVersion が対象と違ったときの動作 */
 export enum VersionMismatchAction {
-  /** 警告コールバックを呼んで続行する
-  /** 既定
-  /** */
+  /**
+   * 警告コールバックを呼んで続行する
+   * 既定
+   */
   Warn = "warn",
-  /** `UNSUPPORTED_DATA_VERSION` の例外にする
-  /** */
+  /** `UNSUPPORTED_DATA_VERSION` の例外にする */
   Error = "error",
-  /** 何もしない
-  /** */
+  /** 何もしない */
   Ignore = "ignore",
 }
 
-/** チャンク読み込みのオプション
-/** */
+/** チャンク読み込みのオプション */
 export interface ChunkReadOptions {
-  /** DataVersion が対象と違うときの動作
-  /** 既定は `Warn`
-  /** */
+  /**
+   * DataVersion が対象と違うときの動作
+   * 既定は `Warn`
+   */
   onVersionMismatch?: VersionMismatchAction;
-  /** 警告の通知先
-  /** */
+  /** 警告の通知先 */
   onWarning?: (message: string) => void;
-  /** data の長さが期待値と違うとき、長さからビット幅を逆算して読むか
-  /** */
+  /** data の長さが期待値と違うとき、長さからビット幅を逆算して読むか */
   lenientBitStorage?: boolean;
 }
 
-/** チャンク書き込みのオプション
-/** */
+/** チャンク書き込みのオプション */
 export interface ChunkWriteOptions {
   /**
    * 対象バージョン以外の DataVersion を持つチャンクの書き戻しを許すか
@@ -109,34 +101,33 @@ export class ChunkSection {
     readonly y: number,
   ) {}
 
-  /** ブロック状態
-  /** 持たないセクション（光源専用）では undefined
-  /** */
+  /**
+   * ブロック状態
+   * 持たないセクション（光源専用）では undefined
+   */
   get blockStates(): PalettedContainer | undefined {
     return this.#blockStates;
   }
 
-  /** バイオーム
-  /** 持たないセクションでは undefined
-  /** */
+  /**
+   * バイオーム
+   * 持たないセクションでは undefined
+   */
   get biomes(): PalettedContainer | undefined {
     return this.#biomes;
   }
 
-  /** ブロック状態を持つか
-  /** */
+  /** ブロック状態を持つか */
   get hasBlockStates(): boolean {
     return this.#blockStates !== undefined;
   }
 
-  /** バイオームを持つか
-  /** */
+  /** バイオームを持つか */
   get hasBiomes(): boolean {
     return this.#biomes !== undefined;
   }
 
-  /** NBT からセクションを読む
-  /** */
+  /** NBT からセクションを読む */
   static fromNbt(nbt: NbtCompound, lenientBitStorage: boolean): ChunkSection {
     const section = new ChunkSection(nbt, nbt.getByte("Y"));
     const blockStates = nbt.optCompound("block_states");
@@ -165,9 +156,10 @@ export class ChunkSection {
     return section;
   }
 
-  /** NBT へ書き戻す
-  /** 解釈していないキーはそのまま残る
-  /** */
+  /**
+   * NBT へ書き戻す
+   * 解釈していないキーはそのまま残る
+   */
   toNbt(): NbtCompound {
     if (this.#blockStates !== undefined) {
       this.raw.set("block_states", this.#blockStates.toNbt());
@@ -180,8 +172,7 @@ export class ChunkSection {
     return this.raw;
   }
 
-  /** 使われていないパレット要素を取り除く
-  /** */
+  /** 使われていないパレット要素を取り除く */
   compact(): void {
     if (this.#blockStates !== undefined) {
       this.#blockStates.compact();
@@ -197,8 +188,7 @@ export class ChunkSection {
  * チャンク 1 つ分
  * 地形の読み書きの入口
  *
- * **読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
- * **
+ * 読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
  * 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
  */
 export class Chunk {
@@ -206,53 +196,51 @@ export class Chunk {
 
   private constructor(readonly raw: NbtCompound) {}
 
-  /** チャンク構造のバージョン
-  /** */
+  /** チャンク構造のバージョン */
   get dataVersion(): number {
     return this.raw.getInt("DataVersion");
   }
 
-  /** 絶対チャンクX座標
-  /** */
+  /** 絶対チャンクX座標 */
   get x(): number {
     return this.raw.getInt("xPos");
   }
 
-  /** 絶対チャンクZ座標
-  /** */
+  /** 絶対チャンクZ座標 */
   get z(): number {
     return this.raw.getInt("zPos");
   }
 
-  /** 最下段セクションのY位置
-  /** オーバーワールドは -4
-  /** */
+  /**
+   * 最下段セクションのY位置
+   * オーバーワールドは -4
+   */
   get minSectionY(): number {
     return this.raw.getInt("yPos");
   }
 
-  /** 生成段階（`minecraft:full` など）
-  /** */
+  /** 生成段階（`minecraft:full` など） */
   get status(): string {
     return this.raw.getString("Status");
   }
 
-  /** 生成が完了しているか
-  /** ブロック改変の対象にしてよいのはこれだけ
-  /** */
+  /**
+   * 生成が完了しているか
+   * ブロック改変の対象にしてよいのはこれだけ
+   */
   get isFullyGenerated(): boolean {
     return this.status === "minecraft:full";
   }
 
-  /** 存在するセクションのY位置
-  /** 昇順
-  /** */
+  /**
+   * 存在するセクションのY位置
+   * 昇順
+   */
   get sectionYs(): number[] {
     return [...this.#sections.keys()].sort((left, right) => left - right);
   }
 
-  /** NBT からチャンクを読む
-  /** */
+  /** NBT からチャンクを読む */
   static fromNbt(nbt: NbtCompound, options?: ChunkReadOptions): Chunk {
     const chunk = new Chunk(nbt);
     chunk.#checkDataVersion(options);
@@ -282,8 +270,7 @@ export class Chunk {
     return chunk;
   }
 
-  /** DataVersion を検査し、オプションに従って警告またはエラーにする
-  /** */
+  /** DataVersion を検査し、オプションに従って警告またはエラーにする */
   #checkDataVersion(options?: ChunkReadOptions): void {
     const version = this.dataVersion;
 
@@ -311,9 +298,10 @@ export class Chunk {
     }
   }
 
-  /** NBT へ書き戻す
-  /** 変更したセクションだけを反映し、他のキーはそのまま残す
-  /** */
+  /**
+   * NBT へ書き戻す
+   * 変更したセクションだけを反映し、他のキーはそのまま残す
+   */
   toNbt(options?: ChunkWriteOptions): NbtCompound {
     const version = this.dataVersion;
     let allowForeign = false;
@@ -348,9 +336,10 @@ export class Chunk {
     return this.raw;
   }
 
-  /** Y位置からセクションを得る
-  /** 無ければ undefined
-  /** */
+  /**
+   * Y位置からセクションを得る
+   * 無ければ undefined
+   */
   section(sectionY: number): ChunkSection | undefined {
     return this.#sections.get(sectionY);
   }
@@ -379,8 +368,7 @@ export class Chunk {
     return BlockState.fromNbt(entry as NbtCompound);
   }
 
-  /** ブロックを設定する
-  /** */
+  /** ブロックを設定する */
   setBlock(x: number, y: number, z: number, state: BlockState): void {
     checkLocalCoordinates(x, z);
 
@@ -435,9 +423,10 @@ export class Chunk {
     }
   }
 
-  /** バイオームを取得する
-  /** 4×4×4 の単位なので、座標は自動的に丸められる
-  /** */
+  /**
+   * バイオームを取得する
+   * 4×4×4 の単位なので、座標は自動的に丸められる
+   */
   getBiome(x: number, y: number, z: number): string | undefined {
     checkLocalCoordinates(x, z);
     const section = this.section(y >> 4);
@@ -455,9 +444,10 @@ export class Chunk {
     return (entry as NbtString).value;
   }
 
-  /** バイオームを設定する
-  /** 4×4×4 の単位
-  /** */
+  /**
+   * バイオームを設定する
+   * 4×4×4 の単位
+   */
   setBiome(x: number, y: number, z: number, biome: string): void {
     checkLocalCoordinates(x, z);
 
@@ -484,14 +474,12 @@ export class Chunk {
     this.raw.remove("Heightmaps");
   }
 
-  /** `isLightOn` を 0 にし、光源の再計算を促す
-  /** */
+  /** `isLightOn` を 0 にし、光源の再計算を促す */
   invalidateLighting(): void {
     this.raw.set("isLightOn", new NbtByte(0));
   }
 
-  /** 使われていないパレット要素を全セクションから取り除く
-  /** */
+  /** 使われていないパレット要素を全セクションから取り除く */
   compact(): void {
     // 全セクションのパレットをまとめて掃除する
     for (const section of this.#sections.values()) {
@@ -509,9 +497,10 @@ export function blockIndex(x: number, y: number, z: number): number {
   return (y & 15) * 256 + (z & 15) * 16 + (x & 15);
 }
 
-/** セクション内のバイオーム添字
-/** 1 エントリが 4×4×4 ブロック
-/** */
+/**
+ * セクション内のバイオーム添字
+ * 1 エントリが 4×4×4 ブロック
+ */
 export function biomeIndex(x: number, y: number, z: number): number {
   return Math.floor((y & 15) / 4) * 16 + Math.floor((z & 15) / 4) * 4 + Math.floor((x & 15) / 4);
 }

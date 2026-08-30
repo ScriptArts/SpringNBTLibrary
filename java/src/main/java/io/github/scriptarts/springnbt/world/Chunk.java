@@ -27,17 +27,16 @@ import java.util.TreeMap;
  */
 public final class Chunk {
 
-    /** セクション 1 つに入るブロック数
-    /** */
+    /** セクション 1 つに入るブロック数 */
     public static final int BLOCKS_PER_SECTION = 4096;
 
-    /** セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）
-    /** */
+    /** セクション 1 つに入るバイオームのエントリ数（4×4×4 単位） */
     public static final int BIOMES_PER_SECTION = 64;
 
-    /** ブロックに紐づく付随データのキー
-    /** ブロックを置き換えたら整合が崩れる
-    /** */
+    /**
+     * ブロックに紐づく付随データのキー
+     * ブロックを置き換えたら整合が崩れる
+     */
     private static final String[] BLOCK_DATA_KEYS = {"block_entities", "block_ticks", "fluid_ticks"};
 
     private final NbtCompound root;
@@ -164,8 +163,7 @@ public final class Chunk {
         return chunk;
     }
 
-    /** DataVersion を検査し、オプションに従って警告またはエラーにする
-    /** */
+    /** DataVersion を検査し、オプションに従って警告またはエラーにする */
     private void checkDataVersion(ChunkReadOptions options) {
         int version = dataVersion();
 
@@ -333,8 +331,7 @@ public final class Chunk {
         }
     }
 
-    /** 付随データの要素が、指定の絶対座標を指しているか
-    /** */
+    /** 付随データの要素が、指定の絶対座標を指しているか */
     private static boolean matchesPosition(NbtCompound entry, int x, int y, int z) {
         Integer entryX = entry.optInt("x");
         Integer entryY = entry.optInt("y");
@@ -411,14 +408,12 @@ public final class Chunk {
         root.remove("Heightmaps");
     }
 
-    /** {@code isLightOn} を 0 にし、光源の再計算を促す
-    /** */
+    /** {@code isLightOn} を 0 にし、光源の再計算を促す */
     public void invalidateLighting() {
         root.set("isLightOn", new NbtByte((byte) 0));
     }
 
-    /** 使われていないパレット要素を全セクションから取り除く
-    /** */
+    /** 使われていないパレット要素を全セクションから取り除く */
     public void compact() {
         Collection<ChunkSection> values = sections.values();
 
