@@ -6,7 +6,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
     <PackageId>SpringNBTLibrary</PackageId>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Description>Minecraft Java Edition の NBT / Anvil ワールドデータを読み書きするライブラリ</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/scriptarts/SpringNBTLibrary</RepositoryUrl>

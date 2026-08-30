@@ -78,4 +78,10 @@ export class RawChunk {
     readonly data: Uint8Array,
     readonly external: boolean = false,
   ) {}
+
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `RawChunk(${chunkCompressionAsString(this.compression)}, ` +
+      `${this.data.length} バイト, external=${this.external})`;
+  }
 }

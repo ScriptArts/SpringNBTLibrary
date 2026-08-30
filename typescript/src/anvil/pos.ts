@@ -48,6 +48,11 @@ export class RegionPos {
 
     return new RegionPos(Number.parseInt(parts[1], 10), Number.parseInt(parts[2], 10));
   }
+
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `RegionPos(${this.x}, ${this.z})`;
+  }
 }
 
 /** チャンクの絶対座標 */
@@ -84,5 +89,10 @@ export class ChunkPos {
   /** 座標が等しいか */
   equals(other: ChunkPos): boolean {
     return other.x === this.x && other.z === this.z;
+  }
+
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `ChunkPos(${this.x}, ${this.z})`;
   }
 }

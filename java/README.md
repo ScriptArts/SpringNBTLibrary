@@ -14,7 +14,7 @@ C# / Java / TypeScript / Python / Rust 版があり、どれも同じ仕様書�
 
 ```groovy
 dependencies {
-    implementation files("libs/spring-nbt-library-0.1.0.jar")
+    implementation files("libs/spring-nbt-library-1.0.0.jar")
 }
 ```
 

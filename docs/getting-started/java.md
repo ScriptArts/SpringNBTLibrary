@@ -10,7 +10,7 @@ Gradle なら jar を `libs/` へ置いて読み込みます。
 
 ```groovy
 dependencies {
-    implementation files("libs/spring-nbt-library-0.1.0.jar")
+    implementation files("libs/spring-nbt-library-1.0.0.jar")
 }
 ```
 
@@ -18,24 +18,24 @@ Maven ならローカルリポジトリへ入れてから依存に書きます�
 
 ```bash
 mvn install:install-file \
-  -Dfile=spring-nbt-library-0.1.0.jar \
+  -Dfile=spring-nbt-library-1.0.0.jar \
   -DgroupId=io.github.scriptarts \
   -DartifactId=spring-nbt-library \
-  -Dversion=0.1.0 -Dpackaging=jar
+  -Dversion=1.0.0 -Dpackaging=jar
 ```
 
 ```xml
 <dependency>
   <groupId>io.github.scriptarts</groupId>
   <artifactId>spring-nbt-library</artifactId>
-  <version>0.1.0</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
 クラスパスへ直接置くこともできます。
 
 ```bash
-java -cp spring-nbt-library-0.1.0.jar:. YourApp
+java -cp spring-nbt-library-1.0.0.jar:. YourApp
 ```
 
 ## NBT ファイルを読む

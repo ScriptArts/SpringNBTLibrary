@@ -114,7 +114,6 @@ EXPECTED_TYPE_GAPS = {
 #: 混ぜないこと。等値比較や深い複製は前者なので、ここには入れず突合の対象にする。
 INTERNAL_MEMBERS = {
     "hash_code",
-    "to_string",
     "dispose",
     "iterator",
     "get_enumerator",
@@ -534,9 +533,10 @@ def extract_csharp() -> Api:
 
                 api.add_type(current, summary)
 
-                # record は値としての等値比較を自動で持つ
+                # record は等値比較と文字列表現を自動で持つ
                 if " record " in line:
                     api.add_member(current, "equals", "Equals()")
+                    api.add_member(current, "to_string", "ToString()")
 
                 # 継承元のメンバも論理的にはこの型が持っている
                 base_match = CSHARP_BASE.search(line)
@@ -641,8 +641,9 @@ def extract_java() -> Api:
                     for component in split_parameters(record_match.group(1)):
                         api.add_member(current, to_snake(component), component + "()")
 
-                    # record は値としての等値比較を自動で持つ
+                    # record は等値比較と文字列表現を自動で持つ
                     api.add_member(current, "equals", "equals()")
+                    api.add_member(current, "to_string", "toString()")
 
                 continue
 
@@ -691,7 +692,7 @@ TS_FUNCTION = re.compile(r"^export\s+function\s+([A-Za-z0-9_]+)")
 TS_CONST = re.compile(r"^export\s+const\s+([A-Za-z0-9_]+)")
 
 TS_MEMBER = re.compile(
-    r"^  (?:static\s+|readonly\s+)*(?:get\s+|set\s+)?\*?([A-Za-z0-9_]+)\s*[\(:<]")
+    r"^  (?:static\s+|readonly\s+|override\s+)*(?:get\s+|set\s+)?\*?([A-Za-z0-9_]+)\s*[\(:<]")
 
 TS_ENUM_VALUE = re.compile(r"^  ([A-Za-z0-9_]+)\s*=")
 
@@ -858,6 +859,8 @@ PY_ATTRIBUTE = re.compile(r"^\s{8,}self\.([a-z][A-Za-z0-9_]*)\s*[:=]")
 #: 論理APIにあたる特殊メソッドと、その論理名。
 PY_DUNDER_MEMBERS = {
     "__eq__": "equals",
+    "__repr__": "to_string",
+    "__str__": "to_string",
 }
 
 
@@ -988,7 +991,7 @@ RS_SETTER_MACRO = re.compile(r"^([a-z_]+_setters)!\(\s*([a-z_0-9]+)\s*,")
 RS_DERIVE = re.compile(r"^#\[derive\(([^)]*)\)\]")
 
 RS_TRAIT_IMPL_NAMED = re.compile(
-    r"^impl(?:<[^>]*>)?\s+([A-Za-z0-9_]+)(?:<[^>]*>)?\s+for\s+([A-Za-z0-9_]+)")
+    r"^impl(?:<[^>]*>)?\s+(?:[A-Za-z0-9_]+::)*([A-Za-z0-9_]+)(?:<[^>]*>)?\s+for\s+([A-Za-z0-9_]+)")
 
 #: derive / trait 実装で得られる論理メンバと、その Rust での書き方。
 #:
@@ -997,6 +1000,8 @@ RS_TRAIT_IMPL_NAMED = re.compile(
 RS_TRAIT_MEMBERS = {
     "Clone": ("copy", "clone()"),
     "PartialEq": ("equals", "=="),
+    # Display を実装すると to_string() が生える。Debug は {:?} なので別物
+    "Display": ("to_string", "to_string()"),
 }
 
 

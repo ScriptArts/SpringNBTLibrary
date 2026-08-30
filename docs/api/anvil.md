@@ -54,6 +54,7 @@
 | `local_x` | `LocalX` | `localX()` | `localX()` | `local_x()` | `local_x()` | リージョン内でのX位置 (0..31) |
 | `local_z` | `LocalZ` | `localZ()` | `localZ()` | `local_z()` | `local_z()` | リージョン内でのZ位置 (0..31) |
 | `region` | `Region` | `region()` | `region()` | `region()` | `region()` | このチャンクを含むリージョンの座標 |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `x` | `X` | `x()` | `x` | `x` | `x` | 絶対チャンクX座標 |
 | `z` | `Z` | `z()` | `z` | `z` | `z` | 絶対チャンクZ座標 |
 | **RegionPos** | `RegionPos` | `RegionPos` | `RegionPos` | `RegionPos` | `RegionPos` | リージョンの座標 |
@@ -62,6 +63,7 @@
 | `file_name` | `FileName` | `fileName()` | `fileName()` | `file_name()` | `file_name()` | このリージョンのファイル名（r.X.Z.mca） |
 | `from_file_name` | `FromFileName()` | `fromFileName()` | `fromFileName()` | `from_file_name()` | `from_file_name()` | r.X.Z.mca 形式のファイル名から座標を得る |
 | `key` | — | — | `key()` | — | — |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `x` | `X` | `x()` | `x` | `x` | `x` | リージョンX座標 |
 | `z` | `Z` | `z()` | `z` | `z` | `z` | リージョンZ座標 |
 | **ChunkCompression** | `ChunkCompression` | `ChunkCompression` | `ChunkCompression` | `ChunkCompression` | `ChunkCompression` | リージョンファイル内でチャンクに使われる圧縮方式 |
@@ -81,6 +83,7 @@
 | `data` | `Data` | `data()` | `data` | `data` | `data` | 圧縮されたままの本体 |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `external` | `External` | `external()` | `external` | `external` | `external` | 外部ファイル c.X.Z.mcc に格納されていたか |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 
 <!-- generated:end -->
 

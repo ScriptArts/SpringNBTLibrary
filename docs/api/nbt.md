@@ -51,46 +51,55 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | **NbtByte** | `NbtByte` | `NbtByte` | `NbtByte` | `NbtByte` | — |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `value` | `Value` | `value()` | `value()` | `value` | — | 保持している値 |
 | **NbtShort** | `NbtShort` | `NbtShort` | `NbtShort` | `NbtShort` | — |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `value` | `Value` | `value()` | `value()` | `value` | — | 保持している値 |
 | **NbtInt** | `NbtInt` | `NbtInt` | `NbtInt` | `NbtInt` | — |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `value` | `Value` | `value()` | `value()` | `value` | — | 保持している値 |
 | **NbtLong** | `NbtLong` | `NbtLong` | `NbtLong` | `NbtLong` | — |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `value` | `Value` | `value()` | `value()` | `value` | — | 保持している値 |
 | **NbtFloat** | `NbtFloat` | `NbtFloat` | `NbtFloat` | `NbtFloat` | — |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `value` | `Value` | `value()` | `value()` | `value` | — | 保持している値 |
 | **NbtDouble** | `NbtDouble` | `NbtDouble` | `NbtDouble` | `NbtDouble` | — |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `value` | `Value` | `value()` | `value` | `value` | — | 保持している値 |
 | **NbtByteArray** | `NbtByteArray` | `NbtByteArray` | `NbtByteArray` | `NbtByteArray` | — |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `value` | `Value` | `value()` | `value` | `value` | — | 保持している配列 |
 | **NbtIntArray** | `NbtIntArray` | `NbtIntArray` | `NbtIntArray` | `NbtIntArray` | — |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `value` | `Value` | `value()` | `value` | `value` | — | 保持している配列 |
 | **NbtLongArray** | `NbtLongArray` | `NbtLongArray` | `NbtLongArray` | `NbtLongArray` | — |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `value` | `Value` | `value()` | `value` | `value` | — | 保持している配列 |
 | **NbtString** | `NbtString` | `NbtString` | `NbtString` | `NbtString` | `NbtString` |  |
@@ -102,6 +111,7 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `surrogates` | — | — | — | — | `Surrogates` |  |
 | `text` | — | — | — | — | `Text` |  |
 | `to_mutf8` | — | — | — | — | `to_mutf8()` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `to_utf16` | — | — | — | — | `to_utf16()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `value` | `Value` | `value()` | `value()` | `value` | — | 保持している値 |
@@ -113,6 +123,7 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `get` | `Get()` | `get()` | `get()` | `get()` | `get()` |  |
 | `remove` | `Remove()` | `remove()` | `remove()` | `remove()` | `remove()` |  |
 | `set` | `Set()` | `set()` | `set()` | `set()` | `set()` |  |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | `with_element_type` | — | — | — | — | `with_element_type()` |  |
 | **NbtCompound** | `NbtCompound` | `NbtCompound` | `NbtCompound` | `NbtCompound` | `NbtCompound` | TAG_Compound |
@@ -163,12 +174,14 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `set_long_array` | `SetLongArray()` | `setLongArray()` | `setLongArray()` | `set_long_array()` | `set_long_array()` | TAG_Long_Array として設定する |
 | `set_short` | `SetShort()` | `setShort()` | `setShort()` | `set_short()` | `set_short()` | TAG_Short として設定する |
 | `set_string` | `SetString()` | `setString()` | `setString()` | `set_string()` | `set_string()` | TAG_String として設定する |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | **NamedTag** | `NamedTag` | `NamedTag` | `NamedTag` | `NamedTag` | `NamedTag` | ルート名とルートタグの組 |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `name` | `Name` | `name()` | `name` | `name` | `name` | ルート名 |
 | `tag` | `Tag` | `tag()` | `tag` | `tag` | `tag` | ルートタグ |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | **Compression** | `Compression` | `Compression` | `Compression` | `Compression` | `Compression` | 圧縮方式 |
 | `auto` | `Auto` | `AUTO` | `Auto` | `AUTO` | `Auto` | 先頭バイトから自動判定する |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
@@ -193,6 +206,7 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `end` | `End` | `end()` | `end` | `end` | `end` | 読み終わった直後の位置 |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `tag` | `Tag` | `tag()` | `tag` | `tag` | `tag` | 読んだタグ |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | **NbtWriteOptions** | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | NBT 書き込みのオプション |
 | `compression` | `Compression` | `compression()` | `compression` | `compression` | `compression` |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |

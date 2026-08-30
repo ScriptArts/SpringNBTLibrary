@@ -256,7 +256,7 @@ internal static class Program
     {
         return string.Create(
             CultureInfo.InvariantCulture,
-            $"csharp spring-nbt-library 0.1.0 target_data_version={SpringNbt.TargetDataVersion}\n");
+            $"csharp spring-nbt-library 1.0.0 target_data_version={SpringNbt.TargetDataVersion}\n");
     }
 
     private static string Usage()

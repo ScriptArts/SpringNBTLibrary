@@ -120,6 +120,7 @@
 | `properties` | `Properties` | `properties()` | `properties()` | `properties` | `properties()` |  |
 | `property` | `Property()` | `property()` | `property()` | `property()` | `property()` |  |
 | `to_nbt` | `ToNbt()` | `toNbt()` | `toNbt()` | `to_nbt()` | `to_nbt()` | パレット要素の NBT へ変換する |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` | minecraft:oak_stairs[facing=north,half=top] 形式の文字列を返す |
 | `with` | `With()` | `with()` | `with()` | `with_property()` | `with()` | プロパティを 1 つ差し替えた新しい状態を返す |
 | **BlockPos** | `BlockPos` | `BlockPos` | `BlockPos` | `BlockPos` | `BlockPos` | ブロックの絶対座標 |
 | `chunk_pos` | `ChunkPos` | `chunkPos()` | `chunkPos()` | `chunk_pos` | `chunk_pos()` | この座標を含むチャンクの座標 |
@@ -128,6 +129,7 @@
 | `local_x` | `LocalX` | `localX()` | `localX()` | `local_x` | `local_x()` | チャンク内でのX位置 (0..15) |
 | `local_z` | `LocalZ` | `localZ()` | `localZ()` | `local_z` | `local_z()` | チャンク内でのZ位置 (0..15) |
 | `offset` | `Offset()` | `offset()` | `offset()` | `offset()` | `offset()` | 各軸へずらした座標を返す |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `x` | `X` | `x()` | `x` | `x` | `x` | X座標 |
 | `y` | `Y` | `y()` | `y` | `y` | `y` | Y座標 |
 | `z` | `Z` | `z()` | `z` | `z` | `z` | Z座標 |
@@ -145,6 +147,7 @@
 | `size_x` | `SizeX` | `sizeX()` | `sizeX()` | `size_x` | `size_x()` | X 方向の長さ |
 | `size_y` | `SizeY` | `sizeY()` | `sizeY()` | `size_y` | `size_y()` | Y 方向の長さ |
 | `size_z` | `SizeZ` | `sizeZ()` | `sizeZ()` | `size_z` | `size_z()` | Z 方向の長さ |
+| `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `volume` | `Volume` | `volume()` | `volume()` | `volume` | `volume()` | 含まれるブロックの個数 |
 | **PalettedContainer** | `PalettedContainer` | `PalettedContainer` | `PalettedContainer` | `PalettedContainer` | `PalettedContainer` | パレットとビットストレージの組 |
 | `bits_per_entry` | `BitsPerEntry` | `bitsPerEntry()` | `bitsPerEntry()` | `bits_per_entry` | `bits_per_entry()` |  |

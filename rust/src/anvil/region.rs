@@ -9,6 +9,7 @@
 //! 仕様: `docs/spec/20-anvil-region.md`
 
 use std::collections::HashMap;
+use std::fmt;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -962,5 +963,29 @@ fn compress_chunk(plain: &[u8], compression: ChunkCompression) -> Result<Vec<u8>
             ErrorCode::UnsupportedFeature,
             format!("この圧縮方式では書き込めない: {}", other.as_str()),
         )),
+    }
+}
+
+impl fmt::Display for RegionPos {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RegionPos({}, {})", self.x, self.z)
+    }
+}
+
+impl fmt::Display for ChunkPos {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ChunkPos({}, {})", self.x, self.z)
+    }
+}
+
+impl fmt::Display for RawChunk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "RawChunk({}, {} バイト, external={})",
+            self.compression.as_str(),
+            self.data.len(),
+            self.external
+        )
     }
 }

@@ -7,7 +7,7 @@ Python 3.10 以上が必要です。依存パッケージはありません。
 [Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `spring_nbt_library-<版>-py3-none-any.whl` を落とします。
 
 ```bash
-pip install spring_nbt_library-0.1.0-py3-none-any.whl
+pip install spring_nbt_library-1.0.0-py3-none-any.whl
 ```
 
 wheel なのでビルドは不要です。

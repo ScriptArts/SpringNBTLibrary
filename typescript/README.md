@@ -12,7 +12,7 @@ C# / Java / TypeScript / Python / Rust 版があり、どれも同じ仕様書�
 [Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `spring-nbt-library-<版>.tgz` を落として入れます。
 
 ```bash
-npm install ./spring-nbt-library-0.1.0.tgz
+npm install ./spring-nbt-library-1.0.0.tgz
 ```
 
 型定義（`.d.ts`）も含まれています。

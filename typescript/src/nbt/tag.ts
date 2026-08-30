@@ -168,6 +168,11 @@ export class NbtByte {
     return new NbtByte(this.#value);
   }
 
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `${this.#value}b`;
+  }
+
   /** 同じ型で同じ値か */
   equals(other: unknown): boolean {
     return other instanceof NbtByte && other.value === this.#value;
@@ -204,6 +209,11 @@ export class NbtShort {
     return new NbtShort(this.#value);
   }
 
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `${this.#value}s`;
+  }
+
   /** 同じ型で同じ値か */
   equals(other: unknown): boolean {
     return other instanceof NbtShort && other.value === this.#value;
@@ -238,6 +248,11 @@ export class NbtInt {
   /** このタグの深いコピーを作る */
   copy(): NbtInt {
     return new NbtInt(this.#value);
+  }
+
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `${this.#value}`;
   }
 
   /** 同じ型で同じ値か */
@@ -281,6 +296,11 @@ export class NbtLong {
   /** このタグの深いコピーを作る */
   copy(): NbtLong {
     return new NbtLong(this.#value);
+  }
+
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `${this.#value}L`;
   }
 
   /** 同じ型で同じ値か */
@@ -332,6 +352,11 @@ export class NbtFloat {
     return new NbtFloat(this.#value);
   }
 
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `${this.#value}f`;
+  }
+
   /**
    * 同じ型で同じ値か
    * NaN や -0.0 を区別するため、値ではなくビットパターンで比べる
@@ -353,6 +378,11 @@ export class NbtDouble {
   /** このタグの深いコピーを作る */
   copy(): NbtDouble {
     return new NbtDouble(this.value);
+  }
+
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `${this.value}d`;
   }
 
   /**
@@ -394,6 +424,11 @@ export class NbtString {
     return new NbtString(this.#value);
   }
 
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return this.#value;
+  }
+
   /** 同じ型で同じ値か */
   equals(other: unknown): boolean {
     return other instanceof NbtString && other.value === this.#value;
@@ -428,6 +463,11 @@ export class NbtByteArray {
     return new NbtByteArray(this.value.slice());
   }
 
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `[B; ${this.value.length} 要素]`;
+  }
+
   /** 同じ型で、同じ並びの配列を持つか */
   equals(other: unknown): boolean {
     return other instanceof NbtByteArray && arrayEquals(other.value, this.value);
@@ -448,6 +488,11 @@ export class NbtIntArray {
     return new NbtIntArray(this.value.slice());
   }
 
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `[I; ${this.value.length} 要素]`;
+  }
+
   /** 同じ型で、同じ並びの配列を持つか */
   equals(other: unknown): boolean {
     return other instanceof NbtIntArray && arrayEquals(other.value, this.value);
@@ -466,6 +511,11 @@ export class NbtLongArray {
   /** このタグの深いコピーを作る */
   copy(): NbtLongArray {
     return new NbtLongArray(this.value.slice());
+  }
+
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `[L; ${this.value.length} 要素]`;
   }
 
   /** 同じ型で、同じ並びの配列を持つか */
@@ -559,6 +609,11 @@ export class NbtList {
     }
 
     return result;
+  }
+
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `[${tagTypeAsString(this.#elementType)}; ${this.#items.length} 要素]`;
   }
 
   /** 要素型と、同じ位置の要素がすべて一致するか */
@@ -757,6 +812,11 @@ export class NbtCompound {
     }
 
     return result;
+  }
+
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `{${this.#entries.size} 要素}`;
   }
 
   /**

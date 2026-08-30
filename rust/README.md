@@ -13,7 +13,7 @@ Cargo.toml に git 参照を書きます。
 
 ```toml
 [dependencies]
-spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v0.1.0" }
+spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v1.0.0" }
 ```
 
 ネットワークに繋がらない環境向けに、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) へ `.crate` も置いています。

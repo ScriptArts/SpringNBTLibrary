@@ -735,6 +735,41 @@ test("型付き設定子は挿入順を変えない", () => {
   assert.equal(root.getInt("a"), 3);
 });
 
+test("どの型も人が読める文字列になる", () => {
+  // 中身の形式は仕様で決めていないので、[object Object] にならないことだけを見る
+  const list = new NbtList();
+  list.add(new NbtInt(1));
+
+  const compound = new NbtCompound();
+  compound.setInt("a", 1);
+
+  const values = [
+    new NbtByte(1),
+    new NbtShort(1),
+    new NbtInt(1),
+    new NbtLong(1n),
+    new NbtFloat(1),
+    new NbtDouble(1),
+    new NbtString("x"),
+    new NbtByteArray(Int8Array.from([1])),
+    new NbtIntArray(Int32Array.from([1])),
+    new NbtLongArray(BigInt64Array.from([1n])),
+    list,
+    compound,
+    new NamedTag("root", compound),
+  ];
+
+  // どれも既定の [object Object] のままになっていないこと
+  for (const value of values) {
+    assert.notEqual(String(value), "[object Object]", value.constructor.name);
+  }
+
+  assert.equal(String(new NbtInt(42)), "42");
+  assert.equal(String(new NbtByte(1)), "1b");
+  assert.equal(String(list), "[int; 1 要素]");
+  assert.equal(String(compound), "{1 要素}");
+});
+
 /** 複数のバイト列をつなぐ。 */
 function concat(...parts: Uint8Array[]): Uint8Array {
   let total = 0;

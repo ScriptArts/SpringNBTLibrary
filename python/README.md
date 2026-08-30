@@ -12,7 +12,7 @@ C# / Java / TypeScript / Python / Rust 版があり、どれも同じ仕様書�
 [Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から wheel を落として入れます。
 
 ```bash
-pip install spring_nbt_library-0.1.0-py3-none-any.whl
+pip install spring_nbt_library-1.0.0-py3-none-any.whl
 ```
 
 ## 使い方

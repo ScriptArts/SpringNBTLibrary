@@ -69,6 +69,11 @@ export class NamedTag {
     readonly name: string,
     readonly tag: NbtCompound,
   ) {}
+
+  /** 人が読むための表現。中身の形式は決めていない */
+  toString(): string {
+    return `NamedTag("${this.name}", ${this.tag})`;
+  }
 }
 
 /** NBT 読み込みのオプション */

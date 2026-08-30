@@ -1,6 +1,6 @@
 [package]
 name = "spring-nbt-library"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT"
@@ -17,8 +17,7 @@ path = "src/lib.rs"
 [dependencies]
 flate2 = "1.0"
 
-# LZ4（圧縮ID 4）は v0.1.0 では未実装。生バイトでのみ取り出せる。
-# 実装するときに lz4_flex を任意依存として足す（docs/features.md）
+# LZ4（圧縮ID 4）の展開は自前で持つ。外部の依存を増やさないため
 
 [dev-dependencies]
 serde_json = "1.0"

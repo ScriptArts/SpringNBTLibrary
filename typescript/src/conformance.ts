@@ -526,7 +526,7 @@ function main(argv: string[]): number {
 
   if (command === "version") {
     process.stdout.write(
-      `typescript spring-nbt-library 0.1.0 target_data_version=${TARGET_DATA_VERSION}\n`,
+      `typescript spring-nbt-library 1.0.0 target_data_version=${TARGET_DATA_VERSION}\n`,
     );
     return 0;
   }

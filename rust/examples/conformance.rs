@@ -41,7 +41,7 @@ fn main() -> ExitCode {
 
     match args[0].as_str() {
         "version" => {
-            print!("rust spring-nbt-library 0.1.0 target_data_version={TARGET_DATA_VERSION}\n");
+            print!("rust spring-nbt-library 1.0.0 target_data_version={TARGET_DATA_VERSION}\n");
             ExitCode::SUCCESS
         }
         "decode" | "encode" | "snbt" | "nbt-list" | "region-list" | "region-rewrite"

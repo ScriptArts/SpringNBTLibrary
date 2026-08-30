@@ -3,6 +3,7 @@
 //! 仕様: `docs/spec/10-nbt-binary.md` 1章・7章
 
 use std::collections::HashMap;
+use std::fmt;
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::mutf8;
@@ -724,5 +725,33 @@ impl NbtCompound {
     /// キーが無ければエラー
     pub fn get_bool(&self, key: &str) -> Result<bool> {
         Ok(self.get_byte(key)? != 0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 人が読むための表現
+//
+// デバッグ用であり、中身の形式は仕様で決めていない
+// SNBT が要るなら `snbt::write` を使う
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for NbtString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.as_str() {
+            Some(text) => write!(f, "{text}"),
+            None => write!(f, "<{} コード単位>", self.to_utf16().len()),
+        }
+    }
+}
+
+impl fmt::Display for NbtList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}; {} 要素]", self.element_type().as_str(), self.len())
+    }
+}
+
+impl fmt::Display for NbtCompound {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{{} 要素}}", self.len())
     }
 }

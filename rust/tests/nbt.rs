@@ -899,3 +899,21 @@ fn typed_setters_keep_the_insertion_order() {
     assert_eq!(keys, vec!["a", "b"]);
     assert_eq!(root.get_int("a").unwrap(), 3);
 }
+
+#[test]
+fn every_type_has_a_readable_string() {
+    // 中身の形式は仕様で決めていないので、空にならないことだけを見る
+    let mut list = NbtList::new();
+    list.push(NbtTag::Int(1)).unwrap();
+
+    let mut compound = NbtCompound::new();
+    compound.set_int("a", 1);
+
+    assert_eq!(NbtString::from("x").to_string(), "x");
+    assert_eq!(list.to_string(), "[int; 1 要素]");
+    assert_eq!(compound.to_string(), "{1 要素}");
+    assert_eq!(
+        NamedTag::new("root", compound).to_string(),
+        "NamedTag(\"root\", {1 要素})"
+    );
+}

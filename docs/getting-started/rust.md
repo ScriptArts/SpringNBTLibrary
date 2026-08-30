@@ -8,7 +8,7 @@ Cargo.toml に git 参照を書きます。
 
 ```toml
 [dependencies]
-spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v0.1.0" }
+spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v1.0.0" }
 ```
 
 Cargo が自分で取得します。
@@ -17,12 +17,12 @@ Cargo が自分で取得します。
 `spring-nbt-library-<版>.crate`（拡張子が違うだけの tar.gz）を展開してパス参照します。
 
 ```bash
-tar xzf spring-nbt-library-0.1.0.crate
+tar xzf spring-nbt-library-1.0.0.crate
 ```
 
 ```toml
 [dependencies]
-spring-nbt-library = { path = "spring-nbt-library-0.1.0" }
+spring-nbt-library = { path = "spring-nbt-library-1.0.0" }
 ```
 
 ## 例外ではなく `Result`

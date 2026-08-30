@@ -420,7 +420,7 @@ def main(argv=None) -> int:
     # version は入力ファイルを取らない
     if command == "version":
         sys.stdout.write(
-            "python spring-nbt-library 0.1.0 target_data_version=%d\n" % TARGET_DATA_VERSION)
+            "python spring-nbt-library 1.0.0 target_data_version=%d\n" % TARGET_DATA_VERSION)
         return 0
 
     # 知らないコマンドなら使い方を出して終わる

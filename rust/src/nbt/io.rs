@@ -2,6 +2,7 @@
 //!
 //! 仕様: `docs/spec/10-nbt-binary.md` 3章〜6章
 
+use std::fmt;
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -782,4 +783,10 @@ pub fn write_writer(
     let bytes = write_bytes(named, options)?;
     destination.write_all(&bytes)?;
     Ok(())
+}
+
+impl fmt::Display for NamedTag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "NamedTag(\"{}\", {})", self.name, self.tag)
+    }
 }
