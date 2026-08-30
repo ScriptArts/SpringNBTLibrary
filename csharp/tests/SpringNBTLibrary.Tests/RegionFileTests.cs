@@ -165,6 +165,63 @@ public class RegionFileTests : IDisposable
     }
 
     [Fact]
+    public void ReadsLz4Chunks()
+    {
+        using RegionFile region = RegionFile.Open(
+            Path.Combine(VectorDirectory("lz4"), "r.0.0.mca"));
+
+        // 1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
+        for (int x = 0; x < 4; x++)
+        {
+            Assert.Equal(ChunkCompression.Lz4, region.ReadChunkRaw(x, 0)!.Compression);
+            Assert.Equal(x, region.ReadChunk(x, 0)!.GetInt("xPos"));
+        }
+
+        // 同じバイトの繰り返しは、重なりのあるマッチとして詰められている
+        Assert.Equal(new string('A', 4000), region.ReadChunk(3, 0)!.GetString("filler"));
+    }
+
+    [Fact]
+    public void RejectsLz4BlockWithBrokenMagic()
+    {
+        using RegionFile region = RegionFile.Open(
+            Path.Combine(VectorDirectory("lz4_bad_magic"), "r.0.0.mca"));
+
+        SpringNbtException error = Assert.Throws<SpringNbtException>(
+            () => region.ReadChunk(0, 0));
+        Assert.Equal(ErrorCode.MalformedData, error.Code);
+    }
+
+    [Fact]
+    public void WritingLz4IsRejected()
+    {
+        string directory = CopyVector("lz4");
+        using RegionFile region = RegionFile.Open(
+            Path.Combine(directory, "r.0.0.mca"), RegionFileMode.ReadWrite);
+
+        // LZ4 は読み込みのみ対応なので、圧縮して書き出すことはできない
+        NbtCompound chunk = region.ReadChunk(0, 0)!;
+        SpringNbtException error = Assert.Throws<SpringNbtException>(
+            () => region.WriteChunk(0, 0, chunk, ChunkCompression.Lz4));
+        Assert.Equal(ErrorCode.UnsupportedFeature, error.Code);
+    }
+
+    [Fact]
+    public void UntouchedLz4ChunksKeepTheirCompression()
+    {
+        string directory = CopyVector("lz4");
+        string path = Path.Combine(directory, "r.0.0.mca");
+        byte[] before = File.ReadAllBytes(path);
+
+        using (RegionFile region = RegionFile.Open(path, RegionFileMode.ReadWrite))
+        {
+            // 触らずに閉じるだけ。生バイトを素通しするので LZ4 のまま残る
+        }
+
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
+    [Fact]
     public void ReadsChunkStoredInExternalFile()
     {
         using RegionFile region = RegionFile.Open(

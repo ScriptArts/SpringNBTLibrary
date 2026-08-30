@@ -165,6 +165,69 @@ test("圧縮方式が混在していても読める", () => {
   region.close();
 });
 
+test("LZ4 圧縮のチャンクを読める", () => {
+  const region = RegionFile.open(join(vectorDir("lz4"), "r.0.0.mca"));
+
+  // 1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
+  for (let x = 0; x < 4; x++) {
+    assert.equal(region.readChunkRaw(x, 0)?.compression, ChunkCompression.Lz4);
+    assert.equal(region.readChunk(x, 0)?.getInt("xPos"), x);
+  }
+
+  // 同じバイトの繰り返しは、重なりのあるマッチとして詰められている
+  assert.equal(region.readChunk(3, 0)?.getString("filler"), "A".repeat(4000));
+  region.close();
+});
+
+test("LZ4Block のマジックが壊れていたら弾く", () => {
+  const region = RegionFile.open(join(vectorDir("lz4_bad_magic"), "r.0.0.mca"));
+
+  assert.throws(
+    () => region.readChunk(0, 0),
+    (error: SpringNbtError) => error.code === ErrorCode.MalformedData,
+  );
+
+  region.close();
+});
+
+test("LZ4 では書き出せない", () => {
+  const work = makeWorkDir();
+
+  try {
+    const directory = copyVector("lz4", work);
+    const region = RegionFile.open(join(directory, "r.0.0.mca"), RegionFileMode.ReadWrite);
+
+    // LZ4 は読み込みのみ対応なので、圧縮して書き出すことはできない
+    const chunk = region.readChunk(0, 0)!;
+    assert.throws(
+      () => region.writeChunk(0, 0, chunk, ChunkCompression.Lz4),
+      (error: SpringNbtError) => error.code === ErrorCode.UnsupportedFeature,
+    );
+
+    region.close();
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test("触っていない LZ4 チャンクは圧縮方式が保たれる", () => {
+  const work = makeWorkDir();
+
+  try {
+    const directory = copyVector("lz4", work);
+    const path = join(directory, "r.0.0.mca");
+    const before = readFileSync(path);
+
+    // 触らずに閉じるだけ。生バイトを素通しするので LZ4 のまま残る
+    const region = RegionFile.open(path, RegionFileMode.ReadWrite);
+    region.close();
+
+    assert.deepEqual(readFileSync(path), before);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
 test("外部ファイルへ退避されたチャンクを読める", () => {
   const region = RegionFile.open(join(vectorDir("external_mcc"), "r.0.0.mca"));
   const raw = region.readChunkRaw(0, 0);

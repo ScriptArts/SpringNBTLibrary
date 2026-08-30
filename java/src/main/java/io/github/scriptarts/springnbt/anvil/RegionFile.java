@@ -742,8 +742,7 @@ final class ChunkCodec {
         return switch (raw.compression()) {
             case NONE -> raw.data();
             case GZIP, ZLIB -> inflate(raw.data(), raw.compression());
-            case LZ4 -> throw SpringNbtException.unsupportedFeature(
-                    "LZ4 圧縮のチャンクは扱えない。生バイトAPI (readChunkRaw) を使うこと");
+            case LZ4 -> Lz4.decompress(raw.data());
             case CUSTOM -> throw SpringNbtException.unsupportedFeature(
                     "カスタム圧縮のチャンクは扱えない。生バイトAPI (readChunkRaw) を使うこと");
         };

@@ -18,6 +18,7 @@ use flate2::write::{GzEncoder, ZlibEncoder};
 use flate2::Compression as FlateLevel;
 
 use crate::error::{Error, ErrorCode, Result};
+use super::lz4;
 use crate::nbt::tag::NbtCompound;
 use crate::nbt::{read_bytes, write_bytes, Compression, NamedTag, NbtReadOptions, NbtWriteOptions};
 
@@ -920,6 +921,8 @@ fn decompress_chunk(raw: &RawChunk) -> Result<Vec<u8>> {
             read_all(&mut decoder, &mut plain)?;
             Ok(plain)
         }
+        // LZ4 は読み込みのみ対応
+        ChunkCompression::Lz4 => lz4::decompress(&raw.data),
         other => Err(Error::new(
             ErrorCode::UnsupportedFeature,
             format!(

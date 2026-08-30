@@ -24,6 +24,7 @@ from ..errors import ErrorCode, SpringNbtError
 from ..nbt import Compression, NamedTag, NbtCompound, NbtReadOptions, NbtWriteOptions
 from ..nbt import read_bytes as read_nbt_bytes
 from ..nbt import write_bytes as write_nbt_bytes
+from .lz4 import decompress_lz4
 
 __all__ = [
     "SECTOR_SIZE",
@@ -746,6 +747,10 @@ def _decompress_chunk(raw: RawChunk) -> bytes:
         except zlib.error as error:
             raise SpringNbtError(
                 ErrorCode.MALFORMED_DATA, "チャンクの圧縮データを展開できない") from error
+
+    # LZ4 は読み込みのみ対応
+    if raw.compression == ChunkCompression.LZ4:
+        return decompress_lz4(raw.data)
 
     raise SpringNbtError.unsupported_feature(
         "%s 圧縮のチャンクは扱えない。生バイトAPI (read_chunk_raw) を使うこと"

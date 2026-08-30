@@ -149,6 +149,52 @@ def test_reads_every_compression_scheme():
             assert region.read_chunk(x, 0).get_int("xPos") == x
 
 
+def test_reads_lz4_chunks():
+    with RegionFile.open(os.path.join(vector_dir("lz4"), "r.0.0.mca")) as region:
+        # 1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
+        for x in range(4):
+            assert region.read_chunk_raw(x, 0).compression == ChunkCompression.LZ4
+            assert region.read_chunk(x, 0).get_int("xPos") == x
+
+        # 同じバイトの繰り返しは、重なりのあるマッチとして詰められている
+        assert region.read_chunk(3, 0).get_string("filler") == "A" * 4000
+
+
+def test_rejects_lz4_block_with_broken_magic():
+    with RegionFile.open(os.path.join(vector_dir("lz4_bad_magic"), "r.0.0.mca")) as region:
+        with pytest.raises(SpringNbtError) as error:
+            region.read_chunk(0, 0)
+
+        assert error.value.code == ErrorCode.MALFORMED_DATA
+
+
+def test_writing_lz4_is_rejected(tmp_path):
+    path = os.path.join(copy_vector("lz4", tmp_path), "r.0.0.mca")
+
+    with RegionFile.open(path, RegionFileMode.READ_WRITE) as region:
+        # LZ4 は読み込みのみ対応なので、圧縮して書き出すことはできない
+        chunk = region.read_chunk(0, 0)
+
+        with pytest.raises(SpringNbtError) as error:
+            region.write_chunk(0, 0, chunk, ChunkCompression.LZ4)
+
+        assert error.value.code == ErrorCode.UNSUPPORTED_FEATURE
+
+
+def test_untouched_lz4_chunks_keep_their_compression(tmp_path):
+    path = os.path.join(copy_vector("lz4", tmp_path), "r.0.0.mca")
+
+    with open(path, "rb") as handle:
+        before = handle.read()
+
+    # 触らずに閉じるだけ。生バイトを素通しするので LZ4 のまま残る
+    with RegionFile.open(path, RegionFileMode.READ_WRITE):
+        pass
+
+    with open(path, "rb") as handle:
+        assert handle.read() == before
+
+
 def test_reads_chunk_stored_in_external_file():
     with RegionFile.open(os.path.join(vector_dir("external_mcc"), "r.0.0.mca")) as region:
         raw = region.read_chunk_raw(0, 0)

@@ -191,6 +191,8 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `ceil_log2` | `CeilLog2()` | `ceilLog2()` | `ceilLog2()` | `ceil_log2()` | `ceil_log2()` |  |
 | `decode` | `Decode()` | `decode()` | `decode()` | `decode()` | `decode()` | MUTF-8 バイト列を文字列へ復号する |
 | `decode_to_utf16` | — | — | — | — | `decode_to_utf16()` |  |
+| `decompress` | — | — | — | — | `decompress()` |  |
+| `decompress_lz4` | — | — | `decompressLz4()` | `decompress_lz4()` | — |  |
 | `default_max_cached_regions` | `DefaultMaxCachedRegions` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` |  |
 | `detect_compression` | `DetectCompression()` | `detectCompression()` | `detectCompression()` | `detect_compression()` | `detect_compression()` | 先頭バイトから圧縮方式を判定する |
 | `encode` | `Encode()` | `encode()` | `encode()` | `encode()` | `encode()` | 文字列を MUTF-8 バイト列へ符号化する |
@@ -199,8 +201,13 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `from_f32` | — | — | — | — | `from_f32()` |  |
 | `from_f64` | — | — | — | — | `from_f64()` |  |
 | `from_float` | — | — | `fromFloat()` | `from_float()` | — |  |
+| `header_length` | — | — | — | `HEADER_LENGTH` | — |  |
 | `is_bare_char` | — | — | — | `is_bare_char()` | — |  |
+| `magic` | — | — | — | `MAGIC` | — |  |
 | `max_byte_length` | `MaxByteLength` | `MAX_BYTE_LENGTH` | `MAX_BYTE_LENGTH` | `MAX_BYTE_LENGTH` | `MAX_BYTE_LENGTH` | MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため） |
+| `method_compressed` | — | — | — | `METHOD_COMPRESSED` | — |  |
+| `method_stored` | — | — | — | `METHOD_STORED` | — |  |
+| `min_match` | — | — | — | `MIN_MATCH` | — |  |
 | `parse` | `Parse()` | `parse()` | `parse()` | `parse()` | `parse()` | SNBT 文字列をタグへ変換する |
 | `parse_compound` | `ParseCompound()` | `parseCompound()` | `parseCompound()` | `parse_compound()` | `parse_compound()` | SNBT 文字列を Compound へ変換する |
 | `read_bytes` | `ReadBytes()` | `readBytes()` | `readBytes()` | `read_bytes()` | `read_bytes()` | バイト列から NBT を読む |

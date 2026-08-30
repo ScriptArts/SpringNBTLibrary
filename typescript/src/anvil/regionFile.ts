@@ -28,6 +28,7 @@ import {
   chunkCompressionAsString,
   chunkCompressionFromId,
 } from "./compression.js";
+import { decompressLz4 } from "./lz4.js";
 import { ChunkPos, RegionPos } from "./pos.js";
 
 /** セクタ長 */
@@ -689,6 +690,10 @@ function decompressChunk(raw: RawChunk): Uint8Array {
         cause: error,
       });
     }
+  }
+
+  if (raw.compression === ChunkCompression.Lz4) {
+    return decompressLz4(raw.data);
   }
 
   throw SpringNbtError.unsupportedFeature(

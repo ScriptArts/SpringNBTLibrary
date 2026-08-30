@@ -204,6 +204,57 @@ class RegionFileTest {
     }
 
     @Test
+    void readsLz4Chunks() {
+        try (RegionFile region = RegionFile.open(vectorDir("lz4").resolve("r.0.0.mca"))) {
+            // 1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
+            for (int x = 0; x < 4; x++) {
+                assertEquals(ChunkCompression.LZ4, region.readChunkRaw(x, 0).compression());
+                assertEquals(x, region.readChunk(x, 0).getInt("xPos"));
+            }
+
+            // 同じバイトの繰り返しは、重なりのあるマッチとして詰められている
+            assertEquals("A".repeat(4000), region.readChunk(3, 0).getString("filler"));
+        }
+    }
+
+    @Test
+    void rejectsLz4BlockWithBrokenMagic() {
+        try (RegionFile region =
+                RegionFile.open(vectorDir("lz4_bad_magic").resolve("r.0.0.mca"))) {
+            SpringNbtException error =
+                    assertThrows(SpringNbtException.class, () -> region.readChunk(0, 0));
+            assertEquals(ErrorCode.MALFORMED_DATA, error.code());
+        }
+    }
+
+    @Test
+    void writingLz4IsRejected() throws IOException {
+        Path path = copyVector("lz4").resolve("r.0.0.mca");
+
+        try (RegionFile region = RegionFile.open(path, RegionFileMode.READ_WRITE)) {
+            // LZ4 は読み込みのみ対応なので、圧縮して書き出すことはできない
+            NbtCompound chunk = region.readChunk(0, 0);
+            SpringNbtException error = assertThrows(
+                    SpringNbtException.class,
+                    () -> region.writeChunk(0, 0, chunk, ChunkCompression.LZ4));
+            assertEquals(ErrorCode.UNSUPPORTED_FEATURE, error.code());
+        }
+    }
+
+    @Test
+    void untouchedLz4ChunksKeepTheirCompression() throws IOException {
+        Path path = copyVector("lz4").resolve("r.0.0.mca");
+        byte[] before = Files.readAllBytes(path);
+
+        try (RegionFile region = RegionFile.open(path, RegionFileMode.READ_WRITE)) {
+            // 触らずに閉じるだけ。生バイトを素通しするので LZ4 のまま残る
+            assertNotNull(region);
+        }
+
+        assertArrayEquals(before, Files.readAllBytes(path));
+    }
+
+    @Test
     void readsChunkStoredInExternalFile() {
         try (RegionFile region =
                 RegionFile.open(vectorDir("external_mcc").resolve("r.0.0.mca"))) {

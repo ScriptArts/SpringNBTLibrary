@@ -3,6 +3,7 @@
 //! 仕様: `docs/spec/20-anvil-region.md`
 
 pub mod folder;
+mod lz4;
 pub mod region;
 
 pub use folder::{RegionFolder, DEFAULT_MAX_CACHED_REGIONS};

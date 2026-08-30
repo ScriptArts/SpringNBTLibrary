@@ -579,6 +579,120 @@ class RegionBuilder:
         return bytes(out)
 
 
+# ---------------------------------------------------------------------------
+# LZ4（圧縮方式ID 4）の符号化
+#
+# 展開側はライブラリが実装するので、ここには符号化だけを置く。
+# 仕様: docs/spec/20-anvil-region.md 3.1.1 / 3.1.2
+# ---------------------------------------------------------------------------
+
+#: LZ4 ブロックのマッチはここから始まる長さ以上でなければならない。
+LZ4_MIN_MATCH = 4
+
+#: ブロックの末尾 5 バイトは必ずリテラルにする。
+LZ4_LAST_LITERALS = 5
+
+#: 最後のマッチは末尾から 12 バイト以内で始めない。
+LZ4_MATCH_LIMIT = 12
+
+
+def lz4_write_length(out, value):
+    """長さの追加ぶんを、255 が続く形式で書く。"""
+    # 255 を書けるだけ書き、最後に 255 未満のバイトで終える
+    while value >= 255:
+        out.append(255)
+        value -= 255
+
+    out.append(value)
+
+
+def lz4_emit(out, literals, offset, match_length):
+    """シーケンスを 1 つ書く。offset が None なら最後のシーケンス。"""
+    token = (min(len(literals), 15) << 4) | min(match_length - LZ4_MIN_MATCH, 15)
+    out.append(token)
+
+    # リテラル長が 15 以上なら追加バイトが続く
+    if len(literals) >= 15:
+        lz4_write_length(out, len(literals) - 15)
+
+    out += literals
+
+    # 最後のシーケンスにはマッチが付かない
+    if offset is None:
+        return
+
+    out += struct.pack("<H", offset)
+
+    # マッチ長が 19 以上なら追加バイトが続く
+    if match_length - LZ4_MIN_MATCH >= 15:
+        lz4_write_length(out, match_length - LZ4_MIN_MATCH - 15)
+
+
+def lz4_compress_block(data):
+    """LZ4 ブロック形式へ符号化する。
+
+    圧縮率は求めない。展開側の検証に必要な形（リテラル・マッチ・
+    重なりのあるマッチ・長さの追加バイト）が出れば十分。
+    """
+    out = bytearray()
+    table = {}
+    anchor = 0
+    position = 0
+    limit = len(data) - LZ4_MATCH_LIMIT
+
+    # 4 バイト一致する直前の位置を探しながら進む
+    while position < limit:
+        key = bytes(data[position:position + LZ4_MIN_MATCH])
+        candidate = table.get(key)
+        table[key] = position
+
+        # 参照できる範囲に候補が無ければ 1 バイト進む
+        if candidate is None or position - candidate > 65535:
+            position += 1
+            continue
+
+        # 一致が続く限りマッチを伸ばす
+        length = LZ4_MIN_MATCH
+
+        while (position + length < len(data) - LZ4_LAST_LITERALS
+               and data[candidate + length] == data[position + length]):
+            length += 1
+
+        lz4_emit(out, data[anchor:position], position - candidate, length)
+        position += length
+        anchor = position
+
+    # 残りはリテラルとして出す
+    lz4_emit(out, data[anchor:], None, LZ4_MIN_MATCH)
+    return bytes(out)
+
+
+def lz4_block(payload, compressed=True):
+    """LZ4Block 形式のブロックを 1 つ作る。"""
+    if compressed:
+        body = lz4_compress_block(payload)
+        token = 0x26
+    else:
+        body = payload
+        token = 0x16
+
+    # チェックサムは検証対象外なので 0 を入れる
+    header = (b"LZ4Block" + bytes([token])
+              + struct.pack("<i", len(body))
+              + struct.pack("<i", len(payload))
+              + struct.pack("<i", 0))
+    return header + body
+
+
+def lz4_chunk(payload, split=None, compressed=True):
+    """チャンクのペイロードを LZ4Block の連結へ包む。"""
+    # split を指定すると、その位置で 2 ブロックに分ける
+    if split is None:
+        return lz4_block(payload, compressed)
+
+    return lz4_block(payload[:split], compressed) + lz4_block(payload[split:], compressed)
+
+
 def sample_chunk(x, z, extra=None):
     """チャンクらしい形の NBT を作る。実データの構造を最小限まねる。"""
     entries = [
@@ -636,6 +750,33 @@ def build_anvil():
     add_vector(
         "anvil/mixed_compression", "anvil/mixed_compression/r.0.0.mca", builder.build(),
         "圧縮方式ID 1 (GZip) / 2 (Zlib) / 3 (無圧縮) が混在")
+
+    # 圧縮方式 4 (LZ4)
+    #
+    # 1 ブロック / 2 ブロック連結 / 無圧縮ブロックの 3 通りを並べる。
+    # 繰り返しの多い NBT なので、重なりのあるマッチも含まれる
+    builder = RegionBuilder()
+    builder.add_chunk(0, 0, lz4_chunk(sample_chunk(0, 0)), compression=4)
+    builder.add_chunk(1, 0, lz4_chunk(sample_chunk(1, 0), split=40), compression=4)
+    builder.add_chunk(2, 0, lz4_chunk(sample_chunk(2, 0), compressed=False), compression=4)
+
+    # 同じバイトが延々と続くチャンク
+    # 重なりのあるマッチ（オフセット 1）と、長さの追加バイトを必ず含ませる
+    repetitive = sample_chunk(3, 0, extra=("filler", t_string("A" * 4000)))
+    builder.add_chunk(3, 0, lz4_chunk(repetitive), compression=4)
+    add_vector(
+        "anvil/lz4", "anvil/lz4/r.0.0.mca", builder.build(),
+        "圧縮方式ID 4 (LZ4)。1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ")
+
+    # 異常系: LZ4Block のマジックが違う
+    builder = RegionBuilder()
+    broken = bytearray(lz4_chunk(sample_chunk(0, 0)))
+    broken[0] = ord("X")
+    builder.add_chunk(0, 0, bytes(broken), compression=4)
+    add_vector(
+        "anvil/lz4_bad_magic", "anvil/lz4_bad_magic/r.0.0.mca", builder.build(),
+        "LZ4Block のマジックが壊れている",
+        expect_error="MALFORMED_DATA")
 
     # 外部ファイル (.mcc) へ退避されたチャンク
     external_payload = zlib.compress(sample_chunk(0, 0), 6)

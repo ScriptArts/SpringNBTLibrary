@@ -196,6 +196,71 @@ fn reads_every_compression_scheme() {
 }
 
 #[test]
+fn reads_lz4_chunks() {
+    let region =
+        RegionFile::open(vector_dir("lz4").join("r.0.0.mca"), RegionFileMode::ReadOnly).unwrap();
+
+    // 1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
+    for x in 0..4 {
+        assert_eq!(
+            region.read_chunk_raw(x, 0).unwrap().unwrap().compression,
+            ChunkCompression::Lz4
+        );
+        assert_eq!(
+            region.read_chunk(x, 0).unwrap().unwrap().get_int("xPos").unwrap(),
+            x
+        );
+    }
+
+    // 同じバイトの繰り返しは、重なりのあるマッチとして詰められている
+    assert_eq!(
+        region.read_chunk(3, 0).unwrap().unwrap().get_string("filler").unwrap(),
+        "A".repeat(4000)
+    );
+}
+
+#[test]
+fn rejects_lz4_block_with_broken_magic() {
+    let region = RegionFile::open(
+        vector_dir("lz4_bad_magic").join("r.0.0.mca"),
+        RegionFileMode::ReadOnly,
+    )
+    .unwrap();
+
+    let error = region.read_chunk(0, 0).unwrap_err();
+    assert_eq!(error.code(), ErrorCode::MalformedData);
+}
+
+#[test]
+fn writing_lz4_is_rejected() {
+    let work = WorkDir::new("lz4write");
+    let path = work.copy_vector("lz4").join("r.0.0.mca");
+    let mut region = RegionFile::open(&path, RegionFileMode::ReadWrite).unwrap();
+
+    // LZ4 は読み込みのみ対応なので、圧縮して書き出すことはできない
+    let chunk = region.read_chunk(0, 0).unwrap().unwrap();
+    let error = region
+        .write_chunk(0, 0, &chunk, ChunkCompression::Lz4)
+        .unwrap_err();
+    assert_eq!(error.code(), ErrorCode::UnsupportedFeature);
+}
+
+#[test]
+fn untouched_lz4_chunks_keep_their_compression() {
+    let work = WorkDir::new("lz4keep");
+    let path = work.copy_vector("lz4").join("r.0.0.mca");
+    let before = std::fs::read(&path).unwrap();
+
+    {
+        // 触らずに閉じるだけ。生バイトを素通しするので LZ4 のまま残る
+        let mut region = RegionFile::open(&path, RegionFileMode::ReadWrite).unwrap();
+        region.close().unwrap();
+    }
+
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+}
+
+#[test]
 fn reads_chunk_stored_in_external_file() {
     let region = RegionFile::open(
         vector_dir("external_mcc").join("r.0.0.mca"),

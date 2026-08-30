@@ -272,6 +272,26 @@
       "roundtrip": true
     },
     {
+      "id": "anvil/lz4",
+      "kind": "anvil",
+      "input": "anvil/lz4/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "圧縮方式ID 4 (LZ4)。1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ",
+      "expect": "expect/anvil/lz4.json",
+      "roundtrip": true
+    },
+    {
+      "id": "anvil/lz4_bad_magic",
+      "kind": "anvil",
+      "input": "anvil/lz4_bad_magic/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "LZ4Block のマジックが壊れている",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
       "id": "anvil/external_mcc",
       "kind": "anvil",
       "input": "anvil/external_mcc/r.0.0.mca",

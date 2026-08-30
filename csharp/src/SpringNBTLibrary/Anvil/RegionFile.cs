@@ -748,8 +748,7 @@ internal static class ChunkCodec
             case ChunkCompression.Zlib:
                 return Inflate(raw.Data, ChunkCompression.Zlib);
             case ChunkCompression.Lz4:
-                throw SpringNbtException.UnsupportedFeature(
-                    "LZ4 圧縮のチャンクは扱えない。生バイトAPI (ReadChunkRaw) を使うこと");
+                return Lz4.Decompress(raw.Data);
             default:
                 throw SpringNbtException.UnsupportedFeature(
                     "カスタム圧縮のチャンクは扱えない。生バイトAPI (ReadChunkRaw) を使うこと");
