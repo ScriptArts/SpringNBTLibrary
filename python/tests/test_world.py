@@ -303,6 +303,30 @@ class TestChunk:
         assert chunk.get_block(3, -60, 6).name == "minecraft:air"
         assert chunk.get_block(4, -60, 7).name == "minecraft:air"
 
+    def test_ブロックを文字列でも置ける(self):
+        chunk = load_chunk("palette_1")
+        chunk.set_block(3, -60, 7, "minecraft:oak_stairs[facing=north,half=top]")
+
+        assert str(chunk.get_block(3, -60, 7)) == "minecraft:oak_stairs[facing=north,half=top]"
+
+    def test_変更したチャンクには印が付く(self):
+        chunk = load_chunk("palette_1")
+        assert chunk.is_modified is False
+
+        chunk.set_block(3, -60, 7, "minecraft:stone")
+        assert chunk.is_modified is True
+
+        # 保存済みとして印を下ろせる
+        chunk.is_modified = False
+        assert chunk.is_modified is False
+
+        # 同じ状態を置き直すだけなら何も起きないので印も付かない
+        chunk.set_block(3, -60, 7, "minecraft:stone")
+        assert chunk.is_modified is False
+
+        chunk.clear_heightmaps()
+        assert chunk.is_modified is True
+
     def test_バイオームは4ブロック単位で効く(self):
         chunk = load_chunk("palette_1")
         chunk.set_biome(0, -64, 0, "minecraft:desert")

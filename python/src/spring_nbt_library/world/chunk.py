@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import enum
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Union
 
 from .. import TARGET_DATA_VERSION
 from ..errors import ErrorCode, SpringNbtError
@@ -178,11 +178,12 @@ class ChunkSection:
 class Chunk:
     """チャンク 1 つ分"""
 
-    __slots__ = ("raw", "_sections")
+    __slots__ = ("raw", "_sections", "_modified")
 
     def __init__(self, raw: NbtCompound) -> None:
         self.raw = raw
         self._sections: Dict[int, ChunkSection] = {}
+        self._modified = False
 
     @property
     def data_version(self) -> int:
@@ -217,6 +218,22 @@ class Chunk:
         ブロック改変の対象にしてよいのはこれだけ
         """
         return self.status == "minecraft:full"
+
+    @property
+    def is_modified(self) -> bool:
+        """このチャンクに変更が加わったか
+
+        ブロックやバイオームを書き換えると立つ
+        :meth:`Dimension.flush` はこれが立っているチャンクだけを書き戻す
+
+        ``raw`` を直接いじった場合はここが立たないので、自分で True にすること
+        """
+        return self._modified
+
+    @is_modified.setter
+    def is_modified(self, value: bool) -> None:
+        """変更の印を付け外しする"""
+        self._modified = value
 
     @property
     def section_ys(self) -> List[int]:
@@ -335,8 +352,10 @@ class Chunk:
 
         return BlockState.from_nbt(entry)
 
-    def set_block(self, x: int, y: int, z: int, state: BlockState) -> None:
+    def set_block(self, x: int, y: int, z: int, state: Union[BlockState, str]) -> None:
         """ブロックを設定する
+
+        ``minecraft:oak_stairs[facing=north]`` の形の文字列でも指定できる
 
         置き換えによって不整合になる付随データ（``block_entities`` /
         ``block_ticks`` / ``fluid_ticks`` のうち、その座標を指すもの）は
@@ -348,6 +367,10 @@ class Chunk:
 
         :raises SpringNbtError: 対象のセクションが無い、または block_states を持たない場合
         """
+        # 文字列で渡されたら BlockState へ直してから進む
+        if isinstance(state, str):
+            state = BlockState.parse(state)
+
         _check_local_coordinates(x, z)
         section_y = y >> 4
         section = self.section(section_y)
@@ -366,6 +389,7 @@ class Chunk:
 
         section.block_states.set(block_index(x, y, z), state.to_nbt())
         self._remove_block_data(x, y, z)
+        self._modified = True
 
     def _remove_block_data(self, x: int, y: int, z: int) -> None:
         """その座標を指す付随データを取り除く
@@ -423,6 +447,7 @@ class Chunk:
                 "Y=%d を含むセクション（Y=%d）が無いか、バイオームを持たない" % (y, section_y))
 
         section.biomes.set(biome_index(x, y, z), NbtString(biome))
+        self._modified = True
 
     def clear_heightmaps(self) -> None:
         """``Heightmaps`` を削除し、Minecraft に再計算させる
@@ -432,10 +457,12 @@ class Chunk:
         （``docs/adr/0004-defer-heightmap-recalc.md``）
         """
         self.raw.remove("Heightmaps")
+        self._modified = True
 
     def invalidate_lighting(self) -> None:
         """``isLightOn`` を 0 にし、光源の再計算を促す"""
-        self.raw.set("isLightOn", NbtByte(0))
+        self.raw.set_byte("isLightOn", 0)
+        self._modified = True
 
     def compact(self) -> None:
         """使われていないパレット要素を全セクションから取り除く"""

@@ -684,3 +684,52 @@ class TestConcatenatedNbt:
             read_bytes_at(hello_world_bytes(), 0, options)
 
         assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+
+class TestTypedSetters:
+    """型付き設定子
+
+    仕様: docs/spec/10-nbt-binary.md 7.1章
+    """
+
+    def test_mirror_the_getters(self):
+        root = NbtCompound()
+        root.set_byte("b", -128)
+        root.set_short("s", 32767)
+        root.set_int("i", -2147483648)
+        root.set_long("l", 9223372036854775807)
+        root.set_float("f", 1.5)
+        root.set_double("d", -2.25)
+        root.set_bool("t", True)
+        root.set_bool("n", False)
+        root.set_string("str", "Bananrama")
+        root.set_byte_array("ba", [1, -1])
+        root.set_int_array("ia", [1, -1])
+        root.set_long_array("la", [1, -1])
+
+        assert root.get_byte("b") == -128
+        assert root.get_short("s") == 32767
+        assert root.get_int("i") == -2147483648
+        assert root.get_long("l") == 9223372036854775807
+        assert root.get_float("f") == 1.5
+        assert root.get_double("d") == -2.25
+        assert root.get_bool("t") is True
+        assert root.get_bool("n") is False
+        assert root.get_string("str") == "Bananrama"
+        assert root.get_byte_array("ba") == [1, -1]
+        assert root.get_int_array("ia") == [1, -1]
+        assert root.get_long_array("la") == [1, -1]
+
+        # 真偽値は TAG_Byte の 0 / 1 として入る
+        assert root.get("t").type == TagType.BYTE
+
+    def test_keep_the_insertion_order(self):
+        root = NbtCompound()
+        root.set_int("a", 1)
+        root.set_int("b", 2)
+
+        # 既存キーへの再設定は位置を変えない
+        root.set_int("a", 3)
+
+        assert list(root.keys()) == ["a", "b"]
+        assert root.get_int("a") == 3

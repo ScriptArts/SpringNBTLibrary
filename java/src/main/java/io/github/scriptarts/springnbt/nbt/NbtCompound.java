@@ -564,4 +564,126 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
 
         return tag;
     }
+    // -- 型付き設定子 -------------------------------------------------------
+    //
+    // set(key, new NbtInt(42)) と書かずに済むようにするための糖衣
+    // 取得子の getInt と対になる
+
+    /**
+     * TAG_Byte として設定する
+     *
+     * @param key キー
+     * @param value 値
+     */
+    public void setByte(String key, byte value) {
+        set(key, new NbtByte(value));
+    }
+
+    /**
+     * TAG_Short として設定する
+     *
+     * @param key キー
+     * @param value 値
+     */
+    public void setShort(String key, short value) {
+        set(key, new NbtShort(value));
+    }
+
+    /**
+     * TAG_Int として設定する
+     *
+     * @param key キー
+     * @param value 値
+     */
+    public void setInt(String key, int value) {
+        set(key, new NbtInt(value));
+    }
+
+    /**
+     * TAG_Long として設定する
+     *
+     * @param key キー
+     * @param value 値
+     */
+    public void setLong(String key, long value) {
+        set(key, new NbtLong(value));
+    }
+
+    /**
+     * TAG_Float として設定する
+     *
+     * @param key キー
+     * @param value 値
+     */
+    public void setFloat(String key, float value) {
+        set(key, new NbtFloat(value));
+    }
+
+    /**
+     * TAG_Double として設定する
+     *
+     * @param key キー
+     * @param value 値
+     */
+    public void setDouble(String key, double value) {
+        set(key, new NbtDouble(value));
+    }
+
+    /**
+     * TAG_Byte として設定する
+     * true は 1、false は 0
+     *
+     * @param key キー
+     * @param value 値
+     */
+    public void setBool(String key, boolean value) {
+        // NBT に真偽値の専用型は無いので TAG_Byte の 0 / 1 で表す
+        if (value) {
+            setByte(key, (byte) 1);
+        } else {
+            setByte(key, (byte) 0);
+        }
+    }
+
+    /**
+     * TAG_String として設定する
+     *
+     * @param key キー
+     * @param value 値
+     * @throws SpringNbtException MUTF-8 に符号化すると 65535 バイトを超える場合
+     */
+    public void setString(String key, String value) {
+        set(key, new NbtString(value));
+    }
+
+    /**
+     * TAG_Byte_Array として設定する
+     *
+     * @param key キー
+     * @param value 値
+     */
+    public void setByteArray(String key, byte[] value) {
+        set(key, new NbtByteArray(value));
+    }
+
+    /**
+     * TAG_Int_Array として設定する
+     *
+     * @param key キー
+     * @param value 値
+     */
+    public void setIntArray(String key, int[] value) {
+        set(key, new NbtIntArray(value));
+    }
+
+    /**
+     * TAG_Long_Array として設定する
+     *
+     * @param key キー
+     * @param value 値
+     */
+    public void setLongArray(String key, long[] value) {
+        set(key, new NbtLongArray(value));
+    }
+
 }

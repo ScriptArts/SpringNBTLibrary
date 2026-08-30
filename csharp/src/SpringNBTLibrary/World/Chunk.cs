@@ -110,6 +110,21 @@ public sealed class Chunk
     /// ブロック改変の対象にしてよいのはこれだけ</summary>
     public bool IsFullyGenerated => Status == "minecraft:full";
 
+    /// <summary>
+    /// このチャンクに変更が加わったか
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// ブロックやバイオームを書き換えると立つ
+    /// <see cref="Dimension.Flush"/> はこれが立っているチャンクだけを書き戻す
+    /// </para>
+    /// <para>
+    /// <see cref="Raw"/> を直接いじった場合はここが立たないので、
+    /// 自分で true にすること
+    /// </para>
+    /// </remarks>
+    public bool IsModified { get; set; }
+
     /// <summary>存在するセクションのY位置
     /// 昇順</summary>
     public IEnumerable<int> SectionYs => sections.Keys;
@@ -291,6 +306,19 @@ public sealed class Chunk
 
     /// <summary>
     /// ブロックを設定する
+    /// <c>minecraft:oak_stairs[facing=north]</c> の形の文字列で指定する
+    /// </summary>
+    /// <exception cref="SpringNbtException">
+    /// 文字列を解釈できない場合（<see cref="ErrorCode.InvalidArgument"/>）
+    /// </exception>
+    public void SetBlock(int x, int y, int z, string state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        SetBlock(x, y, z, BlockState.Parse(state));
+    }
+
+    /// <summary>
+    /// ブロックを設定する
     /// </summary>
     /// <remarks>
     /// 置き換えによって不整合になる付随データ（<c>block_entities</c> /
@@ -333,6 +361,7 @@ public sealed class Chunk
 
         section.BlockStates!.Set(BlockIndex(x, y, z), state.ToNbt());
         RemoveBlockData(x, y, z);
+        IsModified = true;
     }
 
     /// <summary>
@@ -431,6 +460,7 @@ public sealed class Chunk
         }
 
         section.Biomes!.Set(BiomeIndex(x, y, z), new NbtString(biome));
+        IsModified = true;
     }
 
     /// <summary>
@@ -444,6 +474,7 @@ public sealed class Chunk
     public void ClearHeightmaps()
     {
         root.Remove("Heightmaps");
+        IsModified = true;
     }
 
     /// <summary>
@@ -451,7 +482,8 @@ public sealed class Chunk
     /// </summary>
     public void InvalidateLighting()
     {
-        root.Set("isLightOn", new NbtByte(0));
+        root.SetByte("isLightOn", 0);
+        IsModified = true;
     }
 
     /// <summary>使われていないパレット要素を全セクションから取り除く</summary>

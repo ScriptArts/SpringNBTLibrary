@@ -700,4 +700,57 @@ class NbtTest {
         }
     }
 
+    @Nested
+    @DisplayName("型付き設定子")
+    class TypedSetters {
+
+        @Test
+        @DisplayName("取得子と対になっている")
+        void mirrorTheGetters() {
+            NbtCompound root = new NbtCompound();
+            root.setByte("b", (byte) -128);
+            root.setShort("s", (short) 32767);
+            root.setInt("i", -2147483648);
+            root.setLong("l", 9223372036854775807L);
+            root.setFloat("f", 1.5f);
+            root.setDouble("d", -2.25);
+            root.setBool("t", true);
+            root.setBool("n", false);
+            root.setString("str", "Bananrama");
+            root.setByteArray("ba", new byte[] {1, -1});
+            root.setIntArray("ia", new int[] {1, -1});
+            root.setLongArray("la", new long[] {1L, -1L});
+
+            assertEquals((byte) -128, root.getByte("b"));
+            assertEquals((short) 32767, root.getShort("s"));
+            assertEquals(-2147483648, root.getInt("i"));
+            assertEquals(9223372036854775807L, root.getLong("l"));
+            assertEquals(1.5f, root.getFloat("f"));
+            assertEquals(-2.25, root.getDouble("d"));
+            assertTrue(root.getBool("t"));
+            assertFalse(root.getBool("n"));
+            assertEquals("Bananrama", root.getString("str"));
+            assertArrayEquals(new byte[] {1, -1}, root.getByteArray("ba"));
+            assertArrayEquals(new int[] {1, -1}, root.getIntArray("ia"));
+            assertArrayEquals(new long[] {1L, -1L}, root.getLongArray("la"));
+
+            // 真偽値は TAG_Byte の 0 / 1 として入る
+            assertEquals(TagType.BYTE, root.get("t").type());
+        }
+
+        @Test
+        @DisplayName("挿入順を変えない")
+        void keepTheInsertionOrder() {
+            NbtCompound root = new NbtCompound();
+            root.setInt("a", 1);
+            root.setInt("b", 2);
+
+            // 既存キーへの再設定は位置を変えない
+            root.setInt("a", 3);
+
+            assertEquals(List.of("a", "b"), List.copyOf(root.keys()));
+            assertEquals(3, root.getInt("a"));
+        }
+    }
+
 }

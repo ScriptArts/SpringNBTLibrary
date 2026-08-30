@@ -42,6 +42,7 @@
 | 展開後サイズの上限 | ✅ | ✅ | ✅ | ✅ | ✅ | [00](spec/00-conventions.md#5-安全上限既定値) | 既定は無制限 |
 | 挿入順を保持する Compound | ✅ | ✅ | ✅ | ✅ | ✅ | [10](spec/10-nbt-binary.md#71-nbtcompound) | ラウンドトリップの前提 |
 | 型付き取得子（キー欠落と型不一致の区別） | ✅ | ✅ | ✅ | ✅ | ✅ | [10](spec/10-nbt-binary.md#71-nbtcompound) | `get_*` / `opt_*` |
+| 型付き設定子 | ✅ | ✅ | ✅ | ✅ | ✅ | [10](spec/10-nbt-binary.md#71-nbtcompound) | `set_int(key, 42)` のように値を直に渡せる |
 | 位置を指定した読み込み | ✅ | ✅ | ✅ | ✅ | ✅ | [10](spec/10-nbt-binary.md#31-連なった-nbt-を読む) | 連なった NBT を順に読み進める |
 | SNBT パース | ✅ | ✅ | ✅ | ✅ | ✅ | [11](spec/11-snbt.md) | 1.21.5+ 構文 |
 | SNBT 出力（1行 / 整形） | ✅ | ✅ | ✅ | ✅ | ✅ | [11](spec/11-snbt.md#5-出力) | |
@@ -84,6 +85,8 @@
 | 置き換え時の付随データの掃除 | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#24-ブロックを置き換えたときの掃除) | `block_entities` / `block_ticks` / `fluid_ticks` から同じ座標の要素を取り除く |
 | バイオームの取得・設定（4×4×4） | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#22-座標とエントリ添字) | |
 | `BlockState` の文字列表現 | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#21-ブロック状態のパレット要素) | `minecraft:oak_stairs[facing=north]` |
+| ブロック座標と範囲の型 | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#5-座標の型) | `BlockPos` / `Cuboid`。範囲内の走査つき |
+| チャンクの変更フラグ | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#5-座標の型) | `is_modified`。書き戻す対象を決める |
 | パレット自動拡張とビット幅の再計算 | ✅ | ✅ | ✅ | ✅ | ✅ | [31](spec/31-paletted-container.md#4-書き込み時のビット幅再計算) | |
 | 未使用パレットの掃除 `compact()` | ✅ | ✅ | ✅ | ✅ | ✅ | [31](spec/31-paletted-container.md#4-書き込み時のビット幅再計算) | 明示呼び出し時のみ |
 | 非正準な BitStorage の救済読み | ✅ | ✅ | ✅ | ✅ | ✅ | [31](spec/31-paletted-container.md#3-読み込み時の検証) | `lenient_bit_storage` |
@@ -99,7 +102,7 @@
 | 機能 | C# | Java | TS | Py | Rust | 仕様 | 備考 |
 |---|:--:|:--:|:--:|:--:|:--:|---|---|
 | 共通 `ErrorCode` による分類 | ✅ | ✅ | ✅ | ✅ | ✅ | [00](spec/00-conventions.md#4-エラー分類) | 全言語でコード集合が一致 |
-| DataVersion 不一致時の警告／エラー切替 | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#5-バージョン検査) | |
+| DataVersion 不一致時の警告／エラー切替 | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#6-バージョン検査) | |
 | 適合性検証ツール（CLI） | ✅ | ✅ | ✅ | ✅ | ✅ | [90](spec/90-conformance.md#23-クロス言語一致) | 全言語の出力を相互diff |
 | 実ワールド走査ツール | — | — | — | ✅ | — | [90](spec/90-conformance.md#24-実ワールド走査) | `spec/tools/scan_world.py`。検証用のため Python のみ |
 | ドキュメント同期検証 | — | — | — | ✅ | — | [adr/0009](adr/0009-static-api-extraction.md) | `spec/tools/check_docs_sync.py`。全言語のソースを静的解析して突き合わせる |

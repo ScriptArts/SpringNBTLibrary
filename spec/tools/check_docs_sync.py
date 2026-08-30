@@ -79,7 +79,7 @@ API_PAGES = {
             "MinecraftWorld", "WorldOpenOptions", "LevelData", "Dimension",
             "Chunk", "ChunkSection", "ChunkReadOptions", "ChunkWriteOptions",
             "VersionMismatchAction",
-            "BlockState", "PalettedContainer", "BitStorage",
+            "BlockState", "BlockPos", "Cuboid", "PalettedContainer", "BitStorage",
         ],
     },
 }

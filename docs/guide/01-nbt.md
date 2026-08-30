@@ -102,6 +102,15 @@ root.Set("flags", new NbtByteArray(new sbyte[] { 1, 0, 1 }));
 NbtIo.WriteFile("out.nbt", new NamedTag("", root));
 ```
 
+値を直に渡す設定子もあります。取得子と対になっています。
+
+```csharp
+root.SetString("name", "SpringNBTLibrary");
+root.SetInt("count", 42);
+root.SetBool("enabled", true);        // TAG_Byte の 0 / 1 になります
+root.SetByteArray("flags", new sbyte[] { 1, 0, 1 });
+```
+
 `NbtCompound` は挿入順を保持します。
 これは飾りではありません。触っていないデータを書き戻したときに
 バイト単位で元と一致させるために必要です。

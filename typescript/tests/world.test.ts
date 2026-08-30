@@ -333,6 +333,32 @@ test("Chunk: ブロックを置くとその場所だけ変わる", () => {
   assert.equal(chunk.getBlock(4, -60, 7)?.name, "minecraft:air");
 });
 
+test("Chunk: ブロックを文字列でも置ける", () => {
+  const chunk = loadChunk("palette_1");
+  chunk.setBlock(3, -60, 7, "minecraft:oak_stairs[facing=north,half=top]");
+
+  assert.equal(chunk.getBlock(3, -60, 7)?.toString(), "minecraft:oak_stairs[facing=north,half=top]");
+});
+
+test("Chunk: 変更したチャンクには印が付く", () => {
+  const chunk = loadChunk("palette_1");
+  assert.equal(chunk.isModified, false);
+
+  chunk.setBlock(3, -60, 7, "minecraft:stone");
+  assert.equal(chunk.isModified, true);
+
+  // 保存済みとして印を下ろせる
+  chunk.isModified = false;
+  assert.equal(chunk.isModified, false);
+
+  // 同じ状態を置き直すだけなら何も起きないので印も付かない
+  chunk.setBlock(3, -60, 7, "minecraft:stone");
+  assert.equal(chunk.isModified, false);
+
+  chunk.clearHeightmaps();
+  assert.equal(chunk.isModified, true);
+});
+
 test("Chunk: バイオームは 4 ブロック単位で効く", () => {
   const chunk = loadChunk("palette_1");
   chunk.setBiome(0, -64, 0, "minecraft:desert");

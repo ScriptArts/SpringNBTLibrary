@@ -104,6 +104,8 @@ EXPECTED_TYPE_GAPS = {
     "NbtLongArray": ["rust"],
     # TypeScript は NbtTag を型の合併で表すので、基底クラスが無い
     "NbtTag": ["typescript"],
+    # 他の言語は set_block のオーバーロードで済むが、Rust には無いのでトレイトで受ける
+    "IntoBlockState": ["csharp", "java", "typescript", "python"],
 }
 
 #: API 一覧から除くメンバ。言語の作法として要るが、論理APIではない。
@@ -689,7 +691,7 @@ TS_FUNCTION = re.compile(r"^export\s+function\s+([A-Za-z0-9_]+)")
 TS_CONST = re.compile(r"^export\s+const\s+([A-Za-z0-9_]+)")
 
 TS_MEMBER = re.compile(
-    r"^  (?:static\s+|readonly\s+)*(?:get\s+|set\s+)?([A-Za-z0-9_]+)\s*[\(:<]")
+    r"^  (?:static\s+|readonly\s+)*(?:get\s+|set\s+)?\*?([A-Za-z0-9_]+)\s*[\(:<]")
 
 TS_ENUM_VALUE = re.compile(r"^  ([A-Za-z0-9_]+)\s*=")
 
@@ -704,7 +706,9 @@ TS_INLINE_PARAMETER_PROPERTY = re.compile(
     r"^(?:public\s+readonly\s+|readonly\s+|public\s+)([A-Za-z0-9_]+)\s*:")
 
 #: クラス直下の公開フィールド（`readonly type = TagType.Byte as const;`）。
-TS_CLASS_FIELD = re.compile(r"^  (?:public\s+)?readonly\s+([A-Za-z0-9_]+)\s*=")
+#: `static readonly OVERWORLD = "..."` のような定数もここで拾う。
+TS_CLASS_FIELD = re.compile(
+    r"^  (?:public\s+)?(?:static\s+)?readonly\s+([A-Za-z0-9_]+)\s*=")
 
 def extract_typescript() -> Api:
     """TypeScript のソースから公開APIを抜き出す。"""
@@ -913,7 +917,8 @@ def extract_python() -> Api:
             enum_match = PY_ENUM_VALUE.match(line)
 
             if enum_match is not None:
-                api.add_member(current, enum_match.group(1).lower())
+                name = enum_match.group(1)
+                api.add_member(current, name.lower(), name)
                 continue
 
             method_match = PY_METHOD.match(line)
@@ -969,10 +974,16 @@ RS_ENUM_VALUE = re.compile(r"^    ([A-Z][A-Za-z0-9_]*)\s*[,\(\{]")
 RS_FUNCTION = re.compile(r"^pub\s+fn\s+([A-Za-z0-9_]+)")
 RS_CONST = re.compile(r"^pub\s+const\s+([A-Z][A-Z0-9_]*)\s*:")
 
+#: impl の中に置いた関連定数（`pub const OVERWORLD: &'static str = ...`）。
+RS_ASSOCIATED_CONST = re.compile(r"^    pub\s+const\s+([A-Z][A-Z0-9_]*)\s*:")
+
 #: `scalar_accessors!(opt_int, get_int, ...)` のように、マクロで生成するアクセサ。
 #: 静的解析ではマクロを展開できないので、呼び出し行から名前だけ拾う。
 RS_ACCESSOR_MACRO = re.compile(
     r"^([a-z_]+_accessors)!\(\s*([a-z_0-9]+)\s*,\s*([a-z_0-9]+)\s*,")
+
+#: `scalar_setters!(set_int, Int, i32, "Int")` のように、マクロで生成する設定子。
+RS_SETTER_MACRO = re.compile(r"^([a-z_]+_setters)!\(\s*([a-z_0-9]+)\s*,")
 
 RS_DERIVE = re.compile(r"^#\[derive\(([^)]*)\)\]")
 
@@ -1057,6 +1068,13 @@ def extract_rust() -> Api:
 
                 continue
 
+            setter_match = RS_SETTER_MACRO.match(line)
+
+            if setter_match is not None:
+                name = setter_match.group(2)
+                api.add_member("NbtCompound", name, name + "()")
+                continue
+
             function_match = RS_FUNCTION.match(line)
 
             if function_match is not None:
@@ -1078,7 +1096,8 @@ def extract_rust() -> Api:
                 enum_match = RS_ENUM_VALUE.match(line)
 
                 if enum_match is not None:
-                    api.add_member(current, to_snake(enum_match.group(1)))
+                    name = enum_match.group(1)
+                    api.add_member(current, to_snake(name), name)
 
                 continue
 
@@ -1087,6 +1106,14 @@ def extract_rust() -> Api:
             if method_match is not None:
                 name = method_match.group(1)
                 api.add_member(current, name, name + "()")
+                continue
+
+            # impl の中の関連定数も公開APIに数える
+            associated_match = RS_ASSOCIATED_CONST.match(line)
+
+            if associated_match is not None:
+                name = associated_match.group(1)
+                api.add_member(current, name.lower(), name)
                 continue
 
             field_match = RS_FIELD.match(line)

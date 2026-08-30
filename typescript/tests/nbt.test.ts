@@ -691,6 +691,50 @@ test("位置を指定した読み込みでは圧縮を扱えない", () => {
   );
 });
 
+test("型付き設定子は取得子と対になっている", () => {
+  const root = new NbtCompound();
+  root.setByte("b", -128);
+  root.setShort("s", 32767);
+  root.setInt("i", -2147483648);
+  root.setLong("l", 9223372036854775807n);
+  root.setFloat("f", 1.5);
+  root.setDouble("d", -2.25);
+  root.setBool("t", true);
+  root.setBool("n", false);
+  root.setString("str", "Bananrama");
+  root.setByteArray("ba", Int8Array.from([1, -1]));
+  root.setIntArray("ia", Int32Array.from([1, -1]));
+  root.setLongArray("la", BigInt64Array.from([1n, -1n]));
+
+  assert.equal(root.getByte("b"), -128);
+  assert.equal(root.getShort("s"), 32767);
+  assert.equal(root.getInt("i"), -2147483648);
+  assert.equal(root.getLong("l"), 9223372036854775807n);
+  assert.equal(root.getFloat("f"), 1.5);
+  assert.equal(root.getDouble("d"), -2.25);
+  assert.equal(root.getBool("t"), true);
+  assert.equal(root.getBool("n"), false);
+  assert.equal(root.getString("str"), "Bananrama");
+  assert.deepEqual(root.getByteArray("ba"), Int8Array.from([1, -1]));
+  assert.deepEqual(root.getIntArray("ia"), Int32Array.from([1, -1]));
+  assert.deepEqual(root.getLongArray("la"), BigInt64Array.from([1n, -1n]));
+
+  // 真偽値は TAG_Byte の 0 / 1 として入る
+  assert.equal(root.get("t").type, TagType.Byte);
+});
+
+test("型付き設定子は挿入順を変えない", () => {
+  const root = new NbtCompound();
+  root.setInt("a", 1);
+  root.setInt("b", 2);
+
+  // 既存キーへの再設定は位置を変えない
+  root.setInt("a", 3);
+
+  assert.deepEqual([...root.keys()], ["a", "b"]);
+  assert.equal(root.getInt("a"), 3);
+});
+
 /** 複数のバイト列をつなぐ。 */
 function concat(...parts: Uint8Array[]): Uint8Array {
   let total = 0;

@@ -641,6 +641,77 @@ export class NbtCompound {
     this.#entries.set(key, value);
   }
 
+  // -- 型付き設定子 -------------------------------------------------------
+  //
+  // set(key, new NbtInt(42)) と書かずに済むようにするための糖衣
+  // 取得子の getInt と対になる
+
+  /** TAG_Byte として設定する */
+  setByte(key: string, value: number): void {
+    this.set(key, new NbtByte(value));
+  }
+
+  /** TAG_Short として設定する */
+  setShort(key: string, value: number): void {
+    this.set(key, new NbtShort(value));
+  }
+
+  /** TAG_Int として設定する */
+  setInt(key: string, value: number): void {
+    this.set(key, new NbtInt(value));
+  }
+
+  /** TAG_Long として設定する */
+  setLong(key: string, value: bigint): void {
+    this.set(key, new NbtLong(value));
+  }
+
+  /** TAG_Float として設定する */
+  setFloat(key: string, value: number): void {
+    this.set(key, new NbtFloat(value));
+  }
+
+  /** TAG_Double として設定する */
+  setDouble(key: string, value: number): void {
+    this.set(key, new NbtDouble(value));
+  }
+
+  /**
+   * TAG_Byte として設定する
+   * true は 1、false は 0
+   */
+  setBool(key: string, value: boolean): void {
+    // NBT に真偽値の専用型は無いので TAG_Byte の 0 / 1 で表す
+    if (value) {
+      this.setByte(key, 1);
+    } else {
+      this.setByte(key, 0);
+    }
+  }
+
+  /**
+   * TAG_String として設定する
+   * MUTF-8 で 65535 バイトを超えると INVALID_ARGUMENT
+   */
+  setString(key: string, value: string): void {
+    this.set(key, new NbtString(value));
+  }
+
+  /** TAG_Byte_Array として設定する */
+  setByteArray(key: string, value: Int8Array): void {
+    this.set(key, new NbtByteArray(value));
+  }
+
+  /** TAG_Int_Array として設定する */
+  setIntArray(key: string, value: Int32Array): void {
+    this.set(key, new NbtIntArray(value));
+  }
+
+  /** TAG_Long_Array として設定する */
+  setLongArray(key: string, value: BigInt64Array): void {
+    this.set(key, new NbtLongArray(value));
+  }
+
   /**
    * キーに対応するタグを返す
    * 存在しなければ undefined

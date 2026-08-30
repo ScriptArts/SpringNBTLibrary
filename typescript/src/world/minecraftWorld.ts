@@ -120,8 +120,16 @@ export class LevelData {
  * リージョン・チャンク・セクションの解決は内部で済ませる
  */
 export class Dimension {
+  /** オーバーワールドの次元ID */
+  static readonly OVERWORLD = "minecraft:overworld";
+
+  /** ネザーの次元ID */
+  static readonly THE_NETHER = "minecraft:the_nether";
+
+  /** エンドの次元ID */
+  static readonly THE_END = "minecraft:the_end";
+
   readonly #chunkCache = new Map<string, Chunk>();
-  readonly #modified = new Set<string>();
   readonly #writable: boolean;
   readonly #chunkRead: ChunkReadOptions | undefined;
   readonly #chunkWrite: ChunkWriteOptions | undefined;
@@ -236,7 +244,7 @@ export class Dimension {
     }
 
     folder.writeChunk(chunk.x, chunk.z, chunk.toNbt(this.#chunkWrite));
-    this.#modified.delete(`${chunk.x},${chunk.z}`);
+    chunk.isModified = false;
   }
 
   /**
@@ -256,10 +264,12 @@ export class Dimension {
   /**
    * 絶対座標でブロックを設定する
    *
-   * 変更したチャンクは記録され、`flush()` でまとめて書き戻される
+   * `minecraft:oak_stairs[facing=north]` の形の文字列でも指定できる
+   *
+   * 変更したチャンクには印が付き、`flush()` でまとめて書き戻される
    * 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
    */
-  setBlock(x: number, y: number, z: number, state: BlockState): void {
+  setBlock(x: number, y: number, z: number, state: BlockState | string): void {
     this.#ensureWritable();
     const chunkX = x >> 4;
     const chunkZ = z >> 4;
@@ -272,7 +282,6 @@ export class Dimension {
     }
 
     chunk.setBlock(x & 15, y, z & 15, state);
-    this.#modified.add(`${chunkX},${chunkZ}`);
   }
 
   /**
@@ -306,7 +315,6 @@ export class Dimension {
     }
 
     chunk.setBiome(x & 15, y, z & 15, biome);
-    this.#modified.add(`${chunkX},${chunkZ}`);
   }
 
   /** 変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する */
@@ -317,16 +325,14 @@ export class Dimension {
       return;
     }
 
-    // 変更のあったチャンクだけを書き戻す
-    for (const key of this.#modified) {
-      const chunk = this.#chunkCache.get(key);
-
-      if (chunk !== undefined) {
+    // 印の立っているチャンクだけを書き戻す
+    for (const chunk of this.#chunkCache.values()) {
+      if (chunk.isModified) {
         this.regionFolder!.writeChunk(chunk.x, chunk.z, chunk.toNbt(this.#chunkWrite));
+        chunk.isModified = false;
       }
     }
 
-    this.#modified.clear();
     this.#flushFolders();
   }
 

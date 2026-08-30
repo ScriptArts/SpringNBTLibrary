@@ -695,3 +695,39 @@ fn level_datが無いディレクトリはio() {
         Err(error) => assert_code(ErrorCode::Io, error),
     }
 }
+
+
+// ---------------------------------------------------------------------------
+// 文字列でのブロック指定と、変更の印
+// ---------------------------------------------------------------------------
+
+#[test]
+fn accepts_a_block_state_written_as_text() {
+    let mut chunk = load_chunk("palette_1");
+    chunk.set_block(3, -60, 7, "minecraft:oak_stairs[facing=north,half=top]").unwrap();
+
+    assert_eq!(
+        chunk.get_block(3, -60, 7).unwrap().unwrap().to_string(),
+        "minecraft:oak_stairs[facing=north,half=top]"
+    );
+}
+
+#[test]
+fn marks_the_chunk_as_modified() {
+    let mut chunk = load_chunk("palette_1");
+    assert!(!chunk.is_modified());
+
+    chunk.set_block(3, -60, 7, "minecraft:stone").unwrap();
+    assert!(chunk.is_modified());
+
+    // 保存済みとして印を下ろせる
+    chunk.set_is_modified(false);
+    assert!(!chunk.is_modified());
+
+    // 同じ状態を置き直すだけなら何も起きないので印も付かない
+    chunk.set_block(3, -60, 7, "minecraft:stone").unwrap();
+    assert!(!chunk.is_modified());
+
+    chunk.clear_heightmaps();
+    assert!(chunk.is_modified());
+}

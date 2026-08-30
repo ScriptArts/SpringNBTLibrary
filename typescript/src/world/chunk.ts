@@ -193,6 +193,7 @@ export class ChunkSection {
  */
 export class Chunk {
   readonly #sections = new Map<number, ChunkSection>();
+  #modified = false;
 
   private constructor(readonly raw: NbtCompound) {}
 
@@ -230,6 +231,23 @@ export class Chunk {
    */
   get isFullyGenerated(): boolean {
     return this.status === "minecraft:full";
+  }
+
+  /**
+   * このチャンクに変更が加わったか
+   *
+   * ブロックやバイオームを書き換えると立つ
+   * `Dimension.flush()` はこれが立っているチャンクだけを書き戻す
+   *
+   * `raw` を直接いじった場合はここが立たないので、自分で true にすること
+   */
+  get isModified(): boolean {
+    return this.#modified;
+  }
+
+  /** 変更の印を付け外しする */
+  set isModified(value: boolean) {
+    this.#modified = value;
   }
 
   /**
@@ -368,8 +386,18 @@ export class Chunk {
     return BlockState.fromNbt(entry as NbtCompound);
   }
 
-  /** ブロックを設定する */
-  setBlock(x: number, y: number, z: number, state: BlockState): void {
+  /**
+   * ブロックを設定する
+   *
+   * `minecraft:oak_stairs[facing=north]` の形の文字列でも指定できる
+   */
+  setBlock(x: number, y: number, z: number, state: BlockState | string): void {
+    // 文字列で渡されたら BlockState へ直してから進む
+    if (typeof state === "string") {
+      this.setBlock(x, y, z, BlockState.parse(state));
+      return;
+    }
+
     checkLocalCoordinates(x, z);
 
     const sectionY = y >> 4;
@@ -391,6 +419,7 @@ export class Chunk {
 
     section.blockStates!.set(blockIndex(x, y, z), state.toNbt());
     this.#removeBlockData(x, y, z);
+    this.#modified = true;
   }
 
   /**
@@ -461,6 +490,7 @@ export class Chunk {
     }
 
     section.biomes!.set(biomeIndex(x, y, z), new NbtString(biome));
+    this.#modified = true;
   }
 
   /**
@@ -472,11 +502,13 @@ export class Chunk {
    */
   clearHeightmaps(): void {
     this.raw.remove("Heightmaps");
+    this.#modified = true;
   }
 
   /** `isLightOn` を 0 にし、光源の再計算を促す */
   invalidateLighting(): void {
-    this.raw.set("isLightOn", new NbtByte(0));
+    this.raw.setByte("isLightOn", 0);
+    this.#modified = true;
   }
 
   /** 使われていないパレット要素を全セクションから取り除く */

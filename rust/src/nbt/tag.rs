@@ -538,6 +538,61 @@ scalar_accessors!(opt_long, get_long, Long, i64, "Long");
 scalar_accessors!(opt_float, get_float, Float, f32, "Float");
 scalar_accessors!(opt_double, get_double, Double, f64, "Double");
 
+/// スカラ型の設定子を生やすためのマクロ
+///
+/// `set(key, NbtTag::Int(42))` と書かずに済むようにするための糖衣
+/// 取得子の `get_int` と対になる
+macro_rules! scalar_setters {
+    ($set:ident, $variant:ident, $arg:ty, $label:literal) => {
+        impl NbtCompound {
+            #[doc = concat!("TAG_", $label, " として設定する")]
+            pub fn $set(&mut self, key: &str, value: $arg) {
+                self.set(key, NbtTag::$variant(value));
+            }
+        }
+    };
+}
+
+scalar_setters!(set_byte, Byte, i8, "Byte");
+scalar_setters!(set_short, Short, i16, "Short");
+scalar_setters!(set_int, Int, i32, "Int");
+scalar_setters!(set_long, Long, i64, "Long");
+scalar_setters!(set_float, Float, f32, "Float");
+scalar_setters!(set_double, Double, f64, "Double");
+
+impl NbtCompound {
+    /// TAG_Byte として設定する
+    /// `true` は 1、`false` は 0
+    pub fn set_bool(&mut self, key: &str, value: bool) {
+        // NBT に真偽値の専用型は無いので TAG_Byte の 0 / 1 で表す
+        if value {
+            self.set_byte(key, 1);
+        } else {
+            self.set_byte(key, 0);
+        }
+    }
+
+    /// TAG_String として設定する
+    pub fn set_string(&mut self, key: &str, value: &str) {
+        self.set(key, NbtTag::String(NbtString::from(value)));
+    }
+
+    /// TAG_Byte_Array として設定する
+    pub fn set_byte_array(&mut self, key: &str, value: Vec<i8>) {
+        self.set(key, NbtTag::ByteArray(value));
+    }
+
+    /// TAG_Int_Array として設定する
+    pub fn set_int_array(&mut self, key: &str, value: Vec<i32>) {
+        self.set(key, NbtTag::IntArray(value));
+    }
+
+    /// TAG_Long_Array として設定する
+    pub fn set_long_array(&mut self, key: &str, value: Vec<i64>) {
+        self.set(key, NbtTag::LongArray(value));
+    }
+}
+
 /// 参照を返す取得子を生やすためのマクロ
 macro_rules! ref_accessors {
     ($opt:ident, $get:ident, $variant:ident, $ret:ty, $label:literal, $convert:ident) => {

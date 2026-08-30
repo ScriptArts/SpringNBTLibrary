@@ -4,6 +4,7 @@
 """
 
 from .bit_storage import BitStorage
+from .block_pos import BlockPos, Cuboid
 from .block_state import BlockState
 from .chunk import (
     BIOMES_PER_SECTION,
@@ -23,6 +24,8 @@ __all__ = [
     "BIOMES_PER_SECTION",
     "BLOCKS_PER_SECTION",
     "BitStorage",
+    "BlockPos",
+    "Cuboid",
     "BlockState",
     "Chunk",
     "ChunkReadOptions",

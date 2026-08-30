@@ -247,6 +247,11 @@ WriteOptions {
 - 型付き取得子 `get_int(key)` 等は、キーが無い場合と型が違う場合を区別する
   - キーが無い → `None` / `null` を返す取得子（`opt_int`）と、エラーにする取得子（`get_int`）の両方を用意する
   - 型が違う → 常に `UNEXPECTED_TAG_TYPE`
+- 型付き設定子 `set_int(key, value)` 等を、取得子と対で用意する
+  - `set(key, NbtInt(42))` と書かずに済ませるための糖衣であり、動きは `set` と同じ
+  - 真偽値は専用型が無いので、`set_bool` は `TAG_Byte` の 0 / 1 として書く
+  - 対象は `byte` `short` `int` `long` `float` `double` `bool` `string`
+    `byte_array` `int_array` `long_array` の 11 種
 
 ### 7.2 `NbtList`
 

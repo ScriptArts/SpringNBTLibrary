@@ -15,38 +15,38 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 |---|---|---|---|---|---|---|
 | **TagType** | `TagType` | `TagType` | `TagType` | `TagType` | `TagType` | NBT のタグ型 |
 | `as_string` | `AsString()` | `asString()` | `tagTypeAsString()` | `as_string()` | `as_str()` | 適合性テストで言語間比較に使う識別子を返す |
-| `byte` | `Byte` | `BYTE` | `Byte` | `byte` | `byte` | TAG_Byte (1) |
-| `byte_array` | `ByteArray` | `BYTE_ARRAY` | `ByteArray` | `byte_array` | `byte_array` | TAG_Byte_Array (7) |
-| `compound` | `Compound` | `COMPOUND` | `Compound` | `compound` | `compound` | TAG_Compound (10) |
+| `byte` | `Byte` | `BYTE` | `Byte` | `BYTE` | `Byte` | TAG_Byte (1) |
+| `byte_array` | `ByteArray` | `BYTE_ARRAY` | `ByteArray` | `BYTE_ARRAY` | `ByteArray` | TAG_Byte_Array (7) |
+| `compound` | `Compound` | `COMPOUND` | `Compound` | `COMPOUND` | `Compound` | TAG_Compound (10) |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
-| `double` | `Double` | `DOUBLE` | `Double` | `double` | `double` | TAG_Double (6) |
-| `end` | `End` | `END` | `End` | `end` | `end` |  |
+| `double` | `Double` | `DOUBLE` | `Double` | `DOUBLE` | `Double` | TAG_Double (6) |
+| `end` | `End` | `END` | `End` | `END` | `End` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
-| `float` | `Float` | `FLOAT` | `Float` | `float` | `float` | TAG_Float (5) |
+| `float` | `Float` | `FLOAT` | `Float` | `FLOAT` | `Float` | TAG_Float (5) |
 | `from_id` | `FromId()` | `fromId()` | `tagTypeFromId()` | `from_id()` | `from_id()` | タグIDから TagType を得る |
 | `id` | `Id` | `id()` | `id` | `id()` | `id()` |  |
-| `int` | `Int` | `INT` | `Int` | `int` | `int` | TAG_Int (3) |
-| `int_array` | `IntArray` | `INT_ARRAY` | `IntArray` | `int_array` | `int_array` | TAG_Int_Array (11) |
-| `list` | `List` | `LIST` | `List` | `list` | `list` | TAG_List (9) |
-| `long` | `Long` | `LONG` | `Long` | `long` | `long` | TAG_Long (4) |
-| `long_array` | `LongArray` | `LONG_ARRAY` | `LongArray` | `long_array` | `long_array` | TAG_Long_Array (12) |
-| `short` | `Short` | `SHORT` | `Short` | `short` | `short` | TAG_Short (2) |
-| `string` | `String` | `STRING` | `String` | `string` | `string` | TAG_String (8) |
+| `int` | `Int` | `INT` | `Int` | `INT` | `Int` | TAG_Int (3) |
+| `int_array` | `IntArray` | `INT_ARRAY` | `IntArray` | `INT_ARRAY` | `IntArray` | TAG_Int_Array (11) |
+| `list` | `List` | `LIST` | `List` | `LIST` | `List` | TAG_List (9) |
+| `long` | `Long` | `LONG` | `Long` | `LONG` | `Long` | TAG_Long (4) |
+| `long_array` | `LongArray` | `LONG_ARRAY` | `LongArray` | `LONG_ARRAY` | `LongArray` | TAG_Long_Array (12) |
+| `short` | `Short` | `SHORT` | `Short` | `SHORT` | `Short` | TAG_Short (2) |
+| `string` | `String` | `STRING` | `String` | `STRING` | `String` | TAG_String (8) |
 | **NbtTag** | `NbtTag` | `NbtTag` | — | `NbtTag` | `NbtTag` | NBT のタグ |
-| `byte` | `Byte` | `BYTE` | `Byte` | `byte` | `byte` |  |
-| `byte_array` | `ByteArray` | `BYTE_ARRAY` | `ByteArray` | `byte_array` | `byte_array` |  |
-| `compound` | `Compound` | `COMPOUND` | `Compound` | `compound` | `compound` |  |
+| `byte` | `Byte` | `BYTE` | `Byte` | `BYTE` | `Byte` |  |
+| `byte_array` | `ByteArray` | `BYTE_ARRAY` | `ByteArray` | `BYTE_ARRAY` | `ByteArray` |  |
+| `compound` | `Compound` | `COMPOUND` | `Compound` | `COMPOUND` | `Compound` |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` | このタグの深いコピーを作る |
-| `double` | `Double` | `DOUBLE` | `Double` | `double` | `double` |  |
+| `double` | `Double` | `DOUBLE` | `Double` | `DOUBLE` | `Double` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
-| `float` | `Float` | `FLOAT` | `Float` | `float` | `float` |  |
-| `int` | `Int` | `INT` | `Int` | `int` | `int` |  |
-| `int_array` | `IntArray` | `INT_ARRAY` | `IntArray` | `int_array` | `int_array` |  |
-| `list` | `List` | `LIST` | `List` | `list` | `list` |  |
-| `long` | `Long` | `LONG` | `Long` | `long` | `long` |  |
-| `long_array` | `LongArray` | `LONG_ARRAY` | `LongArray` | `long_array` | `long_array` |  |
-| `short` | `Short` | `SHORT` | `Short` | `short` | `short` |  |
-| `string` | `String` | `STRING` | `String` | `string` | `string` |  |
+| `float` | `Float` | `FLOAT` | `Float` | `FLOAT` | `Float` |  |
+| `int` | `Int` | `INT` | `Int` | `INT` | `Int` |  |
+| `int_array` | `IntArray` | `INT_ARRAY` | `IntArray` | `INT_ARRAY` | `IntArray` |  |
+| `list` | `List` | `LIST` | `List` | `LIST` | `List` |  |
+| `long` | `Long` | `LONG` | `Long` | `LONG` | `Long` |  |
+| `long_array` | `LongArray` | `LONG_ARRAY` | `LongArray` | `LONG_ARRAY` | `LongArray` |  |
+| `short` | `Short` | `SHORT` | `Short` | `SHORT` | `Short` |  |
+| `string` | `String` | `STRING` | `String` | `STRING` | `String` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` | このタグの型 |
 | **NbtByte** | `NbtByte` | `NbtByte` | `NbtByte` | `NbtByte` | — |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
@@ -99,8 +99,8 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `from_utf16` | — | — | — | — | `from_utf16()` |  |
 | `mutf8_len` | — | — | — | — | `mutf8_len()` |  |
-| `surrogates` | — | — | — | — | `surrogates` |  |
-| `text` | — | — | — | — | `text` |  |
+| `surrogates` | — | — | — | — | `Surrogates` |  |
+| `text` | — | — | — | — | `Text` |  |
 | `to_mutf8` | — | — | — | — | `to_mutf8()` |  |
 | `to_utf16` | — | — | — | — | `to_utf16()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
@@ -152,6 +152,17 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `opt_string_tag` | — | — | — | — | `opt_string_tag()` |  |
 | `remove` | `Remove()` | `remove()` | `remove()` | `remove()` | `remove()` |  |
 | `set` | `Set()` | `set()` | `set()` | `set()` | `set()` | 値を設定する |
+| `set_bool` | `SetBool()` | `setBool()` | `setBool()` | `set_bool()` | `set_bool()` | TAG_Byte として設定する |
+| `set_byte` | `SetByte()` | `setByte()` | `setByte()` | `set_byte()` | `set_byte()` | TAG_Byte として設定する |
+| `set_byte_array` | `SetByteArray()` | `setByteArray()` | `setByteArray()` | `set_byte_array()` | `set_byte_array()` | TAG_Byte_Array として設定する |
+| `set_double` | `SetDouble()` | `setDouble()` | `setDouble()` | `set_double()` | `set_double()` | TAG_Double として設定する |
+| `set_float` | `SetFloat()` | `setFloat()` | `setFloat()` | `set_float()` | `set_float()` | TAG_Float として設定する |
+| `set_int` | `SetInt()` | `setInt()` | `setInt()` | `set_int()` | `set_int()` | TAG_Int として設定する |
+| `set_int_array` | `SetIntArray()` | `setIntArray()` | `setIntArray()` | `set_int_array()` | `set_int_array()` | TAG_Int_Array として設定する |
+| `set_long` | `SetLong()` | `setLong()` | `setLong()` | `set_long()` | `set_long()` | TAG_Long として設定する |
+| `set_long_array` | `SetLongArray()` | `setLongArray()` | `setLongArray()` | `set_long_array()` | `set_long_array()` | TAG_Long_Array として設定する |
+| `set_short` | `SetShort()` | `setShort()` | `setShort()` | `set_short()` | `set_short()` | TAG_Short として設定する |
+| `set_string` | `SetString()` | `setString()` | `setString()` | `set_string()` | `set_string()` | TAG_String として設定する |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | **NamedTag** | `NamedTag` | `NamedTag` | `NamedTag` | `NamedTag` | `NamedTag` | ルート名とルートタグの組 |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
@@ -159,17 +170,17 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `name` | `Name` | `name()` | `name` | `name` | `name` | ルート名 |
 | `tag` | `Tag` | `tag()` | `tag` | `tag` | `tag` | ルートタグ |
 | **Compression** | `Compression` | `Compression` | `Compression` | `Compression` | `Compression` | 圧縮方式 |
-| `auto` | `Auto` | `AUTO` | `Auto` | `auto` | `auto` | 先頭バイトから自動判定する |
+| `auto` | `Auto` | `AUTO` | `Auto` | `AUTO` | `Auto` | 先頭バイトから自動判定する |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
-| `gzip` | `Gzip` | `GZIP` | `Gzip` | `gzip` | `gzip` | GZip (RFC 1952) |
-| `none` | `None` | `NONE` | `None` | `none` | `none` | 無圧縮 |
-| `zlib` | `Zlib` | `ZLIB` | `Zlib` | `zlib` | `zlib` | Zlib (RFC 1950) |
+| `gzip` | `Gzip` | `GZIP` | `Gzip` | `GZIP` | `Gzip` | GZip (RFC 1952) |
+| `none` | `None` | `NONE` | `None` | `NONE` | `None` | 無圧縮 |
+| `zlib` | `Zlib` | `ZLIB` | `Zlib` | `ZLIB` | `Zlib` | Zlib (RFC 1950) |
 | **NbtFormat** | `NbtFormat` | `NbtFormat` | `NbtFormat` | `NbtFormat` | `NbtFormat` | NBT のルートタグの並び方 |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
-| `java` | `Java` | `JAVA` | `Java` | `java` | `java` | ファイル形式 |
-| `network` | `Network` | `NETWORK` | `Network` | `network` | `network` | ネットワーク形式 (1.20.2 以降) |
+| `java` | `Java` | `JAVA` | `Java` | `JAVA` | `Java` | ファイル形式 |
+| `network` | `Network` | `NETWORK` | `Network` | `NETWORK` | `Network` | ネットワーク形式 (1.20.2 以降) |
 | **NbtReadOptions** | `NbtReadOptions` | `NbtReadOptions` | `NbtReadOptions` | `NbtReadOptions` | `NbtReadOptions` | NBT 読み込みのオプション |
 | `compression` | `Compression` | `compression()` | `compression` | `compression` | `compression` |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |

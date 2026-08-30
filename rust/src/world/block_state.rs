@@ -23,6 +23,33 @@ pub struct BlockState {
     properties: BTreeMap<String, String>,
 }
 
+/// [`Chunk::set_block`](crate::world::Chunk::set_block) へ渡せるもの
+///
+/// 他の言語ではオーバーロードで済むが、Rust には無いのでトレイトで受ける
+/// `&BlockState` と `&str` の両方をそのまま渡せる
+pub trait IntoBlockState {
+    /// ブロック状態へ変換する
+    fn into_block_state(self) -> Result<BlockState>;
+}
+
+impl IntoBlockState for BlockState {
+    fn into_block_state(self) -> Result<BlockState> {
+        Ok(self)
+    }
+}
+
+impl IntoBlockState for &BlockState {
+    fn into_block_state(self) -> Result<BlockState> {
+        Ok(self.clone())
+    }
+}
+
+impl IntoBlockState for &str {
+    fn into_block_state(self) -> Result<BlockState> {
+        BlockState::parse(self)
+    }
+}
+
 impl BlockState {
     /// 名前とプロパティを指定して作る
     ///

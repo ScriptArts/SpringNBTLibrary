@@ -402,6 +402,38 @@ public class WorldTests
         }
 
         [Fact]
+        public void ブロックを文字列でも置ける()
+        {
+            Chunk chunk = LoadChunk("palette_1");
+            chunk.SetBlock(3, -60, 7, "minecraft:oak_stairs[facing=north,half=top]");
+
+            Assert.Equal(
+                "minecraft:oak_stairs[facing=north,half=top]",
+                chunk.GetBlock(3, -60, 7)!.ToString());
+        }
+
+        [Fact]
+        public void 変更したチャンクには印が付く()
+        {
+            Chunk chunk = LoadChunk("palette_1");
+            Assert.False(chunk.IsModified);
+
+            chunk.SetBlock(3, -60, 7, "minecraft:stone");
+            Assert.True(chunk.IsModified);
+
+            // 保存済みとして印を下ろせる
+            chunk.IsModified = false;
+            Assert.False(chunk.IsModified);
+
+            // 同じ状態を置き直すだけなら何も起きないので印も付かない
+            chunk.SetBlock(3, -60, 7, "minecraft:stone");
+            Assert.False(chunk.IsModified);
+
+            chunk.ClearHeightmaps();
+            Assert.True(chunk.IsModified);
+        }
+
+        [Fact]
         public void バイオームは4ブロック単位で効く()
         {
             Chunk chunk = LoadChunk("palette_1");

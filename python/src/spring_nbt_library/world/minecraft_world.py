@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import shutil
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Union
 
 try:
     import fcntl
@@ -136,12 +136,20 @@ class Dimension:
     仕様: ``docs/spec/40-world-layout.md`` 4章
     """
 
+    #: オーバーワールドの次元ID
+    OVERWORLD = "minecraft:overworld"
+
+    #: ネザーの次元ID
+    THE_NETHER = "minecraft:the_nether"
+
+    #: エンドの次元ID
+    THE_END = "minecraft:the_end"
+
     def __init__(self, dimension_id: str, directory: str, options: WorldOpenOptions) -> None:
         self.id = dimension_id
         self.directory = directory
         self._options = options
         self._chunk_cache: Dict[str, Chunk] = {}
-        self._modified: Set[str] = set()
         self._regions: Optional[RegionFolder] = None
         self._entities: Optional[RegionFolder] = None
         self._poi: Optional[RegionFolder] = None
@@ -232,7 +240,7 @@ class Dimension:
                 "region/ が無い次元には書き込めない: %s" % self.id)
 
         folder.write_chunk(chunk.x, chunk.z, chunk.to_nbt(self._options.chunk_write))
-        self._modified.discard("%d,%d" % (chunk.x, chunk.z))
+        chunk.is_modified = False
 
     def get_block(self, x: int, y: int, z: int) -> Optional[BlockState]:
         """絶対座標でブロックを取得する
@@ -245,10 +253,12 @@ class Dimension:
 
         return chunk.get_block(x & 15, y, z & 15)
 
-    def set_block(self, x: int, y: int, z: int, state: BlockState) -> None:
+    def set_block(self, x: int, y: int, z: int, state: Union[BlockState, str]) -> None:
         """絶対座標でブロックを設定する
 
-        変更したチャンクは記録され、:meth:`flush` でまとめて書き戻される
+        ``minecraft:oak_stairs[facing=north]`` の形の文字列でも指定できる
+
+        変更したチャンクには印が付き、:meth:`flush` でまとめて書き戻される
         本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
         """
         self._ensure_writable()
@@ -262,7 +272,6 @@ class Dimension:
                 % (chunk_x, chunk_z))
 
         chunk.set_block(x & 15, y, z & 15, state)
-        self._modified.add("%d,%d" % (chunk_x, chunk_z))
 
     def get_biome(self, x: int, y: int, z: int) -> Optional[str]:
         """絶対座標でバイオームを取得する
@@ -290,7 +299,6 @@ class Dimension:
                 % (chunk_x, chunk_z))
 
         chunk.set_biome(x & 15, y, z & 15, biome)
-        self._modified.add("%d,%d" % (chunk_x, chunk_z))
 
     def flush(self) -> None:
         """変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する"""
@@ -299,16 +307,13 @@ class Dimension:
         if not self._options.writable:
             return
 
-        # 変更のあったチャンクだけを書き戻す
-        for key in self._modified:
-            chunk = self._chunk_cache.get(key)
-
-            # キャッシュに残っているものだけ書き戻せる
-            if chunk is not None:
+        # 印の立っているチャンクだけを書き戻す
+        for chunk in self._chunk_cache.values():
+            # 触っていないチャンクは書き戻さない
+            if chunk.is_modified:
                 self.region_folder().write_chunk(
                     chunk.x, chunk.z, chunk.to_nbt(self._options.chunk_write))
-
-        self._modified.clear()
+                chunk.is_modified = False
 
         # 開いているフォルダだけを書き出す
         for folder in (self._regions, self._entities, self._poi):

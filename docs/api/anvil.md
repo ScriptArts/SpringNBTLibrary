@@ -45,8 +45,8 @@
 | **RegionFileMode** | `RegionFileMode` | `RegionFileMode` | `RegionFileMode` | `RegionFileMode` | `RegionFileMode` | リージョンファイルを開くときの動作 |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
-| `read_only` | `ReadOnly` | `READ_ONLY` | `ReadOnly` | `read_only` | `read_only` |  |
-| `read_write` | `ReadWrite` | `READ_WRITE` | `ReadWrite` | `read_write` | `read_write` |  |
+| `read_only` | `ReadOnly` | `READ_ONLY` | `ReadOnly` | `READ_ONLY` | `ReadOnly` |  |
+| `read_write` | `ReadWrite` | `READ_WRITE` | `ReadWrite` | `READ_WRITE` | `ReadWrite` |  |
 | **ChunkPos** | `ChunkPos` | `ChunkPos` | `ChunkPos` | `ChunkPos` | `ChunkPos` | チャンクの絶対座標 |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
@@ -67,14 +67,14 @@
 | **ChunkCompression** | `ChunkCompression` | `ChunkCompression` | `ChunkCompression` | `ChunkCompression` | `ChunkCompression` | リージョンファイル内でチャンクに使われる圧縮方式 |
 | `as_string` | `AsString()` | `asString()` | `chunkCompressionAsString()` | `as_string()` | `as_str()` | 適合性テストで言語間比較に使う識別子を返す |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
-| `custom` | `Custom` | `CUSTOM` | `Custom` | `custom` | `custom` |  |
+| `custom` | `Custom` | `CUSTOM` | `Custom` | `CUSTOM` | `Custom` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `from_id` | `FromId()` | `fromId()` | `chunkCompressionFromId()` | `from_id()` | `from_id()` | 圧縮方式IDから ChunkCompression を得る |
-| `gzip` | `Gzip` | `GZIP` | `Gzip` | `gzip` | `gzip` |  |
+| `gzip` | `Gzip` | `GZIP` | `Gzip` | `GZIP` | `Gzip` |  |
 | `id` | `Id` | `id()` | `id` | `id()` | `id()` |  |
-| `lz4` | `Lz4` | `LZ4` | `Lz4` | `lz4` | `lz4` |  |
-| `none` | `None` | `NONE` | `None` | `none` | `none` |  |
-| `zlib` | `Zlib` | `ZLIB` | `Zlib` | `zlib` | `zlib` |  |
+| `lz4` | `Lz4` | `LZ4` | `Lz4` | `LZ4` | `Lz4` |  |
+| `none` | `None` | `NONE` | `None` | `NONE` | `None` |  |
+| `zlib` | `Zlib` | `ZLIB` | `Zlib` | `ZLIB` | `Zlib` |  |
 | **RawChunk** | `RawChunk` | `RawChunk` | `RawChunk` | `RawChunk` | `RawChunk` | リージョンファイルに格納されたままの、圧縮済みチャンクデータ |
 | `compression` | `Compression` | `compression()` | `compression` | `compression` | `compression` | この本体に使われている圧縮方式 |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |

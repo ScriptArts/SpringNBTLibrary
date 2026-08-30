@@ -12,7 +12,7 @@ use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::tag::{NbtCompound, NbtList, NbtString, NbtTag, TagType};
 use crate::TARGET_DATA_VERSION;
 
-use super::block_state::BlockState;
+use super::block_state::{BlockState, IntoBlockState};
 use super::paletted_container::PalettedContainer;
 
 /// セクション 1 つに入るブロック数
@@ -229,6 +229,7 @@ impl ChunkSection {
 pub struct Chunk {
     raw: NbtCompound,
     sections: BTreeMap<i32, ChunkSection>,
+    modified: bool,
 }
 
 impl Chunk {
@@ -267,6 +268,23 @@ impl Chunk {
         }
     }
 
+    /// このチャンクに変更が加わったか
+    ///
+    /// ブロックやバイオームを書き換えると立つ
+    /// [`Dimension::flush`](crate::world::Dimension::flush) は
+    /// これが立っているチャンクだけを書き戻す
+    ///
+    /// [`Chunk::raw`] を直接いじった場合はここが立たないので、
+    /// 自分で [`Chunk::set_is_modified`] を呼ぶこと
+    pub fn is_modified(&self) -> bool {
+        self.modified
+    }
+
+    /// 変更の印を付け外しする
+    pub fn set_is_modified(&mut self, value: bool) {
+        self.modified = value;
+    }
+
     /// 存在するセクションのY位置
     /// 昇順
     pub fn section_ys(&self) -> Vec<i32> {
@@ -281,7 +299,7 @@ impl Chunk {
 
     /// NBT からチャンクを読む
     pub fn from_nbt(nbt: NbtCompound, options: &ChunkReadOptions) -> Result<Chunk> {
-        let mut chunk = Chunk { raw: nbt, sections: BTreeMap::new() };
+        let mut chunk = Chunk { raw: nbt, sections: BTreeMap::new(), modified: false };
         chunk.check_data_version(options)?;
 
         let section_list = match chunk.raw.opt_list("sections")? {
@@ -408,7 +426,17 @@ impl Chunk {
     }
 
     /// ブロックを設定する
-    pub fn set_block(&mut self, x: i32, y: i32, z: i32, state: &BlockState) -> Result<()> {
+    ///
+    /// `&BlockState` のほか、`"minecraft:oak_stairs[facing=north]"` の形の
+    /// 文字列でも指定できる
+    pub fn set_block(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        state: impl IntoBlockState,
+    ) -> Result<()> {
+        let state = &state.into_block_state()?;
         check_local_coordinates(x, z)?;
         let section_y = y >> 4;
         let index = block_index(x, y, z);
@@ -439,7 +467,9 @@ impl Chunk {
             .unwrap()
             .set(index, NbtTag::Compound(state.to_nbt()))?;
 
-        self.remove_block_data(x, y, z)
+        self.remove_block_data(x, y, z)?;
+        self.modified = true;
+        Ok(())
     }
 
     /// その座標を指す付随データを取り除く
@@ -542,7 +572,10 @@ impl Chunk {
         section
             .biomes_mut()
             .unwrap()
-            .set(index, NbtTag::String(NbtString::new(biome)))
+            .set(index, NbtTag::String(NbtString::new(biome)))?;
+
+        self.modified = true;
+        Ok(())
     }
 
     /// `Heightmaps` を削除し、Minecraft に再計算させる
@@ -552,11 +585,13 @@ impl Chunk {
     /// （`docs/adr/0004-defer-heightmap-recalc.md`）
     pub fn clear_heightmaps(&mut self) {
         self.raw.remove("Heightmaps");
+        self.modified = true;
     }
 
     /// `isLightOn` を 0 にし、光源の再計算を促す
     pub fn invalidate_lighting(&mut self) {
-        self.raw.set("isLightOn", NbtTag::Byte(0));
+        self.raw.set_byte("isLightOn", 0);
+        self.modified = true;
     }
 
     /// 使われていないパレット要素を全セクションから取り除く

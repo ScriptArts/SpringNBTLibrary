@@ -50,12 +50,14 @@
 | `get_biome` | `GetBiome()` | `getBiome()` | `getBiome()` | `get_biome()` | `get_biome()` |  |
 | `get_block` | `GetBlock()` | `getBlock()` | `getBlock()` | `get_block()` | `get_block()` | 絶対座標でブロックを取得する |
 | `id` | `Id` | `id()` | `id` | `id` | `id()` | 次元ID（minecraft:overworld など） |
-| `mark_modified` | — | — | — | — | `mark_modified()` |  |
+| `overworld` | `Overworld` | `OVERWORLD` | `OVERWORLD` | `OVERWORLD` | `OVERWORLD` | オーバーワールドの次元ID |
 | `poi_folder` | `PoiFolder` | `poiFolder()` | `poiFolder()` | `poi_folder()` | `poi_folder()` |  |
 | `region_folder` | `RegionFolder` | `regionFolder()` | `regionFolder()` | `region_folder()` | `region_folder()` |  |
 | `save_chunk` | `SaveChunk()` | `saveChunk()` | `saveChunk()` | `save_chunk()` | `save_chunk()` | チャンクを書き戻す |
 | `set_biome` | `SetBiome()` | `setBiome()` | `setBiome()` | `set_biome()` | `set_biome()` |  |
 | `set_block` | `SetBlock()` | `setBlock()` | `setBlock()` | `set_block()` | `set_block()` | 絶対座標でブロックを設定する |
+| `the_end` | `TheEnd` | `THE_END` | `THE_END` | `THE_END` | `THE_END` | エンドの次元ID |
+| `the_nether` | `TheNether` | `THE_NETHER` | `THE_NETHER` | `THE_NETHER` | `THE_NETHER` | ネザーの次元ID |
 | **Chunk** | `Chunk` | `Chunk` | `Chunk` | `Chunk` | `Chunk` | チャンク 1 つ分 |
 | `biome_index` | `BiomeIndex()` | `biomeIndex()` | `biomeIndex()` | `biome_index()` | `biome_index()` |  |
 | `biomes_per_section` | `BiomesPerSection` | `BIOMES_PER_SECTION` | `BIOMES_PER_SECTION` | `BIOMES_PER_SECTION` | `BIOMES_PER_SECTION` | セクション 1 つに入るバイオームのエントリ数（4×4×4 単位） |
@@ -70,6 +72,7 @@
 | `get_block` | `GetBlock()` | `getBlock()` | `getBlock()` | `get_block()` | `get_block()` | ブロックを取得する |
 | `invalidate_lighting` | `InvalidateLighting()` | `invalidateLighting()` | `invalidateLighting()` | `invalidate_lighting()` | `invalidate_lighting()` | isLightOn を 0 にし、光源の再計算を促す |
 | `is_fully_generated` | `IsFullyGenerated` | `isFullyGenerated()` | `isFullyGenerated()` | `is_fully_generated` | `is_fully_generated()` |  |
+| `is_modified` | `IsModified` | `isModified()` | `isModified()` | `is_modified` | `is_modified()` | このチャンクに変更が加わったか |
 | `min_section_y` | `MinSectionY` | `minSectionY()` | `minSectionY()` | `min_section_y` | `min_section_y()` |  |
 | `raw` | `Raw` | `raw()` | `raw` | `raw` | `raw()` |  |
 | `section` | `Section` | `section()` | `section()` | `section()` | `section()` |  |
@@ -104,20 +107,45 @@
 | **VersionMismatchAction** | `VersionMismatchAction` | `VersionMismatchAction` | `VersionMismatchAction` | `VersionMismatchAction` | `VersionMismatchAction` | DataVersion が対象と違ったときの動作 |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
-| `error` | `Error` | `ERROR` | `Error` | `error` | `error` | UnsupportedDataVersion の例外にする |
-| `ignore` | `Ignore` | `IGNORE` | `Ignore` | `ignore` | `ignore` | 何もしない |
-| `warn` | `Warn` | `WARN` | `Warn` | `warn` | `warn` |  |
+| `error` | `Error` | `ERROR` | `Error` | `ERROR` | `Error` | UnsupportedDataVersion の例外にする |
+| `ignore` | `Ignore` | `IGNORE` | `Ignore` | `IGNORE` | `Ignore` | 何もしない |
+| `warn` | `Warn` | `WARN` | `Warn` | `WARN` | `Warn` |  |
 | **BlockState** | `BlockState` | `BlockState` | `BlockState` | `BlockState` | `BlockState` | ブロックの状態 |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `from_nbt` | `FromNbt()` | `fromNbt()` | `fromNbt()` | `from_nbt()` | `from_nbt()` | パレット要素の NBT から作る |
 | `name` | `Name` | `name()` | `name()` | `name` | `name()` | ブロックID（名前空間つき） |
-| `of` | — | — | — | — | `of()` |  |
+| `of` | `Of()` | `of()` | `of()` | `of()` | `of()` |  |
 | `parse` | `Parse()` | `parse()` | `parse()` | `parse()` | `parse()` | minecraft:oak_stairs[facing=north,half=top] 形式の文字列から作る |
 | `properties` | `Properties` | `properties()` | `properties()` | `properties` | `properties()` |  |
 | `property` | `Property()` | `property()` | `property()` | `property()` | `property()` |  |
 | `to_nbt` | `ToNbt()` | `toNbt()` | `toNbt()` | `to_nbt()` | `to_nbt()` | パレット要素の NBT へ変換する |
 | `with` | `With()` | `with()` | `with()` | `with_property()` | `with()` | プロパティを 1 つ差し替えた新しい状態を返す |
+| **BlockPos** | `BlockPos` | `BlockPos` | `BlockPos` | `BlockPos` | `BlockPos` | ブロックの絶対座標 |
+| `chunk_pos` | `ChunkPos` | `chunkPos()` | `chunkPos()` | `chunk_pos` | `chunk_pos()` | この座標を含むチャンクの座標 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `local_x` | `LocalX` | `localX()` | `localX()` | `local_x` | `local_x()` | チャンク内でのX位置 (0..15) |
+| `local_z` | `LocalZ` | `localZ()` | `localZ()` | `local_z` | `local_z()` | チャンク内でのZ位置 (0..15) |
+| `offset` | `Offset()` | `offset()` | `offset()` | `offset()` | `offset()` | 各軸へずらした座標を返す |
+| `x` | `X` | `x()` | `x` | `x` | `x` | X座標 |
+| `y` | `Y` | `y()` | `y` | `y` | `y` | Y座標 |
+| `z` | `Z` | `z()` | `z` | `z` | `z` | Z座標 |
+| **Cuboid** | `Cuboid` | `Cuboid` | `Cuboid` | `Cuboid` | `Cuboid` | ブロック座標の直方体な範囲 |
+| `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
+| `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
+| `max_x` | `MaxX` | `maxX()` | `maxX` | `max_x` | `max_x` | X の最大値（含む） |
+| `max_y` | `MaxY` | `maxY()` | `maxY` | `max_y` | `max_y` | Y の最大値（含む） |
+| `max_z` | `MaxZ` | `maxZ()` | `maxZ` | `max_z` | `max_z` | Z の最大値（含む） |
+| `min_x` | `MinX` | `minX()` | `minX` | `min_x` | `min_x` | X の最小値 |
+| `min_y` | `MinY` | `minY()` | `minY` | `min_y` | `min_y` | Y の最小値 |
+| `min_z` | `MinZ` | `minZ()` | `minZ` | `min_z` | `min_z` | Z の最小値 |
+| `of` | `Of()` | `of()` | `of()` | `of()` | `of()` | 両端の座標から作る |
+| `positions` | `Positions()` | `positions()` | `positions()` | `positions()` | `positions()` | 範囲内の座標を順に返す |
+| `size_x` | `SizeX` | `sizeX()` | `sizeX()` | `size_x` | `size_x()` | X 方向の長さ |
+| `size_y` | `SizeY` | `sizeY()` | `sizeY()` | `size_y` | `size_y()` | Y 方向の長さ |
+| `size_z` | `SizeZ` | `sizeZ()` | `sizeZ()` | `size_z` | `size_z()` | Z 方向の長さ |
+| `volume` | `Volume` | `volume()` | `volume()` | `volume` | `volume()` | 含まれるブロックの個数 |
 | **PalettedContainer** | `PalettedContainer` | `PalettedContainer` | `PalettedContainer` | `PalettedContainer` | `PalettedContainer` | パレットとビットストレージの組 |
 | `bits_per_entry` | `BitsPerEntry` | `bitsPerEntry()` | `bitsPerEntry()` | `bits_per_entry` | `bits_per_entry()` |  |
 | `ceil_log2` | `CeilLog2()` | `ceilLog2()` | `ceilLog2()` | `ceil_log2()` | `ceil_log2()` |  |

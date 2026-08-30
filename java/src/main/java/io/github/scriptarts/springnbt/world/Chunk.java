@@ -40,6 +40,7 @@ public final class Chunk {
     private static final String[] BLOCK_DATA_KEYS = {"block_entities", "block_ticks", "fluid_ticks"};
 
     private final NbtCompound root;
+    private boolean modified;
     private final SortedMap<Integer, ChunkSection> sections = new TreeMap<>();
 
     private Chunk(NbtCompound root) {
@@ -100,6 +101,30 @@ public final class Chunk {
      */
     public boolean isFullyGenerated() {
         return "minecraft:full".equals(status());
+    }
+
+    /**
+     * このチャンクに変更が加わったか
+     *
+     * <p>ブロックやバイオームを書き換えると立つ
+     * {@link Dimension#flush()} はこれが立っているチャンクだけを書き戻す
+     *
+     * <p>{@link #raw()} を直接いじった場合はここが立たないので、
+     * 自分で {@link #setIsModified(boolean)} を呼ぶこと
+     *
+     * @return 変更があれば true
+     */
+    public boolean isModified() {
+        return modified;
+    }
+
+    /**
+     * 変更の印を付け外しする
+     *
+     * @param value 立てるなら true
+     */
+    public void setIsModified(boolean value) {
+        modified = value;
     }
 
     /**
@@ -276,6 +301,20 @@ public final class Chunk {
      * @param state ブロック
      * @throws SpringNbtException 対象のセクションが無い、または block_states を持たない場合
      */
+    public void setBlock(int x, int y, int z, String state) {
+        Objects.requireNonNull(state, "state");
+        setBlock(x, y, z, BlockState.parse(state));
+    }
+
+    /**
+     * ブロックを設定する
+     *
+     * @param x     チャンク内相対X座標 (0..15)
+     * @param y     絶対Y座標
+     * @param z     チャンク内相対Z座標 (0..15)
+     * @param state ブロック
+     * @throws SpringNbtException 対象のセクションが無い、または block_states を持たない場合
+     */
     public void setBlock(int x, int y, int z, BlockState state) {
         Objects.requireNonNull(state, "state");
         checkLocalCoordinates(x, z);
@@ -298,6 +337,7 @@ public final class Chunk {
 
         section.blockStates().set(blockIndex(x, y, z), state.toNbt());
         removeBlockData(x, y, z);
+        modified = true;
     }
 
     /**
@@ -395,6 +435,7 @@ public final class Chunk {
         }
 
         section.biomes().set(biomeIndex(x, y, z), new NbtString(biome));
+        modified = true;
     }
 
     /**
@@ -406,11 +447,13 @@ public final class Chunk {
      */
     public void clearHeightmaps() {
         root.remove("Heightmaps");
+        modified = true;
     }
 
     /** {@code isLightOn} を 0 にし、光源の再計算を促す */
     public void invalidateLighting() {
-        root.set("isLightOn", new NbtByte((byte) 0));
+        root.setByte("isLightOn", (byte) 0);
+        modified = true;
     }
 
     /** 使われていないパレット要素を全セクションから取り除く */

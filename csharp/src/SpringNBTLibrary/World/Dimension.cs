@@ -16,9 +16,17 @@ namespace SpringNBTLibrary.World;
 /// </remarks>
 public sealed class Dimension : IDisposable
 {
+    /// <summary>オーバーワールドの次元ID</summary>
+    public const string Overworld = "minecraft:overworld";
+
+    /// <summary>ネザーの次元ID</summary>
+    public const string TheNether = "minecraft:the_nether";
+
+    /// <summary>エンドの次元ID</summary>
+    public const string TheEnd = "minecraft:the_end";
+
     private readonly WorldOpenOptions options;
     private readonly Dictionary<long, Chunk> chunkCache = new Dictionary<long, Chunk>();
-    private readonly HashSet<long> modifiedChunks = new HashSet<long>();
 
     private RegionFolder? regions;
     private RegionFolder? entities;
@@ -133,7 +141,7 @@ public sealed class Dimension : IDisposable
         }
 
         folder.WriteChunk(chunk.X, chunk.Z, chunk.ToNbt(options.ChunkWrite));
-        modifiedChunks.Remove(ChunkKey(chunk.X, chunk.Z));
+        chunk.IsModified = false;
     }
 
     /// <summary>
@@ -154,9 +162,22 @@ public sealed class Dimension : IDisposable
 
     /// <summary>
     /// 絶対座標でブロックを設定する
+    /// <c>minecraft:oak_stairs[facing=north]</c> の形の文字列で指定する
+    /// </summary>
+    /// <exception cref="SpringNbtException">
+    /// 文字列を解釈できない場合（<see cref="ErrorCode.InvalidArgument"/>）
+    /// </exception>
+    public void SetBlock(int x, int y, int z, string state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        SetBlock(x, y, z, BlockState.Parse(state));
+    }
+
+    /// <summary>
+    /// 絶対座標でブロックを設定する
     /// </summary>
     /// <remarks>
-    /// 変更したチャンクは記録され、<see cref="Flush"/> でまとめて書き戻される
+    /// 変更したチャンクには印が付き、<see cref="Flush"/> でまとめて書き戻される
     /// 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
     /// </remarks>
     public void SetBlock(int x, int y, int z, BlockState state)
@@ -175,7 +196,6 @@ public sealed class Dimension : IDisposable
         }
 
         chunk.SetBlock(x & 15, y, z & 15, state);
-        modifiedChunks.Add(ChunkKey(chunkX, chunkZ));
     }
 
     /// <summary>絶対座標でバイオームを取得する
@@ -210,7 +230,6 @@ public sealed class Dimension : IDisposable
         }
 
         chunk.SetBiome(x & 15, y, z & 15, biome);
-        modifiedChunks.Add(ChunkKey(chunkX, chunkZ));
     }
 
     /// <summary>変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する</summary>
@@ -223,17 +242,17 @@ public sealed class Dimension : IDisposable
             return;
         }
 
-        // 変更のあったチャンクだけを書き戻す
-        foreach (long key in modifiedChunks)
+        // 印の立っているチャンクだけを書き戻す
+        foreach (Chunk chunk in chunkCache.Values)
         {
-            // キャッシュに残っているものだけ書き戻せる
-            if (chunkCache.TryGetValue(key, out Chunk? chunk))
+            // 触っていないチャンクは書き戻さない
+            if (chunk.IsModified)
             {
                 RegionFolder!.WriteChunk(chunk.X, chunk.Z, chunk.ToNbt(options.ChunkWrite));
+                chunk.IsModified = false;
             }
         }
 
-        modifiedChunks.Clear();
         // 開いているフォルダだけを書き出す
         foreach (RegionFolder? folder in new[] { regions, entities, poi })
         {

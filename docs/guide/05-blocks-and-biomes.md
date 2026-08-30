@@ -61,8 +61,16 @@ BlockState facingSouth = stairs.With("facing", "south");
 ## 3. ブロックを置く
 
 ```csharp
-overworld.SetBlock(100, 64, -200, BlockState.Parse("minecraft:stone"));
+overworld.SetBlock(100, 64, -200, "minecraft:stone");
 overworld.Flush();
+```
+
+`BlockState` を渡すこともできます。同じ状態を何度も置くなら、
+一度解析したものを使い回すほうが速くなります。
+
+```csharp
+BlockState stone = BlockState.Parse("minecraft:stone");
+overworld.SetBlock(100, 64, -200, stone);
 ```
 
 パレットに無いブロックは自動で追加されます。
@@ -81,7 +89,7 @@ overworld.Flush();
 
 ```csharp
 // この座標にチェストがあったなら、その中身ごと消える
-overworld.SetBlock(100, 64, -200, BlockState.Parse("minecraft:stone"));
+overworld.SetBlock(100, 64, -200, "minecraft:stone");
 ```
 
 取り除かないと、ブロックと中身が食い違った状態が残り、
@@ -103,6 +111,45 @@ chunk.Compact();   // 未使用のパレット要素を捨て、必要ならビ�
 ```
 
 `SetBlock` のたびに自動でやると著しく遅くなるので、明示的に呼んだときだけ行います。
+
+---
+
+### 範囲をまとめて書き換える
+
+`Cuboid` は両端を指定した直方体の範囲です。`Positions()` で中の座標を順に返します。
+
+```csharp
+Cuboid area = Cuboid.Of(100, 64, -200, 110, 70, -190);
+
+// 並びは Y、Z、X の順。X がいちばん内側で動くので、同じセクションを続けて触れる
+foreach (BlockPos pos in area.Positions())
+{
+    overworld.SetBlock(pos.X, pos.Y, pos.Z, "minecraft:stone");
+}
+
+overworld.Flush();
+```
+
+`BlockPos` からはチャンク座標も引けます。
+
+```csharp
+BlockPos pos = new BlockPos(100, 64, -200);
+ChunkPos chunk = pos.ChunkPos;   // (6, -13)
+int localX = pos.LocalX;         // 4
+```
+
+### 書き戻される対象
+
+ブロックやバイオームを書き換えたチャンクには印が付き、`Flush` はそれだけを書き戻します。
+
+```csharp
+Chunk chunk = overworld.Chunk(6, -13)!;
+chunk.SetBlock(4, 64, 8, "minecraft:stone");
+chunk.IsModified;   // true
+```
+
+同じ状態を置き直しただけなら何も起きないので、印も付きません。
+`Raw` を直接いじったときは印が付かないので、自分で立ててください。
 
 ---
 

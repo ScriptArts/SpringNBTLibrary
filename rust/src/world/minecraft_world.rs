@@ -5,7 +5,7 @@
 //!
 //! 仕様: `docs/spec/40-world-layout.md`
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::anvil::{ChunkPos, RegionFileMode, RegionFolder};
@@ -13,7 +13,7 @@ use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::tag::NbtCompound;
 use crate::nbt::{read_file, write_file, NamedTag, NbtReadOptions, NbtWriteOptions};
 
-use super::block_state::BlockState;
+use super::block_state::{BlockState, IntoBlockState};
 use super::chunk::{Chunk, ChunkReadOptions, ChunkWriteOptions};
 
 /// ワールドを開くときの動作
@@ -136,11 +136,19 @@ pub struct Dimension {
     entities: Option<RegionFolder>,
     poi: Option<RegionFolder>,
     chunk_cache: HashMap<(i32, i32), Chunk>,
-    modified: HashSet<(i32, i32)>,
     closed: bool,
 }
 
 impl Dimension {
+    /// オーバーワールドの次元ID
+    pub const OVERWORLD: &'static str = "minecraft:overworld";
+
+    /// ネザーの次元ID
+    pub const THE_NETHER: &'static str = "minecraft:the_nether";
+
+    /// エンドの次元ID
+    pub const THE_END: &'static str = "minecraft:the_end";
+
     fn new(id: String, directory: PathBuf, options: &WorldOpenOptions) -> Dimension {
         Dimension {
             id,
@@ -156,7 +164,6 @@ impl Dimension {
             entities: None,
             poi: None,
             chunk_cache: HashMap::new(),
-            modified: HashSet::new(),
             closed: false,
         }
     }
@@ -260,16 +267,9 @@ impl Dimension {
     }
 
     /// チャンクへの可変参照を得る
-    /// 変更したら [`Dimension::mark_modified`] を呼ぶこと
     pub fn chunk_mut(&mut self, chunk_x: i32, chunk_z: i32) -> Result<Option<&mut Chunk>> {
         self.chunk(chunk_x, chunk_z)?;
         Ok(self.chunk_cache.get_mut(&(chunk_x, chunk_z)))
-    }
-
-    /// チャンクを「変更あり」として記録する
-    /// 次の `flush` で書き戻される
-    pub fn mark_modified(&mut self, chunk_x: i32, chunk_z: i32) {
-        self.modified.insert((chunk_x, chunk_z));
     }
 
     /// チャンクをその場で書き戻す
@@ -301,7 +301,11 @@ impl Dimension {
             }
         }
 
-        self.modified.remove(&(chunk_x, chunk_z));
+        // 書き戻したので、キャッシュ側の印も下ろす
+        if let Some(cached) = self.chunk_cache.get_mut(&(chunk_x, chunk_z)) {
+            cached.set_is_modified(false);
+        }
+
         Ok(())
     }
 
@@ -316,9 +320,18 @@ impl Dimension {
 
     /// 絶対座標でブロックを設定する
     ///
-    /// 変更したチャンクは記録され、[`Dimension::flush`] でまとめて書き戻される
+    /// `&BlockState` のほか、`"minecraft:oak_stairs[facing=north]"` の形の
+    /// 文字列でも指定できる
+    ///
+    /// 変更したチャンクには印が付き、[`Dimension::flush`] でまとめて書き戻される
     /// 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
-    pub fn set_block(&mut self, x: i32, y: i32, z: i32, state: &BlockState) -> Result<()> {
+    pub fn set_block(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        state: impl IntoBlockState,
+    ) -> Result<()> {
         self.ensure_writable()?;
         let chunk_x = x >> 4;
         let chunk_z = z >> 4;
@@ -336,7 +349,6 @@ impl Dimension {
             }
         }
 
-        self.modified.insert((chunk_x, chunk_z));
         Ok(())
     }
 
@@ -369,7 +381,6 @@ impl Dimension {
             }
         }
 
-        self.modified.insert((chunk_x, chunk_z));
         Ok(())
     }
 
@@ -381,27 +392,24 @@ impl Dimension {
             return Ok(());
         }
 
-        // 変更のあったチャンクだけを書き戻す
-        let modified: Vec<(i32, i32)> = self.modified.iter().copied().collect();
         let write_options = self.chunk_write;
+        let mut pending: Vec<((i32, i32), NbtCompound)> = Vec::new();
 
-        // 変更のあったチャンクだけを書き戻す
-        for key in modified {
-            let nbt = match self.chunk_cache.get(&key) {
-                Some(chunk) => Some(chunk.to_nbt(&write_options)?),
-                None => None,
-            };
-
-            // 組み立てられたものだけを書き込む
-            if let Some(nbt) = nbt {
-                // 地形のフォルダが無ければ書き込めない
-                if let Some(folder) = self.region_folder()? {
-                    folder.write_chunk_nbt(key.0, key.1, &nbt)?;
-                }
+        // 印の立っているチャンクだけを組み立てる
+        for (key, chunk) in self.chunk_cache.iter_mut() {
+            if chunk.is_modified() {
+                pending.push((*key, chunk.to_nbt(&write_options)?));
+                chunk.set_is_modified(false);
             }
         }
 
-        self.modified.clear();
+        // 組み立てたものを書き戻す
+        for (key, nbt) in pending {
+            // 地形のフォルダが無ければ書き込めない
+            if let Some(folder) = self.region_folder()? {
+                folder.write_chunk_nbt(key.0, key.1, &nbt)?;
+            }
+        }
 
         // 開いているフォルダだけを書き出す
         for folder in [&mut self.regions, &mut self.entities, &mut self.poi]

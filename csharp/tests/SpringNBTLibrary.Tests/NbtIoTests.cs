@@ -71,6 +71,54 @@ public class NbtIoTests
         Assert.Equal(ErrorCode.InvalidArgument, error.Code);
     }
 
+    [Fact]
+    public void TypedSettersMirrorTheGetters()
+    {
+        NbtCompound root = new NbtCompound();
+        root.SetByte("b", -128);
+        root.SetShort("s", 32767);
+        root.SetInt("i", -2147483648);
+        root.SetLong("l", 9223372036854775807L);
+        root.SetFloat("f", 1.5f);
+        root.SetDouble("d", -2.25);
+        root.SetBool("t", true);
+        root.SetBool("n", false);
+        root.SetString("str", "Bananrama");
+        root.SetByteArray("ba", new sbyte[] { 1, -1 });
+        root.SetIntArray("ia", new int[] { 1, -1 });
+        root.SetLongArray("la", new long[] { 1L, -1L });
+
+        Assert.Equal(-128, root.GetByte("b"));
+        Assert.Equal(32767, root.GetShort("s"));
+        Assert.Equal(-2147483648, root.GetInt("i"));
+        Assert.Equal(9223372036854775807L, root.GetLong("l"));
+        Assert.Equal(1.5f, root.GetFloat("f"));
+        Assert.Equal(-2.25, root.GetDouble("d"));
+        Assert.True(root.GetBool("t"));
+        Assert.False(root.GetBool("n"));
+        Assert.Equal("Bananrama", root.GetString("str"));
+        Assert.Equal(new sbyte[] { 1, -1 }, root.GetByteArray("ba"));
+        Assert.Equal(new int[] { 1, -1 }, root.GetIntArray("ia"));
+        Assert.Equal(new long[] { 1L, -1L }, root.GetLongArray("la"));
+
+        // 真偽値は TAG_Byte の 0 / 1 として入る
+        Assert.Equal(TagType.Byte, root.Get("t").Type);
+    }
+
+    [Fact]
+    public void TypedSettersKeepTheInsertionOrder()
+    {
+        NbtCompound root = new NbtCompound();
+        root.SetInt("a", 1);
+        root.SetInt("b", 2);
+
+        // 既存キーへの再設定は位置を変えない
+        root.SetInt("a", 3);
+
+        Assert.Equal(new[] { "a", "b" }, root.Select(entry => entry.Key).ToArray());
+        Assert.Equal(3, root.GetInt("a"));
+    }
+
     /// <summary>複数のバイト列をつなぐ。</summary>
     private static byte[] Concat(params byte[][] parts)
     {

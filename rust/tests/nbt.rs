@@ -846,3 +846,56 @@ fn rejects_compression_when_reading_at_offset() {
     let error = read_bytes_at(&hello_world_bytes(), 0, &options).unwrap_err();
     assert_eq!(error.code(), ErrorCode::InvalidArgument);
 }
+
+// ---------------------------------------------------------------------------
+// 型付き設定子
+//
+// 仕様: docs/spec/10-nbt-binary.md 7.1章
+// ---------------------------------------------------------------------------
+
+#[test]
+fn typed_setters_mirror_the_getters() {
+    let mut root = NbtCompound::new();
+    root.set_byte("b", -128);
+    root.set_short("s", 32767);
+    root.set_int("i", -2147483648);
+    root.set_long("l", 9223372036854775807);
+    root.set_float("f", 1.5);
+    root.set_double("d", -2.25);
+    root.set_bool("t", true);
+    root.set_bool("n", false);
+    root.set_string("str", "Bananrama");
+    root.set_byte_array("ba", vec![1, -1]);
+    root.set_int_array("ia", vec![1, -1]);
+    root.set_long_array("la", vec![1, -1]);
+
+    assert_eq!(root.get_byte("b").unwrap(), -128);
+    assert_eq!(root.get_short("s").unwrap(), 32767);
+    assert_eq!(root.get_int("i").unwrap(), -2147483648);
+    assert_eq!(root.get_long("l").unwrap(), 9223372036854775807);
+    assert_eq!(root.get_float("f").unwrap(), 1.5);
+    assert_eq!(root.get_double("d").unwrap(), -2.25);
+    assert!(root.get_bool("t").unwrap());
+    assert!(!root.get_bool("n").unwrap());
+    assert_eq!(root.get_string("str").unwrap(), "Bananrama");
+    assert_eq!(root.get_byte_array("ba").unwrap(), &[1, -1]);
+    assert_eq!(root.get_int_array("ia").unwrap(), &[1, -1]);
+    assert_eq!(root.get_long_array("la").unwrap(), &[1, -1]);
+
+    // 真偽値は TAG_Byte の 0 / 1 として入る
+    assert_eq!(root.get("t").unwrap().tag_type(), TagType::Byte);
+}
+
+#[test]
+fn typed_setters_keep_the_insertion_order() {
+    let mut root = NbtCompound::new();
+    root.set_int("a", 1);
+    root.set_int("b", 2);
+
+    // 既存キーへの再設定は位置を変えない
+    root.set_int("a", 3);
+
+    let keys: Vec<&str> = root.keys().collect();
+    assert_eq!(keys, vec!["a", "b"]);
+    assert_eq!(root.get_int("a").unwrap(), 3);
+}

@@ -367,6 +367,35 @@ class WorldTest {
         }
 
         @Test
+        void ブロックを文字列でも置ける() {
+            Chunk chunk = loadChunk("palette_1");
+            chunk.setBlock(3, -60, 7, "minecraft:oak_stairs[facing=north,half=top]");
+
+            assertEquals("minecraft:oak_stairs[facing=north,half=top]",
+                    chunk.getBlock(3, -60, 7).toString());
+        }
+
+        @Test
+        void 変更したチャンクには印が付く() {
+            Chunk chunk = loadChunk("palette_1");
+            assertFalse(chunk.isModified());
+
+            chunk.setBlock(3, -60, 7, "minecraft:stone");
+            assertTrue(chunk.isModified());
+
+            // 保存済みとして印を下ろせる
+            chunk.setIsModified(false);
+            assertFalse(chunk.isModified());
+
+            // 同じ状態を置き直すだけなら何も起きないので印も付かない
+            chunk.setBlock(3, -60, 7, "minecraft:stone");
+            assertFalse(chunk.isModified());
+
+            chunk.clearHeightmaps();
+            assertTrue(chunk.isModified());
+        }
+
+        @Test
         void バイオームは4ブロック単位で効く() {
             Chunk chunk = loadChunk("palette_1");
             chunk.setBiome(0, -64, 0, "minecraft:desert");

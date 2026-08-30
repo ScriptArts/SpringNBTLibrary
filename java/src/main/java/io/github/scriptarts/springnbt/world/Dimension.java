@@ -27,11 +27,19 @@ import java.util.Set;
  */
 public final class Dimension implements AutoCloseable {
 
+    /** オーバーワールドの次元ID */
+    public static final String OVERWORLD = "minecraft:overworld";
+
+    /** ネザーの次元ID */
+    public static final String THE_NETHER = "minecraft:the_nether";
+
+    /** エンドの次元ID */
+    public static final String THE_END = "minecraft:the_end";
+
     private final String id;
     private final Path directory;
     private final WorldOpenOptions options;
     private final Map<Long, Chunk> chunkCache = new HashMap<>();
-    private final Set<Long> modifiedChunks = new HashSet<>();
 
     private RegionFolder regions;
     private RegionFolder entities;
@@ -181,7 +189,7 @@ public final class Dimension implements AutoCloseable {
         }
 
         folder.writeChunk(chunk.x(), chunk.z(), chunk.toNbt(options.chunkWrite()));
-        modifiedChunks.remove(chunkKey(chunk.x(), chunk.z()));
+        chunk.setIsModified(false);
     }
 
     /**
@@ -214,6 +222,22 @@ public final class Dimension implements AutoCloseable {
      * @param z     Z座標
      * @param state ブロック
      */
+    public void setBlock(int x, int y, int z, String state) {
+        Objects.requireNonNull(state, "state");
+        setBlock(x, y, z, BlockState.parse(state));
+    }
+
+    /**
+     * 絶対座標でブロックを設定する
+     *
+     * <p>変更したチャンクには印が付き、{@link #flush()} でまとめて書き戻される
+     *
+     * @param x     絶対X座標
+     * @param y     絶対Y座標
+     * @param z     絶対Z座標
+     * @param state ブロック
+     * @throws SpringNbtException チャンクが無い場合
+     */
     public void setBlock(int x, int y, int z, BlockState state) {
         Objects.requireNonNull(state, "state");
         ensureWritable();
@@ -228,7 +252,6 @@ public final class Dimension implements AutoCloseable {
         }
 
         chunk.setBlock(x & 15, y, z & 15, state);
-        modifiedChunks.add(chunkKey(chunkX, chunkZ));
     }
 
     /**
@@ -274,7 +297,6 @@ public final class Dimension implements AutoCloseable {
         }
 
         chunk.setBiome(x & 15, y, z & 15, biome);
-        modifiedChunks.add(chunkKey(chunkX, chunkZ));
     }
 
     /** 変更したチャンクをすべて書き戻し、リージョンをディスクへ反映する */
@@ -285,16 +307,14 @@ public final class Dimension implements AutoCloseable {
             return;
         }
 
-        // 変更のあったチャンクだけを書き戻す
-        for (Long key : modifiedChunks) {
-            Chunk chunk = chunkCache.get(key);
-
-            if (chunk != null) {
+        // 印の立っているチャンクだけを書き戻す
+        for (Chunk chunk : chunkCache.values()) {
+            // 触っていないチャンクは書き戻さない
+            if (chunk.isModified()) {
                 regionFolder().writeChunk(chunk.x(), chunk.z(), chunk.toNbt(options.chunkWrite()));
+                chunk.setIsModified(false);
             }
         }
-
-        modifiedChunks.clear();
 
         if (regions != null) {
             regions.flush();

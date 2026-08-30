@@ -468,6 +468,64 @@ class NbtCompound(NbtTag):
             for key, value in entries:
                 self.set(key, value)
 
+    # -- 型付き設定子 -------------------------------------------------------
+    #
+    # set(key, NbtInt(42)) と書かずに済むようにするための糖衣
+    # 取得子の get_int と対になる
+
+    def set_byte(self, key: str, value: int) -> None:
+        """TAG_Byte として設定する"""
+        self.set(key, NbtByte(value))
+
+    def set_short(self, key: str, value: int) -> None:
+        """TAG_Short として設定する"""
+        self.set(key, NbtShort(value))
+
+    def set_int(self, key: str, value: int) -> None:
+        """TAG_Int として設定する"""
+        self.set(key, NbtInt(value))
+
+    def set_long(self, key: str, value: int) -> None:
+        """TAG_Long として設定する"""
+        self.set(key, NbtLong(value))
+
+    def set_float(self, key: str, value: float) -> None:
+        """TAG_Float として設定する"""
+        self.set(key, NbtFloat(value))
+
+    def set_double(self, key: str, value: float) -> None:
+        """TAG_Double として設定する"""
+        self.set(key, NbtDouble(value))
+
+    def set_bool(self, key: str, value: bool) -> None:
+        """TAG_Byte として設定する
+        True は 1、False は 0
+        """
+        # NBT に真偽値の専用型は無いので TAG_Byte の 0 / 1 で表す
+        if value:
+            self.set_byte(key, 1)
+        else:
+            self.set_byte(key, 0)
+
+    def set_string(self, key: str, value: str) -> None:
+        """TAG_String として設定する
+
+        :raises SpringNbtError: MUTF-8 で 65535 バイトを超える場合
+        """
+        self.set(key, NbtString(value))
+
+    def set_byte_array(self, key: str, value: List[int]) -> None:
+        """TAG_Byte_Array として設定する"""
+        self.set(key, NbtByteArray(value))
+
+    def set_int_array(self, key: str, value: List[int]) -> None:
+        """TAG_Int_Array として設定する"""
+        self.set(key, NbtIntArray(value))
+
+    def set_long_array(self, key: str, value: List[int]) -> None:
+        """TAG_Long_Array として設定する"""
+        self.set(key, NbtLongArray(value))
+
     def set(self, key: str, value: NbtTag) -> None:
         """値を設定する
         既存キーなら位置を維持して値だけ置き換える

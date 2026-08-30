@@ -5,6 +5,7 @@
  */
 
 export { BlockState } from "./blockState.js";
+export { BlockPos, Cuboid } from "./blockPos.js";
 export { BitStorage } from "./bitStorage.js";
 export { PalettedContainer, ceilLog2 } from "./palettedContainer.js";
 export {
