@@ -1,6 +1,6 @@
 # 02. SNBT
 
-SNBT (Stringified NBT) は NBT を人が読める文字列で表したもの。
+SNBT (Stringified NBT) は NBT を人が読める文字列で表したものです。
 コマンドの `/give` や `/data` で使われる記法です。
 
 ```
@@ -23,7 +23,7 @@ string oneLine = Snbt.Write(tag);
 string pretty  = Snbt.WritePretty(tag);
 ```
 
-`WritePretty` は改行とインデントを入れる。
+`WritePretty` は改行とインデントを入れます。
 `Write` は 1 行に詰める。どちらも全言語で 1 バイトも違わない出力になります。
 
 ---
@@ -69,9 +69,9 @@ true/false  bool（TAG_Byte の 1 / 0 になる）
 
 ### 16進での接尾辞に注意
 
-`0xFFb` の `b` は 16 進の数字なのか `TAG_Byte` の印なのか区別できない。
-そこで 16 進・2 進リテラルでは `s` / `S` / `l` / `L` だけを型の接尾辞として認める。
-`b` / `d` / `f` は数字として読む（[spec/11 2.1](../spec/11-snbt.md)）。
+`0xFFb` の `b` は 16 進の数字なのか `TAG_Byte` の印なのか区別できません。
+そこで 16 進・2 進リテラルでは `s` / `S` / `l` / `L` だけを型の接尾辞として認めます。
+`b` / `d` / `f` は数字として読みます（[spec/11 2.1](../spec/11-snbt.md)）。
 
 ---
 
@@ -82,7 +82,7 @@ Infinity    -Infinity    NaN
 ```
 
 これらは SNBT で読み書きできるが、Minecraft 自身は受け付けないことがあります。
-ワールドへ書き込む用途では使わないこと。
+ワールドへ書き込む用途には使わないでください。
 
 ---
 

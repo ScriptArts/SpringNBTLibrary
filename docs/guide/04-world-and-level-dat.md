@@ -89,7 +89,7 @@ level.Difficulty;        // "normal"
 level.IsHardcore;
 ```
 
-それ以外は生の NBT を直接たどる。
+それ以外は生の NBT を直接たどります。
 
 ```csharp
 NbtCompound data = level.Data;
@@ -97,7 +97,7 @@ NbtCompound data = level.Data;
 
 ### 分離されたデータファイル
 
-ゲームルールなどは `level.dat` にはもう入っていない。
+ゲームルールなどは `level.dat` にはもう入っていません。
 
 ```csharp
 NbtCompound? rules = world.DataFile("game_rules");
@@ -121,8 +121,8 @@ Dimension? overworld = world.Dimension("minecraft:overworld");
 名前空間を省くと `minecraft:` を補う。`world.Dimension("overworld")` でも構いません。
 存在しない次元（まだ生成されていない、など）は `null` になります。
 
-カスタム次元も同じように扱える。データパックが作った
-`dimensions/mypack/mydim/` は `"mypack:mydim"` で開ける。
+カスタム次元も同じように扱えます。データパックが作った
+`dimensions/mypack/mydim/` は `"mypack:mydim"` で開けます。
 
 ### 次元の中身
 
@@ -162,18 +162,18 @@ overworld.Flush();     // 変更したチャンクを書き戻す
 world.SaveLevel();     // level.dat を書き戻す
 ```
 
-`SaveLevel` は一時ファイルへ書いてから置き換える。
+`SaveLevel` は一時ファイルへ書いてから置き換えます。
 書き込み中に落ちても `level.dat` が壊れないようにするためで、
-直前の内容は `level.dat_old` へ退避される。
+直前の内容は `level.dat_old` へ退避されます。
 
 `using`（Java は try-with-resources、Python は `with`）を抜けるときに
-`Close` が呼ばれ、書き込みモードなら自動で `Flush` される。
+`Close` が呼ばれ、書き込みモードなら自動で `Flush` されます。
 
 ---
 
 ## 7. バージョンが違うワールド
 
-読み込みは寛容、書き込みは対象バージョン固定というのが本ライブラリの方針
+読み込みは寛容に、書き込みは対象バージョン固定にしています
 （[adr/0003](../adr/0003-version-policy.md)）。詳しくは [07](07-version-policy.md)。
 
 ---
