@@ -68,7 +68,9 @@ jobs:
       - name: 全言語の挙動が一致することの検証
         run: ./spec/run-conformance.sh
 
-      - name: C# (dll)
+      # dll を直接参照したい人向け。xml を隣に置かないと補完に説明が出ないので、
+      # LICENSE と合わせてひとまとめにする
+      - name: C# (zip)
         run: |
           dotnet build csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj \
             --configuration Release
@@ -79,6 +81,12 @@ jobs:
           cp csharp/README.md artifacts/csharp/
           (cd artifacts/csharp && zip -q -r \
             "../SpringNBTLibrary-${{ steps.version.outputs.value }}-dotnet8.zip" .)
+
+      # NuGet へは公開しないが、落としたファイルをローカルのソースにできる
+      - name: C# (nupkg)
+        run: |
+          dotnet pack csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj \
+            --configuration Release --output artifacts
 
       - name: Java (jar)
         run: |

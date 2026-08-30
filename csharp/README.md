@@ -9,15 +9,15 @@ C# / Java / TypeScript / Python / Rust 版があり、どれも同じ仕様書�
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `SpringNBTLibrary-<版>-dotnet8.zip` を落として、
-中の `.dll` を参照に追加します。
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
+`SpringNBTLibrary.<版>.nupkg` を落とし、置いたフォルダをソースに登録します。
 
-```xml
-<Reference Include="SpringNBTLibrary">
-  <HintPath>lib/SpringNBTLibrary.dll</HintPath>
-</Reference>
+```bash
+dotnet nuget add source ./packages -n springnbt
+dotnet add package SpringNBTLibrary --version 1.0.0
 ```
 
+dll を直接参照したいときは `SpringNBTLibrary-<版>-dotnet8.zip` のほうを使います。
 同梱の `.xml` を dll と同じ場所に置くと、IDE の補完に説明が出ます。
 
 ## 使い方

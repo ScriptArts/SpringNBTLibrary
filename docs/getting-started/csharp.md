@@ -7,9 +7,26 @@ C# は[基準実装](../adr/0002-idiomatic-naming.md)です。
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `SpringNBTLibrary-<版>-dotnet8.zip` を落とします。
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) に 2 通り置いてあります。
+どちらでも中身は同じです。
 
-1. zip を展開します。中身は次のとおりです
+### `.nupkg` を使う（おすすめ）
+
+`SpringNBTLibrary.<版>.nupkg` を落とし、置いたフォルダをソースとして登録します。
+NuGet へは公開していないので、この 1 手間だけが要ります。
+
+```bash
+dotnet nuget add source ./packages -n springnbt
+dotnet add package SpringNBTLibrary --version 1.0.0
+```
+
+ドキュメントの置き場所は NuGet が面倒を見るので、補完に説明が出ます。
+
+### `.zip` を使う
+
+dll を直接参照したいときはこちらです。
+
+1. `SpringNBTLibrary-<版>-dotnet8.zip` を展開します。中身は次のとおりです
 
    ```
    SpringNBTLibrary.dll   ライブラリ本体
