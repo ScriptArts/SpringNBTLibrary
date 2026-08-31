@@ -10,6 +10,7 @@
 //!
 //! 仕様: `docs/spec/30-chunk-format.md` 2.1章
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -27,26 +28,25 @@ pub struct BlockState {
 ///
 /// 他の言語ではオーバーロードで済むが、Rust には無いのでトレイトで受ける
 /// `&BlockState` と `&str` の両方をそのまま渡せる
+///
+/// [`Cow`] を返すのは、すでに [`BlockState`] を持っているときに
+/// 複製を作らないようにするためである
+/// 1 ブロックずつ置く用途では、この複製が積み上がって効いてくる
 pub trait IntoBlockState {
-    /// ブロック状態へ変換する
-    fn into_block_state(self) -> Result<BlockState>;
+    /// ブロック状態として借りる
+    /// 文字列から作った場合だけ、その場で組み立てたものを返す
+    fn as_block_state(&self) -> Result<Cow<'_, BlockState>>;
 }
 
 impl IntoBlockState for BlockState {
-    fn into_block_state(self) -> Result<BlockState> {
-        Ok(self)
+    fn as_block_state(&self) -> Result<Cow<'_, BlockState>> {
+        Ok(Cow::Borrowed(self))
     }
 }
 
-impl IntoBlockState for &BlockState {
-    fn into_block_state(self) -> Result<BlockState> {
-        Ok(self.clone())
-    }
-}
-
-impl IntoBlockState for &str {
-    fn into_block_state(self) -> Result<BlockState> {
-        BlockState::parse(self)
+impl IntoBlockState for str {
+    fn as_block_state(&self) -> Result<Cow<'_, BlockState>> {
+        Ok(Cow::Owned(BlockState::parse(self)?))
     }
 }
 

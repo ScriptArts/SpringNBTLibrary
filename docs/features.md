@@ -120,6 +120,7 @@
 | `TAG_String` の値型 | Rust のみ 2 形態の enum | `String` が UTF-8 に限られ、孤立サロゲートを保持できない（[spec/10 2.3](spec/10-nbt-binary.md#23-各言語での保持方法)） |
 | 整数の範囲検証 | Python / TypeScript は構築時に実行時検査 | 言語に整数幅が無いため、型では守れない |
 | 例外 / 戻り値 | Rust のみ `Result<T, Error>` | 他4言語は例外。`ErrorCode` の集合は一致（[adr/0005](adr/0005-unified-error-model.md)） |
+| `set_block` の引数 | Rust のみ `IntoBlockState` トレイト | 他4言語はオーバーロードで `BlockState` と文字列の両方を受ける |
 | Java の検査例外 | 使わない | シグネチャを他言語と揃えるため（[adr/0005](adr/0005-unified-error-model.md)） |
 | Python の再帰上限 | 読み書き時に一時的に引き上げる | 既定の上限 1000 が仕様の深さ上限 512 に届かないため |
 | ストリーム入出力 | TypeScript には無い | Node のストリームは非同期しか無く、同期 API で揃えられないため。ファイルとバイト列の入口は同じ |

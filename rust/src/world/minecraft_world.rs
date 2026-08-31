@@ -325,13 +325,10 @@ impl Dimension {
     ///
     /// 変更したチャンクには印が付き、[`Dimension::flush`] でまとめて書き戻される
     /// 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
-    pub fn set_block(
-        &mut self,
-        x: i32,
-        y: i32,
-        z: i32,
-        state: impl IntoBlockState,
-    ) -> Result<()> {
+    pub fn set_block<S>(&mut self, x: i32, y: i32, z: i32, state: &S) -> Result<()>
+    where
+        S: IntoBlockState + ?Sized,
+    {
         self.ensure_writable()?;
         let chunk_x = x >> 4;
         let chunk_z = z >> 4;

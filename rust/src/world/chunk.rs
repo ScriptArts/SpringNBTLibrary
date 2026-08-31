@@ -429,14 +429,13 @@ impl Chunk {
     ///
     /// `&BlockState` のほか、`"minecraft:oak_stairs[facing=north]"` の形の
     /// 文字列でも指定できる
-    pub fn set_block(
-        &mut self,
-        x: i32,
-        y: i32,
-        z: i32,
-        state: impl IntoBlockState,
-    ) -> Result<()> {
-        let state = &state.into_block_state()?;
+    pub fn set_block<S>(&mut self, x: i32, y: i32, z: i32, state: &S) -> Result<()>
+    where
+        S: IntoBlockState + ?Sized,
+    {
+        // すでに BlockState を持っているなら借りるだけで済ませる
+        let borrowed = state.as_block_state()?;
+        let state: &BlockState = &borrowed;
         check_local_coordinates(x, z)?;
         let section_y = y >> 4;
         let index = block_index(x, y, z);
