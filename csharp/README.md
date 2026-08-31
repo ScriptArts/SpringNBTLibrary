@@ -28,7 +28,7 @@ C# / Java / TypeScript / Python / Rust 版があり、どれも同じ仕様書�
 dotnet add package SpringNBTLibrary --version 1.0.0
 ```
 
-dll を直接参照したいときは `SpringNBTLibrary-<版>-dotnet8.zip` のほうを使います。
+dll を直接参照したいときは `SpringNBTLibrary-dotnet8.zip` のほうを使います。
 同梱の `.xml` を dll と同じ場所に置くと、IDE の補完に説明が出ます。
 
 ## 使い方

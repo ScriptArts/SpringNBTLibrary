@@ -14,11 +14,14 @@ spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", t
 Cargo が自分で取得します。
 
 ネットワークに繋がらない環境なら、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) の
-`spring-nbt-library-<版>.crate`（拡張子が違うだけの tar.gz）を展開してパス参照します。
+`spring-nbt-library.crate`（拡張子が違うだけの tar.gz）を展開してパス参照します。
 
 ```bash
-tar xzf spring-nbt-library-1.0.0.crate
+tar xzf spring-nbt-library.crate
 ```
+
+展開すると `spring-nbt-library-<版>/` というディレクトリができます。
+中の名前は cargo が決めるので、こちらには版が入ります。
 
 ```toml
 [dependencies]
