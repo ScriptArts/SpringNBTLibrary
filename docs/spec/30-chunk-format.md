@@ -269,12 +269,30 @@ X はチャンク内で連続するので、同じセクションを続けて触
 
 ## 6. バージョン検査
 
-- 読み込み時、`DataVersion` が `4903` 以外なら `ReadOptions.on_version_mismatch` に従う
+判定するのは**ワールドの形式**であり、Minecraft のバージョンそのものではない。
+
+いまの形式は **26.1（DataVersion `4786`）** で導入された。
+これ以降のバージョンは、形式が変わらない限りそのまま読み書きできる。
+
+```
+MIN_SUPPORTED_DATA_VERSION = 4786   扱える形式の下限
+TARGET_DATA_VERSION        = 4903   動作を確かめたバージョン（26.2）
+```
+
+- 読み込み時、`DataVersion` が `4786` **以上なら何もしない**
+  - 対象より新しいバージョンでも警告を出さない
+  - 形式が同じなら読めるのだから、知らせる意味がない
+- `4786` 未満なら `ReadOptions.on_version_mismatch` に従う
   - `Warn`（既定）: 警告コールバックを呼んで続行する
   - `Error`: `UNSUPPORTED_DATA_VERSION`
   - `Ignore`: 何もしない
-- 書き込み時、`DataVersion` は**常に `4903`** を書く
-  - 元の値が `4903` 以外だった場合は既定で `UNSUPPORTED_DATA_VERSION`
-  - `WriteOptions.allow_foreign_data_version = true` で明示的に許可できる
+- 書き込み時、`DataVersion` は**読んだ値をそのまま残す**
+  - 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
+  - `4786` 未満のチャンクは既定で `UNSUPPORTED_DATA_VERSION`
+  - `WriteOptions.allow_foreign_data_version = true` で明示的に許可できる。
+    このときも `DataVersion` は書き換えない
+
+**形式が変わったときだけ下限を上げる。** 上げたら、そのワールドを扱えなくなる
+利用者が出るので、バージョン番号のいちばん上の桁も上げる。
 
 詳細は [07 バージョンポリシー](../guide/07-version-policy.md)。

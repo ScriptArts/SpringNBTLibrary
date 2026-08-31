@@ -644,7 +644,7 @@ fn 別バージョン由来のチャンクは既定で書き戻せない() {
 }
 
 #[test]
-fn 許可すれば対象バージョンとして書き戻す() {
+fn 許可すれば古いチャンクも元のバージョンのまま書き戻せる() {
     let read = ChunkReadOptions {
         on_version_mismatch: VersionMismatchAction::Ignore,
         ..ChunkReadOptions::default()
@@ -654,9 +654,54 @@ fn 許可すれば対象バージョンとして書き戻す() {
         allow_foreign_data_version: true,
     };
 
-    // 書き戻しは常に対象バージョンへ揃える
+    // DataVersion は読んだ値のまま残す
     let written = chunk.to_nbt(&write).unwrap();
-    assert_eq!(TARGET_DATA_VERSION, written.get_int("DataVersion").unwrap());
+    assert_eq!(3953, written.get_int("DataVersion").unwrap());
+}
+
+/// 対象より新しい DataVersion を持つチャンクを作る。
+fn newer_chunk() -> NbtCompound {
+    let named = read_file(vector_path("palette_1"), &NbtReadOptions::default()).unwrap();
+    let mut root = named.tag;
+    root.set_int("DataVersion", 5015);
+    root
+}
+
+#[test]
+fn 新しいバージョンのチャンクは警告を出さない() {
+    let warnings: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&warnings);
+    let read = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Warn,
+        on_warning: Some(Box::new(move |message: &str| {
+            sink.borrow_mut().push(message.to_string());
+        })),
+        lenient_bit_storage: false,
+    };
+
+    // 形式が同じであれば、新しいバージョンでも黙って読める
+    let chunk = Chunk::from_nbt(newer_chunk(), &read).unwrap();
+    assert_eq!(chunk.data_version().unwrap(), 5015);
+    assert!(warnings.borrow().is_empty());
+}
+
+#[test]
+fn 新しいバージョンのチャンクはエラー設定でも通る() {
+    let read = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Error,
+        ..ChunkReadOptions::default()
+    };
+    let chunk = Chunk::from_nbt(newer_chunk(), &read).unwrap();
+    assert_eq!(chunk.data_version().unwrap(), 5015);
+}
+
+#[test]
+fn 新しいバージョンのチャンクはそのまま書き戻せる() {
+    let chunk = Chunk::from_nbt(newer_chunk(), &ChunkReadOptions::default()).unwrap();
+
+    // 許可を出さなくても書き戻せて、DataVersion も変わらない
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    assert_eq!(5015, written.get_int("DataVersion").unwrap());
 }
 
 #[test]

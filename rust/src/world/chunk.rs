@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::tag::{NbtCompound, NbtList, NbtString, NbtTag, TagType};
-use crate::TARGET_DATA_VERSION;
+use crate::MIN_SUPPORTED_DATA_VERSION;
 
 use super::block_state::{BlockState, IntoBlockState};
 use super::paletted_container::PalettedContainer;
@@ -60,7 +60,7 @@ pub enum VersionMismatchAction {
 ///
 /// 仕様: `docs/spec/30-chunk-format.md` 5章
 pub struct ChunkReadOptions {
-    /// DataVersion が対象と違うときの動作
+    /// DataVersion が扱える形式より古いときの動作
     pub on_version_mismatch: VersionMismatchAction,
     /// 警告の通知先
     /// `None` なら何もしない
@@ -333,12 +333,15 @@ impl Chunk {
     fn check_data_version(&self, options: &ChunkReadOptions) -> Result<()> {
         let version = self.data_version()?;
 
-        if version == TARGET_DATA_VERSION {
+        // 形式が同じであれば、新しいバージョンでもそのまま読める
+        if version >= MIN_SUPPORTED_DATA_VERSION {
             return Ok(());
         }
 
-        let message =
-            format!("DataVersion が対象と違う: {version}（対象は {TARGET_DATA_VERSION}）");
+        let message = format!(
+            "DataVersion {version} はこのライブラリが扱う形式より古い\
+             （{MIN_SUPPORTED_DATA_VERSION} 以降が対象）"
+        );
 
         if options.on_version_mismatch == VersionMismatchAction::Error {
             return Err(Error::new(ErrorCode::UnsupportedDataVersion, message));
@@ -360,20 +363,21 @@ impl Chunk {
     pub fn to_nbt(&self, options: &ChunkWriteOptions) -> Result<NbtCompound> {
         let version = self.data_version()?;
 
-        if version != TARGET_DATA_VERSION && !options.allow_foreign_data_version {
+        // 形式の違う古いチャンクは、書き戻すと壊しかねない
+        if version < MIN_SUPPORTED_DATA_VERSION && !options.allow_foreign_data_version {
             return Err(Error::new(
                 ErrorCode::UnsupportedDataVersion,
                 format!(
-                    "DataVersion {version} のチャンクは書き戻せない（対象は {TARGET_DATA_VERSION}）。\
+                    "DataVersion {version} のチャンクは書き戻せない\
+                     （{MIN_SUPPORTED_DATA_VERSION} 以降が対象）。\
                      許可するなら ChunkWriteOptions.allow_foreign_data_version を立てること"
                 ),
             ));
         }
 
+        // DataVersion は読んだ値のまま残す
+        // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
         let mut result = self.raw.clone();
-
-        // 常に対象バージョンを書く
-        result.set("DataVersion", NbtTag::Int(TARGET_DATA_VERSION));
 
         if self.sections.is_empty() {
             return Ok(result);

@@ -12,7 +12,9 @@
 | ❌ | 未対応 |
 
 対応しているのは C# / Java / TypeScript / Python / Rust で、今後も増やします。
-対象は Java版 26.2 / DataVersion 4903 です。
+対象は **26.1 で導入されたワールド形式**（DataVersion 4786 以降）です。
+動作は Java版 26.2 / DataVersion 4903 で確かめています。
+形式が同じであれば、これより新しいバージョンのワールドもそのまま読み書きできます。
 過去バージョンのワールド改変には対応していません（→ [07 バージョンポリシー](guide/07-version-policy.md)）。
 
 この表は CI の `docs-sync` ジョブが各言語の公開APIと突き合わせていて、
@@ -102,7 +104,7 @@
 | 機能 | C# | Java | TS | Py | Rust | 仕様 | 備考 |
 |---|:--:|:--:|:--:|:--:|:--:|---|---|
 | 共通 `ErrorCode` による分類 | ✅ | ✅ | ✅ | ✅ | ✅ | [00](spec/00-conventions.md#4-エラー分類) | 全言語でコード集合が一致 |
-| DataVersion 不一致時の警告／エラー切替 | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#6-バージョン検査) | |
+| 扱えない形式の検出（警告／エラー切替） | ✅ | ✅ | ✅ | ✅ | ✅ | [30](spec/30-chunk-format.md#6-バージョン検査) | |
 | 適合性検証ツール（CLI） | ✅ | ✅ | ✅ | ✅ | ✅ | [90](spec/90-conformance.md#23-クロス言語一致) | 全言語の出力を相互diff |
 | 実ワールド走査ツール | — | — | — | ✅ | — | [90](spec/90-conformance.md#24-実ワールド走査) | `spec/tools/scan_world.py`。検証用のため Python のみ |
 | ドキュメント同期検証 | — | — | — | ✅ | — | [adr/0009](adr/0009-static-api-extraction.md) | `spec/tools/check_docs_sync.py`。全言語のソースを静的解析して突き合わせる |

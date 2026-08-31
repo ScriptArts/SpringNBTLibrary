@@ -509,16 +509,48 @@ test("DataVersion: 別バージョン由来のチャンクは既定で書き戻�
   assertErrorCode(ErrorCode.UnsupportedDataVersion, () => chunk.toNbt());
 });
 
-test("DataVersion: 許可すれば対象バージョンとして書き戻す", () => {
+test("DataVersion: 許可すれば古いチャンクも元のバージョンのまま書き戻せる", () => {
   const chunk = Chunk.fromNbt(foreignChunk(), {
     onVersionMismatch: VersionMismatchAction.Ignore,
   });
 
-  // 書き戻しは常に対象バージョンへ揃える
-  assert.equal(
-    chunk.toNbt({ allowForeignDataVersion: true }).getInt("DataVersion"),
-    TARGET_DATA_VERSION,
-  );
+  // DataVersion は読んだ値のまま残す
+  assert.equal(chunk.toNbt({ allowForeignDataVersion: true }).getInt("DataVersion"), 3953);
+});
+
+/** 対象より新しい DataVersion を持つチャンクを作る。 */
+function newerChunk(): NbtCompound {
+  const root = readFile(vectorPath("palette_1")).tag;
+  root.setInt("DataVersion", 5015);
+  return root;
+}
+
+test("DataVersion: 新しいバージョンのチャンクは警告を出さない", () => {
+  const warnings: string[] = [];
+
+  // 形式が同じであれば、新しいバージョンでも黙って読める
+  const chunk = Chunk.fromNbt(newerChunk(), {
+    onVersionMismatch: VersionMismatchAction.Warn,
+    onWarning: (message) => warnings.push(message),
+  });
+
+  assert.equal(chunk.dataVersion, 5015);
+  assert.deepEqual(warnings, []);
+});
+
+test("DataVersion: 新しいバージョンのチャンクはエラー設定でも通る", () => {
+  const chunk = Chunk.fromNbt(newerChunk(), {
+    onVersionMismatch: VersionMismatchAction.Error,
+  });
+
+  assert.equal(chunk.dataVersion, 5015);
+});
+
+test("DataVersion: 新しいバージョンのチャンクはそのまま書き戻せる", () => {
+  const chunk = Chunk.fromNbt(newerChunk());
+
+  // 許可を出さなくても書き戻せて、DataVersion も変わらない
+  assert.equal(chunk.toNbt().getInt("DataVersion"), 5015);
 });
 
 test("DataVersion: 対象バージョンのチャンクはそのまま書き戻せる", () => {

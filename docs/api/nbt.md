@@ -238,6 +238,7 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `method_compressed` | — | — | — | `METHOD_COMPRESSED` | — |  |
 | `method_stored` | — | — | — | `METHOD_STORED` | — |  |
 | `min_match` | — | — | — | `MIN_MATCH` | — |  |
+| `min_supported_data_version` | `MinSupportedDataVersion` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | このライブラリが扱えるワールド形式の下限となる DataVersion (26.1) |
 | `parse` | `Parse()` | `parse()` | `parse()` | `parse()` | `parse()` | SNBT 文字列をタグへ変換する |
 | `parse_compound` | `ParseCompound()` | `parseCompound()` | `parseCompound()` | `parse_compound()` | `parse_compound()` | SNBT 文字列を Compound へ変換する |
 | `read_bytes` | `ReadBytes()` | `readBytes()` | `readBytes()` | `read_bytes()` | `read_bytes()` | バイト列から NBT を読む |
@@ -246,7 +247,7 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `read_file` | `ReadFile()` | `readFile()` | `readFile()` | `read_file()` | `read_file()` | ファイルから NBT を読む |
 | `read_stream` | `ReadStream()` | `readStream()` | — | `read_stream()` | `read_reader()` |  |
 | `sector_size` | `SectorSize` | `SECTOR_SIZE` | `SECTOR_SIZE` | `SECTOR_SIZE` | `SECTOR_SIZE` |  |
-| `target_data_version` | `TargetDataVersion` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | 本ライブラリが対象とする Minecraft Java版の DataVersion (26.2) |
+| `target_data_version` | `TargetDataVersion` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | 動作を確かめた Minecraft Java版の DataVersion (26.2) |
 | `utf16_to_string` | — | — | — | — | `utf16_to_string()` |  |
 | `write` | `Write()` | `write()` | `write()` | `write()` | `write()` | タグを 1 行の SNBT へ変換する |
 | `write_bytes` | `WriteBytes()` | `writeBytes()` | `writeBytes()` | `write_bytes()` | `write_bytes()` | NBT をバイト列へ書き出す |

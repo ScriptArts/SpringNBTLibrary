@@ -477,18 +477,46 @@ class TestDataVersion:
 
         assert error.value.code == ErrorCode.UNSUPPORTED_DATA_VERSION
 
-    def test_許可すれば対象バージョンとして書き戻す(self):
+    def test_許可すれば古いチャンクも元のバージョンのまま書き戻せる(self):
         chunk = Chunk.from_nbt(
             self.foreign_chunk(),
             ChunkReadOptions(on_version_mismatch=VersionMismatchAction.IGNORE))
 
-        # 書き戻しは常に対象バージョンへ揃える
+        # DataVersion は読んだ値のまま残す
         written = chunk.to_nbt(ChunkWriteOptions(allow_foreign_data_version=True))
-        assert written.get_int("DataVersion") == TARGET_DATA_VERSION
+        assert written.get_int("DataVersion") == 3953
 
     def test_対象バージョンのチャンクはそのまま書き戻せる(self):
         chunk = load_chunk("palette_1")
         assert chunk.to_nbt().get_int("DataVersion") == TARGET_DATA_VERSION
+
+    @staticmethod
+    def newer_chunk() -> NbtCompound:
+        """対象より新しい DataVersion を持つチャンクを作る。"""
+        root = read_file(vector_path("palette_1")).tag
+        root.set("DataVersion", NbtInt(5015))
+        return root
+
+    def test_新しいバージョンのチャンクは警告を出さない(self):
+        warnings = []
+        options = ChunkReadOptions(
+            on_version_mismatch=VersionMismatchAction.WARN,
+            on_warning=warnings.append)
+
+        # 形式が同じであれば、新しいバージョンでも黙って読める
+        chunk = Chunk.from_nbt(self.newer_chunk(), options)
+        assert chunk.data_version == 5015
+        assert warnings == []
+
+    def test_新しいバージョンのチャンクはERRORでも通る(self):
+        options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.ERROR)
+        assert Chunk.from_nbt(self.newer_chunk(), options).data_version == 5015
+
+    def test_新しいバージョンのチャンクはそのまま書き戻せる(self):
+        chunk = Chunk.from_nbt(self.newer_chunk())
+
+        # 許可を出さなくても書き戻せて、DataVersion も変わらない
+        assert chunk.to_nbt().get_int("DataVersion") == 5015
 
 
 class TestMinecraftWorld:

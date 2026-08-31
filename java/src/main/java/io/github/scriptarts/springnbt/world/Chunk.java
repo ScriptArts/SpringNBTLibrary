@@ -192,12 +192,13 @@ public final class Chunk {
     private void checkDataVersion(ChunkReadOptions options) {
         int version = dataVersion();
 
-        if (version == SpringNbt.TARGET_DATA_VERSION) {
+        // 形式が同じであれば、新しいバージョンでもそのまま読める
+        if (version >= SpringNbt.MIN_SUPPORTED_DATA_VERSION) {
             return;
         }
 
-        String message = "DataVersion が対象と違う: " + version
-                + "（対象は " + SpringNbt.TARGET_DATA_VERSION + "）";
+        String message = "DataVersion " + version + " はこのライブラリが扱う形式より古い（"
+                + SpringNbt.MIN_SUPPORTED_DATA_VERSION + " 以降が対象）";
 
         if (options.onVersionMismatch() == VersionMismatchAction.ERROR) {
             throw new SpringNbtException(ErrorCode.UNSUPPORTED_DATA_VERSION, message);
@@ -229,15 +230,17 @@ public final class Chunk {
 
         int version = dataVersion();
 
-        if (version != SpringNbt.TARGET_DATA_VERSION && !effective.allowForeignDataVersion()) {
+        // 形式の違う古いチャンクは、書き戻すと壊しかねない
+        if (version < SpringNbt.MIN_SUPPORTED_DATA_VERSION && !effective.allowForeignDataVersion()) {
             throw new SpringNbtException(ErrorCode.UNSUPPORTED_DATA_VERSION,
-                    "DataVersion " + version + " のチャンクは書き戻せない（対象は "
-                            + SpringNbt.TARGET_DATA_VERSION
-                            + "）。許可するなら ChunkWriteOptions.setAllowForeignDataVersion(true)");
+                    "DataVersion " + version + " のチャンクは書き戻せない（"
+                            + SpringNbt.MIN_SUPPORTED_DATA_VERSION
+                            + " 以降が対象）。許可するなら"
+                            + " ChunkWriteOptions.setAllowForeignDataVersion(true)");
         }
 
-        // 常に対象バージョンを書く
-        root.set("DataVersion", new NbtInt(SpringNbt.TARGET_DATA_VERSION));
+        // DataVersion は読んだ値のまま残す
+        // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
         if (sections.isEmpty()) {
             return root;

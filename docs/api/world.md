@@ -99,7 +99,7 @@
 | `y` | `Y` | `y()` | `y` | `y` | `y()` |  |
 | **ChunkReadOptions** | `ChunkReadOptions` | `ChunkReadOptions` | `ChunkReadOptions` | `ChunkReadOptions` | `ChunkReadOptions` | チャンク読み込みのオプション |
 | `lenient_bit_storage` | `LenientBitStorage` | `lenientBitStorage()` | `lenientBitStorage` | `lenient_bit_storage` | `lenient_bit_storage` | data の長さが期待値と違うとき、長さからビット幅を逆算して読むか |
-| `on_version_mismatch` | `OnVersionMismatch` | `onVersionMismatch()` | `onVersionMismatch` | `on_version_mismatch` | `on_version_mismatch` | DataVersion が TargetDataVersion と違うときの動作 |
+| `on_version_mismatch` | `OnVersionMismatch` | `onVersionMismatch()` | `onVersionMismatch` | `on_version_mismatch` | `on_version_mismatch` | DataVersion が扱える形式より古いときの動作 |
 | `on_warning` | `OnWarning` | `onWarning()` | `onWarning` | `on_warning` | `on_warning` |  |
 | **ChunkWriteOptions** | `ChunkWriteOptions` | `ChunkWriteOptions` | `ChunkWriteOptions` | `ChunkWriteOptions` | `ChunkWriteOptions` | チャンク書き込みのオプション |
 | `allow_foreign_data_version` | `AllowForeignDataVersion` | `allowForeignDataVersion()` | `allowForeignDataVersion` | `allow_foreign_data_version` | `allow_foreign_data_version` | 対象バージョン以外の DataVersion を持つチャンクの書き戻しを許すか |

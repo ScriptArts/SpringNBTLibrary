@@ -24,7 +24,7 @@ public sealed class ChunkReadOptions
     /// <summary>既定のオプション</summary>
     public static ChunkReadOptions Default { get; } = new ChunkReadOptions();
 
-    /// <summary>DataVersion が <see cref="SpringNbt.TargetDataVersion"/> と違うときの動作</summary>
+    /// <summary>DataVersion が扱える形式より古いときの動作</summary>
     public VersionMismatchAction OnVersionMismatch { get; set; } = VersionMismatchAction.Warn;
 
     /// <summary>警告の通知先
@@ -185,14 +185,16 @@ public sealed class Chunk
     {
         int version = DataVersion;
 
-        if (version == SpringNbt.TargetDataVersion)
+        // 形式が同じであれば、新しいバージョンでもそのまま読める
+        if (version >= SpringNbt.MinSupportedDataVersion)
         {
             return;
         }
 
         string message = string.Create(
             CultureInfo.InvariantCulture,
-            $"DataVersion が対象と違う: {version}（対象は {SpringNbt.TargetDataVersion}）");
+            $"DataVersion {version} はこのライブラリが扱う形式より古い"
+                + $"（{SpringNbt.MinSupportedDataVersion} 以降が対象）");
 
         if (options.OnVersionMismatch == VersionMismatchAction.Error)
         {
@@ -232,19 +234,20 @@ public sealed class Chunk
 
         int version = DataVersion;
 
-        // 対象バージョン以外のチャンクは、明示的に許可されない限り書き戻さない
-        if (version != SpringNbt.TargetDataVersion && !effective.AllowForeignDataVersion)
+        // 形式の違う古いチャンクは、書き戻すと壊しかねない
+        if (version < SpringNbt.MinSupportedDataVersion && !effective.AllowForeignDataVersion)
         {
             string message = string.Create(
                 CultureInfo.InvariantCulture,
-                $"DataVersion {version} のチャンクは書き戻せない（対象は {SpringNbt.TargetDataVersion}）");
+                $"DataVersion {version} のチャンクは書き戻せない"
+                    + $"（{SpringNbt.MinSupportedDataVersion} 以降が対象）");
             throw new SpringNbtException(
                 ErrorCode.UnsupportedDataVersion,
                 message + "。許可するなら ChunkWriteOptions.AllowForeignDataVersion を立てること");
         }
 
-        // 常に対象バージョンを書く
-        root.Set("DataVersion", new NbtInt(SpringNbt.TargetDataVersion));
+        // DataVersion は読んだ値のまま残す
+        // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
         if (sections.Count == 0)
         {

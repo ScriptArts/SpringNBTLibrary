@@ -23,7 +23,7 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * DataVersion が対象と違うときの動作
+     * DataVersion が扱える形式より古いときの動作
      *
      * @return 動作
      */
@@ -32,7 +32,7 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * DataVersion が対象と違うときの動作を設定する
+     * DataVersion が扱える形式より古いときの動作を設定する
      *
      * @param value 動作
      * @return このオブジェクト

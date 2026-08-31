@@ -8,7 +8,7 @@
  * 仕様: `docs/spec/30-chunk-format.md`
  */
 
-import { TARGET_DATA_VERSION } from "../index.js";
+import { MIN_SUPPORTED_DATA_VERSION } from "../index.js";
 import { ErrorCode, SpringNbtError } from "../errors.js";
 import {
   NbtByte,
@@ -64,7 +64,7 @@ export enum VersionMismatchAction {
 /** チャンク読み込みのオプション */
 export interface ChunkReadOptions {
   /**
-   * DataVersion が対象と違うときの動作
+   * DataVersion が扱える形式より古いときの動作
    * 既定は `Warn`
    */
   onVersionMismatch?: VersionMismatchAction;
@@ -292,7 +292,8 @@ export class Chunk {
   #checkDataVersion(options?: ChunkReadOptions): void {
     const version = this.dataVersion;
 
-    if (version === TARGET_DATA_VERSION) {
+    // 形式が同じであれば、新しいバージョンでもそのまま読める
+    if (version >= MIN_SUPPORTED_DATA_VERSION) {
       return;
     }
 
@@ -303,7 +304,8 @@ export class Chunk {
     }
 
     const message =
-      `DataVersion が対象と違う: ${version}（対象は ${TARGET_DATA_VERSION}）`;
+      `DataVersion ${version} はこのライブラリが扱う形式より古い` +
+      `（${MIN_SUPPORTED_DATA_VERSION} 以降が対象）`;
 
     if (action === VersionMismatchAction.Error) {
       throw new SpringNbtError(ErrorCode.UnsupportedDataVersion, message);
@@ -328,16 +330,18 @@ export class Chunk {
       allowForeign = true;
     }
 
-    if (version !== TARGET_DATA_VERSION && !allowForeign) {
+    // 形式の違う古いチャンクは、書き戻すと壊しかねない
+    if (version < MIN_SUPPORTED_DATA_VERSION && !allowForeign) {
       throw new SpringNbtError(
         ErrorCode.UnsupportedDataVersion,
-        `DataVersion ${version} のチャンクは書き戻せない（対象は ${TARGET_DATA_VERSION}）。` +
+        `DataVersion ${version} のチャンクは書き戻せない` +
+          `（${MIN_SUPPORTED_DATA_VERSION} 以降が対象）。` +
           "許可するなら allowForeignDataVersion を立てること",
       );
     }
 
-    // 常に対象バージョンを書く
-    this.raw.set("DataVersion", new NbtInt(TARGET_DATA_VERSION));
+    // DataVersion は読んだ値のまま残す
+    // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
     if (this.#sections.size === 0) {
       return this.raw;

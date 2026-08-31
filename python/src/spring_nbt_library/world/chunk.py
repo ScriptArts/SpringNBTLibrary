@@ -13,7 +13,7 @@ from __future__ import annotations
 import enum
 from typing import Callable, Dict, List, Optional, Union
 
-from .. import TARGET_DATA_VERSION
+from .. import MIN_SUPPORTED_DATA_VERSION, TARGET_DATA_VERSION
 from ..errors import ErrorCode, SpringNbtError
 from ..nbt import NbtByte, NbtCompound, NbtInt, NbtList, NbtString, TagType
 from .block_state import BlockState
@@ -275,10 +275,12 @@ class Chunk:
         """DataVersion を検査し、オプションに従って警告またはエラーにする"""
         version = self.data_version
 
-        if version == TARGET_DATA_VERSION:
+        # 形式が同じであれば、新しいバージョンでもそのまま読める
+        if version >= MIN_SUPPORTED_DATA_VERSION:
             return
 
-        message = "DataVersion が対象と違う: %d（対象は %d）" % (version, TARGET_DATA_VERSION)
+        message = ("DataVersion %d はこのライブラリが扱う形式より古い（%d 以降が対象）"
+                   % (version, MIN_SUPPORTED_DATA_VERSION))
 
         if options.on_version_mismatch == VersionMismatchAction.ERROR:
             raise SpringNbtError(ErrorCode.UNSUPPORTED_DATA_VERSION, message)
@@ -301,15 +303,16 @@ class Chunk:
 
         version = self.data_version
 
-        if version != TARGET_DATA_VERSION and not effective.allow_foreign_data_version:
+        # 形式の違う古いチャンクは、書き戻すと壊しかねない
+        if version < MIN_SUPPORTED_DATA_VERSION and not effective.allow_foreign_data_version:
             raise SpringNbtError(
                 ErrorCode.UNSUPPORTED_DATA_VERSION,
-                "DataVersion %d のチャンクは書き戻せない（対象は %d）。"
+                "DataVersion %d のチャンクは書き戻せない（%d 以降が対象）。"
                 "許可するなら ChunkWriteOptions(allow_foreign_data_version=True)"
-                % (version, TARGET_DATA_VERSION))
+                % (version, MIN_SUPPORTED_DATA_VERSION))
 
-        # 常に対象バージョンを書く
-        self.raw.set("DataVersion", NbtInt(TARGET_DATA_VERSION))
+        # DataVersion は読んだ値のまま残す
+        # 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
         if len(self._sections) == 0:
             return self.raw

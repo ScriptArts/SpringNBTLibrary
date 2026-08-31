@@ -5,7 +5,18 @@
  * 対象バージョンは Java版 26.2 (DataVersion 4903)
  */
 
-/** 本ライブラリが対象とする Minecraft Java版の DataVersion (26.2) */
+/**
+ * このライブラリが扱えるワールド形式の下限となる DataVersion (26.1)
+ *
+ * 26.1 で次元とプレイヤーデータの置き場が変わり、いまの形式になった
+ * これ以降のバージョンは、形式が同じであればそのまま読み書きできる
+ *
+ * これより古いワールドは構成そのものが違うので、
+ * 読み込み時に UNSUPPORTED_DATA_VERSION の対象になる
+ */
+export const MIN_SUPPORTED_DATA_VERSION = 4786;
+
+/** 動作を確かめた Minecraft Java版の DataVersion (26.2) */
 export const TARGET_DATA_VERSION = 4903;
 
 export { ErrorCode, SpringNbtError, errorCodeAsString } from "./errors.js";

@@ -569,13 +569,49 @@ class WorldTest {
         }
 
         @Test
-        void 許可すれば対象バージョンとして書き戻す() {
+        void 許可すれば古いチャンクも元のバージョンのまま書き戻せる() {
             Chunk chunk = Chunk.fromNbt(foreignChunk(),
                     new ChunkReadOptions().setOnVersionMismatch(VersionMismatchAction.IGNORE));
             ChunkWriteOptions write = new ChunkWriteOptions().setAllowForeignDataVersion(true);
 
-            // 書き戻しは常に対象バージョンへ揃える
-            assertEquals(SpringNbt.TARGET_DATA_VERSION, chunk.toNbt(write).getInt("DataVersion"));
+            // DataVersion は読んだ値のまま残す
+            assertEquals(3953, chunk.toNbt(write).getInt("DataVersion"));
+        }
+
+        /** 対象より新しい DataVersion を持つチャンクを作る。 */
+        private NbtCompound newerChunk() {
+            NamedTag named = NbtIo.readFile(vectorPath("palette_1"), null);
+            NbtCompound root = (NbtCompound) named.tag();
+            root.setInt("DataVersion", 5015);
+            return root;
+        }
+
+        @Test
+        void 新しいバージョンのチャンクは警告を出さない() {
+            List<String> warnings = new ArrayList<>();
+            ChunkReadOptions options = new ChunkReadOptions()
+                    .setOnVersionMismatch(VersionMismatchAction.WARN)
+                    .setOnWarning(warnings::add);
+
+            // 形式が同じであれば、新しいバージョンでも黙って読める
+            Chunk chunk = Chunk.fromNbt(newerChunk(), options);
+            assertEquals(5015, chunk.dataVersion());
+            assertTrue(warnings.isEmpty());
+        }
+
+        @Test
+        void 新しいバージョンのチャンクはエラー設定でも通る() {
+            ChunkReadOptions options = new ChunkReadOptions()
+                    .setOnVersionMismatch(VersionMismatchAction.ERROR);
+            assertEquals(5015, Chunk.fromNbt(newerChunk(), options).dataVersion());
+        }
+
+        @Test
+        void 新しいバージョンのチャンクはそのまま書き戻せる() {
+            Chunk chunk = Chunk.fromNbt(newerChunk(), null);
+
+            // 許可を出さなくても書き戻せて、DataVersion も変わらない
+            assertEquals(5015, chunk.toNbt(null).getInt("DataVersion"));
         }
 
         @Test

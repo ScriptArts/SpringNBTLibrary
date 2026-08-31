@@ -633,14 +633,59 @@ public class WorldTests
         }
 
         [Fact]
-        public void 許可すれば対象バージョンとして書き戻す()
+        public void 許可すれば古いチャンクも元のバージョンのまま書き戻せる()
         {
             ChunkReadOptions read = new ChunkReadOptions { OnVersionMismatch = VersionMismatchAction.Ignore };
             Chunk chunk = Chunk.FromNbt(ForeignChunk(), read);
             ChunkWriteOptions write = new ChunkWriteOptions { AllowForeignDataVersion = true };
 
-            // 書き戻しは常に対象バージョンへ揃える
-            Assert.Equal(SpringNbt.TargetDataVersion, chunk.ToNbt(write).GetInt("DataVersion"));
+            // DataVersion は読んだ値のまま残す
+            Assert.Equal(3953, chunk.ToNbt(write).GetInt("DataVersion"));
+        }
+
+        /// <summary>対象より新しい DataVersion を持つチャンクを作る。</summary>
+        private static NbtCompound NewerChunk()
+        {
+            NamedTag named = NbtIo.ReadFile(VectorPath("palette_1"));
+            NbtCompound root = (NbtCompound)named.Tag;
+            root.SetInt("DataVersion", 5015);
+            return root;
+        }
+
+        [Fact]
+        public void 新しいバージョンのチャンクは警告を出さない()
+        {
+            List<string> warnings = new List<string>();
+            ChunkReadOptions options = new ChunkReadOptions
+            {
+                OnVersionMismatch = VersionMismatchAction.Warn,
+                OnWarning = warnings.Add,
+            };
+
+            // 形式が同じであれば、新しいバージョンでも黙って読める
+            Chunk chunk = Chunk.FromNbt(NewerChunk(), options);
+            Assert.Equal(5015, chunk.DataVersion);
+            Assert.Empty(warnings);
+        }
+
+        [Fact]
+        public void 新しいバージョンのチャンクはエラー設定でも通る()
+        {
+            ChunkReadOptions options = new ChunkReadOptions
+            {
+                OnVersionMismatch = VersionMismatchAction.Error,
+            };
+
+            Assert.Equal(5015, Chunk.FromNbt(NewerChunk(), options).DataVersion);
+        }
+
+        [Fact]
+        public void 新しいバージョンのチャンクはそのまま書き戻せる()
+        {
+            Chunk chunk = Chunk.FromNbt(NewerChunk());
+
+            // 許可を出さなくても書き戻せて、DataVersion も変わらない
+            Assert.Equal(5015, chunk.ToNbt().GetInt("DataVersion"));
         }
 
         [Fact]

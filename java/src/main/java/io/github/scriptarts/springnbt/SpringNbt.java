@@ -8,7 +8,18 @@ package io.github.scriptarts.springnbt;
  */
 public final class SpringNbt {
 
-    /** 本ライブラリが対象とする Minecraft Java版の DataVersion (26.2) */
+    /**
+     * このライブラリが扱えるワールド形式の下限となる DataVersion (26.1)
+     *
+     * <p>26.1 で次元とプレイヤーデータの置き場が変わり、いまの形式になった
+     * これ以降のバージョンは、形式が同じであればそのまま読み書きできる
+     *
+     * <p>これより古いワールドは構成そのものが違うので、
+     * 読み込み時に {@code UNSUPPORTED_DATA_VERSION} の対象になる
+     */
+    public static final int MIN_SUPPORTED_DATA_VERSION = 4786;
+
+    /** 動作を確かめた Minecraft Java版の DataVersion (26.2) */
     public static final int TARGET_DATA_VERSION = 4903;
 
     private SpringNbt() {

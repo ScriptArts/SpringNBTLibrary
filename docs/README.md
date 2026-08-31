@@ -69,7 +69,7 @@ Minecraft Java版 26.2（DataVersion `4903`）のワールド／NBTファイル�
 
 - [0001. モノレポにする](adr/0001-monorepo.md)
 - [0002. 命名は各言語のイディオムに従う](adr/0002-idiomatic-naming.md)
-- [0003. 読みは寛容・書きは最新固定](adr/0003-version-policy.md)
+- [0003. 見るのは形式であってバージョンではない](adr/0003-version-policy.md)
 - [0004. Heightmap と光源の再計算は行わない](adr/0004-defer-heightmap-recalc.md)
 - [0005. 全言語で共通のエラーモデルを使う](adr/0005-unified-error-model.md)
 - [0006. SNBT はバイナリへ写せる範囲だけを扱う](adr/0006-snbt-scope.md)
