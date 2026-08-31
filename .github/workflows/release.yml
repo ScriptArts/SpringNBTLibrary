@@ -120,6 +120,15 @@ jobs:
           (cd artifacts && sha256sum * > SHA256SUMS.txt)
           ls -la artifacts
 
+      # CHANGELOG からその版の節を取り出し、案内文と合わせて本文にする
+      # 節が無ければここで落ちるので、変更点を書き忘れたまま公開できない
+      - name: リリース本文を組み立てる
+        run: |
+          python3 spec/tools/release_notes.py \
+            "${{ steps.version.outputs.value }}" --output release-body.md
+          echo "----- ここから本文 -----"
+          cat release-body.md
+
       - name: Releases へ上げる
         if: github.ref_type == 'tag'
         env:
@@ -127,7 +136,7 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" artifacts/* \
             --title "${GITHUB_REF_NAME}" \
-            --notes-file .github/release-notes.md \
+            --notes-file release-body.md \
             --verify-tag
 
       # 手動実行では中身を確認できるように残すだけにする

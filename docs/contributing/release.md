@@ -112,6 +112,9 @@ python3 spec/tools/scan_world.py "<ワールドのパス>"
 
 あわせて `CHANGELOG.md` に変更点を書く。
 
+**これはリリースの必須条件である。** 本文はここから組み立てるので、
+節が無いとワークフローが落ちて公開まで進まない。
+
 ---
 
 ## 5. 公開
@@ -157,8 +160,26 @@ Actions の画面から `Run workflow` を選ぶと、
 
 中身を確かめてからタグを打てる。
 
-### 5.4 リリースノート
+### 5.4 リリースの本文
 
-[`.github/release-notes.md`](../../.github/release-notes.md) が
-そのまま本文になる。版ごとの変更点を載せたい場合は、
-Releases の画面で後から追記する。
+本文は 2 つを継いで作る。
+
+| 部分 | 出どころ |
+|---|---|
+| 変更点 | `CHANGELOG.md` の `## [<版>]` の節 |
+| 案内文 | [`.github/release-common.md`](../../.github/release-common.md) |
+
+組み立てるのは
+[`spec/tools/release_notes.py`](../../spec/tools/release_notes.py) で、
+リリースのワークフローが呼ぶ。手元でも確かめられる。
+
+```bash
+python3 spec/tools/release_notes.py 1.1.0
+```
+
+変更点の実体を `CHANGELOG.md` 側に置いているのは、同じ内容を 2 か所へ
+書かせないためである。**節が無ければ組み立てが失敗する**ので、
+変更点を書き忘れたまま公開することがない。
+
+リポジトリ内への相対リンクは、そのタグを指す絶対URLへ書き換える。
+リリースのページからは相対リンクを辿れないため。
