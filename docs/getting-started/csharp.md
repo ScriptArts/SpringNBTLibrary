@@ -42,7 +42,7 @@ NuGet へは公開していないので、落としたファイルを置いた�
 
 dll を直接参照したいときはこちらです。
 
-1. `SpringNBTLibrary-dotnet8.zip` を展開します。中身は次のとおりです
+1. `SpringNBTLibrary-<版>-dotnet8.zip` を展開します。中身は次のとおりです
 
    ```
    SpringNBTLibrary.dll   ライブラリ本体

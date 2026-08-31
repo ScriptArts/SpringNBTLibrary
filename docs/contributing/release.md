@@ -139,22 +139,11 @@ git push origin v1.0.0
 
 | 言語 | ファイル | 中身 |
 |---|---|---|
-| C# | `SpringNBTLibrary-dotnet8.zip` | `.dll` と `.xml`（補完用）、LICENSE、README |
-| C# | `SpringNBTLibrary.<版>.nupkg` | NuGet のパッケージ |
-| Java | `spring-nbt-library.jar` | |
-| TypeScript | `spring-nbt-library.tgz` | ビルド済み JS と型定義 |
+| C# | `SpringNBTLibrary-<版>-dotnet8.zip` | `.dll` と `.xml`（補完用）、LICENSE、README |
+| Java | `spring-nbt-library-<版>.jar` | |
+| TypeScript | `spring-nbt-library-<版>.tgz` | ビルド済み JS と型定義 |
 | Python | `spring_nbt_library-<版>-py3-none-any.whl` / `.tar.gz` | wheel と sdist |
-| Rust | `spring-nbt-library.crate` | ソースの tar.gz |
-
-**ファイル名に版を入れない。** どの版かは Releases のページが示している。
-
-例外は `.nupkg` と Python の 2 つで、こちらはツールがファイル名から版を読む。
-
-| ファイル | 外せない理由 |
-|---|---|
-| `.nupkg` | NuGet はフォルダを読むとき `<Id>.<版>.nupkg` から版を判定する。名前を変えると見つけられない |
-| `.whl` | pip がファイル名を「配布名-版-python-abi-platform」として解釈する。名前を変えると弾かれる |
-| `.tar.gz` | 同上。sdist も名前から配布名と版を読む |
+| Rust | `spring-nbt-library-<版>.crate` | ソースの tar.gz |
 
 Rust は git 参照が主な使い方になる。 Cargo は git リポジトリを直接
 依存にできるので、ファイルを落とす必要がない。`.crate` は

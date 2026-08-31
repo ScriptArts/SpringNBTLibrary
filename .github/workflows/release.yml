@@ -79,12 +79,10 @@ jobs:
           cp csharp/src/SpringNBTLibrary/bin/Release/net8.0/SpringNBTLibrary.xml artifacts/csharp/
           cp LICENSE artifacts/csharp/
           cp csharp/README.md artifacts/csharp/
-          (cd artifacts/csharp && zip -q -r ../SpringNBTLibrary-dotnet8.zip .)
+          (cd artifacts/csharp && zip -q -r \
+            "../SpringNBTLibrary-${{ steps.version.outputs.value }}-dotnet8.zip" .)
 
       # NuGet へは公開しないが、落としたファイルをローカルのソースにできる
-      #
-      # ファイル名の版は外せない。NuGet はフォルダを読むとき
-      # <Id>.<版>.nupkg という名前から版を判定するため
       - name: C# (nupkg)
         run: |
           dotnet pack csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj \
@@ -94,16 +92,14 @@ jobs:
         run: |
           (cd java && mvn --batch-mode -DskipTests package)
           mkdir -p artifacts
-          cp java/target/spring-nbt-library-*.jar artifacts/spring-nbt-library.jar
+          cp java/target/spring-nbt-library-*.jar artifacts/
 
       - name: TypeScript (tgz)
         run: |
           (cd typescript && npm run build && npm pack)
           mkdir -p artifacts
-          cp typescript/spring-nbt-library-*.tgz artifacts/spring-nbt-library.tgz
+          cp typescript/spring-nbt-library-*.tgz artifacts/
 
-      # ファイル名の版は外せない。pip が wheel の名前を
-      # 「配布名-版-python-abi-platform」として解釈するため
       - name: Python (wheel / sdist)
         run: |
           pip install build
@@ -115,7 +111,7 @@ jobs:
         run: |
           (cd rust && cargo package --no-verify)
           mkdir -p artifacts
-          cp rust/target/package/spring-nbt-library-*.crate artifacts/spring-nbt-library.crate
+          cp rust/target/package/spring-nbt-library-*.crate artifacts/
 
       # 落としたファイルが壊れていないか、利用者が確かめられるようにする
       - name: チェックサムを作る
