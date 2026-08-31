@@ -72,30 +72,6 @@ World レイヤでも 3,481 チャンク（83,544 セクション）の再エン
 python3 spec/tools/scan_world.py "<ワールドのパス>"
 ```
 
-## 開発
-
-```bash
-# ツールチェーンへ PATH を通す（Homebrew 前提）
-source spec/tools/env.sh
-
-# 各言語のテスト
-(cd csharp     && dotnet test)
-(cd java       && mvn test)
-(cd typescript && npm test)
-(cd python     && python -m pytest tests)
-(cd rust       && cargo test)
-
-# 対応言語すべての挙動が一致することの検証（このライブラリの核）
-./spec/run-conformance.sh
-
-# ドキュメントと実装の一致検証
-python3 spec/tools/check_docs_sync.py
-python3 spec/tools/check_links.py
-
-# コメントと禁止記法の規約適合
-python3 spec/tools/check_comments.py
-```
-
 ## ライセンス
 
 MIT License — Copyright (c) 2026 ScriptArts

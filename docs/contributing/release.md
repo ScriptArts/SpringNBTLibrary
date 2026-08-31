@@ -71,6 +71,10 @@ source spec/tools/env.sh
 
 # ドキュメントと実装の一致
 python3 spec/tools/check_docs_sync.py
+python3 spec/tools/check_links.py
+
+# コメントと禁止記法の規約適合
+python3 spec/tools/check_comments.py
 
 # 実ワールドでの検証
 python3 spec/tools/scan_world.py "<ワールドのパス>"
