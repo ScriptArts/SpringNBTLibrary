@@ -3,8 +3,9 @@
 本書は SpringNBTLibrary の全言語実装が従う共通規約を定める。
 各言語の実装は本書と本ディレクトリ配下の仕様書を**唯一の正**として実装される。
 
-- 対象: Minecraft **Java版 26.2**（DataVersion `4903` / Protocol `776`）
-- 過去バージョンのワールドデータ改変は非サポート（→ [07 バージョンポリシー](../guide/07-version-policy.md)）
+- 対象: **26.1 で導入されたワールド形式**（DataVersion `4786` 以降）
+- 検証: Minecraft **Java版 26.2**（DataVersion `4903` / Protocol `776`）の実データ
+- それより古い形式のワールド改変は非サポート（→ [07 バージョンポリシー](../guide/07-version-policy.md)）
 
 ---
 

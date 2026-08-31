@@ -5,7 +5,7 @@ namespace SpringNBTLibrary;
 /// </summary>
 /// <remarks>
 /// 仕様は <c>docs/spec/</c> を唯一の正とする
-/// 対象バージョンは Java版 26.2 (DataVersion 4903)
+/// 対象は 26.1 で導入されたワールド形式 (DataVersion 4786 以降)
 /// </remarks>
 public static class SpringNbt
 {

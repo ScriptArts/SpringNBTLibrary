@@ -1,7 +1,7 @@
 //! SpringNBTLibrary — Minecraft Java版の NBT / Anvil ワールドデータを読み書きするライブラリ
 //!
 //! 仕様は `docs/spec/` を唯一の正とする
-//! 対象バージョンは Java版 26.2 (DataVersion 4903)
+//! 対象は 26.1 で導入されたワールド形式 (DataVersion 4786 以降)
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

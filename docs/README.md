@@ -1,6 +1,6 @@
 # SpringNBTLibrary ドキュメント
 
-Minecraft Java版 26.2（DataVersion `4903`）のワールド／NBTファイルを
+Minecraft Java版 26.1 以降のワールド／NBTファイルを
 複数の言語で同一に読み書きするライブラリのドキュメントです。
 
 まずどこを読むか:

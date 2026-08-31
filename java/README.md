@@ -1,7 +1,10 @@
 # SpringNBTLibrary（Java 版）
 
-Minecraft Java版 26.2（DataVersion `4903`）のワールド・NBTファイルを読み書きするライブラリです。
+Minecraft Java版 26.1 以降のワールド・NBTファイルを読み書きするライブラリです。
 Java 21 (LTS) 以上で動きます。
+
+対象は 26.1 で導入されたワールド形式です。それ以降のバージョンは、
+形式が変わらない限りそのまま扱えます。
 
 C# / Java / TypeScript / Python / Rust 版があり、どれも同じ仕様書から作っています。
 同じ入力からは同じ結果が出ます（[対応言語の一覧](../README.md#対応言語)）。
