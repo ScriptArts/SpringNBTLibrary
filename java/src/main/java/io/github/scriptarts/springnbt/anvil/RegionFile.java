@@ -616,6 +616,8 @@ public final class RegionFile implements AutoCloseable {
         }
 
         writeHeader();
+        // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        ensureDirectory();
 
         try {
             Files.write(path, data);
@@ -704,8 +706,23 @@ public final class RegionFile implements AutoCloseable {
         }
     }
 
+    /**
+     * ファイルを置くディレクトリが無ければ作る
+     *
+     * <p>読むだけの操作で空のディレクトリができないよう、書き出す直前にだけ呼ぶ
+     */
+    private void ensureDirectory() {
+        try {
+            Files.createDirectories(directory);
+        } catch (IOException error) {
+            throw new SpringNbtException(ErrorCode.IO, "ディレクトリを作れない: " + directory, error);
+        }
+    }
+
     private void writeExternalFile(int chunkX, int chunkZ, byte[] payload) {
         Path external = externalPath(chunkX, chunkZ);
+        // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        ensureDirectory();
 
         try {
             Files.write(external, payload);

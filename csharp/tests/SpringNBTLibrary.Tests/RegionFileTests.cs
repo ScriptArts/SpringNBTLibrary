@@ -193,6 +193,21 @@ public class RegionFileTests : IDisposable
     }
 
     [Fact]
+    public void TruncatedGzipChunkIsMalformedData()
+    {
+        string directory = CopyVector("lz4");
+        using RegionFile region = RegionFile.Open(
+            Path.Combine(directory, "r.0.0.mca"), RegionFileMode.ReadWrite);
+
+        // GZipのヘッダだけで本体が無い、途中で切れたチャンク
+        byte[] truncated = { 0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF };
+        region.WriteChunkRaw(0, 0, new RawChunk(ChunkCompression.Gzip, truncated));
+
+        SpringNbtException error = Assert.Throws<SpringNbtException>(() => region.ReadChunk(0, 0));
+        Assert.Equal(ErrorCode.MalformedData, error.Code);
+    }
+
+    [Fact]
     public void WritingLz4IsRejected()
     {
         string directory = CopyVector("lz4");
@@ -503,6 +518,29 @@ public class RegionFileTests : IDisposable
         Assert.Equal(-1, reopened.ReadChunk(-1, -1)!.GetInt("xPos"));
         Assert.Null(reopened.ReadChunk(100, 100));
         Assert.False(reopened.HasChunk(100, 100));
+    }
+
+    [Fact]
+    public void ReadWriteFolderCreatesMissingDirectoryOnlyWhenWriting()
+    {
+        string missing = Path.Combine(workDirectory, "missing", "region");
+
+        // 読むだけなら、無いディレクトリは作らない
+        using (RegionFolder folder = RegionFolder.Open(missing, RegionFileMode.ReadWrite))
+        {
+            Assert.Null(folder.ReadChunk(0, 0));
+        }
+
+        Assert.False(Directory.Exists(missing));
+
+        // 書き出すときに作る
+        using (RegionFolder folder = RegionFolder.Open(missing, RegionFileMode.ReadWrite))
+        {
+            folder.WriteChunk(0, 0, SampleChunk(0, 0));
+        }
+
+        using RegionFolder reopened = RegionFolder.Open(missing);
+        Assert.Equal(0, reopened.ReadChunk(0, 0)!.GetInt("xPos"));
     }
 
     [Fact]

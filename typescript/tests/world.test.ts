@@ -6,7 +6,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -32,7 +32,9 @@ import {
   NbtString,
   readFile,
   writeBytes,
+  writeFile,
 } from "../src/nbt/index.js";
+import { RegionFile, RegionFileMode } from "../src/anvil/index.js";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
@@ -571,6 +573,37 @@ test("MinecraftWorld: level.dat が無いディレクトリは IO", () => {
 
   try {
     assertErrorCode(ErrorCode.Io, () => MinecraftWorld.open(work));
+  } finally {
+    // テストごとに作った一時ディレクトリを片付ける
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test("MinecraftWorld: 次元経由で読んだチャンクの警告も通知先へ届く", () => {
+  const work = mkdtempSync(join(tmpdir(), "springnbt-world-"));
+
+  try {
+    const region = join(work, "dimensions", "minecraft", "overworld", "region");
+    mkdirSync(region, { recursive: true });
+
+    // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
+    const level = new NbtCompound();
+    level.set("Data", new NbtCompound());
+    writeFile(join(work, "level.dat"), new NamedTag("", level));
+
+    const file = RegionFile.open(join(region, "r.0.0.mca"), RegionFileMode.ReadWrite);
+    file.writeChunk(0, 0, foreignChunk());
+    file.close();
+
+    const warnings: string[] = [];
+    const world = MinecraftWorld.open(work, { chunkRead: { onWarning: (message) => warnings.push(message) } });
+    const overworld = world.dimension("minecraft:overworld");
+    assert.ok(overworld !== undefined);
+    assert.ok(overworld.chunk(0, 0) !== undefined);
+    world.close();
+
+    // ワールドを開くときに渡した通知先が、次元経由の読み込みでも呼ばれる
+    assert.equal(warnings.length, 1);
   } finally {
     // テストごとに作った一時ディレクトリを片付ける
     rmSync(work, { recursive: true, force: true });

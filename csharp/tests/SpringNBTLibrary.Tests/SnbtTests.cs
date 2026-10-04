@@ -111,6 +111,14 @@ public class SnbtTests
     }
 
     [Fact]
+    public void FloatOutOfRangeBecomesSignedInfinity()
+    {
+        // binary32の範囲を超える値は、符号付きの無限大になる
+        Assert.True(float.IsPositiveInfinity(Assert.IsType<NbtFloat>(Snbt.Parse("1e39f")).Value));
+        Assert.True(float.IsNegativeInfinity(Assert.IsType<NbtFloat>(Snbt.Parse("-1e39f")).Value));
+    }
+
+    [Fact]
     public void TypedArrays()
     {
         Assert.Equal(new NbtByteArray(new sbyte[] { 1, 2 }), Snbt.Parse("[B; 1b, 2b]"));
@@ -154,6 +162,32 @@ public class SnbtTests
         Assert.Equal("H", Assert.IsType<NbtString>(Snbt.Parse("\"\\u0048\"")).Value);
         Assert.Equal(" ", Assert.IsType<NbtString>(Snbt.Parse("\"\\s\"")).Value);
         Assert.Equal("\U0001F600", Assert.IsType<NbtString>(Snbt.Parse("\"\\U0001F600\"")).Value);
+    }
+
+    [Fact]
+    public void SurrogateEscapesFollowTheSameRulesEverywhere()
+    {
+        string lone = ((char)0xD800).ToString();
+
+        // \Uでサロゲートの範囲を書くと、\uと同じく孤立サロゲートになる
+        Assert.Equal(new NbtString(lone), Snbt.Parse("\"\\U0000D800\""));
+        Assert.Equal(new NbtString(lone), Snbt.Parse("\"\\uD800\""));
+
+        // 対になったサロゲートは補助文字1文字と同じ
+        Assert.Equal(new NbtString(char.ConvertFromUtf32(0x1F600)), Snbt.Parse("\"\\uD83D\\uDE00\""));
+
+        // コードポイントの範囲外と、キーの孤立サロゲートは仕様に反する
+        Assert.Equal(ErrorCode.MalformedData,
+            Assert.Throws<SpringNbtException>(() => Snbt.Parse("\"\\U00110000\"")).Code);
+        Assert.Equal(ErrorCode.MalformedData,
+            Assert.Throws<SpringNbtException>(() => Snbt.Parse("{\"\\uD800\":1}")).Code);
+        Assert.Equal(ErrorCode.MalformedData,
+            Assert.Throws<SpringNbtException>(() => Snbt.Parse("{\"\\U0000D800\":1}")).Code);
+
+        // APIからも孤立サロゲートのキーは設定できない
+        NbtCompound compound = new NbtCompound();
+        Assert.Equal(ErrorCode.InvalidArgument,
+            Assert.Throws<SpringNbtException>(() => compound.Set(lone, new NbtInt(1))).Code);
     }
 
     [Fact]

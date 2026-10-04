@@ -77,6 +77,12 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(value);
 
+        // 孤立サロゲートを含むキーは書き出すと読み戻せないので、ここで止める
+        if (Mutf8.HasLoneSurrogate(key))
+        {
+            throw SpringNbtException.InvalidArgument("キーに孤立サロゲートは使えない");
+        }
+
         // TAG_EndはCompoundの終端マーカーなので値として持てない
         if (value.Type == TagType.End)
         {

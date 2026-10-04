@@ -176,4 +176,32 @@ public final class Mutf8 {
 
         return length;
     }
+
+    /**
+     * 対になっていないサロゲートを含むか
+     *
+     * <p>正しいサロゲートペアは1文字として数え、孤立したものだけを探す
+     * Compoundのキーには孤立サロゲートを許さないので、その検査に使う
+     */
+    static boolean hasLoneSurrogate(String text) {
+        // コード単位を1つずつ見て、サロゲート対をまとめる
+        for (int index = 0; index < text.length(); index++) {
+            char c = text.charAt(index);
+
+            // 上位サロゲートは、対になる下位サロゲートとまとめて1文字を成す
+            if (Character.isHighSurrogate(c)) {
+                // 対が揃っていなければ孤立サロゲート
+                if (index + 1 >= text.length() || !Character.isLowSurrogate(text.charAt(index + 1))) {
+                    return true;
+                }
+
+                index += 1;
+            } else if (Character.isLowSurrogate(c)) {
+                // 上位サロゲートを伴わない下位サロゲートは孤立している
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

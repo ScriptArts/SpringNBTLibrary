@@ -3,12 +3,14 @@
 //! 26.xでは構成が大きく変わっており、標準の3次元も`dimensions/<名前空間>/<パス>/`の下に並ぶ
 
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use crate::anvil::{ChunkPos, RegionFileMode, RegionFolder};
 use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::tag::NbtCompound;
-use crate::nbt::{read_file, write_file, NamedTag, NbtReadOptions, NbtWriteOptions};
+use crate::nbt::{read_file, write_bytes, NamedTag, NbtReadOptions, NbtWriteOptions};
 
 use super::block_state::{BlockState, IntoBlockState};
 use super::chunk::{Chunk, ChunkReadOptions, ChunkWriteOptions};
@@ -120,6 +122,7 @@ pub struct Dimension {
     directory: PathBuf,
     writable: bool,
     chunk_read: ChunkReadOptions,
+    warning: Option<SharedWarning>,
     chunk_write: ChunkWriteOptions,
     regions: Option<RegionFolder>,
     entities: Option<RegionFolder>,
@@ -138,7 +141,12 @@ impl Dimension {
     /// エンドの次元ID
     pub const THE_END: &'static str = "minecraft:the_end";
 
-    fn new(id: String, directory: PathBuf, options: &WorldOpenOptions) -> Dimension {
+    fn new(
+        id: String,
+        directory: PathBuf,
+        options: &WorldOpenOptions,
+        warning: Option<SharedWarning>,
+    ) -> Dimension {
         Dimension {
             id,
             directory,
@@ -148,6 +156,7 @@ impl Dimension {
                 on_warning: None,
                 lenient_bit_storage: options.chunk_read.lenient_bit_storage,
             },
+            warning,
             chunk_write: options.chunk_write,
             regions: None,
             entities: None,
@@ -246,9 +255,10 @@ impl Dimension {
                 None => return Ok(None),
             };
 
+            // 警告の通知先は、ワールドを開いたときに渡されたものを使う
             let options = ChunkReadOptions {
                 on_version_mismatch: self.chunk_read.on_version_mismatch,
-                on_warning: None,
+                on_warning: forward_warning(&self.warning),
                 lenient_bit_storage: self.chunk_read.lenient_bit_storage,
             };
             self.chunk_cache.insert(key, Chunk::from_nbt(nbt, &options)?);
@@ -472,10 +482,28 @@ impl Dimension {
     }
 }
 
+/// 全次元で共有する警告の通知先
+type SharedWarning = Rc<dyn Fn(&str)>;
+
+/// 共有している警告の通知先を、チャンク読み込みのオプションへ渡せる形にする
+///
+/// [`ChunkReadOptions`]の通知先は`Box`で持つので複製できない
+/// 次元ごと・チャンクごとに渡すため、`Rc`で共有したものを包み直す
+fn forward_warning(shared: &Option<SharedWarning>) -> Option<Box<dyn Fn(&str)>> {
+    match shared {
+        Some(callback) => {
+            let callback = Rc::clone(callback);
+            Some(Box::new(move |message: &str| callback(message)))
+        }
+        None => None,
+    }
+}
+
 /// Minecraft Java版のセーブデータ1つ分
 pub struct MinecraftWorld {
     directory: PathBuf,
     options: WorldOpenOptions,
+    warning: Option<SharedWarning>,
     level: LevelData,
     dimensions: HashMap<String, Dimension>,
     closed: bool,
@@ -483,7 +511,7 @@ pub struct MinecraftWorld {
 
 impl MinecraftWorld {
     /// ワールドを開く
-    pub fn open(directory: impl AsRef<Path>, options: WorldOpenOptions) -> Result<MinecraftWorld> {
+    pub fn open(directory: impl AsRef<Path>, mut options: WorldOpenOptions) -> Result<MinecraftWorld> {
         let directory = directory.as_ref().to_path_buf();
 
         if !directory.is_dir() {
@@ -504,9 +532,13 @@ impl MinecraftWorld {
 
         let named = read_file(&level_path, &NbtReadOptions::default())?;
 
+        // 警告の通知先は全次元で使うので、複製できる形にして持っておく
+        let warning = options.chunk_read.on_warning.take().map(Rc::from);
+
         Ok(MinecraftWorld {
             directory,
             options,
+            warning,
             level: LevelData { root_name: named.name, raw: named.tag },
             dimensions: HashMap::new(),
             closed: false,
@@ -593,7 +625,8 @@ impl MinecraftWorld {
                 return Ok(None);
             }
 
-            let opened = Dimension::new(normalized.clone(), path, &self.options);
+            let opened =
+                Dimension::new(normalized.clone(), path, &self.options, self.warning.clone());
             self.dimensions.insert(normalized.clone(), opened);
         }
 
@@ -642,7 +675,7 @@ impl MinecraftWorld {
     /// `level.dat`を書き戻す
     ///
     /// `level.dat`がおかしくなるとワールド全体が開けなくなるため、
-    /// 一時ファイルへ書いてから既存の`level.dat`を`level.dat_old`へ退避し、最後に置き換える
+    /// 一時ファイルへ書いて内容をディスクへ確実に書き出してから、既存の`level.dat`を`level.dat_old`へ退避し、最後に置き換える
     pub fn save_level(&mut self) -> Result<()> {
         self.ensure_open()?;
 
@@ -657,8 +690,16 @@ impl MinecraftWorld {
         let temporary = self.directory.join("level.dat.tmp");
         let backup = self.directory.join("level.dat_old");
 
-        write_file(&temporary, &self.level.to_named_tag(), &NbtWriteOptions::default())?;
+        let encoded = write_bytes(&self.level.to_named_tag(), &NbtWriteOptions::default())?;
 
+        // 一時ファイルへ書き、置き換える前に内容をディスクへ確実に書き出す
+        {
+            let mut file = std::fs::File::create(&temporary)?;
+            file.write_all(&encoded)?;
+            file.sync_all()?;
+        }
+
+        // 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
         if path.exists() {
             std::fs::copy(&path, &backup)?;
         }

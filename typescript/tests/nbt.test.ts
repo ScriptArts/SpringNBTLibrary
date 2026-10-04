@@ -124,6 +124,16 @@ test("手で組んだ hello_world を読める", () => {
   assert.equal(named.tag.getString("name"), "Bananrama");
 });
 
+test("NaNのビットパターンを変えずに書き戻す", () => {
+  // ペイロード付き・負・シグナリングのNaNを、Float / Doubleの両方で持つCompound
+  const original = Uint8Array.from([
+    0x0a, 0x00, 0x00, 0x05, 0x00, 0x01, 0x61, 0x7f, 0xc0, 0x00, 0x01, 0x05, 0x00, 0x01, 0x62, 0xff, 0xc0, 0x00, 0x00, 0x05, 0x00, 0x01, 0x63, 0x7f, 0x80, 0x00, 0x01, 0x06, 0x00, 0x01, 0x64, 0x7f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x06, 0x00, 0x01, 0x65, 0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x66, 0x7f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+  ]);
+  const named = readBytes(original, UNCOMPRESSED_READ);
+
+  assert.deepEqual(writeBytes(named, UNCOMPRESSED_WRITE), original);
+});
+
 test("読んで書き直すと同じバイト列になる", () => {
   const original = helloWorldBytes();
   const named = readBytes(original, UNCOMPRESSED_READ);
@@ -188,6 +198,18 @@ test("リストは異なる型の混在を拒否する", () => {
   assertErrorCode(() => list.add(new NbtString("x")), ErrorCode.UnexpectedTagType);
 });
 
+test("リストの範囲外の位置は要素型を確定させずに拒否する", () => {
+  const list = new NbtList();
+
+  assert.throws(() => list.set(0, new NbtInt(1)), RangeError);
+  assert.throws(() => list.insert(1, new NbtInt(1)), RangeError);
+  assert.throws(() => list.get(0), RangeError);
+  assert.throws(() => list.removeAt(0), RangeError);
+
+  // 失敗した操作で要素型が確定していない
+  assert.equal(list.elementType, TagType.End);
+});
+
 test("型付き取得子はキー欠落と型不一致を区別する", () => {
   const root = new NbtCompound();
   root.set("value", new NbtString("text"));
@@ -208,6 +230,19 @@ test("圧縮方式が自動判定される", () => {
     const encoded = writeBytes(named, { compression: method });
     assert.equal(detectCompression(encoded), method);
     assert.equal(readBytes(encoded).tag.getString("name"), "Bananrama");
+  }
+});
+
+test("壊れた圧縮データはMALFORMED_DATAになる", () => {
+  const named = readBytes(helloWorldBytes(), UNCOMPRESSED_READ);
+  const gzip = writeBytes(named, { compression: Compression.Gzip });
+  const truncated = gzip.slice(0, Math.floor(gzip.length / 2));
+  const brokenGzip = Uint8Array.from([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff]);
+  const brokenZlib = Uint8Array.from([0x78, 0x9c, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+
+  // 途中で切れたGZip、中身の壊れたGZip、中身の壊れたZlibは、どれも仕様に反するデータとして扱う
+  for (const data of [truncated, brokenGzip, brokenZlib]) {
+    assertErrorCode(() => readBytes(data), ErrorCode.MalformedData);
   }
 });
 
@@ -451,6 +486,26 @@ test("エスケープシーケンス", () => {
   assertErrorCode(() => snbt.parse('"\\N{SNOWMAN}"'), ErrorCode.UnsupportedFeature);
 });
 
+test("サロゲートのエスケープはどこでも同じ規則に従う", () => {
+  const lone = String.fromCharCode(0xd800);
+
+  // \Uでサロゲートの範囲を書くと、\uと同じく孤立サロゲートになる
+  assert.equal((snbt.parse('"\\U0000D800"') as NbtString).value, lone);
+  assert.equal((snbt.parse('"\\uD800"') as NbtString).value, lone);
+
+  // 対になったサロゲートは補助文字1文字と同じ
+  assert.equal((snbt.parse('"\\uD83D\\uDE00"') as NbtString).value, "\u{1F600}");
+
+  // コードポイントの範囲外と、キーの孤立サロゲートは仕様に反する
+  for (const source of ['"\\U00110000"', '{"\\uD800":1}', '{"\\U0000D800":1}']) {
+    assertErrorCode(() => snbt.parse(source), ErrorCode.MalformedData);
+  }
+
+  // APIからも孤立サロゲートのキーは設定できない
+  const compound = new NbtCompound();
+  assertErrorCode(() => compound.set(lone, new NbtInt(1)), ErrorCode.InvalidArgument);
+});
+
 test("単一引用符の文字列", () => {
   assert.equal((snbt.parse("'say \"hi\"'") as NbtString).value, 'say "hi"');
 });
@@ -548,6 +603,12 @@ test("特殊値の表記", () => {
   assert.equal(snbt.write(new NbtDouble(Number.POSITIVE_INFINITY)), "Infinityd");
   assert.equal(snbt.write(new NbtDouble(Number.NEGATIVE_INFINITY)), "-Infinityd");
   assert.equal(snbt.write(new NbtFloat(Number.NaN)), "NaNf");
+});
+
+test("binary32の範囲を超える値は符号付きの無限大になる", () => {
+  assert.equal((snbt.parse("1e39f") as NbtFloat).value, Number.POSITIVE_INFINITY);
+  assert.equal((snbt.parse("-1e39f") as NbtFloat).value, Number.NEGATIVE_INFINITY);
+  assert.equal(new NbtFloat(1e39).value, Number.POSITIVE_INFINITY);
 });
 
 test("書き出した表記を読み戻すとビットが一致する", () => {

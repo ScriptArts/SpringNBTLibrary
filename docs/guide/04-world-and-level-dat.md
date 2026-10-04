@@ -160,7 +160,7 @@ overworld.Flush();     // 変更したチャンクを書き戻す
 world.SaveLevel();     // level.datを書き戻す
 ```
 
-`SaveLevel`は一時ファイルへ書いてから置き換えます。
+`SaveLevel`は一時ファイルへ書き、内容をディスクへ確実に書き出してから置き換えます。
 書き込み中に落ちても`level.dat`が破損しないようにするためです。直前の内容は`level.dat_old`へ退避されます。
 
 `using`（Javaはtry-with-resources、Pythonは`with`）を抜けるときに`Close`が呼ばれ、書き込みモードなら自動で`Flush`されます。

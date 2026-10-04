@@ -82,6 +82,27 @@ class RegionFileTest {
     }
 
     @Test
+    void 読み書きのフォルダは書き出すときにだけ無いディレクトリを作る() {
+        Path missing = work.resolve("missing").resolve("region");
+
+        // 読むだけなら、無いディレクトリは作らない
+        try (RegionFolder folder = RegionFolder.open(missing, RegionFileMode.READ_WRITE)) {
+            assertNull(folder.readChunk(0, 0));
+        }
+
+        assertFalse(Files.exists(missing));
+
+        // 書き出すときに作る
+        try (RegionFolder folder = RegionFolder.open(missing, RegionFileMode.READ_WRITE)) {
+            folder.writeChunk(0, 0, sampleChunk(0, 0));
+        }
+
+        try (RegionFolder reopened = RegionFolder.open(missing)) {
+            assertEquals(0, reopened.readChunk(0, 0).getInt("xPos"));
+        }
+    }
+
+    @Test
     void キャッシュ上限を超えると古いリージョンから閉じる() {
         // 上限2で4リージョンへ書く
         // 古いものは閉じられるが、内容は失われない
@@ -226,6 +247,20 @@ class RegionFileTest {
                 RegionFile.open(vectorDir("lz4_bad_magic").resolve("r.0.0.mca"))) {
             SpringNbtException error =
                     assertThrows(SpringNbtException.class, () -> region.readChunk(0, 0));
+            assertEquals(ErrorCode.MALFORMED_DATA, error.code());
+        }
+    }
+
+    @Test
+    void truncatedGzipChunkIsMalformedData() throws IOException {
+        Path path = copyVector("lz4").resolve("r.0.0.mca");
+
+        try (RegionFile region = RegionFile.open(path, RegionFileMode.READ_WRITE)) {
+            // GZipのヘッダだけで本体が無い、途中で切れたチャンク
+            byte[] truncated = { 0x1F, (byte) 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, (byte) 0xFF };
+            region.writeChunkRaw(0, 0, new RawChunk(ChunkCompression.GZIP, truncated));
+
+            SpringNbtException error = assertThrows(SpringNbtException.class, () -> region.readChunk(0, 0));
             assertEquals(ErrorCode.MALFORMED_DATA, error.code());
         }
     }

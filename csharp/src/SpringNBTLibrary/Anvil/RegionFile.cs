@@ -615,6 +615,8 @@ public sealed class RegionFile : IDisposable
         }
 
         WriteHeader();
+        // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        EnsureDirectory();
 
         try
         {
@@ -698,9 +700,33 @@ public sealed class RegionFile : IDisposable
         }
     }
 
+    /// <summary>
+    /// ファイルを置くディレクトリが無ければ作る
+    /// </summary>
+    /// <remarks>
+    /// 読むだけの操作で空のディレクトリができないよう、書き出す直前にだけ呼ぶ
+    /// </remarks>
+    private void EnsureDirectory()
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(directory);
+        }
+        catch (IOException error)
+        {
+            throw new SpringNbtException(ErrorCode.Io, $"ディレクトリを作れない: {directory}", error);
+        }
+        catch (UnauthorizedAccessException error)
+        {
+            throw new SpringNbtException(ErrorCode.Io, $"ディレクトリを作れない: {directory}", error);
+        }
+    }
+
     private void WriteExternalFile(int chunkX, int chunkZ, byte[] payload)
     {
         string external = ExternalPath(chunkX, chunkZ);
+        // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        EnsureDirectory();
 
         try
         {

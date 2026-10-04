@@ -144,6 +144,17 @@ class NbtTest {
         }
 
         @Test
+        void nanBitPatternsAreWrittenBackUnchanged() {
+            // ペイロード付き・負・シグナリングのNaNを、Float / Doubleの両方で持つCompound
+            byte[] original = {
+                (byte) 0x0A, (byte) 0x00, (byte) 0x00, (byte) 0x05, (byte) 0x00, (byte) 0x01, (byte) 0x61, (byte) 0x7F, (byte) 0xC0, (byte) 0x00, (byte) 0x01, (byte) 0x05, (byte) 0x00, (byte) 0x01, (byte) 0x62, (byte) 0xFF, (byte) 0xC0, (byte) 0x00, (byte) 0x00, (byte) 0x05, (byte) 0x00, (byte) 0x01, (byte) 0x63, (byte) 0x7F, (byte) 0x80, (byte) 0x00, (byte) 0x01, (byte) 0x06, (byte) 0x00, (byte) 0x01, (byte) 0x64, (byte) 0x7F, (byte) 0xF8, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x06, (byte) 0x00, (byte) 0x01, (byte) 0x65, (byte) 0xFF, (byte) 0xF8, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x06, (byte) 0x00, (byte) 0x01, (byte) 0x66, (byte) 0x7F, (byte) 0xF0, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00,
+            };
+            NamedTag named = NbtIo.readBytes(original, uncompressedRead());
+
+            assertArrayEquals(original, NbtIo.writeBytes(named, uncompressedWrite()));
+        }
+
+        @Test
         void writesBackTheSameBytes() {
             byte[] original = helloWorldBytes();
             NamedTag named = NbtIo.readBytes(original, uncompressedRead());
@@ -217,6 +228,17 @@ class NbtTest {
         }
 
         @Test
+        void listRejectsOutOfRangePositionWithoutFixingElementType() {
+            NbtList list = new NbtList();
+
+            assertThrows(IndexOutOfBoundsException.class, () -> list.set(0, new NbtInt(1)));
+            assertThrows(IndexOutOfBoundsException.class, () -> list.insert(1, new NbtInt(1)));
+
+            // 失敗した操作で要素型が確定していない
+            assertEquals(TagType.END, list.elementType());
+        }
+
+        @Test
         void typedGetterDistinguishesMissingKeyFromWrongType() {
             NbtCompound root = new NbtCompound();
             root.set("value", new NbtString("text"));
@@ -227,6 +249,26 @@ class NbtTest {
             // 型が違う場合はキーの有無に関わらず例外
             assertEquals(ErrorCode.UNEXPECTED_TAG_TYPE, codeOf(() -> root.optInt("value")));
             assertEquals(ErrorCode.INVALID_ARGUMENT, codeOf(() -> root.getInt("missing")));
+        }
+
+        @Test
+        void brokenCompressedDataIsMalformedData() {
+            NamedTag named = NbtIo.readBytes(helloWorldBytes(), uncompressedRead());
+            byte[] gzip = NbtIo.writeBytes(named,
+                    NbtWriteOptions.defaults().setCompression(Compression.GZIP));
+            byte[] truncated = java.util.Arrays.copyOf(gzip, gzip.length / 2);
+            byte[] brokenGzip = {
+                (byte) 0x1F, (byte) 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+            };
+            byte[] brokenZlib = {
+                0x78, (byte) 0x9C, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+            };
+
+            // 途中で切れたGZip、中身の壊れたGZip、中身の壊れたZlibは、どれも仕様に反するデータとして扱う
+            assertEquals(ErrorCode.MALFORMED_DATA, codeOf(() -> NbtIo.readBytes(truncated, null)));
+            assertEquals(ErrorCode.MALFORMED_DATA, codeOf(() -> NbtIo.readBytes(brokenGzip, null)));
+            assertEquals(ErrorCode.MALFORMED_DATA, codeOf(() -> NbtIo.readBytes(brokenZlib, null)));
         }
 
         @ParameterizedTest
@@ -448,6 +490,28 @@ class NbtTest {
         }
 
         @Test
+        void surrogateEscapesFollowTheSameRulesEverywhere() {
+            String lone = String.valueOf((char) 0xD800);
+
+            // 8桁のUエスケープでサロゲートの範囲を書くと、4桁のuエスケープと同じく孤立サロゲートになる
+            assertEquals(new NbtString(lone), Snbt.parse("\"\\U0000D800\""));
+            assertEquals(new NbtString(lone), Snbt.parse("\"\\uD800\""));
+
+            // 対になったサロゲートは補助文字1文字と同じ
+            assertEquals(new NbtString(new String(Character.toChars(0x1F600))),
+                    Snbt.parse("\"\\uD83D\\uDE00\""));
+
+            // コードポイントの範囲外と、キーの孤立サロゲートは仕様に反する
+            assertEquals(ErrorCode.MALFORMED_DATA, codeOf(() -> Snbt.parse("\"\\U00110000\"")));
+            assertEquals(ErrorCode.MALFORMED_DATA, codeOf(() -> Snbt.parse("{\"\\uD800\":1}")));
+            assertEquals(ErrorCode.MALFORMED_DATA, codeOf(() -> Snbt.parse("{\"\\U0000D800\":1}")));
+
+            // APIからも孤立サロゲートのキーは設定できない
+            NbtCompound compound = new NbtCompound();
+            assertEquals(ErrorCode.INVALID_ARGUMENT, codeOf(() -> compound.set(lone, new NbtInt(1))));
+        }
+
+        @Test
         void singleQuotedStringsWork() {
             assertEquals(new NbtString("say \"hi\""), Snbt.parse("'say \"hi\"'"));
         }
@@ -548,6 +612,13 @@ class NbtTest {
             assertEquals("Infinityd", Snbt.write(new NbtDouble(Double.POSITIVE_INFINITY)));
             assertEquals("-Infinityd", Snbt.write(new NbtDouble(Double.NEGATIVE_INFINITY)));
             assertEquals("NaNf", Snbt.write(new NbtFloat(Float.NaN)));
+        }
+
+        @Test
+        void floatOutOfRangeBecomesSignedInfinity() {
+            // binary32の範囲を超える値は、符号付きの無限大になる
+            assertEquals(new NbtFloat(Float.POSITIVE_INFINITY), Snbt.parse("1e39f"));
+            assertEquals(new NbtFloat(Float.NEGATIVE_INFINITY), Snbt.parse("-1e39f"));
         }
 
         @Test

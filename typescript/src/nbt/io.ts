@@ -18,7 +18,6 @@ import {
   NbtByteArray,
   NbtCompound,
   NbtDouble,
-  NbtFloat,
   NbtInt,
   NbtIntArray,
   NbtList,
@@ -28,6 +27,8 @@ import {
   NbtString,
   NbtTag,
   TagType,
+  float32BitsOf,
+  float32FromBits,
   tagTypeAsString,
   tagTypeFromId,
 } from "./tag.js";
@@ -225,7 +226,8 @@ class Reader {
       case TagType.Long:
         return new NbtLong(this.#take(8, (offset) => this.#view.getBigInt64(offset, false)));
       case TagType.Float:
-        return new NbtFloat(this.#take(4, (offset) => this.#view.getFloat32(offset, false)));
+        // NaNのビットパターンを保つため、値ではなくビットとして読む
+        return float32FromBits(this.#take(4, (offset) => this.#view.getInt32(offset, false)));
       case TagType.Double:
         return new NbtDouble(this.#take(8, (offset) => this.#view.getFloat64(offset, false)));
       case TagType.ByteArray:
@@ -495,8 +497,8 @@ class Writer {
         this.#writeScalar(8, (view) => view.setBigInt64(0, tag.value, false));
         break;
       case TagType.Float:
-        // NaNや-0.0を保つため、そのまま書く
-        this.#writeScalar(4, (view) => view.setFloat32(0, tag.value, false));
+        // NaNや-0.0を保つため、値ではなくビットパターンを書く
+        this.#writeScalar(4, (view) => view.setInt32(0, float32BitsOf(tag), false));
         break;
       case TagType.Double:
         this.#writeScalar(8, (view) => view.setFloat64(0, tag.value, false));

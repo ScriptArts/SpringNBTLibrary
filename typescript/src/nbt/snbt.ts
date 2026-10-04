@@ -22,6 +22,7 @@ import {
   NbtString,
   NbtTag,
   TagType,
+  hasLoneSurrogate,
   tagTypeAsString,
 } from "./tag.js";
 
@@ -341,8 +342,16 @@ class Parser {
   #parseKey(): string {
     const c = this.#peek();
 
+    // 引用符で始まるキーは、エスケープを解いて読む
     if (c === '"' || c === "'") {
-      return this.#parseQuotedString();
+      const quoted = this.#parseQuotedString();
+
+      // バイナリの読み込みと同じく、キーには孤立サロゲートを許さない
+      if (hasLoneSurrogate(quoted)) {
+        throw this.#malformed("Compound のキーが UTF-8 に写せない（孤立サロゲートを含む）");
+      }
+
+      return quoted;
     }
 
     const bare = this.#readBareToken();
@@ -414,6 +423,7 @@ class Parser {
         throw this.#malformed(`コードポイントが範囲外: U+${codePoint.toString(16).toUpperCase()}`);
       }
 
+      // サロゲートの範囲は、\uXXXXと同じくそのコード単位を1つ置く（String.fromCodePointはそう扱う）
       return String.fromCodePoint(codePoint);
     }
 
@@ -461,7 +471,7 @@ class Parser {
     // 実装間でUnicode文字名の表が揃わないため対応しない
     return new SpringNbtError(
       ErrorCode.UnsupportedFeature,
-      `文字名によるエスケープには対応していない: \\N${name}`,
+      `文字名によるエスケープには対応していない: \\N{${name}}`,
     );
   }
 

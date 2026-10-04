@@ -126,6 +126,14 @@ class TestNbtIo:
         assert len(named.tag) == 1
         assert named.tag.get_string("name") == "Bananrama"
 
+    def test_nan_bit_patterns_are_written_back_unchanged(self):
+        # ペイロード付き・負・シグナリングのNaNを、Float / Doubleの両方で持つCompound
+        original = bytes.fromhex(
+            "0a0000050001617fc0000105000162ffc00000050001637f800001060001647ff800000000000106000165fff8000000000000060001667ff000000000000100")
+        named = read_bytes(original, uncompressed_read())
+
+        assert write_bytes(named, uncompressed_write()) == original
+
     def test_writes_back_the_same_bytes(self):
         original = hello_world_bytes()
         named = read_bytes(original, uncompressed_read())
@@ -188,6 +196,15 @@ class TestNbtIo:
 
         assert info.value.code == ErrorCode.UNEXPECTED_TAG_TYPE
 
+    def test_list_rejects_out_of_range_position_without_fixing_element_type(self):
+        values = NbtList()
+
+        with pytest.raises(IndexError):
+            values[0] = NbtInt(1)
+
+        # 失敗した操作で要素型が確定していない
+        assert values.element_type == TagType.END
+
     def test_typed_getter_distinguishes_missing_key_from_wrong_type(self):
         root = NbtCompound()
         root.set("value", NbtString("text"))
@@ -203,6 +220,20 @@ class TestNbtIo:
         with pytest.raises(SpringNbtError) as missing:
             root.get_int("missing")
         assert missing.value.code == ErrorCode.INVALID_ARGUMENT
+
+    def test_broken_compressed_data_is_malformed_data(self):
+        named = read_bytes(hello_world_bytes(), uncompressed_read())
+        gzip_bytes = write_bytes(named, NbtWriteOptions(compression=Compression.GZIP))
+        truncated = gzip_bytes[:len(gzip_bytes) // 2]
+        broken_gzip = bytes.fromhex("1f8b0800000000000000ffffffffff")
+        broken_zlib = bytes.fromhex("789cffffffffffff")
+
+        # 途中で切れたGZip、中身の壊れたGZip、中身の壊れたZlibは、どれも仕様に反するデータとして扱う
+        for data in (truncated, broken_gzip, broken_zlib):
+            with pytest.raises(SpringNbtError) as info:
+                read_bytes(data)
+
+            assert info.value.code == ErrorCode.MALFORMED_DATA
 
     @pytest.mark.parametrize("method", [Compression.GZIP, Compression.ZLIB, Compression.NONE])
     def test_compression_is_detected_automatically(self, method):
@@ -444,6 +475,32 @@ class TestSnbt:
         assert snbt.parse('"\\s"') == NbtString(" ")
         assert snbt.parse('"\\U0001F600"') == NbtString("\U0001F600")
 
+    def test_surrogate_escapes_follow_the_same_rules_everywhere(self):
+        lone = chr(0xD800)
+
+        # \Uでサロゲートの範囲を書くと、\uと同じく孤立サロゲートになる
+        assert snbt.parse('"\\U0000D800"') == NbtString(lone)
+        assert snbt.parse('"\\uD800"') == NbtString(lone)
+
+        # 対になったサロゲートは補助文字1文字と同じ
+        assert snbt.parse('"\\uD83D\\uDE00"') == NbtString(chr(0x1F600))
+        assert NbtString(chr(0xD83D) + chr(0xDE00)) == NbtString(chr(0x1F600))
+
+        # コードポイントの範囲外と、キーの孤立サロゲートは仕様に反する
+        for source in ('"\\U00110000"', '{"\\uD800":1}', '{"\\U0000D800":1}'):
+            with pytest.raises(SpringNbtError) as info:
+                snbt.parse(source)
+
+            assert info.value.code == ErrorCode.MALFORMED_DATA
+
+        # APIからも孤立サロゲートのキーは設定できない
+        compound = NbtCompound()
+
+        with pytest.raises(SpringNbtError) as info:
+            compound.set(lone, NbtInt(1))
+
+        assert info.value.code == ErrorCode.INVALID_ARGUMENT
+
     def test_named_character_escape_is_unsupported(self):
         with pytest.raises(SpringNbtError) as info:
             snbt.parse('"\\N{SNOWMAN}"')
@@ -548,6 +605,20 @@ class TestCanonicalDecimal:
         assert snbt.write(NbtDouble(float("inf"))) == "Infinityd"
         assert snbt.write(NbtDouble(float("-inf"))) == "-Infinityd"
         assert snbt.write(NbtFloat(float("nan"))) == "NaNf"
+
+    def test_float_out_of_range_becomes_signed_infinity(self):
+        # binary32の範囲を超える値は、符号付きの無限大になる
+        assert snbt.parse("1e39f") == NbtFloat(float("inf"))
+        assert snbt.parse("-1e39f") == NbtFloat(float("-inf"))
+        assert NbtFloat(1e39).value == float("inf")
+        assert NbtFloat(-(10 ** 400)).value == float("-inf")
+
+        # binary32の最大値へ丸まる値は無限大にしない
+        assert NbtFloat(3.4028235e38).value == struct.unpack(">f", bytes.fromhex("7f7fffff"))[0]
+
+        values = NbtFloat(0.0)
+        values.value = 1e39
+        assert values.value == float("inf")
 
     def test_every_formatted_value_parses_back_to_the_same_bits(self):
         doubles = [0.0, -0.0, 1.0, -1.0, 0.1, 1.0 / 3.0, 1e300, 1e-300, 4903.0]

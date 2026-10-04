@@ -1,7 +1,8 @@
 # SpringNBTLibrary（TypeScript版）
 
 Minecraft Java版26.1以降のワールド・NBTファイルを読み書きするライブラリです。
-Node.js 20以上、TypeScript 5.7以上で動きます。ESM専用です。
+Node.js 20以上で動きます。ESM専用です。
+型定義を同梱しており、TypeScriptから使う場合は5.7以上を推奨します。
 
 いまのワールド形式は26.1で入ったものです。
 それ以降のバージョンなら、形式が変わらない限りそのまま扱えます。

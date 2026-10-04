@@ -332,6 +332,15 @@ export class NbtLong {
 }
 
 /**
+ * 読み込んだときのbinary32のビットパターン
+ *
+ * numberはbinary64なので、シグナリングNaNはbinary32との変換で静かなNaNへ変わってしまう
+ * 読んだビットをここに覚えておき、値を変えていなければそのまま書き戻す
+ * 値を差し替えたタグは表から外す
+ */
+const readFloatBits = new WeakMap<NbtFloat, number>();
+
+/**
  * TAG_Float
  * IEEE 754 binary32
  */
@@ -355,11 +364,22 @@ export class NbtFloat {
    */
   set value(newValue: number) {
     this.#value = Math.fround(newValue);
+
+    // 値を変えたら、読み込んだときのビットパターンはもう使わない
+    readFloatBits.delete(this);
   }
 
   /** このタグの深いコピーを作る */
   copy(): NbtFloat {
-    return new NbtFloat(this.#value);
+    const result = new NbtFloat(this.#value);
+    const bits = readFloatBits.get(this);
+
+    // 読み込んだビットパターンを持っていれば、複製にも引き継ぐ
+    if (bits !== undefined) {
+      readFloatBits.set(result, bits);
+    }
+
+    return result;
   }
 
   /**
@@ -375,9 +395,67 @@ export class NbtFloat {
    * NaNや-0.0を区別するため、値ではなくビットパターンで比べる
    */
   equals(other: unknown): boolean {
-    return other instanceof NbtFloat && floatBits(other.value) === floatBits(this.#value);
+    return other instanceof NbtFloat && float32BitsOf(other) === float32BitsOf(this);
   }
 }
+
+/**
+ * binary32のビットパターンからタグを作る
+ * 読み込んだビットを覚えておき、書き戻すときにそのまま使う（ライブラリ内部用）
+ */
+function float32FromBits(bits: number): NbtFloat {
+  BIT_VIEW.setInt32(0, bits);
+  const tag = new NbtFloat(BIT_VIEW.getFloat32(0));
+  readFloatBits.set(tag, bits | 0);
+  return tag;
+}
+
+/**
+ * タグのbinary32のビットパターンを返す
+ * 読み込んだときのビットを覚えていればそれを、無ければ値から求める（ライブラリ内部用）
+ */
+function float32BitsOf(tag: NbtFloat): number {
+  const bits = readFloatBits.get(tag);
+
+  // 読み込んだままのタグは、読んだときのビットを使う
+  if (bits !== undefined) {
+    return bits;
+  }
+
+  return floatBits(tag.value);
+}
+
+/**
+ * 対になっていないサロゲートを含むか（ライブラリ内部用）
+ *
+ * 正しいサロゲートペアは1文字として数え、孤立したものだけを探す
+ * Compoundのキーには孤立サロゲートを許さないので、その検査に使う
+ */
+function hasLoneSurrogate(text: string): boolean {
+  // コード単位を1つずつ見て、サロゲート対をまとめる
+  for (let index = 0; index < text.length; index++) {
+    const unit = text.charCodeAt(index);
+
+    // 上位サロゲートは、対になる下位サロゲートとまとめて1文字を成す
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = text.charCodeAt(index + 1);
+
+      // 対が揃っていなければ孤立サロゲート
+      if (!(next >= 0xdc00 && next <= 0xdfff)) {
+        return true;
+      }
+
+      index += 1;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      // 上位サロゲートを伴わない下位サロゲートは孤立している
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export { float32BitsOf, float32FromBits, hasLoneSurrogate };
 
 /**
  * TAG_Double
@@ -590,13 +668,24 @@ export class NbtList {
     return this.#items.length;
   }
 
-  /** 位置を指定して取り出す */
+  /**
+   * 位置を指定して取り出す
+   *
+   * @throws RangeError 位置が範囲外の場合
+   */
   get(index: number): NbtTag {
+    this.#checkIndex(index, this.#items.length - 1);
     return this.#items[index];
   }
 
-  /** 位置を指定して置き換える */
+  /**
+   * 位置を指定して置き換える
+   *
+   * @throws RangeError 位置が範囲外の場合
+   */
   set(index: number, item: NbtTag): void {
+    // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+    this.#checkIndex(index, this.#items.length - 1);
     this.#ensureElementType(item);
     this.#items[index] = item;
   }
@@ -607,15 +696,34 @@ export class NbtList {
     this.#items.push(item);
   }
 
-  /** 位置を指定して挿入する */
+  /**
+   * 位置を指定して挿入する
+   *
+   * @throws RangeError 位置が範囲外の場合
+   */
   insert(index: number, item: NbtTag): void {
+    // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+    this.#checkIndex(index, this.#items.length);
     this.#ensureElementType(item);
     this.#items.splice(index, 0, item);
   }
 
-  /** 位置を指定して削除する */
+  /**
+   * 位置を指定して削除する
+   *
+   * @throws RangeError 位置が範囲外の場合
+   */
   removeAt(index: number): void {
+    this.#checkIndex(index, this.#items.length - 1);
     this.#items.splice(index, 1);
+  }
+
+  /** 位置が0以上`max`以下の整数であることを確かめる */
+  #checkIndex(index: number, max: number): void {
+    // 配列の範囲外へ書くと穴が空くので、他言語と同じく例外にする
+    if (!Number.isInteger(index) || index < 0 || index > max) {
+      throw new RangeError(`位置が範囲外: ${index}`);
+    }
   }
 
   /**
@@ -723,6 +831,11 @@ export class NbtCompound {
    * 既存キーなら位置を維持して値だけ置き換える
    */
   set(key: string, value: NbtTag): void {
+    // 孤立サロゲートを含むキーは書き出すと読み戻せないので、ここで止める
+    if (hasLoneSurrogate(key)) {
+      throw SpringNbtError.invalidArgument("キーに孤立サロゲートは使えない");
+    }
+
     this.#entries.set(key, value);
   }
 

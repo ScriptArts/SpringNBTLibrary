@@ -26,6 +26,8 @@ from .tag import (
     NbtString,
     NbtTag,
     TagType,
+    _has_lone_surrogate,
+    _join_surrogate_pairs,
 )
 
 __all__ = ["parse", "parse_compound", "write", "write_pretty"]
@@ -262,8 +264,15 @@ class _Parser:
     def _parse_key(self) -> str:
         character = self._peek()
 
+        # 引用符で始まるキーは、エスケープを解いて読む
         if character in "\"'":
-            return self._parse_quoted_string()
+            quoted = _join_surrogate_pairs(self._parse_quoted_string())
+
+            # バイナリの読み込みと同じく、キーには孤立サロゲートを許さない
+            if _has_lone_surrogate(quoted):
+                raise self._malformed("Compound のキーが UTF-8 に写せない（孤立サロゲートを含む）")
+
+            return quoted
 
         bare = self._read_bare_token()
 

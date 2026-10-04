@@ -4,12 +4,22 @@
  * 26.xでは構成が大きく変わっており、標準の3次元も`dimensions/<名前空間>/<パス>/`の下に並ぶ
  */
 
-import { copyFileSync, existsSync, readdirSync, renameSync, statSync } from "node:fs";
+import {
+  closeSync,
+  copyFileSync,
+  existsSync,
+  fsyncSync,
+  openSync,
+  readdirSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, join } from "node:path";
 
 import { ChunkPos, RegionFileMode, RegionFolder } from "../anvil/index.js";
 import { ErrorCode, SpringNbtError } from "../errors.js";
-import { NamedTag, NbtCompound, readFile, writeFile } from "../nbt/index.js";
+import { NamedTag, NbtCompound, readFile, writeBytes } from "../nbt/index.js";
 import { Chunk, ChunkReadOptions, ChunkWriteOptions } from "./chunk.js";
 import { BlockState } from "./blockState.js";
 
@@ -566,7 +576,7 @@ export class MinecraftWorld {
    * `level.dat`を書き戻す
    *
    * `level.dat`がおかしくなるとワールド全体が開けなくなるため、
-   * 一時ファイルへ書いてから既存の`level.dat`を`level.dat_old`へ退避し、最後に置き換える
+   * 一時ファイルへ書いて内容をディスクへ確実に書き出してから、既存の`level.dat`を`level.dat_old`へ退避し、最後に置き換える
    */
   saveLevel(): void {
     this.#ensureOpen();
@@ -579,14 +589,28 @@ export class MinecraftWorld {
     const temporary = `${path}.tmp`;
     const backup = `${path}_old`;
 
-    writeFile(temporary, this.level.toNamedTag());
+    const encoded = writeBytes(this.level.toNamedTag());
 
-    // 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
-    if (existsSync(path)) {
-      copyFileSync(path, backup);
+    try {
+      // 一時ファイルへ書き、置き換える前に内容をディスクへ確実に書き出す
+      const descriptor = openSync(temporary, "w");
+
+      try {
+        writeFileSync(descriptor, encoded);
+        fsyncSync(descriptor);
+      } finally {
+        closeSync(descriptor);
+      }
+
+      // 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
+      if (existsSync(path)) {
+        copyFileSync(path, backup);
+      }
+
+      renameSync(temporary, path);
+    } catch (error) {
+      throw new SpringNbtError(ErrorCode.Io, `level.dat を書けない: ${path}`, { cause: error });
     }
-
-    renameSync(temporary, path);
   }
 
   /** 開いている次元をすべて閉じる */

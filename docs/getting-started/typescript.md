@@ -1,6 +1,7 @@
 # はじめに（TypeScript）
 
-Node.js 20以上、TypeScript 5.7以上が必要です。ESM専用です。
+Node.js 20以上が必要です。ESM専用です。
+型定義を同梱しています。TypeScriptから使う場合は、ビルドに使っている5.7以上を推奨します。
 
 ## 導入
 

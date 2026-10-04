@@ -20,6 +20,7 @@ from spring_nbt_library.nbt import (
     NbtWriteOptions,
     read_file,
     write_bytes,
+    write_file,
 )
 from spring_nbt_library.world import (
     BitStorage,
@@ -30,8 +31,10 @@ from spring_nbt_library.world import (
     MinecraftWorld,
     PalettedContainer,
     VersionMismatchAction,
+    WorldOpenOptions,
     ceil_log2,
 )
+from spring_nbt_library.anvil import RegionFile, RegionFileMode
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 VECTORS = os.path.join(REPO_ROOT, "spec", "testdata", "world")
@@ -538,3 +541,27 @@ class TestMinecraftWorld:
             MinecraftWorld.open(str(tmp_path))
 
         assert error.value.code == ErrorCode.IO
+
+    def test_次元経由で読んだチャンクの警告も通知先へ届く(self, tmp_path):
+        region = tmp_path / "dimensions" / "minecraft" / "overworld" / "region"
+        region.mkdir(parents=True)
+
+        # DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
+        level = NbtCompound()
+        level.set("Data", NbtCompound())
+        write_file(str(tmp_path / "level.dat"), NamedTag("", level))
+
+        chunk = read_file(vector_path("palette_1")).tag
+        chunk.set("DataVersion", NbtInt(3953))
+
+        with RegionFile.open(str(region / "r.0.0.mca"), RegionFileMode.READ_WRITE) as file:
+            file.write_chunk(0, 0, chunk)
+
+        warnings = []
+        options = WorldOpenOptions(chunk_read=ChunkReadOptions(on_warning=warnings.append))
+
+        with MinecraftWorld.open(str(tmp_path), options) as world:
+            assert world.dimension("minecraft:overworld").chunk(0, 0) is not None
+
+        # ワールドを開くときに渡した通知先が、次元経由の読み込みでも呼ばれる
+        assert len(warnings) == 1

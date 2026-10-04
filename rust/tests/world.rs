@@ -10,8 +10,9 @@ use std::rc::Rc;
 use spring_nbt_library::error::{Error, ErrorCode};
 use spring_nbt_library::nbt::tag::{NbtCompound, NbtString, NbtTag};
 use spring_nbt_library::nbt::{
-    read_file, write_bytes, Compression, NamedTag, NbtReadOptions, NbtWriteOptions,
+    read_file, write_bytes, write_file, Compression, NamedTag, NbtReadOptions, NbtWriteOptions,
 };
+use spring_nbt_library::anvil::{ChunkCompression, RegionFile, RegionFileMode};
 use spring_nbt_library::world::{
     ceil_log2, BitStorage, BlockState, Chunk, ChunkReadOptions, ChunkWriteOptions, MinecraftWorld,
     PalettedContainer, VersionMismatchAction, WorldOpenOptions,
@@ -738,6 +739,52 @@ fn level_datが無いディレクトリはio() {
         Ok(_) => panic!("開けてしまった"),
         Err(error) => assert_code(ErrorCode::Io, error),
     }
+}
+
+#[test]
+fn 次元経由で読んだチャンクの警告も通知先へ届く() {
+    let work = std::env::temp_dir().join(format!("springnbt-warn-{}", std::process::id()));
+    let region = work.join("dimensions").join("minecraft").join("overworld").join("region");
+    std::fs::create_dir_all(&region).unwrap();
+
+    // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
+    let mut level = NbtCompound::new();
+    level.set("Data", NbtTag::Compound(NbtCompound::new()));
+    write_file(work.join("level.dat"), &NamedTag::new("", level), &NbtWriteOptions::default())
+        .unwrap();
+
+    {
+        let mut file = RegionFile::open(region.join("r.0.0.mca"), RegionFileMode::ReadWrite).unwrap();
+        file.write_chunk(0, 0, &foreign_chunk(), ChunkCompression::Zlib).unwrap();
+        file.close().unwrap();
+    }
+
+    let warnings: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&warnings);
+    let options = WorldOpenOptions {
+        chunk_read: ChunkReadOptions {
+            on_warning: Some(Box::new(move |message: &str| {
+                sink.borrow_mut().push(message.to_string());
+            })),
+            ..ChunkReadOptions::default()
+        },
+        ..WorldOpenOptions::default()
+    };
+
+    let found = {
+        let mut world = MinecraftWorld::open(&work, options).unwrap();
+        let overworld = world.dimension("minecraft:overworld").unwrap().unwrap();
+        let found = overworld.chunk(0, 0).unwrap().is_some();
+        world.close().unwrap();
+        found
+    };
+
+    // 判定の前に一時ディレクトリを片付ける
+    std::fs::remove_dir_all(&work).unwrap();
+
+    // ワールドを開くときに渡した通知先が、次元経由の読み込みでも呼ばれる
+    assert!(found);
+    assert_eq!(1, warnings.borrow().len());
 }
 
 

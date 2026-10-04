@@ -27,7 +27,7 @@ spec/testdata/
       "input": "nbt/all_tags.nbt",
       "format": "java",
       "compression": "none",
-      "description": "全13タグを1つずつ含む",
+      "description": "全13タグを含む。TAG_EndはCompoundの終端として現れる",
       "expect": "expect/nbt/all_tags.json",
       "roundtrip": true
     }
@@ -144,7 +144,7 @@ python3 spec/tools/scan_world.py "<ワールドのパス>" --verbose
 | ID | 検証内容 |
 |---|---|
 | `nbt/hello_world` | 最小のCompound。ルート名が空でない |
-| `nbt/all_tags` | 全13タグを1つずつ |
+| `nbt/all_tags` | 全13タグ（TAG_EndはCompoundの終端として現れる） |
 | `nbt/nested_deep` | ネスト深さ500（上限512の直下） |
 | `nbt/nested_too_deep` | ネスト深さ600 → `LIMIT_EXCEEDED` |
 | `nbt/empty_list` | 空リスト（要素型End） |

@@ -304,9 +304,18 @@ internal sealed class SnbtParser
     {
         char c = Peek();
 
+        // 引用符で始まるキーは、エスケープを解いて読む
         if (c == '"' || c == '\'')
         {
-            return ParseQuotedString();
+            string quoted = ParseQuotedString();
+
+            // バイナリの読み込みと同じく、キーには孤立サロゲートを許さない
+            if (Mutf8.HasLoneSurrogate(quoted))
+            {
+                throw Malformed("Compound のキーが UTF-8 に写せない（孤立サロゲートを含む）");
+            }
+
+            return quoted;
         }
 
         string bare = ReadBareToken();
@@ -445,6 +454,13 @@ internal sealed class SnbtParser
         if (codePoint < 0 || codePoint > 0x10FFFF)
         {
             throw Malformed($"コードポイントが範囲外: U+{codePoint:X}");
+        }
+
+        // サロゲートの範囲は、\uXXXXと同じくそのコード単位を1つ置く
+        if (codePoint >= 0xD800 && codePoint <= 0xDFFF)
+        {
+            builder.Append((char)codePoint);
+            return;
         }
 
         builder.Append(char.ConvertFromUtf32((int)codePoint));

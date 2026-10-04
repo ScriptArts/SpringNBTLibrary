@@ -170,6 +170,19 @@ public class NbtIoTests
     }
 
     [Fact]
+    public void NanBitPatternsAreWrittenBackUnchanged()
+    {
+        // ペイロード付き・負・シグナリングのNaNを、Float / Doubleの両方で持つCompound
+        byte[] original =
+        {
+            0x0A, 0x00, 0x00, 0x05, 0x00, 0x01, 0x61, 0x7F, 0xC0, 0x00, 0x01, 0x05, 0x00, 0x01, 0x62, 0xFF, 0xC0, 0x00, 0x00, 0x05, 0x00, 0x01, 0x63, 0x7F, 0x80, 0x00, 0x01, 0x06, 0x00, 0x01, 0x64, 0x7F, 0xF8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x06, 0x00, 0x01, 0x65, 0xFF, 0xF8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x66, 0x7F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+        };
+        NamedTag named = NbtIo.ReadBytes(original, UncompressedRead());
+
+        Assert.Equal(original, NbtIo.WriteBytes(named, NbtWriteOptions.Uncompressed));
+    }
+
+    [Fact]
     public void WritesBackTheSameBytes()
     {
         byte[] original = HelloWorldBytes();
@@ -258,6 +271,18 @@ public class NbtIoTests
     }
 
     [Fact]
+    public void ListRejectsOutOfRangePositionWithoutFixingElementType()
+    {
+        NbtList list = new NbtList();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => list[0] = new NbtInt(1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => list.Insert(1, new NbtInt(1)));
+
+        // 失敗した操作で要素型が確定していない
+        Assert.Equal(TagType.End, list.ElementType);
+    }
+
+    [Fact]
     public void TypedGetterDistinguishesMissingKeyFromWrongType()
     {
         NbtCompound root = new NbtCompound();
@@ -272,6 +297,21 @@ public class NbtIoTests
 
         SpringNbtException missing = Assert.Throws<SpringNbtException>(() => root.GetInt("missing"));
         Assert.Equal(ErrorCode.InvalidArgument, missing.Code);
+    }
+
+    [Fact]
+    public void BrokenCompressedDataIsMalformedData()
+    {
+        NamedTag named = NbtIo.ReadBytes(HelloWorldBytes(), UncompressedRead());
+        byte[] gzip = NbtIo.WriteBytes(named, new NbtWriteOptions { Compression = Compression.Gzip });
+        byte[] truncated = gzip.AsSpan(0, gzip.Length / 2).ToArray();
+        byte[] brokenGzip = { 0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+        byte[] brokenZlib = { 0x78, 0x9C, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+
+        // 途中で切れたGZip、中身の壊れたGZip、中身の壊れたZlibは、どれも仕様に反するデータとして扱う
+        Assert.Equal(ErrorCode.MalformedData, Assert.Throws<SpringNbtException>(() => NbtIo.ReadBytes(truncated)).Code);
+        Assert.Equal(ErrorCode.MalformedData, Assert.Throws<SpringNbtException>(() => NbtIo.ReadBytes(brokenGzip)).Code);
+        Assert.Equal(ErrorCode.MalformedData, Assert.Throws<SpringNbtException>(() => NbtIo.ReadBytes(brokenZlib)).Code);
     }
 
     [Theory]

@@ -70,6 +70,12 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     public void set(String key, NbtTag value) {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(value, "value");
+
+        // 孤立サロゲートを含むキーは書き出すと読み戻せないので、ここで止める
+        if (Mutf8.hasLoneSurrogate(key)) {
+            throw SpringNbtException.invalidArgument("キーに孤立サロゲートは使えない");
+        }
+
         entries.put(key, value);
     }
 

@@ -226,7 +226,8 @@ class _Reader:
             return NbtLong(struct.unpack(">q", self._take(8))[0])
 
         if tag_type == TagType.FLOAT:
-            return NbtFloat(struct.unpack(">f", self._take(4))[0])
+            # NaNのビットパターンを保つため、読んだビットをそのまま渡す
+            return NbtFloat._from_bits(self._take(4))
 
         if tag_type == TagType.DOUBLE:
             return NbtDouble(struct.unpack(">d", self._take(8))[0])
@@ -434,7 +435,8 @@ class _Writer:
         elif isinstance(tag, NbtLong):
             self._buffer += struct.pack(">q", tag.value)
         elif isinstance(tag, NbtFloat):
-            self._buffer += struct.pack(">f", tag.value)
+            # NaNや-0.0を保つため、値ではなくビットパターンを書く
+            self._buffer += tag._to_bits()
         elif isinstance(tag, NbtDouble):
             self._buffer += struct.pack(">d", tag.value)
         elif isinstance(tag, NbtByteArray):
@@ -535,7 +537,8 @@ def _decompress(data: bytes, options: NbtReadOptions) -> bytes:
     elif method == Compression.GZIP:
         try:
             plain = gzip.decompress(data)
-        except OSError as error:
+        except (OSError, EOFError, zlib.error) as error:
+            # GZipでないデータ、途中で切れたデータ、中身の壊れたデータのどれも、仕様に反するデータとして扱う
             raise SpringNbtError(ErrorCode.MALFORMED_DATA, "GZip データを展開できない") from error
     elif method == Compression.ZLIB:
         try:

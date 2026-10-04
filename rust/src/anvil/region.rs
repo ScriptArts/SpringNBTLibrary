@@ -771,6 +771,8 @@ impl RegionFile {
         }
 
         self.write_header();
+        // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        self.ensure_directory()?;
 
         match std::fs::write(&self.path, &self.data) {
             Ok(()) => {
@@ -856,8 +858,22 @@ impl RegionFile {
         })
     }
 
+    /// ファイルを置くディレクトリが無ければ作る
+    /// 読むだけの操作で空のディレクトリができないよう、書き出す直前にだけ呼ぶ
+    fn ensure_directory(&self) -> Result<()> {
+        std::fs::create_dir_all(&self.directory).map_err(|error| {
+            Error::with_source(
+                ErrorCode::Io,
+                format!("ディレクトリを作れない: {}", self.directory.display()),
+                error,
+            )
+        })
+    }
+
     fn write_external_file(&self, chunk_x: i32, chunk_z: i32, payload: &[u8]) -> Result<()> {
         let external = self.external_path(chunk_x, chunk_z);
+        // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        self.ensure_directory()?;
 
         std::fs::write(&external, payload).map_err(|error| {
             Error::with_source(

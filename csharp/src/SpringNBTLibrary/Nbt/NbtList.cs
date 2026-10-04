@@ -69,6 +69,13 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
         set
         {
             ArgumentNullException.ThrowIfNull(value);
+
+            // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+            if (index < 0 || index >= items.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index), index, "位置が範囲外");
+            }
+
             EnsureElementType(value);
             items[index] = value;
         }
@@ -92,6 +99,13 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
     public void Insert(int index, NbtTag item)
     {
         ArgumentNullException.ThrowIfNull(item);
+
+        // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+        if (index < 0 || index > items.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index), index, "位置が範囲外");
+        }
+
         EnsureElementType(item);
         items.Insert(index, item);
     }

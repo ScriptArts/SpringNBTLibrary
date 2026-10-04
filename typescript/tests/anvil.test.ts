@@ -18,6 +18,7 @@ import { ErrorCode, SpringNbtError } from "../src/errors.js";
 import {
   ChunkCompression,
   ChunkPos,
+  RawChunk,
   RegionFile,
   RegionFileMode,
   RegionFolder,
@@ -190,6 +191,28 @@ test("LZ4Block のマジックが壊れていたら弾く", () => {
   );
 
   region.close();
+});
+
+test("途中で切れたGZipのチャンクはMALFORMED_DATAになる", () => {
+  const work = makeWorkDir();
+
+  try {
+    const directory = copyVector("lz4", work);
+    const region = RegionFile.open(join(directory, "r.0.0.mca"), RegionFileMode.ReadWrite);
+
+    // GZipのヘッダだけで本体が無い、途中で切れたチャンク
+    const truncated = Uint8Array.from([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff]);
+    region.writeChunkRaw(0, 0, new RawChunk(ChunkCompression.Gzip, truncated));
+
+    assert.throws(
+      () => region.readChunk(0, 0),
+      (error: SpringNbtError) => error.code === ErrorCode.MalformedData,
+    );
+
+    region.close();
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 });
 
 test("LZ4 では書き出せない", () => {
@@ -523,6 +546,31 @@ test("フォルダは複数リージョンへチャンクを振り分ける", ()
     assert.equal(reopened.readChunk(-1, -1)?.getInt("xPos"), -1);
     assert.equal(reopened.readChunk(100, 100), undefined);
     assert.equal(reopened.hasChunk(100, 100), false);
+    reopened.close();
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test("読み書きのフォルダは書き出すときにだけ無いディレクトリを作る", () => {
+  const work = makeWorkDir();
+
+  try {
+    const missing = join(work, "missing", "region");
+
+    // 読むだけなら、無いディレクトリは作らない
+    const reader = RegionFolder.open(missing, RegionFileMode.ReadWrite);
+    assert.equal(reader.readChunk(0, 0), undefined);
+    reader.close();
+    assert.equal(existsSync(missing), false);
+
+    // 書き出すときに作る
+    const writer = RegionFolder.open(missing, RegionFileMode.ReadWrite);
+    writer.writeChunk(0, 0, sampleChunk(0, 0));
+    writer.close();
+
+    const reopened = RegionFolder.open(missing);
+    assert.equal(reopened.readChunk(0, 0)?.getInt("xPos"), 0);
     reopened.close();
   } finally {
     rmSync(work, { recursive: true, force: true });

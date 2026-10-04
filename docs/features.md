@@ -121,6 +121,8 @@
 | 整数の範囲検証 | Python / TypeScriptは構築時に実行時検査 | 言語に整数幅が無いため、型では守れない |
 | 例外 / 戻り値 | Rustのみ`Result<T, Error>` | 他4言語は例外。`ErrorCode`の集合は一致（[adr/0005](adr/0005-unified-error-model.md)） |
 | `set_block`の引数 | Rustのみ`IntoBlockState`トレイト | 他4言語は`BlockState`と文字列の両方を受ける。C# / Javaはオーバーロード、TypeScript / Pythonは合併型の引数で表す |
+| リストの範囲外の位置 | 各言語の標準の例外を使う。C# `ArgumentOutOfRangeException` / Java `IndexOutOfBoundsException` / Python `IndexError` / TypeScript `RangeError`。Rustは`get`が`None`、`insert`が`INVALID_ARGUMENT` | リストは各言語の標準のコレクションの約束事に合わせる。失敗したときに要素型は確定させない |
+| `TAG_Float`のビットパターン | Python / TypeScriptは読み込んだビットを別に持つ | 値を倍精度で持つため、シグナリングNaNのビットが変わってしまう。値を変えていなければ読んだビットのまま書き戻す |
 | Javaの検査例外 | 使わない | シグネチャを他言語と揃えるため（[adr/0005](adr/0005-unified-error-model.md)） |
 | Pythonの再帰上限 | 読み書き時に一時的に引き上げる | 既定の上限1000が仕様の深さ上限512に届かないため |
 | ストリーム入出力 | TypeScriptには無い | Nodeのストリームは非同期しか無く、同期APIで揃えられないため。ファイルとバイト列の入出力は同じ |

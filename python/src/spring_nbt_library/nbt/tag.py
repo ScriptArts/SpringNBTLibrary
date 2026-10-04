@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import enum
+import math
 import struct
 from typing import Dict, Iterator, List, Optional, Tuple
 
@@ -79,6 +80,32 @@ _TYPE_NAMES = {
     TagType.INT_ARRAY: "int_array",
     TagType.LONG_ARRAY: "long_array",
 }
+
+
+def _join_surrogate_pairs(text: str) -> str:
+    """UTF-16で対になるサロゲートを1文字へまとめる
+
+    他言語は文字列をUTF-16で持つので、対になったサロゲートと補助文字は同じ文字列になる
+    Pythonでも同じ文字列として比べられるよう、対になったものだけを合成し、孤立したものは残す
+    """
+    # サロゲートを含む文字列だけを組み直す
+    for character in text:
+        if 0xD800 <= ord(character) <= 0xDFFF:
+            return mutf8._from_utf16_units(mutf8._to_utf16_units(text))
+
+    return text
+
+
+def _has_lone_surrogate(text: str) -> bool:
+    """孤立サロゲートを含むか
+    対になったサロゲートは:func:`_join_surrogate_pairs`で合成してある前提で、残ったものを探す
+    """
+    # 合成したあとに残っているサロゲートは、どれも対になっていない
+    for character in text:
+        if 0xD800 <= ord(character) <= 0xDFFF:
+            return True
+
+    return False
 
 
 def _check_range(value: int, minimum: int, maximum: int, type_name: str) -> int:
@@ -192,29 +219,86 @@ class NbtLong(_ScalarTag):
         return _check_range(value, -9223372036854775808, 9223372036854775807, "long")
 
 
+def _round_to_float32(value) -> float:
+    """数値をbinary32へ最近接丸めする
+    binary32で表せない大きさの値は、他言語と同じく符号付きの無限大にする
+    """
+    try:
+        return struct.unpack(">f", struct.pack(">f", float(value)))[0]
+    except OverflowError:
+        # 無限大へ丸まる値だけがここへ来る（floatに収まらない巨大な整数も含む）
+        if value > 0:
+            return math.inf
+
+        return -math.inf
+
+
 class NbtFloat(_ScalarTag):
     """TAG_Float
     IEEE 754 binary32
+
+    Pythonのfloatはbinary64なので、シグナリングNaNはbinary32との変換で静かなNaNへ変わってしまう
+    読み込んだときのビットパターンを覚えておき、値を変えていなければそのまま書き戻す
     """
 
+    __slots__ = ("_bits",)
+
     type = TagType.FLOAT
+
+    def __init__(self, value) -> None:
+        super().__init__(value)
+        self._bits = struct.pack(">f", self._value)
+
+    @property
+    def value(self):
+        """保持している値"""
+        return self._value
+
+    @value.setter
+    def value(self, new_value) -> None:
+        """値を差し替える
+        構築時と同じくbinary32へ丸める
+        """
+        self._value = self._validate(new_value)
+
+        # 値を変えたら、読み込んだときのビットパターンはもう使わない
+        self._bits = struct.pack(">f", self._value)
+
+    @classmethod
+    def _from_bits(cls, raw: bytes) -> "NbtFloat":
+        """binary32のビットパターンからタグを作る
+        読んだビットを覚えておき、書き戻すときにそのまま使う
+        """
+        tag = cls(struct.unpack(">f", raw)[0])
+        tag._bits = bytes(raw)
+        return tag
+
+    def _to_bits(self) -> bytes:
+        """書き出すbinary32のビットパターン"""
+        return self._bits
 
     def _validate(self, value):
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             raise SpringNbtError.invalid_argument("float には数値を渡すこと: %r" % (value,))
 
         # Pythonのfloatはbinary64なので、構築時にbinary32へ丸めて他言語と揃える
-        return struct.unpack(">f", struct.pack(">f", float(value)))[0]
+        return _round_to_float32(value)
+
+    def copy(self) -> "NbtTag":
+        """このタグの深いコピーを作る"""
+        result = NbtFloat(self._value)
+        result._bits = self._bits
+        return result
 
     def __eq__(self, other) -> bool:
         if type(other) is not type(self):
             return False
 
         # NaNや-0.0を区別するため、値ではなくビットパターンで比較する
-        return struct.pack(">f", other._value) == struct.pack(">f", self._value)
+        return other._bits == self._bits
 
     def __hash__(self) -> int:
-        return hash((self.type, struct.pack(">f", self._value)))
+        return hash((self.type, self._bits))
 
 
 class NbtDouble(_ScalarTag):
@@ -252,6 +336,8 @@ class NbtString(_ScalarTag):
         if not isinstance(value, str):
             raise SpringNbtError.invalid_argument("string には str を渡すこと: %r" % (value,))
 
+        # 対になったサロゲートは、他言語と同じく補助文字1文字として持つ
+        value = _join_surrogate_pairs(value)
         length = mutf8.byte_length(value)
 
         # 長さフィールドはu16
@@ -426,6 +512,10 @@ class NbtList(NbtTag):
         return self._items[index]
 
     def __setitem__(self, index: int, item: NbtTag) -> None:
+        # 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+        if index < -len(self._items) or index >= len(self._items):
+            raise IndexError("位置が範囲外: %d" % index)
+
         self._ensure_element_type(item)
         self._items[index] = item
 
@@ -532,6 +622,12 @@ class NbtCompound(NbtTag):
         if not isinstance(key, str):
             raise SpringNbtError.invalid_argument("キーには str を渡すこと: %r" % (key,))
 
+        key = _join_surrogate_pairs(key)
+
+        # 孤立サロゲートを含むキーは書き出すと読み戻せないので、ここで止める
+        if _has_lone_surrogate(key):
+            raise SpringNbtError.invalid_argument("キーに孤立サロゲートは使えない")
+
         # TAG_EndはCompoundの終端マーカーなので値として持てない
         if value.type == TagType.END:
             raise SpringNbtError.unexpected_tag_type("TAG_End は Compound の値にできない")
@@ -542,13 +638,13 @@ class NbtCompound(NbtTag):
         """キーに対応するタグを返す
         存在しなければNone
         """
-        return self._entries.get(key)
+        return self._entries.get(_join_surrogate_pairs(key))
 
     def get(self, key: str) -> NbtTag:
         """キーに対応するタグを返す
         存在しなければ例外
         """
-        found = self._entries.get(key)
+        found = self._entries.get(_join_surrogate_pairs(key))
 
         if found is None:
             raise SpringNbtError.invalid_argument("キーが存在しない: %s" % key)
@@ -559,6 +655,9 @@ class NbtCompound(NbtTag):
         """キーを削除する
         削除できたらTrue
         """
+        key = _join_surrogate_pairs(key)
+
+        # 存在するキーだけを削除する
         if key in self._entries:
             del self._entries[key]
             return True
@@ -571,7 +670,7 @@ class NbtCompound(NbtTag):
 
     def contains_key(self, key: str) -> bool:
         """キーが存在するか"""
-        return key in self._entries
+        return _join_surrogate_pairs(key) in self._entries
 
     def keys(self):
         """挿入順のキー一覧"""
@@ -595,7 +694,7 @@ class NbtCompound(NbtTag):
         return len(self._entries)
 
     def __contains__(self, key: str) -> bool:
-        return key in self._entries
+        return _join_surrogate_pairs(key) in self._entries
 
     def __getitem__(self, key: str) -> NbtTag:
         return self.get(key)
@@ -604,7 +703,7 @@ class NbtCompound(NbtTag):
         self.set(key, value)
 
     def __delitem__(self, key: str) -> None:
-        del self._entries[key]
+        del self._entries[_join_surrogate_pairs(key)]
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._entries)

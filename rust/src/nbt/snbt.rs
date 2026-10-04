@@ -398,7 +398,13 @@ impl Parser {
         if c == 'U' {
             let code_point = self.read_hex_digits(8)?;
 
-            // Unicodeのコードポイント範囲外とサロゲート領域（U+D800..U+DFFF）を弾く
+            // サロゲートの範囲は、\uXXXXと同じくそのコード単位を1つ置く
+            if (0xD800..=0xDFFF).contains(&code_point) {
+                units.push(code_point as u16);
+                return Ok(());
+            }
+
+            // Unicodeのコードポイント範囲外を弾く
             let value = match char::from_u32(code_point as u32) {
                 Some(value) => value,
                 None => {
@@ -459,7 +465,7 @@ impl Parser {
 
         Error::new(
             ErrorCode::UnsupportedFeature,
-            format!("文字名によるエスケープには対応していない: \\N{name}"),
+            format!("文字名によるエスケープには対応していない: \\N{{{name}}}"),
         )
     }
 

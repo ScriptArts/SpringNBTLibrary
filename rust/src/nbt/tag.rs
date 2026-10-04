@@ -296,7 +296,13 @@ impl NbtList {
     }
 
     /// 位置を指定して挿入する
+    /// 位置が要素数を超えていればエラー
     pub fn insert(&mut self, index: usize, item: NbtTag) -> Result<()> {
+        // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+        if index > self.items.len() {
+            return Err(Error::invalid_argument(format!("位置が範囲外: {index}")));
+        }
+
         self.ensure_element_type(&item)?;
         self.items.insert(index, item);
         Ok(())

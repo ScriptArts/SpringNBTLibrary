@@ -20,6 +20,7 @@ from spring_nbt_library.anvil import (
     RegionFile,
     RegionFileMode,
     RegionFolder,
+    RawChunk,
     RegionPos,
 )
 from spring_nbt_library.nbt import NbtByteArray, NbtCompound, NbtInt, NbtString
@@ -164,6 +165,20 @@ def test_reads_lz4_chunks():
 
 def test_rejects_lz4_block_with_broken_magic():
     with RegionFile.open(os.path.join(vector_dir("lz4_bad_magic"), "r.0.0.mca")) as region:
+        with pytest.raises(SpringNbtError) as error:
+            region.read_chunk(0, 0)
+
+        assert error.value.code == ErrorCode.MALFORMED_DATA
+
+
+def test_truncated_gzip_chunk_is_malformed_data(tmp_path):
+    path = os.path.join(copy_vector("lz4", tmp_path), "r.0.0.mca")
+
+    with RegionFile.open(path, RegionFileMode.READ_WRITE) as region:
+        # GZipのヘッダだけで本体が無い、途中で切れたチャンク
+        truncated = bytes.fromhex("1f8b08000000000000ff")
+        region.write_chunk_raw(0, 0, RawChunk(ChunkCompression.GZIP, truncated))
+
         with pytest.raises(SpringNbtError) as error:
             region.read_chunk(0, 0)
 
@@ -424,6 +439,23 @@ def test_folder_resolves_chunks_across_regions(work):
         assert reopened.read_chunk(-1, -1).get_int("xPos") == -1
         assert reopened.read_chunk(100, 100) is None
         assert not reopened.has_chunk(100, 100)
+
+
+def test_read_write_folder_creates_missing_directory_only_when_writing(work):
+    missing = os.path.join(work, "missing", "region")
+
+    # 読むだけなら、無いディレクトリは作らない
+    with RegionFolder.open(missing, RegionFileMode.READ_WRITE) as folder:
+        assert folder.read_chunk(0, 0) is None
+
+    assert not os.path.exists(missing)
+
+    # 書き出すときに作る
+    with RegionFolder.open(missing, RegionFileMode.READ_WRITE) as folder:
+        folder.write_chunk(0, 0, sample_chunk(0, 0))
+
+    with RegionFolder.open(missing) as reopened:
+        assert reopened.read_chunk(0, 0).get_int("xPos") == 0
 
 
 def test_キャッシュ上限を超えると古いリージョンから閉じる(work):

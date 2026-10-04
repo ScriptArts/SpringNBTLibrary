@@ -8,7 +8,7 @@
  * ただし空のファイルは、8KiBのヘッダだけのファイルになる
  */
 
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { deflateSync, gunzipSync, gzipSync, inflateSync, constants as zlibConstants } from "node:zlib";
 
@@ -541,6 +541,8 @@ export class RegionFile {
     }
 
     this.#writeHeader();
+    // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+    this.#ensureDirectory();
 
     try {
       writeFileSync(this.#path, this.#data);
@@ -640,8 +642,22 @@ export class RegionFile {
     }
   }
 
+  /**
+   * ファイルを置くディレクトリが無ければ作る
+   * 読むだけの操作で空のディレクトリができないよう、書き出す直前にだけ呼ぶ
+   */
+  #ensureDirectory(): void {
+    try {
+      mkdirSync(this.#directory, { recursive: true });
+    } catch (error) {
+      throw new SpringNbtError(ErrorCode.Io, `ディレクトリを作れない: ${this.#directory}`, { cause: error });
+    }
+  }
+
   #writeExternalFile(chunkX: number, chunkZ: number, payload: Uint8Array): void {
     const external = this.#externalPath(chunkX, chunkZ);
+    // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+    this.#ensureDirectory();
 
     try {
       writeFileSync(external, payload);

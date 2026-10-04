@@ -145,7 +145,7 @@ Gzip圧縮されたNBT。ルートは空名の`TAG_Compound`で、`Data`キー�
 
 `level.dat`の中身がおかしくなるとワールド全体が開けなくなるため、書き込みは次の順で行う。
 
-1. 一時ファイル`level.dat.tmp`へ書く
+1. 一時ファイル`level.dat.tmp`へ書き、fsyncで内容をディスクへ確実に書き出す
 2. 既存の`level.dat`を`level.dat_old`へコピーする
 3. `level.dat.tmp`を`level.dat`へリネームする
 

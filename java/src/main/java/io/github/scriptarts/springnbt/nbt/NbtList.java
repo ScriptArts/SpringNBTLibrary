@@ -73,6 +73,8 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
      * @throws SpringNbtException 要素型と一致しない場合
      */
     public void set(int index, NbtTag item) {
+        // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+        Objects.checkIndex(index, items.size());
         ensureElementType(item);
         items.set(index, item);
     }
@@ -96,6 +98,11 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
      * @throws SpringNbtException 要素型と一致しない場合
      */
     public void insert(int index, NbtTag item) {
+        // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+        if (index < 0 || index > items.size()) {
+            throw new IndexOutOfBoundsException("位置が範囲外: " + index);
+        }
+
         ensureElementType(item);
         items.add(index, item);
     }

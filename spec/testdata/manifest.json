@@ -17,7 +17,7 @@
       "input": "nbt/all_tags.nbt",
       "format": "java",
       "compression": "none",
-      "description": "全13タグを1つずつ含む",
+      "description": "全13タグを含む。TAG_EndはCompoundの終端として現れる",
       "expect": "expect/nbt/all_tags.json",
       "roundtrip": true
     },

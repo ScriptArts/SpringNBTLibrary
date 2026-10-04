@@ -256,8 +256,16 @@ final class SnbtParser {
     private String parseKey() {
         char c = peek();
 
+        // 引用符で始まるキーは、エスケープを解いて読む
         if (c == '"' || c == '\'') {
-            return parseQuotedString();
+            String quoted = parseQuotedString();
+
+            // バイナリの読み込みと同じく、キーには孤立サロゲートを許さない
+            if (Mutf8.hasLoneSurrogate(quoted)) {
+                throw malformed("Compound のキーが UTF-8 に写せない（孤立サロゲートを含む）");
+            }
+
+            return quoted;
         }
 
         String bare = readBareToken();

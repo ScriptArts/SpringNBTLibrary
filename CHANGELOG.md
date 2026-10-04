@@ -14,6 +14,24 @@
 
 対応言語はすべて、常に同じバージョン番号で公開する。
 
+## [未リリース]
+
+### 修正
+
+- Rust: ワールド経由でチャンクを読むと、`WorldOpenOptions`に渡した警告の通知先が呼ばれなかった
+- Python: binary32の範囲を超える値を`NbtFloat`に渡すと`OverflowError`が出ていた。他の言語と同じく符号付きの無限大にする
+- Python: 途中で切れたGZipや中身の壊れた圧縮データを読むと、`MALFORMED_DATA`ではなく標準の例外がそのまま出ていた
+- Python / TypeScript: `TAG_Float`のシグナリングNaNを読んで書き戻すと、ビットパターンが変わっていた
+- Python: SNBTの`"😀"`のように対になったサロゲートが、補助文字1文字と別の文字列として扱われていた
+- SNBTの`\U`でサロゲートの範囲を書いたときの扱いが言語ごとに違っていた（C#は想定外の例外が漏れていた）。`\u`と同じく孤立サロゲートとして読む
+- C# / Java / TypeScript / Python: SNBTやAPIで、孤立サロゲートを含むCompoundのキーを受け付けていた。書き出すと読み戻せないため、SNBTでは`MALFORMED_DATA`、APIでは`INVALID_ARGUMENT`にする
+- TypeScript: `NbtList`の`get` / `set` / `insert` / `removeAt`が位置を検査せず、範囲外へ`set`すると配列が伸びていた。`RangeError`にする
+- C# / Java / Python / TypeScript / Rust: リストの範囲外の位置へ`set` / `insert`して失敗したときに、空のリストの要素型が確定していた
+- Rust: `NbtList::insert`で範囲外の位置を渡すとパニックしていた。`INVALID_ARGUMENT`にする
+- 読み書きモードで存在しないリージョンフォルダを開くと、書き出しの時点でディレクトリが無く失敗していた。書き出すときにディレクトリを作る
+- `level.dat`の保存で、一時ファイルの内容をディスクへ書き出してから置き換えるようにした（fsync）
+- TypeScript / Rust: SNBTの`\N{…}`のエラーメッセージで波括弧が抜けていた
+
 ## [1.0.0]
 
 最初のリリース。対象は**26.1で導入されたワールド形式**（DataVersion 4786以降）。

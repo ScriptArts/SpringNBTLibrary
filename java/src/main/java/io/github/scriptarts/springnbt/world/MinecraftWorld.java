@@ -7,12 +7,14 @@ import io.github.scriptarts.springnbt.nbt.NbtCompound;
 import io.github.scriptarts.springnbt.nbt.NbtIo;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -275,7 +277,7 @@ public final class MinecraftWorld implements AutoCloseable {
      * {@code level.dat}を書き戻す
      *
      * <p>{@code level.dat}がおかしくなるとワールド全体が開けなくなるため、
-     * 一時ファイルへ書いてから既存の{@code level.dat}を{@code level.dat_old}へ退避し、最後に置き換える
+     * 一時ファイルへ書いて内容をディスクへ確実に書き出してから、既存の{@code level.dat}を{@code level.dat_old}へ退避し、最後に置き換える
      */
     public void saveLevel() {
         ensureOpen();
@@ -289,7 +291,20 @@ public final class MinecraftWorld implements AutoCloseable {
         Path backup = directory.resolve("level.dat_old");
 
         try {
-            NbtIo.writeFile(temporary, level.toNamedTag(), null);
+            byte[] encoded = NbtIo.writeBytes(level.toNamedTag(), null);
+
+            // 一時ファイルへ書き、置き換える前に内容をディスクへ確実に書き出す
+            try (FileChannel channel = FileChannel.open(temporary,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+                ByteBuffer buffer = ByteBuffer.wrap(encoded);
+
+                // 全バイトを書き終えるまで書き続ける
+                while (buffer.hasRemaining()) {
+                    channel.write(buffer);
+                }
+
+                channel.force(true);
+            }
 
             // 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
             if (Files.exists(path)) {

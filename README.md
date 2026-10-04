@@ -21,7 +21,7 @@ Minecraft Java版26.1以降のワールドデータ・NBTファイルを読み�
 | [Java](docs/getting-started/java.md) | Java 21 (LTS) | `spring-nbt-library-<版>.jar` | クラスパスへ追加 |
 | [TypeScript](docs/getting-started/typescript.md) | Node.js 20+ | `spring-nbt-library-<版>.tgz` | `npm install ./<ファイル>` |
 | [Python](docs/getting-started/python.md) | Python 3.10+ | `spring_nbt_library-<版>-py3-none-any.whl` | `pip install <ファイル>` |
-| [Rust](docs/getting-started/rust.md) | Rust 1.75+ | — | `Cargo.toml`でgit参照 |
+| [Rust](docs/getting-started/rust.md) | Rust 1.75+ | 不要（オフライン用に`spring-nbt-library-<版>.crate`もある） | `Cargo.toml`でgit参照（`.crate`は展開してパス参照） |
 
 同梱の`SHA256SUMS.txt`でファイルの整合性を確認できます。
 

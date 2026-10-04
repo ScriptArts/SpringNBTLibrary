@@ -383,7 +383,7 @@ def build_all():
     add_vector(
         "nbt/all_tags", "nbt/all_tags.nbt",
         to_java_file("", all_tags),
-        "全13タグを1つずつ含む")
+        "全13タグを含む。TAG_EndはCompoundの終端として現れる")
 
     add_vector(
         "nbt/nested_deep", "nbt/nested_deep.nbt",

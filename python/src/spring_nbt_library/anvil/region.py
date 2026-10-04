@@ -654,6 +654,8 @@ class RegionFile:
             return
 
         self._write_header()
+        # 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        self._ensure_directory()
 
         try:
             with open(self._path, "wb") as handle:
@@ -701,8 +703,19 @@ class RegionFile:
             raise SpringNbtError(
                 ErrorCode.IO, "外部チャンクファイルを読めない: %s" % external) from error
 
+    def _ensure_directory(self) -> None:
+        """ファイルを置くディレクトリが無ければ作る
+        読むだけの操作で空のディレクトリができないよう、書き出す直前にだけ呼ぶ
+        """
+        try:
+            os.makedirs(self._directory, exist_ok=True)
+        except OSError as error:
+            raise SpringNbtError(ErrorCode.IO, "ディレクトリを作れない: %s" % self._directory) from error
+
     def _write_external_file(self, chunk_x: int, chunk_z: int, payload: bytes) -> None:
         external = self._external_path(chunk_x, chunk_z)
+        # 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        self._ensure_directory()
 
         try:
             with open(external, "wb") as handle:
@@ -732,7 +745,8 @@ def _decompress_chunk(raw: RawChunk) -> bytes:
     if raw.compression == ChunkCompression.GZIP:
         try:
             return gzip.decompress(raw.data)
-        except OSError as error:
+        except (OSError, EOFError, zlib.error) as error:
+            # GZipでないデータ、途中で切れたデータ、中身の壊れたデータのどれも、仕様に反するデータとして扱う
             raise SpringNbtError(
                 ErrorCode.MALFORMED_DATA, "チャンクの圧縮データを展開できない") from error
 

@@ -270,7 +270,7 @@ public sealed class MinecraftWorld : IDisposable
     /// </summary>
     /// <remarks>
     /// <c>level.dat</c>がおかしくなるとワールド全体が開けなくなるため、
-    /// 一時ファイルへ書いてから既存の<c>level.dat</c>を<c>level.dat_old</c>へ退避し、最後に置き換える
+    /// 一時ファイルへ書いて内容をディスクへ確実に書き出してから、既存の<c>level.dat</c>を<c>level.dat_old</c>へ退避し、最後に置き換える
     /// </remarks>
     public void SaveLevel()
     {
@@ -287,7 +287,14 @@ public sealed class MinecraftWorld : IDisposable
 
         try
         {
-            NbtIo.WriteFile(temporary, Level.ToNamedTag());
+            byte[] encoded = NbtIo.WriteBytes(Level.ToNamedTag());
+
+            // 一時ファイルへ書き、置き換える前に内容をディスクへ確実に書き出す
+            using (FileStream stream = new FileStream(temporary, FileMode.Create, FileAccess.Write))
+            {
+                stream.Write(encoded);
+                stream.Flush(flushToDisk: true);
+            }
 
             // 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
             if (File.Exists(path))

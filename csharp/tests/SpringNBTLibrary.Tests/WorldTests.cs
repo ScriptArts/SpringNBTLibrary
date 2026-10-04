@@ -1,3 +1,4 @@
+using SpringNBTLibrary.Anvil;
 using SpringNBTLibrary.Nbt;
 using SpringNBTLibrary.World;
 
@@ -726,6 +727,48 @@ public class WorldTests
             finally
             {
                 System.IO.Directory.Delete(empty, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void 次元経由で読んだチャンクの警告も通知先へ届く()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "springnbt-warn-" + Guid.NewGuid().ToString("N"));
+            string region = Path.Combine(root, "dimensions", "minecraft", "overworld", "region");
+            System.IO.Directory.CreateDirectory(region);
+
+            try
+            {
+                // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
+                NbtCompound level = new NbtCompound();
+                level.Set("Data", new NbtCompound());
+                NbtIo.WriteFile(Path.Combine(root, "level.dat"), new NamedTag("", level));
+
+                NbtCompound chunk = (NbtCompound)NbtIo.ReadFile(VectorPath("palette_1")).Tag;
+                chunk.Set("DataVersion", new NbtInt(3953));
+
+                using (RegionFile file = RegionFile.Open(Path.Combine(region, "r.0.0.mca"), RegionFileMode.ReadWrite))
+                {
+                    file.WriteChunk(0, 0, chunk);
+                }
+
+                List<string> warnings = new List<string>();
+                WorldOpenOptions options = new WorldOpenOptions
+                {
+                    ChunkRead = new ChunkReadOptions { OnWarning = message => warnings.Add(message) },
+                };
+
+                using (MinecraftWorld world = MinecraftWorld.Open(root, options))
+                {
+                    Assert.NotNull(world.Dimension(Dimension.Overworld)!.Chunk(0, 0));
+                }
+
+                // ワールドを開くときに渡した通知先が、次元経由の読み込みでも呼ばれる
+                Assert.Single(warnings);
+            }
+            finally
+            {
+                System.IO.Directory.Delete(root, recursive: true);
             }
         }
     }

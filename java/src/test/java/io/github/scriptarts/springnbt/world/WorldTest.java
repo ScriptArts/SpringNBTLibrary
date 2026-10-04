@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,6 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.scriptarts.springnbt.ErrorCode;
 import io.github.scriptarts.springnbt.SpringNbt;
 import io.github.scriptarts.springnbt.SpringNbtException;
+import io.github.scriptarts.springnbt.anvil.RegionFile;
+import io.github.scriptarts.springnbt.anvil.RegionFileMode;
 import io.github.scriptarts.springnbt.nbt.Compression;
 import io.github.scriptarts.springnbt.nbt.NamedTag;
 import io.github.scriptarts.springnbt.nbt.NbtCompound;
@@ -640,6 +643,35 @@ class WorldTest {
             SpringNbtException error = assertThrows(SpringNbtException.class,
                     () -> MinecraftWorld.open(work));
             assertEquals(ErrorCode.IO, error.code());
+        }
+
+        @Test
+        void 次元経由で読んだチャンクの警告も通知先へ届く() throws Exception {
+            Path region = work.resolve("dimensions").resolve("minecraft").resolve("overworld").resolve("region");
+            Files.createDirectories(region);
+
+            // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
+            NbtCompound level = new NbtCompound();
+            level.set("Data", new NbtCompound());
+            NbtIo.writeFile(work.resolve("level.dat"), new NamedTag("", level), null);
+
+            NbtCompound chunk = (NbtCompound) NbtIo.readFile(vectorPath("palette_1"), null).tag();
+            chunk.set("DataVersion", new NbtInt(3953));
+
+            try (RegionFile file = RegionFile.open(region.resolve("r.0.0.mca"), RegionFileMode.READ_WRITE)) {
+                file.writeChunk(0, 0, chunk);
+            }
+
+            List<String> warnings = new ArrayList<>();
+            WorldOpenOptions options = WorldOpenOptions.defaults()
+                    .setChunkRead(ChunkReadOptions.defaults().setOnWarning(warnings::add));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work, options)) {
+                assertNotNull(world.dimension(Dimension.OVERWORLD).chunk(0, 0));
+            }
+
+            // ワールドを開くときに渡した通知先が、次元経由の読み込みでも呼ばれる
+            assertEquals(1, warnings.size());
         }
     }
 }

@@ -18,7 +18,7 @@ except ImportError:
 
 from ..anvil import ChunkPos, RegionFileMode, RegionFolder
 from ..errors import ErrorCode, SpringNbtError
-from ..nbt import NamedTag, NbtCompound, read_file, write_file
+from ..nbt import NamedTag, NbtCompound, read_file, write_bytes
 from .block_state import BlockState
 from .chunk import Chunk, ChunkReadOptions, ChunkWriteOptions
 
@@ -498,7 +498,7 @@ class MinecraftWorld:
         """``level.dat``を書き戻す
 
         ``level.dat``がおかしくなるとワールド全体が開けなくなるため、
-        一時ファイルへ書いてから既存の``level.dat``を``level.dat_old``へ退避し、最後に置き換える
+        一時ファイルへ書いて内容をディスクへ確実に書き出してから、既存の``level.dat``を``level.dat_old``へ退避し、最後に置き換える
         """
         self._ensure_open()
 
@@ -509,13 +509,22 @@ class MinecraftWorld:
         temporary = path + ".tmp"
         backup = path + "_old"
 
-        write_file(temporary, self.level.to_named_tag())
+        encoded = write_bytes(self.level.to_named_tag())
 
-        # 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
-        if os.path.exists(path):
-            shutil.copyfile(path, backup)
+        try:
+            # 一時ファイルへ書き、置き換える前に内容をディスクへ確実に書き出す
+            with open(temporary, "wb") as handle:
+                handle.write(encoded)
+                handle.flush()
+                os.fsync(handle.fileno())
 
-        os.replace(temporary, path)
+            # 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
+            if os.path.exists(path):
+                shutil.copyfile(path, backup)
+
+            os.replace(temporary, path)
+        except OSError as error:
+            raise SpringNbtError(ErrorCode.IO, "level.dat を書けない: %s" % path) from error
 
     def close(self) -> None:
         """開いている次元をすべて閉じる"""

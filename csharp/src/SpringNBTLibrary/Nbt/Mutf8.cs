@@ -179,4 +179,37 @@ public static class Mutf8
 
         return length;
     }
+
+    /// <summary>対になっていないサロゲートを含むか</summary>
+    /// <remarks>
+    /// 正しいサロゲートペアは1文字として数え、孤立したものだけを探す
+    /// Compoundのキーには孤立サロゲートを許さないので、その検査に使う
+    /// </remarks>
+    internal static bool HasLoneSurrogate(string text)
+    {
+        // コード単位を1つずつ見て、サロゲート対をまとめる
+        for (int index = 0; index < text.Length; index++)
+        {
+            char c = text[index];
+
+            // 上位サロゲートは、対になる下位サロゲートとまとめて1文字を成す
+            if (char.IsHighSurrogate(c))
+            {
+                // 対が揃っていなければ孤立サロゲート
+                if (index + 1 >= text.Length || !char.IsLowSurrogate(text[index + 1]))
+                {
+                    return true;
+                }
+
+                index += 1;
+            }
+            else if (char.IsLowSurrogate(c))
+            {
+                // 上位サロゲートを伴わない下位サロゲートは孤立している
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

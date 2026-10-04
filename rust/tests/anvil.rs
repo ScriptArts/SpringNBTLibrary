@@ -7,7 +7,8 @@
 use std::path::{Path, PathBuf};
 
 use spring_nbt_library::anvil::{
-    ChunkCompression, ChunkPos, RegionFile, RegionFileMode, RegionFolder, RegionPos, SECTOR_SIZE,
+    ChunkCompression, ChunkPos, RawChunk, RegionFile, RegionFileMode, RegionFolder, RegionPos,
+    SECTOR_SIZE,
 };
 use spring_nbt_library::error::ErrorCode;
 use spring_nbt_library::nbt::tag::{NbtCompound, NbtString, NbtTag};
@@ -227,6 +228,20 @@ fn rejects_lz4_block_with_broken_magic() {
         RegionFileMode::ReadOnly,
     )
     .unwrap();
+
+    let error = region.read_chunk(0, 0).unwrap_err();
+    assert_eq!(error.code(), ErrorCode::MalformedData);
+}
+
+#[test]
+fn truncated_gzip_chunk_is_malformed_data() {
+    let work = WorkDir::new("gziptruncated");
+    let path = work.copy_vector("lz4").join("r.0.0.mca");
+    let mut region = RegionFile::open(&path, RegionFileMode::ReadWrite).unwrap();
+
+    // GZipのヘッダだけで本体が無い、途中で切れたチャンク
+    let truncated = vec![0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff];
+    region.write_chunk_raw(0, 0, &RawChunk::new(ChunkCompression::Gzip, truncated)).unwrap();
 
     let error = region.read_chunk(0, 0).unwrap_err();
     assert_eq!(error.code(), ErrorCode::MalformedData);
@@ -577,6 +592,34 @@ fn timestamp_can_be_set_explicitly() {
 // ---------------------------------------------------------------------------
 // RegionFolder
 // ---------------------------------------------------------------------------
+
+#[test]
+fn read_write_folder_creates_missing_directory_only_when_writing() {
+    let work = WorkDir::new("missingfolder");
+    let missing = work.join("missing").join("region");
+
+    // 読むだけなら、無いディレクトリは作らない
+    {
+        let mut folder = RegionFolder::open(&missing, RegionFileMode::ReadWrite).unwrap();
+        assert!(folder.read_chunk(0, 0).unwrap().is_none());
+        folder.close().unwrap();
+    }
+
+    assert!(!missing.exists());
+
+    // 書き出すときに作る
+    {
+        let mut folder = RegionFolder::open(&missing, RegionFileMode::ReadWrite).unwrap();
+        folder
+            .write_chunk(0, 0, &sample_chunk(0, 0), ChunkCompression::Zlib)
+            .unwrap();
+        folder.close().unwrap();
+    }
+
+    let mut reopened = RegionFolder::open(&missing, RegionFileMode::ReadOnly).unwrap();
+    let chunk = reopened.read_chunk(0, 0).unwrap().unwrap();
+    assert_eq!(chunk.get_int("xPos").unwrap(), 0);
+}
 
 #[test]
 fn folder_resolves_chunks_across_regions() {

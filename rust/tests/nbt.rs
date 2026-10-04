@@ -147,6 +147,17 @@ fn reads_hand_built_hello_world() {
 }
 
 #[test]
+fn nan_bit_patterns_are_written_back_unchanged() {
+    // ペイロード付き・負・シグナリングのNaNを、Float / Doubleの両方で持つCompound
+    let original: Vec<u8> = vec![
+        0x0a, 0x00, 0x00, 0x05, 0x00, 0x01, 0x61, 0x7f, 0xc0, 0x00, 0x01, 0x05, 0x00, 0x01, 0x62, 0xff, 0xc0, 0x00, 0x00, 0x05, 0x00, 0x01, 0x63, 0x7f, 0x80, 0x00, 0x01, 0x06, 0x00, 0x01, 0x64, 0x7f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x06, 0x00, 0x01, 0x65, 0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x66, 0x7f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+    ];
+    let named = read_bytes(&original, &uncompressed_read()).unwrap();
+
+    assert_eq!(write_bytes(&named, &uncompressed_write()).unwrap(), original);
+}
+
+#[test]
 fn writes_back_the_same_bytes() {
     let original = hello_world_bytes();
     let named = read_bytes(&original, &uncompressed_read()).unwrap();
@@ -241,6 +252,18 @@ fn list_rejects_mixed_types() {
 }
 
 #[test]
+fn list_rejects_out_of_range_position_without_fixing_element_type() {
+    let mut list = NbtList::new();
+
+    let error = list.insert(1, NbtTag::Int(1)).unwrap_err();
+    assert_eq!(error.code(), ErrorCode::InvalidArgument);
+    assert!(list.get(0).is_none());
+
+    // 失敗した操作で要素型が確定していない
+    assert_eq!(list.element_type(), TagType::End);
+}
+
+#[test]
 fn list_keeps_element_type_after_clear() {
     let mut list = NbtList::new();
     list.push(NbtTag::Int(1)).unwrap();
@@ -268,6 +291,24 @@ fn typed_getter_distinguishes_missing_key_from_wrong_type() {
         root.get_int("missing").unwrap_err().code(),
         ErrorCode::InvalidArgument
     );
+}
+
+#[test]
+fn broken_compressed_data_is_malformed_data() {
+    let named = read_bytes(&hello_world_bytes(), &uncompressed_read()).unwrap();
+    let options = NbtWriteOptions { format: NbtFormat::Java, compression: Compression::Gzip };
+    let gzip = write_bytes(&named, &options).unwrap();
+    let truncated = gzip[..gzip.len() / 2].to_vec();
+    let broken_gzip: Vec<u8> = vec![
+        0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff,
+    ];
+    let broken_zlib: Vec<u8> = vec![0x78, 0x9c, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+
+    // 途中で切れたGZip、中身の壊れたGZip、中身の壊れたZlibは、どれも仕様に反するデータとして扱う
+    for data in [truncated, broken_gzip, broken_zlib] {
+        let error = read_bytes(&data, &NbtReadOptions::default()).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::MalformedData);
+    }
 }
 
 #[test]
@@ -524,6 +565,27 @@ fn escape_sequences() {
 }
 
 #[test]
+fn surrogate_escapes_follow_the_same_rules_everywhere() {
+    let lone = NbtTag::String(NbtString::from_utf16(vec![0xD800]));
+
+    // \Uでサロゲートの範囲を書くと、\uと同じく孤立サロゲートになる
+    assert_eq!(snbt::parse("\"\\U0000D800\"").unwrap(), lone);
+    assert_eq!(snbt::parse("\"\\uD800\"").unwrap(), lone);
+
+    // 対になったサロゲートは補助文字1文字と同じ
+    assert_eq!(
+        snbt::parse("\"\\uD83D\\uDE00\"").unwrap(),
+        NbtTag::String(NbtString::new("\u{1F600}"))
+    );
+
+    // コードポイントの範囲外と、キーの孤立サロゲートは仕様に反する
+    // Rustのキーは`String`なので、APIから孤立サロゲートのキーを設定することはそもそもできない
+    for source in ["\"\\U00110000\"", "{\"\\uD800\":1}", "{\"\\U0000D800\":1}"] {
+        assert_eq!(snbt::parse(source).unwrap_err().code(), ErrorCode::MalformedData, "{source}");
+    }
+}
+
+#[test]
 fn functions() {
     assert_eq!(snbt::parse("bool(5)").unwrap(), NbtTag::Byte(1));
     assert_eq!(snbt::parse("bool(0)").unwrap(), NbtTag::Byte(0));
@@ -642,6 +704,13 @@ fn special_values() {
     assert_eq!(snbt::write(&NbtTag::Double(f64::INFINITY)), "Infinityd");
     assert_eq!(snbt::write(&NbtTag::Double(f64::NEG_INFINITY)), "-Infinityd");
     assert_eq!(snbt::write(&NbtTag::Float(f32::NAN)), "NaNf");
+}
+
+#[test]
+fn float_out_of_range_becomes_signed_infinity() {
+    // binary32の範囲を超える値は、符号付きの無限大になる
+    assert_eq!(snbt::parse("1e39f").unwrap(), NbtTag::Float(f32::INFINITY));
+    assert_eq!(snbt::parse("-1e39f").unwrap(), NbtTag::Float(f32::NEG_INFINITY));
 }
 
 #[test]
