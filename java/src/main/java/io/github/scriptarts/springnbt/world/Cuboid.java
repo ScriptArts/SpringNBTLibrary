@@ -5,9 +5,10 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 
 /**
- * ブロック座標の直方体な範囲
+ * ブロック座標の直方体の範囲
  *
- * <p>両端を含む。{@code of(0, 0, 0, 0, 0, 0)} は 1 ブロック
+ * <p>両端を含む
+ * {@code of(0, 0, 0, 0, 0, 0)}は1ブロック
  *
  * <p>範囲内のブロックを順に処理したいときに使う
  */
@@ -23,7 +24,8 @@ public final class Cuboid {
     /**
      * 両端の座標から作る
      *
-     * <p>大小の順序は問わない。内部で小さいほうを最小に揃える
+     * <p>大小の順序は問わない
+     * 内部で小さいほうを最小に揃える
      *
      * @param first 端の座標
      * @param second もう一方の端の座標
@@ -56,7 +58,7 @@ public final class Cuboid {
     }
 
     /**
-     * X の最小値
+     * Xの最小値
      *
      * @return 座標
      */
@@ -65,7 +67,7 @@ public final class Cuboid {
     }
 
     /**
-     * Y の最小値
+     * Yの最小値
      *
      * @return 座標
      */
@@ -74,7 +76,7 @@ public final class Cuboid {
     }
 
     /**
-     * Z の最小値
+     * Zの最小値
      *
      * @return 座標
      */
@@ -83,7 +85,7 @@ public final class Cuboid {
     }
 
     /**
-     * X の最大値（含む）
+     * Xの最大値（含む）
      *
      * @return 座標
      */
@@ -92,7 +94,7 @@ public final class Cuboid {
     }
 
     /**
-     * Y の最大値（含む）
+     * Yの最大値（含む）
      *
      * @return 座標
      */
@@ -101,7 +103,7 @@ public final class Cuboid {
     }
 
     /**
-     * Z の最大値（含む）
+     * Zの最大値（含む）
      *
      * @return 座標
      */
@@ -110,7 +112,7 @@ public final class Cuboid {
     }
 
     /**
-     * X 方向の長さ
+     * X方向の長さ
      *
      * @return 長さ
      */
@@ -119,7 +121,7 @@ public final class Cuboid {
     }
 
     /**
-     * Y 方向の長さ
+     * Y方向の長さ
      *
      * @return 長さ
      */
@@ -128,7 +130,7 @@ public final class Cuboid {
     }
 
     /**
-     * Z 方向の長さ
+     * Z方向の長さ
      *
      * @return 長さ
      */
@@ -151,7 +153,7 @@ public final class Cuboid {
      * @param x X座標
      * @param y Y座標
      * @param z Z座標
-     * @return 含まれれば true
+     * @return 含まれればtrue
      */
     public boolean contains(int x, int y, int z) {
         return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
@@ -160,7 +162,7 @@ public final class Cuboid {
     /**
      * 範囲内の座標を順に返す
      *
-     * <p>並びは Y、Z、X の順で、X がいちばん内側で動く
+     * <p>並びはY、Z、Xの順で、Xがいちばん内側で動く
      *
      * @return 座標の並び
      */
@@ -185,7 +187,7 @@ public final class Cuboid {
                 BlockPos current = new BlockPos(x, y, z);
                 x++;
 
-                // 内側から X が動くので、同じチャンクの並びを続けて触れる
+                // Xがいちばん内側で動くので、同じチャンクの並びを続けて扱える
                 if (x > maxX) {
                     x = minX;
                     z++;

@@ -2,13 +2,9 @@
 //! 名前と、任意のプロパティの組
 //!
 //! プロパティは**常に名前の昇順で保持する**
-//! こうしておくと文字列表現が一意になり、
-//! 全言語で同じ出力になる
-//! Minecraft が書き出した並び順は
-//! [`super::PalettedContainer`] がパレットを生の NBT のまま持つことで守られるので、
-//! 触っていないブロックの並びが崩れることはない
-//!
-//! 仕様: `docs/spec/30-chunk-format.md` 2.1章
+//! こうしておくと文字列表現が一意になり、全言語で同じ出力になる
+//! Minecraftが書き出した並び順は、[`super::PalettedContainer`]がパレットを生のNBTのまま持つことで守られる
+//! そのため、触っていないブロックの並びが崩れることはない
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -24,14 +20,13 @@ pub struct BlockState {
     properties: BTreeMap<String, String>,
 }
 
-/// [`Chunk::set_block`](crate::world::Chunk::set_block) へ渡せるもの
+/// [`Chunk::set_block`](crate::world::Chunk::set_block)へ渡せるもの
 ///
-/// 他の言語ではオーバーロードで済むが、Rust には無いのでトレイトで受ける
-/// `&BlockState` と `&str` の両方をそのまま渡せる
+/// 他の言語ではオーバーロードで済むが、Rustには無いのでトレイトで受ける
+/// `&BlockState`と`&str`の両方をそのまま渡せる
 ///
-/// [`Cow`] を返すのは、すでに [`BlockState`] を持っているときに
-/// 複製を作らないようにするためである
-/// 1 ブロックずつ置く用途では、この複製が積み上がって効いてくる
+/// [`Cow`]を返すのは、すでに[`BlockState`]を持っているときに複製を作らないようにするためである
+/// 1ブロックずつ置く用途では、この複製が積み重なって無視できなくなる
 pub trait IntoBlockState {
     /// ブロック状態として借りる
     /// 文字列から作った場合だけ、その場で組み立てたものを返す
@@ -53,7 +48,7 @@ impl IntoBlockState for str {
 impl BlockState {
     /// 名前とプロパティを指定して作る
     ///
-    /// 名前空間が省略されていたら `minecraft:` を補う
+    /// 名前空間が省略されていたら`minecraft:`を補う
     pub fn new(name: impl AsRef<str>, properties: BTreeMap<String, String>) -> BlockState {
         BlockState { name: normalize(name.as_ref()), properties }
     }
@@ -75,19 +70,19 @@ impl BlockState {
     }
 
     /// プロパティを取得する
-    /// 無ければ `None`
+    /// 無ければ`None`
     pub fn property(&self, key: &str) -> Option<&str> {
         self.properties.get(key).map(|value| value.as_str())
     }
 
-    /// プロパティを 1 つ差し替えた新しい状態を返す
+    /// プロパティを1つ差し替えた新しい状態を返す
     pub fn with(&self, key: impl Into<String>, value: impl Into<String>) -> BlockState {
         let mut result = self.clone();
         result.properties.insert(key.into(), value.into());
         result
     }
 
-    /// `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列から作る
+    /// `minecraft:oak_stairs[facing=north,half=top]`形式の文字列から作る
     pub fn parse(text: &str) -> Result<BlockState> {
         let bracket = match text.find('[') {
             Some(position) => position,
@@ -111,7 +106,7 @@ impl BlockState {
         let mut properties = BTreeMap::new();
 
         if !body.is_empty() {
-            // "key=value" をカンマ区切りで読む
+            // "key=value"をカンマ区切りで読む
             for pair in body.split(',') {
                 let equals = match pair.find('=') {
                     Some(position) => position,
@@ -147,13 +142,13 @@ impl BlockState {
         Ok(BlockState::new(&text[..bracket], properties))
     }
 
-    /// パレット要素の NBT から作る
+    /// パレット要素のNBTから作る
     pub fn from_nbt(nbt: &NbtCompound) -> Result<BlockState> {
         let name = nbt.get_string("Name")?.to_string();
         let mut properties = BTreeMap::new();
 
         if let Some(properties_tag) = nbt.opt_compound("Properties")? {
-            // Properties の値はすべて文字列（数値や真偽値も文字列で入る）
+            // Propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
             for (key, value) in properties_tag.iter() {
                 match value {
                     NbtTag::String(text) => match text.as_str() {
@@ -183,10 +178,10 @@ impl BlockState {
         Ok(BlockState::new(name, properties))
     }
 
-    /// パレット要素の NBT へ変換する
+    /// パレット要素のNBTへ変換する
     ///
-    /// プロパティが空なら `Properties` キー自体を出力しない
-    /// Minecraft と同じ振る舞い
+    /// プロパティが空なら`Properties`キー自体を出力しない
+    /// Minecraftと同じ振る舞い
     pub fn to_nbt(&self) -> NbtCompound {
         let mut result = NbtCompound::new();
         result.set("Name", NbtTag::String(NbtString::new(self.name.clone())));
@@ -208,7 +203,7 @@ impl BlockState {
 }
 
 impl fmt::Display for BlockState {
-    /// `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列を返す
+    /// `minecraft:oak_stairs[facing=north,half=top]`形式の文字列を返す
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.name)?;
 
@@ -221,7 +216,7 @@ impl fmt::Display for BlockState {
 
         // 名前の昇順で並べるので、同じ状態なら必ず同じ文字列になる
         for (key, value) in &self.properties {
-            // 2 つ目以降の前に区切りのカンマを置く
+            // 2つ目以降の前に区切りのカンマを置く
             if !first {
                 f.write_str(",")?;
             }
@@ -234,7 +229,7 @@ impl fmt::Display for BlockState {
     }
 }
 
-/// 名前空間が省略されていたら `minecraft:` を補う
+/// 名前空間が省略されていたら`minecraft:`を補う
 fn normalize(name: &str) -> String {
     if name.contains(':') {
         return name.to_string();

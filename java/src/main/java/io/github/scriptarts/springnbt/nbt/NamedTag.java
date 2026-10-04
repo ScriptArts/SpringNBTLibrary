@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * ルート名とルートタグの組
  *
- * <p>{@link NbtFormat#JAVA} ではルート名は通常空文字列だが、
+ * <p>{@link NbtFormat#JAVA}ではルート名は通常空文字列だが、
  * 読んだ値をそのまま保持し、書き出しでも同じ値を出力する
  *
  * @param name ルート名

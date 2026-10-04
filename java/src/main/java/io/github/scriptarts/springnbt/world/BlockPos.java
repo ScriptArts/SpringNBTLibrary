@@ -5,8 +5,6 @@ import io.github.scriptarts.springnbt.anvil.ChunkPos;
 /**
  * ブロックの絶対座標
  *
- * <p>仕様: {@code docs/spec/30-chunk-format.md} 5章
- *
  * @param x X座標
  * @param y Y座標
  * @param z Z座標

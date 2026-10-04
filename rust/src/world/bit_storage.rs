@@ -1,14 +1,12 @@
-//! 添字を 64bit 整数の配列へ詰めた表現
-//! 1.16 以降の**跨ぎなし**パッキング
+//! 添字を64bit整数の配列へ詰めた表現
+//! 1.16以降の**跨ぎなし**パッキング
 //!
-//! 1 つの `i64` に入りきらない分は、その `i64` の残りビットを未使用のまま捨て、
-//! 次の `i64` の最下位ビットから始める
-//!
-//! 仕様: `docs/spec/31-paletted-container.md` 2章
+//! 1つの`i64`に入りきらない分は、その`i64`の残りビットを未使用のまま捨て、
+//! 次の`i64`の最下位ビットから始める
 
 use crate::error::{Error, ErrorCode, Result};
 
-/// packed な添字の並び
+/// packedな添字の並び
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BitStorage {
     data: Vec<i64>,
@@ -17,18 +15,18 @@ pub struct BitStorage {
 }
 
 impl BitStorage {
-    /// 1 エントリあたりのビット数
+    /// 1エントリあたりのビット数
     pub fn bits_per_entry(&self) -> usize {
         self.bits_per_entry
     }
 
     /// エントリ数
-    /// ブロックなら 4096、バイオームなら 64
+    /// ブロックなら4096、バイオームなら64
     pub fn entry_count(&self) -> usize {
         self.entry_count
     }
 
-    /// 1 つの `i64` に入るエントリ数
+    /// 1つの`i64`に入るエントリ数
     pub fn values_per_long(&self) -> usize {
         64 / self.bits_per_entry
     }
@@ -49,10 +47,9 @@ impl BitStorage {
         })
     }
 
-    /// 既存の `i64` 配列から作る
+    /// 既存の`i64`配列から作る
     ///
-    /// `lenient` が `true` なら、配列長が期待値と違う場合に
-    /// 配列長からビット幅を逆算して読む
+    /// `lenient`が`true`なら、配列長が期待値と違う場合に配列長からビット幅を逆算して読む
     /// 第三者ツールが書いたデータの救済用
     pub fn from_longs(
         data: Vec<i64>,
@@ -93,7 +90,7 @@ impl BitStorage {
         ))
     }
 
-    /// 必要な `i64` の個数を求める
+    /// 必要な`i64`の個数を求める
     pub fn long_count(bits_per_entry: usize, entry_count: usize) -> usize {
         let values_per_long = 64 / bits_per_entry;
         entry_count.div_ceil(values_per_long)
@@ -108,7 +105,7 @@ impl BitStorage {
         let bit_offset = (index % per_long) * self.bits_per_entry;
         let mask = (1u64 << self.bits_per_entry) - 1;
 
-        // 符号付きのままシフトすると符号が伸びるので、符号なしへ直してから動かす
+        // 符号付きのままシフトすると上位ビットが伸びるので、符号なしへ直してから動かす
         let unsigned = self.data[long_index] as u64;
         Ok(((unsigned >> bit_offset) & mask) as u32)
     }
@@ -136,17 +133,17 @@ impl BitStorage {
         Ok(())
     }
 
-    /// packed な配列を返す
+    /// packedな配列を返す
     pub fn as_longs(&self) -> &[i64] {
         &self.data
     }
 
-    /// packed な配列を複製して返す
+    /// packedな配列を複製して返す
     pub fn to_longs(&self) -> Vec<i64> {
         self.data.clone()
     }
 
-    /// packed な配列を取り出す
+    /// packedな配列を取り出す
     pub fn into_longs(self) -> Vec<i64> {
         self.data
     }

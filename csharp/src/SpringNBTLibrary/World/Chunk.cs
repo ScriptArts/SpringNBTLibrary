@@ -3,14 +3,14 @@ using SpringNBTLibrary.Nbt;
 
 namespace SpringNBTLibrary.World;
 
-/// <summary>DataVersion が対象と違ったときの動作</summary>
+/// <summary>DataVersionが扱える形式より古いときの動作</summary>
 public enum VersionMismatchAction
 {
     /// <summary>警告コールバックを呼んで続行する
     /// 既定</summary>
     Warn,
 
-    /// <summary><see cref="ErrorCode.UnsupportedDataVersion"/> の例外にする</summary>
+    /// <summary><see cref="ErrorCode.UnsupportedDataVersion"/>の例外にする</summary>
     Error,
 
     /// <summary>何もしない</summary>
@@ -18,21 +18,20 @@ public enum VersionMismatchAction
 }
 
 /// <summary>チャンク読み込みのオプション</summary>
-/// <remarks>仕様: <c>docs/spec/30-chunk-format.md</c> 5章</remarks>
 public sealed class ChunkReadOptions
 {
     /// <summary>既定のオプション</summary>
     public static ChunkReadOptions Default { get; } = new ChunkReadOptions();
 
-    /// <summary>DataVersion が扱える形式より古いときの動作</summary>
+    /// <summary>DataVersionが扱える形式より古いときの動作</summary>
     public VersionMismatchAction OnVersionMismatch { get; set; } = VersionMismatchAction.Warn;
 
     /// <summary>警告の通知先
-    /// null なら何もしない</summary>
+    /// nullなら何もしない</summary>
     public Action<string>? OnWarning { get; set; }
 
     /// <summary>
-    /// data の長さが期待値と違うとき、長さからビット幅を逆算して読むか
+    /// dataの長さが期待値と違うとき、長さからビット幅を逆算して読むか
     /// 第三者ツールが書いたデータの救済用
     /// </summary>
     public bool LenientBitStorage { get; set; }
@@ -45,33 +44,32 @@ public sealed class ChunkWriteOptions
     public static ChunkWriteOptions Default { get; } = new ChunkWriteOptions();
 
     /// <summary>
-    /// 対象バージョン以外の DataVersion を持つチャンクの書き戻しを許すか
+    /// 扱える形式より古いDataVersionを持つチャンクの書き戻しを許すか
     /// </summary>
     /// <remarks>
-    /// 既定は false
-    /// 古いワールドを黙って新形式で上書きし、
-    /// 利用者が気づかないうちに壊すことを防ぐため（<c>docs/adr/0003-version-policy.md</c>）
+    /// 既定はfalse
+    /// エラーを出さずに古いワールドを新形式で上書きし、
+    /// 利用者が気づかないうちに使えなくすることを防ぐため
     /// </remarks>
     public bool AllowForeignDataVersion { get; set; }
 }
 
 /// <summary>
-/// チャンク 1 つ分
-/// 地形の読み書きの入口
+/// チャンク1つ分
+/// 地形の読み書きはここから行う
 /// </summary>
 /// <remarks>
 /// <para>
-/// 読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
-/// 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
+/// 読んだNBTをそのまま保持し、書き戻すときに作り直すのはセクションだけにする
+/// 未知のキーを落とさないので、将来の追加要素があってもデータをおかしくしない
 /// </para>
-/// <para>仕様: <c>docs/spec/30-chunk-format.md</c></para>
 /// </remarks>
 public sealed class Chunk
 {
-    /// <summary>セクション 1 つに入るブロック数</summary>
+    /// <summary>セクション1つに入るブロック数</summary>
     public const int BlocksPerSection = 4096;
 
-    /// <summary>セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）</summary>
+    /// <summary>セクション1つに入るバイオームのエントリ数（4×4×4単位）</summary>
     public const int BiomesPerSection = 64;
 
     /// <summary>
@@ -100,10 +98,10 @@ public sealed class Chunk
     public int Z => root.GetInt("zPos");
 
     /// <summary>最下段セクションのY位置
-    /// オーバーワールドは -4</summary>
+    /// オーバーワールドは-4</summary>
     public int MinSectionY => root.GetInt("yPos");
 
-    /// <summary>生成段階（<c>minecraft:full</c> など）</summary>
+    /// <summary>生成段階（<c>minecraft:full</c>など）</summary>
     public string Status => root.GetString("Status");
 
     /// <summary>生成が完了しているか
@@ -116,11 +114,10 @@ public sealed class Chunk
     /// <remarks>
     /// <para>
     /// ブロックやバイオームを書き換えると立つ
-    /// <see cref="Dimension.Flush"/> はこれが立っているチャンクだけを書き戻す
+    /// <see cref="Dimension.Flush"/>はこれが立っているチャンクだけを書き戻す
     /// </para>
     /// <para>
-    /// <see cref="Raw"/> を直接いじった場合はここが立たないので、
-    /// 自分で true にすること
+    /// <see cref="Raw"/>を直接いじった場合は立たないので、自分でtrueにすること
     /// </para>
     /// </remarks>
     public bool IsModified { get; set; }
@@ -129,12 +126,12 @@ public sealed class Chunk
     /// 昇順</summary>
     public IEnumerable<int> SectionYs => sections.Keys;
 
-    /// <summary>元の NBT
+    /// <summary>元のNBT
     /// 解釈していないキーもここに残っている</summary>
     public NbtCompound Raw => root;
 
     /// <summary>
-    /// NBT からチャンクを読む
+    /// NBTからチャンクを読む
     /// </summary>
     /// <exception cref="SpringNbtException">
     /// 必須のキーが無い、または構造が想定と違う場合
@@ -164,7 +161,7 @@ public sealed class Chunk
             return chunk;
         }
 
-        // 並び順に依存しないよう、Y から索引を作る
+        // 並び順に依存しないよう、Yから索引を作る
         foreach (NbtTag entry in sectionList)
         {
             if (entry is not NbtCompound sectionTag)
@@ -180,7 +177,7 @@ public sealed class Chunk
         return chunk;
     }
 
-    /// <summary>DataVersion を検査し、オプションに従って警告またはエラーにする</summary>
+    /// <summary>DataVersionを検査し、オプションに従って警告またはエラーにする</summary>
     private void CheckDataVersion(ChunkReadOptions options)
     {
         int version = DataVersion;
@@ -212,12 +209,12 @@ public sealed class Chunk
     }
 
     /// <summary>
-    /// NBT へ書き戻す
-    /// 変更したセクションだけを反映し、他のキーはそのまま残す
+    /// NBTへ書き戻す
+    /// 全セクションを書き戻し、他のキーはそのまま残す
     /// </summary>
     /// <exception cref="SpringNbtException">
-    /// DataVersion が対象と違い、かつ
-    /// <see cref="ChunkWriteOptions.AllowForeignDataVersion"/> が false の場合
+    /// DataVersionが扱える形式より古く、かつ
+    /// <see cref="ChunkWriteOptions.AllowForeignDataVersion"/>がfalseの場合
     /// </exception>
     public NbtCompound ToNbt(ChunkWriteOptions? options = null)
     {
@@ -234,7 +231,7 @@ public sealed class Chunk
 
         int version = DataVersion;
 
-        // 形式の違う古いチャンクは、書き戻すと壊しかねない
+        // 形式の違う古いチャンクは、書き戻すと使えなくなりかねない
         if (version < SpringNbt.MinSupportedDataVersion && !effective.AllowForeignDataVersion)
         {
             string message = string.Create(
@@ -246,7 +243,7 @@ public sealed class Chunk
                 message + "。許可するなら ChunkWriteOptions.AllowForeignDataVersion を立てること");
         }
 
-        // DataVersion は読んだ値のまま残す
+        // DataVersionは読んだ値のまま残す
         // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
         if (sections.Count == 0)
@@ -256,7 +253,7 @@ public sealed class Chunk
 
         NbtList sectionList = new NbtList(TagType.Compound);
 
-        // Y の昇順で書き出す
+        // Yの昇順で書き出す
         foreach (ChunkSection section in sections.Values)
         {
             sectionList.Add(section.ToNbt());
@@ -267,7 +264,7 @@ public sealed class Chunk
     }
 
     /// <summary>Y位置からセクションを得る
-    /// 無ければ null</summary>
+    /// 無ければnull</summary>
     public ChunkSection? Section(int sectionY)
     {
         if (sections.TryGetValue(sectionY, out ChunkSection? section))
@@ -285,7 +282,7 @@ public sealed class Chunk
     /// <param name="y">絶対Y座標</param>
     /// <param name="z">チャンク内相対Z座標 (0..15)</param>
     /// <returns>ブロック
-    /// セクションが無い、または block_states を持たない場合は null</returns>
+    /// セクションが無い、またはblock_statesを持たない場合はnull</returns>
     public BlockState? GetBlock(int x, int y, int z)
     {
         CheckLocalCoordinates(x, z);
@@ -309,7 +306,7 @@ public sealed class Chunk
 
     /// <summary>
     /// ブロックを設定する
-    /// <c>minecraft:oak_stairs[facing=north]</c> の形の文字列で指定する
+    /// <c>minecraft:oak_stairs[facing=north]</c>の形の文字列で指定する
     /// </summary>
     /// <exception cref="SpringNbtException">
     /// 文字列を解釈できない場合（<see cref="ErrorCode.InvalidArgument"/>）
@@ -325,14 +322,11 @@ public sealed class Chunk
     /// </summary>
     /// <remarks>
     /// 置き換えによって不整合になる付随データ（<c>block_entities</c> /
-    /// <c>block_ticks</c> / <c>fluid_ticks</c> のうち、その座標を指すもの）は
-    /// 同時に取り除く
-    /// 残すとブロックと中身が食い違い、
-    /// Minecraft 側で予期しない挙動になるため
-    /// 仕様: <c>docs/spec/30-chunk-format.md</c> 2.4章
+    /// <c>block_ticks</c> / <c>fluid_ticks</c>のうち、その座標を指すもの）は同時に取り除く
+    /// 残すとブロックと中身が食い違い、Minecraft側で予期しない挙動になるため
     /// </remarks>
     /// <exception cref="SpringNbtException">
-    /// 対象のセクションが無い、または block_states を持たない場合
+    /// 対象のセクションが無い、またはblock_statesを持たない場合
     /// （<see cref="ErrorCode.InvalidArgument"/>）
     /// </exception>
     public void SetBlock(int x, int y, int z, BlockState state)
@@ -354,7 +348,7 @@ public sealed class Chunk
         }
 
         // 同じ状態を置き直すだけなら、付随データを触る理由がない
-        // プロパティの並び順に左右されないよう、NBT ではなく BlockState として比べる
+        // プロパティの並び順に左右されないよう、NBTではなくBlockStateとして比べる
         BlockState? current = GetBlock(x, y, z);
 
         if (current is not null && current.Equals(state))
@@ -371,15 +365,15 @@ public sealed class Chunk
     /// その座標を指す付随データを取り除く
     /// </summary>
     /// <remarks>
-    /// <c>block_entities</c> / <c>block_ticks</c> / <c>fluid_ticks</c> の要素は
-    /// いずれも <c>x</c> <c>y</c> <c>z</c> を**絶対座標**で持つ
+    /// <c>block_entities</c> / <c>block_ticks</c> / <c>fluid_ticks</c>の要素は
+    /// いずれも<c>x</c> <c>y</c> <c>z</c>を**絶対座標**で持つ
     /// </remarks>
     private void RemoveBlockData(int x, int y, int z)
     {
         int absoluteX = (X * 16) + x;
         int absoluteZ = (Z * 16) + z;
 
-        // 3 つのリストは形が同じなので、まとめて同じ処理をかける
+        // 3つのリストは形が同じなので、まとめて同じ処理をかける
         foreach (string key in BlockDataKeys)
         {
             NbtList? list = root.OptList(key);
@@ -420,10 +414,10 @@ public sealed class Chunk
 
     /// <summary>
     /// バイオームを取得する
-    /// 4×4×4 の単位なので、座標は自動的に丸められる
+    /// 4×4×4の単位なので、座標は自動的に丸められる
     /// </summary>
     /// <returns>バイオームID
-    /// セクションが無い場合は null</returns>
+    /// セクションが無い場合はnull</returns>
     public string? GetBiome(int x, int y, int z)
     {
         CheckLocalCoordinates(x, z);
@@ -446,7 +440,7 @@ public sealed class Chunk
     }
 
     /// <summary>バイオームを設定する
-    /// 4×4×4 の単位</summary>
+    /// 4×4×4の単位</summary>
     public void SetBiome(int x, int y, int z, string biome)
     {
         ArgumentNullException.ThrowIfNull(biome);
@@ -467,12 +461,11 @@ public sealed class Chunk
     }
 
     /// <summary>
-    /// <c>Heightmaps</c> を削除し、Minecraft に再計算させる
+    /// <c>Heightmaps</c>を削除し、Minecraftに再計算させる
     /// </summary>
     /// <remarks>
     /// 本ライブラリは高さマップを再計算しない
     /// ブロックを改変したら呼ぶこと
-    /// （<c>docs/adr/0004-defer-heightmap-recalc.md</c>）
     /// </remarks>
     public void ClearHeightmaps()
     {
@@ -481,7 +474,7 @@ public sealed class Chunk
     }
 
     /// <summary>
-    /// <c>isLightOn</c> を 0 にし、光源の再計算を促す
+    /// <c>isLightOn</c>を0にし、光源の再計算を促す
     /// </summary>
     public void InvalidateLighting()
     {
@@ -500,18 +493,18 @@ public sealed class Chunk
     }
 
     /// <summary>セクション内のブロック添字</summary>
-    /// <remarks><c>&amp; 15</c> により負のY座標でも正しく求まる</remarks>
+    /// <remarks><c>&amp; 15</c>により負のY座標でも正しく求まる</remarks>
     public static int BlockIndex(int x, int y, int z) =>
         ((y & 15) * 256) + ((z & 15) * 16) + (x & 15);
 
     /// <summary>セクション内のバイオーム添字
-    /// 1 エントリが 4×4×4 ブロック</summary>
+    /// 1エントリが4×4×4ブロック</summary>
     public static int BiomeIndex(int x, int y, int z) =>
         (((y & 15) / 4) * 16) + (((z & 15) / 4) * 4) + ((x & 15) / 4);
 
     private static void CheckLocalCoordinates(int x, int z)
     {
-        // チャンク内相対座標は 0..15 でなければならない
+        // チャンク内相対座標は0..15でなければならない
         if (x < 0 || x > 15 || z < 0 || z > 15)
         {
             throw SpringNbtException.InvalidArgument(string.Create(

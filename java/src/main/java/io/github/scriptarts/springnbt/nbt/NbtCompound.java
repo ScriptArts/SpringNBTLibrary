@@ -11,21 +11,18 @@ import java.util.Set;
  * 挿入順を保持する、名前付きタグのマップ
  *
  * <p>既存キーへの再設定は位置を維持したまま値だけを置き換える
- * （{@link LinkedHashMap} の既定の振る舞い）
+ * （{@link LinkedHashMap}の既定の振る舞い）
  * これにより読み込んだ順序が書き出しでも保たれ、ラウンドトリップが成立する
  *
  * <p>「キーが無い」と「型が違う」は区別する
- * {@code opt*} はキーが無ければ {@code null} を返し、{@code get*} は例外を送出する
- * どちらも型が違えば必ず {@link io.github.scriptarts.springnbt.ErrorCode#UNEXPECTED_TAG_TYPE}
- * の例外になる
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 7.1章
+ * {@code opt*}はキーが無ければ{@code null}を返し、{@code get*}は例外を送出する
+ * どちらも型が違えば必ず{@link io.github.scriptarts.springnbt.ErrorCode#UNEXPECTED_TAG_TYPE}の例外になる
  */
 public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, NbtTag>> {
 
     private final Map<String, NbtTag> entries = new LinkedHashMap<>();
 
-    /** 空の Compound を作る */
+    /** 空のCompoundを作る */
     public NbtCompound() {
         // 既定の状態で空
     }
@@ -57,7 +54,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
      * キーが存在するか
      *
      * @param key キー
-     * @return 存在すれば true
+     * @return 存在すればtrue
      */
     public boolean containsKey(String key) {
         return entries.containsKey(key);
@@ -78,10 +75,10 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
 
     /**
      * キーに対応するタグを返す
-     * 存在しなければ null
+     * 存在しなければnull
      *
      * @param key キー
-     * @return タグ、または null
+     * @return タグ、またはnull
      */
     public NbtTag opt(String key) {
         return entries.get(key);
@@ -109,7 +106,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
      * キーを削除する
      *
      * @param key キー
-     * @return 削除できたら true
+     * @return 削除できたらtrue
      */
     public boolean remove(String key) {
         return entries.remove(key) != null;
@@ -151,7 +148,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
         var left = entries.entrySet().iterator();
         var right = tag.entries.entrySet().iterator();
 
-        // キーと値を挿入順に突き合わせる
+        // キーと値を挿入順に比較する
         // 順序も等価性の一部
         while (left.hasNext()) {
             Map.Entry<String, NbtTag> a = left.next();
@@ -178,11 +175,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     // -- 型付き取得子 -------------------------------------------------------
 
     /**
-     * TAG_Byte を取得する
-     * キーが無ければ null
+     * TAG_Byteを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public Byte optByte(String key) {
         NbtByte tag = cast(key, NbtByte.class);
@@ -195,7 +192,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Byte を取得する
+     * TAG_Byteを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -206,11 +203,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Short を取得する
-     * キーが無ければ null
+     * TAG_Shortを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public Short optShort(String key) {
         NbtShort tag = cast(key, NbtShort.class);
@@ -223,7 +220,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Short を取得する
+     * TAG_Shortを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -234,11 +231,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Int を取得する
-     * キーが無ければ null
+     * TAG_Intを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public Integer optInt(String key) {
         NbtInt tag = cast(key, NbtInt.class);
@@ -251,7 +248,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Int を取得する
+     * TAG_Intを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -262,11 +259,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Long を取得する
-     * キーが無ければ null
+     * TAG_Longを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public Long optLong(String key) {
         NbtLong tag = cast(key, NbtLong.class);
@@ -279,7 +276,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Long を取得する
+     * TAG_Longを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -290,11 +287,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Float を取得する
-     * キーが無ければ null
+     * TAG_Floatを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public Float optFloat(String key) {
         NbtFloat tag = cast(key, NbtFloat.class);
@@ -307,7 +304,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Float を取得する
+     * TAG_Floatを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -318,11 +315,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Double を取得する
-     * キーが無ければ null
+     * TAG_Doubleを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public Double optDouble(String key) {
         NbtDouble tag = cast(key, NbtDouble.class);
@@ -335,7 +332,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Double を取得する
+     * TAG_Doubleを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -346,12 +343,12 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Byte を真偽値として取得する
-     * 0 以外が true
-     * キーが無ければ null
+     * TAG_Byteを真偽値として取得する
+     * 0以外がtrue
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public Boolean optBool(String key) {
         Byte raw = optByte(key);
@@ -364,8 +361,8 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Byte を真偽値として取得する
-     * 0 以外が true
+     * TAG_Byteを真偽値として取得する
+     * 0以外がtrue
      * キーが無ければ例外
      *
      * @param key キー
@@ -376,11 +373,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_String を取得する
-     * キーが無ければ null
+     * TAG_Stringを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public String optString(String key) {
         NbtString tag = cast(key, NbtString.class);
@@ -393,7 +390,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_String を取得する
+     * TAG_Stringを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -404,11 +401,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Byte_Array を取得する
-     * キーが無ければ null
+     * TAG_Byte_Arrayを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public byte[] optByteArray(String key) {
         NbtByteArray tag = cast(key, NbtByteArray.class);
@@ -421,7 +418,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Byte_Array を取得する
+     * TAG_Byte_Arrayを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -432,11 +429,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Int_Array を取得する
-     * キーが無ければ null
+     * TAG_Int_Arrayを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public int[] optIntArray(String key) {
         NbtIntArray tag = cast(key, NbtIntArray.class);
@@ -449,7 +446,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Int_Array を取得する
+     * TAG_Int_Arrayを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -460,11 +457,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Long_Array を取得する
-     * キーが無ければ null
+     * TAG_Long_Arrayを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public long[] optLongArray(String key) {
         NbtLongArray tag = cast(key, NbtLongArray.class);
@@ -477,7 +474,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Long_Array を取得する
+     * TAG_Long_Arrayを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -488,18 +485,18 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_List を取得する
-     * キーが無ければ null
+     * TAG_Listを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public NbtList optList(String key) {
         return cast(key, NbtList.class);
     }
 
     /**
-     * TAG_List を取得する
+     * TAG_Listを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -510,18 +507,18 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Compound を取得する
-     * キーが無ければ null
+     * TAG_Compoundを取得する
+     * キーが無ければnull
      *
      * @param key キー
-     * @return 値、または null
+     * @return 値、またはnull
      */
     public NbtCompound optCompound(String key) {
         return cast(key, NbtCompound.class);
     }
 
     /**
-     * TAG_Compound を取得する
+     * TAG_Compoundを取得する
      * キーが無ければ例外
      *
      * @param key キー
@@ -533,7 +530,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
 
     /**
      * キーに対応するタグを目的の型として取り出す
-     * キーが無ければ null、型が違えば例外
+     * キーが無ければnull、型が違えば例外
      */
     private <T extends NbtTag> T cast(String key, Class<T> expected) {
         NbtTag tag = entries.get(key);
@@ -566,11 +563,11 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
     // -- 型付き設定子 -------------------------------------------------------
     //
-    // set(key, new NbtInt(42)) と書かずに済むようにするための糖衣
-    // 取得子の getInt と対になる
+    // set(key, new NbtInt(42))と書かずに済むようにするための糖衣
+    // 取得子のgetIntと対になる
 
     /**
-     * TAG_Byte として設定する
+     * TAG_Byteとして設定する
      *
      * @param key キー
      * @param value 値
@@ -580,7 +577,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Short として設定する
+     * TAG_Shortとして設定する
      *
      * @param key キー
      * @param value 値
@@ -590,7 +587,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Int として設定する
+     * TAG_Intとして設定する
      *
      * @param key キー
      * @param value 値
@@ -600,7 +597,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Long として設定する
+     * TAG_Longとして設定する
      *
      * @param key キー
      * @param value 値
@@ -610,7 +607,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Float として設定する
+     * TAG_Floatとして設定する
      *
      * @param key キー
      * @param value 値
@@ -620,7 +617,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Double として設定する
+     * TAG_Doubleとして設定する
      *
      * @param key キー
      * @param value 値
@@ -630,14 +627,14 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Byte として設定する
-     * true は 1、false は 0
+     * TAG_Byteとして設定する
+     * trueは1、falseは0
      *
      * @param key キー
      * @param value 値
      */
     public void setBool(String key, boolean value) {
-        // NBT に真偽値の専用型は無いので TAG_Byte の 0 / 1 で表す
+        // NBTに真偽値の専用型は無いので、TAG_Byteの0 / 1で表す
         if (value) {
             setByte(key, (byte) 1);
         } else {
@@ -646,18 +643,18 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_String として設定する
+     * TAG_Stringとして設定する
      *
      * @param key キー
      * @param value 値
-     * @throws SpringNbtException MUTF-8 に符号化すると 65535 バイトを超える場合
+     * @throws SpringNbtException MUTF-8に符号化すると65535バイトを超える場合
      */
     public void setString(String key, String value) {
         set(key, new NbtString(value));
     }
 
     /**
-     * TAG_Byte_Array として設定する
+     * TAG_Byte_Arrayとして設定する
      *
      * @param key キー
      * @param value 値
@@ -667,7 +664,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Int_Array として設定する
+     * TAG_Int_Arrayとして設定する
      *
      * @param key キー
      * @param value 値
@@ -677,7 +674,7 @@ public final class NbtCompound implements NbtTag, Iterable<Map.Entry<String, Nbt
     }
 
     /**
-     * TAG_Long_Array として設定する
+     * TAG_Long_Arrayとして設定する
      *
      * @param key キー
      * @param value 値

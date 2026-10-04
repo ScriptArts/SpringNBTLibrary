@@ -1,7 +1,7 @@
 {
   "name": "spring-nbt-library",
   "version": "1.0.0",
-  "description": "Minecraft Java Edition の NBT / Anvil ワールドデータを読み書きするライブラリ",
+  "description": "Minecraft Java EditionのNBT / Anvilワールドデータを読み書きするライブラリ",
   "license": "MIT",
   "type": "module",
   "main": "./dist/src/index.js",

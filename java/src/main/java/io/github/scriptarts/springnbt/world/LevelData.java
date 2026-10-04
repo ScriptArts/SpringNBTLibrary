@@ -4,12 +4,9 @@ import io.github.scriptarts.springnbt.nbt.NamedTag;
 import io.github.scriptarts.springnbt.nbt.NbtCompound;
 
 /**
- * {@code level.dat} の内容
+ * {@code level.dat}の内容
  *
- * <p>26.x では大幅に軽量化されており、ゲームルールやワールド生成設定は
- * {@code data/minecraft/} 配下の個別ファイルへ分離されている
- *
- * <p>仕様: {@code docs/spec/40-world-layout.md} 2章
+ * <p>26.xでは大幅に軽量化されており、ゲームルールやワールド生成設定は{@code data/minecraft/}配下の個別ファイルへ分離されている
  */
 public final class LevelData {
 
@@ -24,8 +21,8 @@ public final class LevelData {
     }
 
     /**
-     * ルートの NBT
-     * {@code Data} を含む
+     * ルートのNBT
+     * {@code Data}を含む
      *
      * @return NBT
      */
@@ -34,7 +31,7 @@ public final class LevelData {
     }
 
     /**
-     * {@code Data} の中身
+     * {@code Data}の中身
      * 実際の設定はここに入っている
      *
      * @return NBT
@@ -81,7 +78,7 @@ public final class LevelData {
     }
 
     /**
-     * スポーン地点の {@code [x, y, z]}
+     * スポーン地点の{@code [x, y, z]}
      *
      * @return 座標
      */
@@ -99,7 +96,7 @@ public final class LevelData {
     }
 
     /**
-     * 難易度（{@code normal} など）
+     * 難易度（{@code normal}など）
      *
      * @return 難易度
      */
@@ -110,14 +107,14 @@ public final class LevelData {
     /**
      * ハードコアか
      *
-     * @return ハードコアなら true
+     * @return ハードコアならtrue
      */
     public boolean isHardcore() {
         return data.getCompound("difficulty_settings").getBool("hardcore");
     }
 
     /**
-     * バージョン名（{@code 26.2} など）
+     * バージョン名（{@code 26.2}など）
      *
      * @return バージョン名
      */
@@ -126,7 +123,7 @@ public final class LevelData {
     }
 
     /**
-     * 書き出し用の {@link NamedTag} を作る
+     * 書き出し用の{@link NamedTag}を作る
      *
      * @return NamedTag
      */

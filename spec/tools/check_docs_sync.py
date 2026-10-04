@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
 """ドキュメントと実装が食い違っていないかを機械で確かめる。
 
-1人で5言語ぶんの API を人手で揃え続けるのは必ず破綻する。
-このツールが CI でそれを守る。
+1人で5言語ぶんのAPIを人手で揃え続けると、必ずうまくいかなくなる。
+そこで、APIが揃っている状態をこのツールがCIで守る。
 
-やること:
+このツールは次のことをする。
 
-1. **型の一致** — 全言語の公開型の論理名集合が一致するか。
-   言語の性質による差異は `extract_api.EXPECTED_TYPE_GAPS` に理由つきで登録し、
+1. **型の一致**: 全言語の公開型の論理名集合が一致するか。
+   言語の性質による差異は`extract_api.EXPECTED_TYPE_GAPS`に理由つきで登録し、
    そこに無い差異が出たら失敗させる
-2. **`docs/api/` の再生成** — 対応表は実装から生成する。
-   生成結果と現在のファイルが違えば失敗させる（`--write` で書き直せる）
-3. **`docs/features.md` の照合** — ✅ が付いている機能に対応する型が
+2. **メンバの一致**: 同じ型のメンバが全言語で揃っているか。
+   基準実装のC#にあるメンバは全言語に要る。C#に無いのに他の言語の多くが持つメンバは、
+   C#の取りこぼしとして報告する。言語の性質による差異は`EXPECTED_MEMBER_GAPS`に理由つきで登録する
+3. **`docs/api/`の再生成**: 対応表は実装から生成する。
+   生成結果と現在のファイルが違えば失敗させる（`--write`で書き直せる）。
+   どのページにも載っていない公開型があっても失敗させる
+4. **`docs/features.md`の照合**: ✅が付いている機能に対応する型が
    その言語に実在するか
 
 使い方:
-    python3 spec/tools/check_docs_sync.py          # 検査する（CI 用）
-    python3 spec/tools/check_docs_sync.py --write  # docs/api/ を書き直す
-
-仕様: docs/spec/00-conventions.md 3章 / docs/adr/0009-static-api-extraction.md
+    python3 spec/tools/check_docs_sync.py          # 検査する（CI用）
+    python3 spec/tools/check_docs_sync.py --write  # docs/api/を書き直す
 """
 
 from __future__ import annotations
@@ -50,7 +52,7 @@ LANGUAGE_LABELS = {
 GENERATED_START = "<!-- generated:start -->"
 GENERATED_END = "<!-- generated:end -->"
 
-#: `docs/api/<ファイル>.md` に、どのレイヤの型を載せるか。
+#: `docs/api/<ファイル>.md`に、どのレイヤの型を載せるか。
 #:
 #: 型はソースのディレクトリではなく、利用者から見た役割で分ける。
 API_PAGES = {
@@ -84,7 +86,7 @@ API_PAGES = {
     },
 }
 
-#: `docs/api/` に載せない型。エラーモデルは `docs/guide/06` が本体。
+#: `docs/api/`に載せない型。エラーモデルは`docs/guide/06`が本体。
 API_EXCLUDED_TYPES = {"SpringNbtError", "ErrorCode"}
 
 
@@ -144,38 +146,37 @@ def check_types(apis, report: Report) -> None:
 #: 言語ごとに存在が変わるメンバと、その理由。メンバの一致検査から除く。
 #:
 #: 「その言語では書きようがない」「言語の作法として別の形で提供している」ものだけを
-#: 載せる。単に実装していないだけのものはここに逃がさず、実装する。
-#: 利用者から見て差が出るものは docs/features.md「言語ごとの差異」にも載せる。
+#: 載せる。単に実装していないだけのものはここに載せて済ませず、実装する。
+#: 利用者から見て差が出るものはdocs/features.md「言語ごとの差異」にも載せる。
 EXPECTED_MEMBER_GAPS = {
-    # Node のストリームは非同期しか無い。このライブラリは全体を同期 API で
-    # 揃えているので、TypeScript ではファイルとバイト列の入口だけを提供する
+    # Nodeのストリームは非同期しか無い。このライブラリは全体を同期APIで
+    # 揃えているので、TypeScriptではファイルとバイト列での読み書きだけを提供する
     (MODULE_LEVEL, "read_stream"): ["typescript"],
     (MODULE_LEVEL, "write_stream"): ["typescript"],
 
-    # Rust ではタグ型を NbtTag 列挙のバリアントが表すので、
+    # Rustではタグ型をNbtTag列挙のバリアントが表すので、
     # 個々の型は自分の型を答える必要がない
     ("NbtCompound", "type"): ["rust"],
     ("NbtList", "type"): ["rust"],
     ("NbtString", "type"): ["rust"],
 
-    # Rust の NbtString は Text / Surrogates の 2 形態
+    # RustのNbtStringはText / Surrogatesの2形態
     # 孤立サロゲートを保持するため、単一の値では表せない
-    # （docs/spec/10-nbt-binary.md 2.3）
     ("NbtString", "value"): ["rust"],
 
-    # C# の NbtList は IList<NbtTag> を実装するので、
-    # インターフェースの要求として値指定の Remove を持つ
-    # 他言語は位置指定の remove_at だけを提供する
+    # C#のNbtListはIList<NbtTag>を実装するので、
+    # インターフェースの要求として値指定のRemoveを持つ
+    # 他言語は位置指定のremove_atだけを提供する
     ("NbtList", "remove"): ["java", "typescript", "python", "rust"],
 
-    # C# は添字子 list[i] で取り出すのが作法
+    # C#は添字子list[i]で取り出すのが作法
     ("NbtList", "get"): ["csharp"],
 
-    # TypeScript のオプションは素のオブジェクトなので、
-    # { compression: Compression.None } をそのまま書く
+    # TypeScriptのオプションは素のオブジェクトなので、
+    # { compression: Compression.None }をそのまま書く
     ("NbtWriteOptions", "uncompressed"): ["typescript"],
 
-    # C# / TypeScript では列挙の基底値へキャストするのが作法
+    # C# / TypeScriptでは列挙の基底値へキャストするのが作法
     ("ChunkCompression", "id"): ["csharp", "typescript"],
 }
 
@@ -209,8 +210,8 @@ def has_member(api, type_name: str, member: str) -> bool:
 def check_members(apis, report: Report) -> None:
     """同じ型のメンバが全言語で揃っているかを見る。
 
-    論理APIの正は基準実装の C# とする（docs/adr/0002）。
-    C# にあるものは全言語に要る。逆に、C# に無いのに他の言語の多くが
+    論理APIの正は基準実装のC#とする。
+    C#にあるものは全言語に要る。逆に、C#に無いのに他の言語の多くが
     持っているものは、基準実装の取りこぼしとして報告する。
     """
     reference = apis["csharp"]
@@ -275,11 +276,11 @@ def check_members(apis, report: Report) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 3. docs/api/ の生成
+# 3. docs/api/の生成
 # ---------------------------------------------------------------------------
 
 def render_api_page(page_id: str, page, apis) -> str:
-    """1 ページぶんの対応表を組み立てる。"""
+    """1ページぶんの対応表を組み立てる。"""
     lines = []
     lines.append("| 論理名 | " + " | ".join(LANGUAGE_LABELS[name] for name in LANGUAGE_ORDER)
                  + " | 概要 |")
@@ -353,7 +354,7 @@ def api_page_path(page_id: str) -> str:
 
 
 def sync_api_pages(apis, write: bool, report: Report) -> None:
-    """docs/api/*.md の生成部分を作り直し、書くか照合するかする。"""
+    """docs/api/*.mdの生成部分を作り直し、書くか照合するかする。"""
     for page_id, page in API_PAGES.items():
         path = api_page_path(page_id)
 
@@ -389,7 +390,7 @@ def sync_api_pages(apis, write: bool, report: Report) -> None:
 
 
 def check_api_coverage(apis, report: Report) -> None:
-    """docs/api/ のどのページにも載っていない公開型が無いかを見る。"""
+    """docs/api/のどのページにも載っていない公開型が無いかを見る。"""
     listed = set()
 
     for page in API_PAGES.values():
@@ -404,32 +405,32 @@ def check_api_coverage(apis, report: Report) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 4. docs/features.md の照合
+# 4. docs/features.mdの照合
 # ---------------------------------------------------------------------------
 
-#: features.md の行と、その機能を代表する型の対応。
+#: features.mdの行と、その機能を代表する型の対応。
 #:
-#: ✅ が付いている言語にその型が実在するかを確かめる。
+#: ✅が付いている言語にその型が実在するかを確かめる。
 #: 表のすべての行を機械検証できるわけではないので、
 #: 型の有無で判定できる機能だけを載せる。
 FEATURE_TYPES = {
     "SNBT パース": MODULE_LEVEL,
-    "リージョンファイル": "RegionFile",
+    "リージョンの読み込み": "RegionFile",
     "`region/` `entities/` `poi/` の横断アクセス": "RegionFolder",
     "`level.dat` の読み込み": "MinecraftWorld",
     "標準3次元 + カスタム次元の解決": "Dimension",
     "チャンクの解釈": "Chunk",
     "`BlockState` の文字列表現": "BlockState",
     "パレット自動拡張とビット幅の再計算": "PalettedContainer",
-    "DataVersion 不一致時の警告／エラー切替": "VersionMismatchAction",
+    "扱えない形式の検出（警告／エラー切替）": "VersionMismatchAction",
 }
 
-#: features.md の言語列の並び。表の見出しと同じ順。
+#: features.mdの言語列の並び。表の見出しと同じ順。
 FEATURE_COLUMNS = ["csharp", "java", "typescript", "python", "rust"]
 
 
 def check_features(apis, report: Report) -> None:
-    """features.md で ✅ の機能に対応する型が実在するかを見る。"""
+    """features.mdで✅の機能に対応する型が実在するかを見る。"""
     path = os.path.join(REPO_ROOT, "docs", "features.md")
 
     with open(path, "r", encoding="utf-8") as handle:
@@ -441,7 +442,7 @@ def check_features(apis, report: Report) -> None:
 
         cells = [cell.strip() for cell in line.split("|")[1:-1]]
 
-        # 機能名 + 5言語 + 仕様 + 備考 の形でなければ対象外
+        # 機能名と5言語ぶんの列が無い行は対象外
         if len(cells) < 6:
             continue
 

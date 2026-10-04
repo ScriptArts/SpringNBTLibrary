@@ -1,11 +1,9 @@
-//! 4言語で共通のエラーモデル
-//!
-//! 仕様: `docs/spec/00-conventions.md` 4章 / `docs/adr/0005-unified-error-model.md`
+//! 全言語で共通のエラーモデル
 
 use std::fmt;
 
 /// エラーの分類
-/// 4言語すべてで同一の集合を持つ
+/// 全言語で同一の集合を持つ
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ErrorCode {
     /// 下位の入出力失敗
@@ -14,13 +12,13 @@ pub enum ErrorCode {
     MalformedData,
     /// 期待した型と違うタグを取り出した
     UnexpectedTagType,
-    /// 仕様上は妥当だが、このビルドでは扱えない
+    /// 仕様上は妥当だが、このライブラリでは扱えない
     UnsupportedFeature,
     /// 安全上限を超えた
     LimitExceeded,
     /// 呼び出し側の引数が不正
     InvalidArgument,
-    /// 対象バージョン外のデータ
+    /// 扱える形式より古いデータ
     UnsupportedDataVersion,
 }
 
@@ -88,7 +86,7 @@ impl Error {
         Error::new(ErrorCode::LimitExceeded, message)
     }
 
-    /// 仕様上は妥当だが、このビルドでは扱えない
+    /// 仕様上は妥当だが、このライブラリでは扱えない
     pub fn unsupported_feature(message: impl Into<String>) -> Self {
         Error::new(ErrorCode::UnsupportedFeature, message)
     }

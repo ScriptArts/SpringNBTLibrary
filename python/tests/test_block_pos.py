@@ -1,6 +1,4 @@
-"""ブロック座標と範囲の単体テスト。
-
-仕様: docs/spec/30-chunk-format.md 5章
+"""ブロック座標と範囲の単体テスト
 """
 
 from __future__ import annotations
@@ -51,7 +49,7 @@ def test_walks_every_position_inside():
     assert len(positions) == box.volume
     assert len(positions) == 2 * 3 * 4
 
-    # 並びは Y、Z、X の順で、X がいちばん内側で動く
+    # 並びはY、Z、Xの順で、Xがいちばん内側で動く
     assert positions[0] == BlockPos(0, 0, 0)
     assert positions[1] == BlockPos(1, 0, 0)
     assert positions[2] == BlockPos(0, 0, 1)

@@ -17,13 +17,10 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * ワールド内の次元 1 つ分
- * {@code region/} {@code entities/} {@code poi/} をまとめて扱う
+ * ワールド内の次元1つ分
+ * {@code region/} {@code entities/} {@code poi/}をまとめて扱う
  *
- * <p>ブロックの取得・設定は<strong>絶対ワールド座標</strong>で行い、
- * リージョン・チャンク・セクションの解決は内部で済ませる
- *
- * <p>仕様: {@code docs/spec/40-world-layout.md} 4章
+ * <p>ブロックの取得・設定は<strong>絶対ワールド座標</strong>で行い、リージョン・チャンク・セクションの解決は内部で済ませる
  */
 public final class Dimension implements AutoCloseable {
 
@@ -53,7 +50,7 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * 次元ID（{@code minecraft:overworld} など）
+     * 次元ID（{@code minecraft:overworld}など）
      *
      * @return 次元ID
      */
@@ -72,7 +69,7 @@ public final class Dimension implements AutoCloseable {
 
     /**
      * 地形のリージョンフォルダ
-     * 無ければ null
+     * 無ければnull
      *
      * @return フォルダ
      */
@@ -83,7 +80,7 @@ public final class Dimension implements AutoCloseable {
 
     /**
      * エンティティのリージョンフォルダ
-     * 無ければ null
+     * 無ければnull
      *
      * @return フォルダ
      */
@@ -93,8 +90,8 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * POI のリージョンフォルダ
-     * 無ければ null
+     * POIのリージョンフォルダ
+     * 無ければnull
      *
      * @return フォルダ
      */
@@ -104,11 +101,13 @@ public final class Dimension implements AutoCloseable {
     }
 
     /**
-     * {@code data/minecraft/<name>.dat} を読む
+     * {@code data/minecraft/<name>.dat}を読む
+     *
+     * <p>次元ごとの{@code world_border} / {@code raids} / {@code chunk_tickets}などが入る
      *
      * @param name ファイル名（拡張子なし）
      * @return NBT
-     * 存在しなければ null
+     * 存在しなければnull
      */
     public NbtCompound dataFile(String name) {
         ensureOpen();
@@ -144,7 +143,7 @@ public final class Dimension implements AutoCloseable {
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
      * @return チャンク
-     * 存在しなければ null
+     * 存在しなければnull
      */
     public Chunk chunk(int chunkX, int chunkZ) {
         ensureOpen();
@@ -199,7 +198,7 @@ public final class Dimension implements AutoCloseable {
      * @param y Y座標
      * @param z Z座標
      * @return ブロック
-     * チャンクが無ければ null
+     * チャンクが無ければnull
      */
     public BlockState getBlock(int x, int y, int z) {
         Chunk chunk = chunk(x >> 4, z >> 4);
@@ -214,8 +213,8 @@ public final class Dimension implements AutoCloseable {
     /**
      * 絶対座標でブロックを設定する
      *
-     * <p>変更したチャンクは記録され、{@link #flush()} でまとめて書き戻される
-     * 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
+     * <p>変更したチャンクには印が付き、{@link #flush()}でまとめて書き戻される
+     * 本ライブラリはチャンクを新規生成しないので、チャンクが存在しない座標はエラーになる
      *
      * @param x     X座標
      * @param y     Y座標
@@ -230,7 +229,7 @@ public final class Dimension implements AutoCloseable {
     /**
      * 絶対座標でブロックを設定する
      *
-     * <p>変更したチャンクには印が付き、{@link #flush()} でまとめて書き戻される
+     * <p>変更したチャンクには印が付き、{@link #flush()}でまとめて書き戻される
      *
      * @param x     絶対X座標
      * @param y     絶対Y座標
@@ -256,13 +255,13 @@ public final class Dimension implements AutoCloseable {
 
     /**
      * 絶対座標でバイオームを取得する
-     * 4×4×4 の単位
+     * 4×4×4の単位
      *
      * @param x X座標
      * @param y Y座標
      * @param z Z座標
      * @return バイオームID
-     * チャンクが無ければ null
+     * チャンクが無ければnull
      */
     public String getBiome(int x, int y, int z) {
         Chunk chunk = chunk(x >> 4, z >> 4);
@@ -276,7 +275,7 @@ public final class Dimension implements AutoCloseable {
 
     /**
      * 絶対座標でバイオームを設定する
-     * 4×4×4 の単位
+     * 4×4×4の単位
      *
      * @param x     X座標
      * @param y     Y座標
@@ -359,7 +358,7 @@ public final class Dimension implements AutoCloseable {
 
     /**
      * フォルダを遅延して開く
-     * 存在しなければ null のまま
+     * 存在しなければnullのまま
      */
     private RegionFolder folder(RegionFolder slot, String name) {
         ensureOpen();
@@ -398,7 +397,7 @@ public final class Dimension implements AutoCloseable {
         }
     }
 
-    /** チャンク座標を 1 つの long に詰めてキャッシュの鍵にする */
+    /** チャンク座標を1つのlongに詰めてキャッシュのキーにする */
     private static long chunkKey(int chunkX, int chunkZ) {
         return ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
     }

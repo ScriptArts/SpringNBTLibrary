@@ -1,11 +1,9 @@
 //! 浮動小数点の正準10進表記
 //!
-//! 各言語の標準の数値書式（C# の `"R"`、Java の `Float.toString`、
-//! Python の `repr`、Rust の `{}`）は互いに一致しない
-//! 指数表記へ切り替わる閾値も、指数部の桁数も、`E` の大文字小文字も処理系ごとに違う
-//! そのままでは SNBT 出力の言語間一致が成立しないため、書式をここで固定する
-//!
-//! 仕様: `docs/spec/11-snbt.md` 5.1章
+//! 各言語の標準の数値書式（C#の`"R"`、Javaの`Float.toString`、
+//! Pythonの`repr`、Rustの`{}`）は互いに一致しない
+//! 指数表記へ切り替わる閾値も、指数部の桁数も、`E`の大文字小文字も処理系ごとに違う
+//! そのままではSNBTの出力が言語間で一致しないため、書式をここで固定する
 
 /// 固定小数点表記を使う10進指数の下限
 const MIN_FIXED_EXPONENT: i32 = -4;
@@ -13,7 +11,7 @@ const MIN_FIXED_EXPONENT: i32 = -4;
 /// 固定小数点表記を使う10進指数の上限
 const MAX_FIXED_EXPONENT: i32 = 16;
 
-/// binary32 を正準10進表記へ変換する
+/// binary32を正準10進表記へ変換する
 pub fn from_f32(value: f32) -> String {
     if value.is_nan() {
         return "NaN".to_string();
@@ -29,7 +27,7 @@ pub fn from_f32(value: f32) -> String {
 
     let target = value.to_bits();
 
-    // 有効数字を 1 桁ずつ増やし、読み戻してビット一致する最短の表記を探す
+    // 有効数字を1桁ずつ増やし、読み戻したときにビットが一致する最短の表記を探す
     for precision in 1..=9usize {
         let candidate = format!("{:.*e}", precision - 1, value);
 
@@ -43,11 +41,11 @@ pub fn from_f32(value: f32) -> String {
         }
     }
 
-    // 9 桁あれば binary32 は必ず往復するので、ここへは来ない
+    // 9桁あればbinary32は必ず往復するので、ここへは来ない
     format_exponential(&format!("{:.8e}", value))
 }
 
-/// binary64 を正準10進表記へ変換する
+/// binary64を正準10進表記へ変換する
 pub fn from_f64(value: f64) -> String {
     if value.is_nan() {
         return "NaN".to_string();
@@ -63,7 +61,7 @@ pub fn from_f64(value: f64) -> String {
 
     let target = value.to_bits();
 
-    // 有効数字を 1 桁ずつ増やし、読み戻してビット一致する最短の表記を探す
+    // 有効数字を1桁ずつ増やし、読み戻したときにビットが一致する最短の表記を探す
     for precision in 1..=17usize {
         let candidate = format!("{:.*e}", precision - 1, value);
 
@@ -77,11 +75,11 @@ pub fn from_f64(value: f64) -> String {
         }
     }
 
-    // 17 桁あれば binary64 は必ず往復するので、ここへは来ない
+    // 17桁あればbinary64は必ず往復するので、ここへは来ない
     format_exponential(&format!("{:.16e}", value))
 }
 
-/// 指数表記の文字列（Rust の `{:e}` は `7.5e-1` 形式）から、仕様が定める正準表記を組み立てる
+/// 指数表記の文字列（Rustの`{:e}`は`7.5e-1`形式）から、仕様が定める正準表記を組み立てる
 fn format_exponential(exponential: &str) -> String {
     let bytes: Vec<char> = exponential.chars().collect();
     let mut negative = false;
@@ -111,7 +109,7 @@ fn format_exponential(exponential: &str) -> String {
 }
 
 /// 末尾のゼロを取り除く
-/// すべてゼロなら "0" を残す
+/// すべてゼロなら"0"を残す
 fn trim_trailing_zeros(digits: &str) -> String {
     let chars: Vec<char> = digits.chars().collect();
     let mut end = chars.len();
@@ -133,7 +131,7 @@ fn compose(negative: bool, digits: String, exponent: i32) -> String {
         result.push('-');
     }
 
-    // 値が 0 のときは指数に関わらず 0.0 と書く
+    // 値が0のときは指数に関わらず0.0と書く
     if digits == "0" {
         result.push_str("0.0");
         return result;
@@ -144,7 +142,7 @@ fn compose(negative: bool, digits: String, exponent: i32) -> String {
         result.push_str(&digits[0..1]);
         result.push('.');
 
-        // 2 桁目以降があれば小数点のうしろへ回す
+        // 2桁目以降があれば小数点のうしろへ回す
         if digits.len() > 1 {
             result.push_str(&digits[1..]);
         } else {
@@ -157,8 +155,8 @@ fn compose(negative: bool, digits: String, exponent: i32) -> String {
     }
 
     if exponent >= 0 {
-        // 整数部は先頭 (exponent + 1) 桁
-        // 足りなければゼロで右詰めする
+        // 整数部は先頭 (exponent + 1)桁
+        // 足りなければ数字の右側をゼロで埋める
         let integer_digits = (exponent + 1) as usize;
 
         // 整数部が数字の並びに収まるなら、そのまま切り出す
@@ -167,7 +165,7 @@ fn compose(negative: bool, digits: String, exponent: i32) -> String {
         } else {
             result.push_str(&digits);
 
-            // 数字が足りない分は 0 で埋めて桁を合わせる
+            // 数字が足りない分は0で埋めて桁を合わせる
             for _ in digits.len()..integer_digits {
                 result.push('0');
             }
@@ -185,10 +183,10 @@ fn compose(negative: bool, digits: String, exponent: i32) -> String {
         return result;
     }
 
-    // 指数が負なら "0." に続けてゼロを詰めてから数字を置く
+    // 指数が負なら"0."に続けてゼロを詰めてから数字を置く
     result.push_str("0.");
 
-    // 指数のぶんだけ 0.000... と 0 を並べる
+    // 指数の絶対値より1個少ない0を並べ、0.000...の形にする
     for _ in 0..((-exponent) - 1) {
         result.push('0');
     }

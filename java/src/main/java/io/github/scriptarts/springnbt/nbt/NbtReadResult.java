@@ -5,9 +5,7 @@ package io.github.scriptarts.springnbt.nbt;
  *
  * <p>読んだタグと、その直後の位置を持つ
  *
- * <p>続けて読むときは {@code end} を次の開始位置として渡す
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 3.1章
+ * <p>続けて読むときは{@code end}を次の開始位置として渡す
  *
  * @param tag 読んだタグ
  * @param end 読み終わった直後の位置

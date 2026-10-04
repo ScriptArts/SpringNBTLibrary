@@ -2,7 +2,9 @@ using SpringNBTLibrary.Nbt;
 
 namespace SpringNBTLibrary.Tests;
 
-/// <summary>MUTF-8 の符号化・復号。仕様: docs/spec/10-nbt-binary.md 2章</summary>
+/// <summary>
+/// MUTF-8の符号化・復号
+/// </summary>
 public class Mutf8Tests
 {
     [Fact]
@@ -16,7 +18,7 @@ public class Mutf8Tests
     [Fact]
     public void NulIsTwoBytes()
     {
-        // U+0000 は 1 バイトの 0x00 ではなく C0 80 で表す
+        // U+0000は1バイトの0x00ではなく、C0 80で表す
         string sample = "a\u0000b";
         byte[] bytes = Mutf8.Encode(sample);
         Assert.Equal(new byte[] { 0x61, 0xC0, 0x80, 0x62 }, bytes);
@@ -26,7 +28,7 @@ public class Mutf8Tests
     [Fact]
     public void SupplementaryCharIsCesu8()
     {
-        // U+1F600 は UTF-16 で D83D DE00。MUTF-8 では 3 バイト × 2 になる
+        // U+1F600はUTF-16でD83D DE00、MUTF-8では3バイト × 2になる
         string sample = "\U0001F600";
         byte[] bytes = Mutf8.Encode(sample);
         Assert.Equal(new byte[] { 0xED, 0xA0, 0xBD, 0xED, 0xB8, 0x80 }, bytes);
@@ -36,7 +38,7 @@ public class Mutf8Tests
     [Fact]
     public void LoneSurrogateSurvivesRoundtrip()
     {
-        // 対にならない上位サロゲート。UTF-8 には写せないが MUTF-8 では往復できる
+        // 対にならない上位サロゲートはUTF-8には写せないが、MUTF-8では往復できる
         string lone = "\ud83d";
         byte[] bytes = Mutf8.Encode(lone);
         Assert.Equal(new byte[] { 0xED, 0xA0, 0xBD }, bytes);
@@ -54,7 +56,7 @@ public class Mutf8Tests
     [Fact]
     public void OverlongTwoByteIsRejected()
     {
-        // U+0041 を 2 バイトで表した冗長符号化
+        // U+0041を2バイトで表した冗長符号化
         SpringNbtException error = Assert.Throws<SpringNbtException>(
             () => Mutf8.Decode(new byte[] { 0xC1, 0x81 }));
         Assert.Equal(ErrorCode.MalformedData, error.Code);
@@ -63,7 +65,7 @@ public class Mutf8Tests
     [Fact]
     public void FourByteUtf8IsRejected()
     {
-        // 標準 UTF-8 の 4 バイト形式は MUTF-8 では不正
+        // 標準UTF-8の4バイト形式はMUTF-8では不正
         SpringNbtException error = Assert.Throws<SpringNbtException>(
             () => Mutf8.Decode(new byte[] { 0xF0, 0x9F, 0x98, 0x80 }));
         Assert.Equal(ErrorCode.MalformedData, error.Code);

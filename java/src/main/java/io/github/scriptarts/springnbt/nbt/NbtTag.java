@@ -1,11 +1,9 @@
 package io.github.scriptarts.springnbt.nbt;
 
 /**
- * NBT のタグ
+ * NBTのタグ
  *
- * <p>{@code sealed} なので {@code switch} のパターンマッチで網羅的に分岐できる
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 1章
+ * <p>{@code sealed}なので{@code switch}のパターンマッチで網羅的に分岐できる
  */
 public sealed interface NbtTag
         permits NbtByte, NbtShort, NbtInt, NbtLong, NbtFloat, NbtDouble,

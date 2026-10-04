@@ -6,17 +6,16 @@ using SpringNBTLibrary.World;
 namespace SpringNBTLibrary.Conformance;
 
 /// <summary>
-/// チャンクの中身を、言語をまたいで文字列として完全一致する形へ写す。
+/// チャンクの中身を、言語をまたいで文字列として完全一致する形へ写す
 /// </summary>
-/// <remarks>仕様: <c>docs/spec/90-conformance.md</c> 2.3章</remarks>
 internal static class ChunkReport
 {
     /// <summary>
-    /// チャンクの全ブロック・全バイオームを走査して集計する。
+    /// チャンクの全ブロック・全バイオームを走査して集計する
     /// </summary>
     /// <remarks>
     /// パレットとビットストレージを端から端まで通すので、
-    /// ビット詰めの実装が 1 か所でもずれれば集計値が変わる。
+    /// ビット詰めの実装が1か所でもずれれば集計値が変わる
     /// </remarks>
     internal static string Describe(Chunk chunk)
     {
@@ -52,7 +51,7 @@ internal static class ChunkReport
                 CultureInfo.InvariantCulture,
                 $"section {sectionY} {blockPalette} {blockBits} {biomePalette} {biomeBits}\n"));
 
-            // 全ブロックを 1 つずつ読んで、状態の文字列表現ごとに数える
+            // 全ブロックを1つずつ読んで、状態の文字列表現ごとに数える
             for (int y = 0; y < 16; y++)
             {
                 for (int z = 0; z < 16; z++)
@@ -73,7 +72,7 @@ internal static class ChunkReport
                 }
             }
 
-            // バイオームは 4×4×4 単位なので、4 ブロックおきに見る
+            // バイオームは4×4×4単位なので、4ブロックおきに見る
             for (int y = 0; y < 16; y += 4)
             {
                 for (int z = 0; z < 16; z += 4)
@@ -109,11 +108,12 @@ internal static class ChunkReport
     }
 
     /// <summary>
-    /// 決まった手順でチャンクを編集する。全言語で同じ結果になるはず。
+    /// 決まった手順でチャンクを編集する
+    /// 全言語で同じ結果になるはず
     /// </summary>
     /// <remarks>
-    /// パレット拡張・ビット幅の再計算・未使用要素の掃除を一通り通す。
-    /// 出力バイト列を比較すれば、これらの実装が一致していることを確かめられる。
+    /// パレット拡張・ビット幅の再計算・未使用要素の掃除を一通り通す
+    /// 出力バイト列を比較すれば、これらの実装が一致していることを確かめられる
     /// </remarks>
     internal static void Edit(Chunk chunk)
     {
@@ -127,7 +127,8 @@ internal static class ChunkReport
             chunk.SetBlock(index % 16, baseY + (index / 16), index % 16, state);
         }
 
-        // プロパティ付きのブロックを、名前は同じで状態違いで置く
+        // プロパティ付きのブロックを置く
+        // 1つ目と2つ目はプロパティの並び順だけが違う同じ状態、3つ目は名前空間を省いて書いた別の状態
         chunk.SetBlock(1, baseY + 2, 1, BlockState.Parse("minecraft:oak_stairs[facing=north,half=top]"));
         chunk.SetBlock(2, baseY + 2, 2, BlockState.Parse("minecraft:oak_stairs[half=top,facing=north]"));
         chunk.SetBlock(3, baseY + 2, 3, BlockState.Parse("oak_stairs[facing=south]"));
@@ -139,7 +140,7 @@ internal static class ChunkReport
         // 使われなくなったパレット要素を掃除する
         chunk.Compact();
 
-        // 高さマップと光源は再計算しないので、無効化して Minecraft に任せる
+        // 高さマップと光源は再計算しないので、無効化してMinecraftに任せる
         chunk.ClearHeightmaps();
         chunk.InvalidateLighting();
     }

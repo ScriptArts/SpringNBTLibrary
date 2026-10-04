@@ -1,9 +1,8 @@
-//! 適合性検証ツール。4言語すべてが同じインターフェースで同じ出力を出す。
+//! 適合性検証ツール
+//! 全言語が同じインターフェースで同じ出力を出す
 //!
-//! `spec/run-conformance.sh` がこのツールを4言語ぶん起動し、
-//! 出力を相互に diff することで「4言語が同一に振る舞う」ことを機械的に確かめる。
-//!
-//! 仕様: `docs/spec/90-conformance.md` 2.3章
+//! `spec/run-conformance.sh`がこのツールを全言語ぶん起動し、
+//! 出力を相互にdiffすることで「全言語が同一に振る舞う」ことを機械的に確かめる
 
 use std::process::ExitCode;
 
@@ -48,7 +47,7 @@ fn main() -> ExitCode {
         | "chunk-report" | "chunk-edit" => match run(&args) {
             Ok(code) => code,
             Err(error) => {
-                // 4言語で同じ ErrorCode を出すことが検証対象なので、コードを機械可読な形で出す
+                // 言語間で同じErrorCodeを出すことが検証対象なので、コードを機械可読な形で出す
                 eprint!("ERROR {} {}\n", error.code().as_str(), error.message());
                 ExitCode::FAILURE
             }
@@ -60,7 +59,7 @@ fn main() -> ExitCode {
     }
 }
 
-/// 連なった NBT を、位置を追いながら一覧として書き出す
+/// 連なったNBTを、位置を追いながら一覧として書き出す
 fn nbt_list(data: &[u8], format: NbtFormat) -> Result<String> {
     let options =
         NbtReadOptions { format, compression: Compression::None, ..NbtReadOptions::default() };
@@ -95,7 +94,7 @@ fn run(args: &[String]) -> Result<ExitCode> {
         return Ok(ExitCode::from(2));
     }
 
-    // チャンク系は World 層を通す
+    // チャンク系はWorld層を通す
     if args[0] == "chunk-report" || args[0] == "chunk-edit" {
         let mut chunk = read_chunk_file(&args[1])?;
 
@@ -110,14 +109,14 @@ fn run(args: &[String]) -> Result<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
 
-    // 連なった NBT を一覧にする
+    // 連なったNBTを一覧にする
     if args[0] == "nbt-list" {
         let bytes = std::fs::read(&args[1])?;
         std::fs::write(&args[2], nbt_list(&bytes, parse_format(args))?)?;
         return Ok(ExitCode::SUCCESS);
     }
 
-    // リージョン系は NBT の読み込みを経由しない
+    // リージョン系はNBTの読み込みを経由しない
     if args[0] == "region-list" || args[0] == "region-rewrite" {
         let mut region = RegionFile::open(&args[1], RegionFileMode::ReadOnly)?;
 
@@ -152,9 +151,9 @@ fn run(args: &[String]) -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-/// `--format network` が指定されていればネットワーク形式として読む。
+/// `--format network`が指定されていればネットワーク形式として読む
 fn parse_format(args: &[String]) -> NbtFormat {
-    // 3 番目以降の引数からオプションを探す
+    // 3番目以降の引数からオプションを探す
     for index in 3..args.len().saturating_sub(1) {
         if args[index] == "--format" && args[index + 1] == "network" {
             return NbtFormat::Network;
@@ -167,16 +166,15 @@ fn parse_format(args: &[String]) -> NbtFormat {
 
 
 // ---------------------------------------------------------------------------
-// チャンク（World レイヤ）
+// チャンク（Worldレイヤ）
 //
-// 仕様: docs/spec/90-conformance.md 2.3章
 // ---------------------------------------------------------------------------
 
-/// チャンク NBT のファイルを読む。
+/// チャンクNBTのファイルを読む
 fn read_chunk_file(path: &str) -> Result<Chunk> {
     let named = read_file(path, &NbtReadOptions::default())?;
 
-    // 検証では DataVersion の違いを警告にせず、そのまま読む
+    // 検証では、DataVersionが扱える形式より古くても警告にせずそのまま読む
     let options = ChunkReadOptions {
         on_version_mismatch: VersionMismatchAction::Ignore,
         ..ChunkReadOptions::default()
@@ -184,10 +182,10 @@ fn read_chunk_file(path: &str) -> Result<Chunk> {
     Chunk::from_nbt(named.tag, &options)
 }
 
-/// チャンクの全ブロック・全バイオームを走査して集計する。
+/// チャンクの全ブロック・全バイオームを走査して集計する
 ///
 /// パレットとビットストレージを端から端まで通すので、
-/// ビット詰めの実装が 1 か所でもずれれば集計値が変わる。
+/// ビット詰めの実装が1か所でもずれれば集計値が変わる
 fn chunk_describe(chunk: &Chunk) -> Result<String> {
     let mut out = format!(
         "chunk {} {} {} {}\n",
@@ -225,7 +223,7 @@ fn chunk_describe(chunk: &Chunk) -> Result<String> {
             "section {section_y} {block_palette} {block_bits} {biome_palette} {biome_bits}\n"
         ));
 
-        // 全ブロックを 1 つずつ読んで、状態の文字列表現ごとに数える
+        // 全ブロックを1つずつ読んで、状態の文字列表現ごとに数える
         for y in 0..16 {
             for z in 0..16 {
                 for x in 0..16 {
@@ -236,7 +234,7 @@ fn chunk_describe(chunk: &Chunk) -> Result<String> {
             }
         }
 
-        // バイオームは 4×4×4 単位なので、4 ブロックおきに見る
+        // バイオームは4×4×4単位なので、4ブロックおきに見る
         for y in (0..16).step_by(4) {
             for z in (0..16).step_by(4) {
                 for x in (0..16).step_by(4) {
@@ -260,9 +258,10 @@ fn chunk_describe(chunk: &Chunk) -> Result<String> {
     Ok(out)
 }
 
-/// 決まった手順でチャンクを編集する。全言語で同じ結果になるはず。
+/// 決まった手順でチャンクを編集する
+/// 全言語で同じ結果になるはず
 ///
-/// パレット拡張・ビット幅の再計算・未使用要素の掃除を一通り通す。
+/// パレット拡張・ビット幅の再計算・未使用要素の掃除を一通り通す
 fn chunk_edit(chunk: &mut Chunk) -> Result<()> {
     let base_y = chunk.min_section_y()? * 16;
 
@@ -272,7 +271,8 @@ fn chunk_edit(chunk: &mut Chunk) -> Result<()> {
         chunk.set_block(index % 16, base_y + (index / 16), index % 16, &state)?;
     }
 
-    // プロパティ付きのブロックを、名前は同じで状態違いで置く
+    // プロパティ付きのブロックを置く
+    // 1つ目と2つ目はプロパティの並び順だけが違う同じ状態、3つ目は名前空間を省いて書いた別の状態
     chunk.set_block(1, base_y + 2, 1, &BlockState::parse("minecraft:oak_stairs[facing=north,half=top]")?)?;
     chunk.set_block(2, base_y + 2, 2, &BlockState::parse("minecraft:oak_stairs[half=top,facing=north]")?)?;
     chunk.set_block(3, base_y + 2, 3, &BlockState::parse("oak_stairs[facing=south]")?)?;
@@ -284,7 +284,7 @@ fn chunk_edit(chunk: &mut Chunk) -> Result<()> {
     // 使われなくなったパレット要素を掃除する
     chunk.compact()?;
 
-    // 高さマップと光源は再計算しないので、無効化して Minecraft に任せる
+    // 高さマップと光源は再計算しないので、無効化してMinecraftに任せる
     chunk.clear_heightmaps();
     chunk.invalidate_lighting();
     Ok(())
@@ -293,12 +293,12 @@ fn chunk_edit(chunk: &mut Chunk) -> Result<()> {
 // ---------------------------------------------------------------------------
 // リージョンファイル
 //
-// 仕様: docs/spec/90-conformance.md 2.3章
 // ---------------------------------------------------------------------------
 
-/// 存在するチャンクを 1 行 1 チャンクで書き出す。並びはロケーションテーブルの添字順。
+/// 存在するチャンクを1行1チャンクで書き出す
+/// 並びはロケーションテーブルの添字順
 ///
-/// 各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 キー数」。
+/// 各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 ルート直下キー数」
 fn region_list(region: &RegionFile) -> Result<String> {
     let mut out = format!("region {} {}\n", region.region_x(), region.region_z());
     let mut total = 0usize;
@@ -336,10 +336,10 @@ fn region_list(region: &RegionFile) -> Result<String> {
     Ok(out)
 }
 
-/// 全チャンクを読み直し、無圧縮で新しいリージョンへ詰め直して書き出す。
+/// 全チャンクを読み直し、無圧縮で新しいリージョンへ詰め直して書き出す
 ///
-/// 無圧縮にするのは、zlib の出力が処理系ごとに違い、
-/// 圧縮したままでは言語間でバイトが一致しないため。
+/// 無圧縮にするのは、zlibの出力が処理系ごとに違い、
+/// 圧縮したままでは言語間でバイトが一致しないため
 fn region_rewrite(source: &RegionFile, output_path: &str) -> Result<()> {
     // 途中結果が残らないよう、書き出し先は必ず作り直す
     if std::path::Path::new(output_path).exists() {
@@ -369,11 +369,10 @@ fn region_rewrite(source: &RegionFile, output_path: &str) -> Result<()> {
 // ---------------------------------------------------------------------------
 // 正規化JSON
 //
-// 浮動小数点をビットパターンで、64bit 整数を10進文字列で表すのが要。
-// 10進表記の丸めや JSON 数値の精度は処理系ごとに差が出るため、
-// そのまま出すと4言語の出力が一致しない。
+// 浮動小数点をビットパターンで、64bit整数を10進文字列で表すのが要
+// 10進表記の丸めやJSON数値の精度は処理系ごとに差が出るため、
+// そのまま出すと言語間で出力が一致しない
 //
-// 仕様: docs/spec/00-conventions.md 6章
 // ---------------------------------------------------------------------------
 
 fn normalized_json(named: &NamedTag, format: NbtFormat) -> String {
@@ -396,7 +395,7 @@ fn append_tag(out: &mut String, tag: &NbtTag) {
     out.push_str("{\"type\":");
     append_ascii(out, tag.tag_type().as_str());
 
-    // list だけは value の前に element_type が入る（仕様が定めるキー順）
+    // listだけはvalueの前にelement_typeが入る（仕様が定めるキー順）
     if let NbtTag::List(list) = tag {
         out.push_str(",\"element_type\":");
         append_ascii(out, list.element_type().as_str());
@@ -408,21 +407,22 @@ fn append_tag(out: &mut String, tag: &NbtTag) {
         NbtTag::Byte(value) => out.push_str(&value.to_string()),
         NbtTag::Short(value) => out.push_str(&value.to_string()),
         NbtTag::Int(value) => out.push_str(&value.to_string()),
-        // 64bit 整数は JSON 数値だと処理系によって精度が落ちるため10進文字列で表す
+        // 64bit整数はJSON数値だと処理系によって精度が落ちるため10進文字列で表す
         NbtTag::Long(value) => append_ascii(out, &value.to_string()),
         NbtTag::Float(value) => append_ascii(out, &format!("0x{:08x}", value.to_bits())),
         NbtTag::Double(value) => append_ascii(out, &format!("0x{:016x}", value.to_bits())),
         NbtTag::String(value) => {
             append_string(out, &value.to_utf16());
 
-            // MUTF-8 のバイト列も併記する。孤立サロゲートなど UTF-8 に写せない値を厳密に比較するため
+            // MUTF-8のバイト列も併記する
+            // 孤立サロゲートなどUTF-8に写せない値を厳密に比較するため
             out.push_str(",\"mutf8\":");
             append_ascii(out, &to_hex(&value.to_mutf8()));
         }
         NbtTag::ByteArray(values) => append_number_array(out, values),
         NbtTag::IntArray(values) => append_number_array(out, values),
         NbtTag::LongArray(values) => {
-            // 64bit 整数は10進文字列の配列で表す
+            // 64bit整数は10進文字列の配列で表す
             out.push('[');
 
             for (index, value) in values.iter().enumerate() {
@@ -455,7 +455,7 @@ fn append_tag(out: &mut String, tag: &NbtTag) {
 }
 
 fn append_compound(out: &mut String, compound: &NbtCompound) {
-    // JSON オブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
+    // JSONオブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
     out.push('[');
 
     for (index, (key, value)) in compound.iter().enumerate() {
@@ -497,15 +497,16 @@ fn to_hex(bytes: &[u8]) -> String {
     out
 }
 
-/// ASCII だけの文字列を JSON 文字列として書く。
+/// ASCIIだけの文字列をJSON文字列として書く
 fn append_ascii(out: &mut String, text: &str) {
     append_string(out, &text.encode_utf16().collect::<Vec<u16>>());
 }
 
-/// JSON 文字列を書き出す。非 ASCII は必ず `\uXXXX` へ逃がす。
+/// JSON文字列を書き出す
+/// 非ASCIIは必ず`\uXXXX`へエスケープする
 ///
-/// エスケープの単位は UTF-16 コード単位。
-/// C# / Java と桁数を揃えるため、補助文字はサロゲートペアの 2 つに分けて出す。
+/// エスケープの単位はUTF-16コード単位
+/// C# / Javaと桁数を揃えるため、補助文字はサロゲートペアの2つに分けて出す
 fn append_string(out: &mut String, units: &[u16]) {
     out.push('"');
 
@@ -519,7 +520,7 @@ fn append_string(out: &mut String, units: &[u16]) {
             0x0D => out.push_str("\\r"),
             0x09 => out.push_str("\\t"),
             value => {
-                // ASCII の印字可能文字だけ生で出し、それ以外は \uXXXX にする
+                // ASCIIの印字可能文字だけ生で出し、それ以外は\uXXXXにする
                 if (0x20..=0x7E).contains(&value) {
                     out.push(value as u8 as char);
                 } else {

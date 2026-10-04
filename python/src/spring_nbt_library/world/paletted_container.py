@@ -1,11 +1,9 @@
 """パレットとビットストレージの組
 セクション内のブロック状態やバイオームを格納する
 
-パレットの要素は**生の NbtTag のまま**持つ
-こうすると、触っていないブロックについては Minecraft が書き出したときの
+パレットの要素は**生のNbtTagのまま**持つ
+こうすると、触っていないブロックについてはMinecraftが書き出したときの
 プロパティの並び順まで含めてそのまま書き戻せる
-
-仕様: ``docs/spec/31-paletted-container.md``
 """
 
 from __future__ import annotations
@@ -20,12 +18,12 @@ __all__ = ["PalettedContainer", "ceil_log2"]
 
 
 def ceil_log2(count: int) -> int:
-    """``count`` 個の値を表すのに必要な最小ビット数
-    1 なら 0
+    """``count``個の値を表すのに必要な最小ビット数
+    1なら0
     """
     bits = 0
 
-    # 1 を超える分だけシフトして数える
+    # 1を超える分だけシフトして数える
     while (1 << bits) < count:
         bits += 1
 
@@ -53,7 +51,7 @@ class PalettedContainer:
     @property
     def bits_per_entry(self) -> int:
         """現在のビット幅
-        パレットが 1 要素なら 0（記憶域を持たない）
+        パレットが1要素なら0（記憶域を持たない）
         """
         if self._storage is None:
             return 0
@@ -70,9 +68,9 @@ class PalettedContainer:
     @staticmethod
     def from_nbt(nbt: NbtCompound, entry_count: int, min_bits: int,
                  lenient_bit_storage: bool = False) -> "PalettedContainer":
-        """NBT から読み込む
+        """NBTから読み込む
 
-        :raises SpringNbtError: パレットが空、data の長さが合わない、添字が範囲外のいずれか
+        :raises SpringNbtError: パレットが空、dataの長さが合わない、添字がパレット範囲外のいずれか
         """
         result = PalettedContainer(entry_count, min_bits)
         palette_tag = nbt.opt_list("palette")
@@ -80,7 +78,7 @@ class PalettedContainer:
         if palette_tag is None or len(palette_tag) == 0:
             raise SpringNbtError.malformed("palette が無いか空")
 
-        # パレットの要素は生の NbtTag のまま持つ
+        # パレットの要素は生のNbtTagのまま持つ
         # 並び順まで元どおりに書き戻すため
         for entry in palette_tag:
             result._palette.append(entry)
@@ -88,7 +86,7 @@ class PalettedContainer:
         data = nbt.opt_long_array("data")
 
         if data is None:
-            # パレットが 1 要素なら data は無くてよい
+            # パレットが1要素ならdataは無くてよい
             if len(result._palette) != 1:
                 raise SpringNbtError.malformed(
                     "palette が %d 要素なのに data が無い" % len(result._palette))
@@ -99,7 +97,7 @@ class PalettedContainer:
         result._storage = BitStorage.from_longs(data, bits, entry_count, lenient_bit_storage)
 
         # 取り出した添字がパレットの範囲に収まっているか確かめる
-        # 黙って 0 番目で代替すると、壊れたデータをそうと分からない形で書き戻してしまう
+        # エラーを出さずに0番目で代替すると、おかしくなったデータをそうと分からない形で書き戻してしまう
         for index in range(entry_count):
             value = result._storage.get(index)
 
@@ -111,7 +109,7 @@ class PalettedContainer:
         return result
 
     def to_nbt(self) -> NbtCompound:
-        """NBT へ変換する"""
+        """NBTへ変換する"""
         result = NbtCompound()
         palette_tag = NbtList()
 
@@ -119,8 +117,8 @@ class PalettedContainer:
         for entry in self._palette:
             palette_tag.append(entry)
 
-        # パレットが 1 要素なら data は書かない
-        # Minecraft と同じ振る舞い
+        # パレットが1要素ならdataは書かない
+        # Minecraftと同じ振る舞い
         if self._storage is not None and len(self._palette) > 1:
             result.set("data", NbtLongArray(self._storage.to_longs()))
 
@@ -131,7 +129,7 @@ class PalettedContainer:
         """添字の値を取り出す"""
         self._check_index(index)
 
-        # 記憶域が無いということは、全エントリがパレットの 0 番目
+        # 記憶域が無いということは、全エントリがパレットの0番目
         if self._storage is None:
             return self._palette[0]
 
@@ -144,7 +142,7 @@ class PalettedContainer:
         self._check_index(index)
         palette_index = self._index_of_or_add(value)
 
-        # 記憶域が無く、書き込む値も 0 番目なら何もしなくてよい
+        # 記憶域が無く、書き込む値も0番目なら何もしなくてよい
         if self._storage is None and palette_index == 0:
             return
 
@@ -152,8 +150,8 @@ class PalettedContainer:
         self._storage.set(index, palette_index)
 
     def fill(self, value: NbtTag) -> None:
-        """全エントリを 1 つの値で埋める
-        パレットもその 1 要素だけにする
+        """全エントリを1つの値で埋める
+        パレットもその1要素だけにする
         """
         self._palette = [value]
         self._storage = None
@@ -161,7 +159,7 @@ class PalettedContainer:
     def compact(self) -> None:
         """どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す
 
-        大量の ``set`` を行う用途で遅くならないよう、明示的に呼んだときだけ実行する
+        大量の``set``を行う用途で遅くならないよう、明示的に呼んだときだけ実行する
         """
         if self._storage is None:
             return
@@ -196,7 +194,7 @@ class PalettedContainer:
         self._palette = compacted
 
         if len(compacted) == 1:
-            # 1 要素になったら記憶域を捨てる
+            # 1要素になったら記憶域を捨てる
             self._storage = None
         else:
             self._storage = rebuilt
@@ -205,7 +203,7 @@ class PalettedContainer:
         """パレット内の位置を返す
         無ければ末尾へ追加する
         """
-        # パレットは高々 4096 要素なので線形探索で足りる
+        # パレットは高々4096要素なので線形探索で足りる
         for index in range(len(self._palette)):
             if self._palette[index] == value:
                 return index
@@ -218,7 +216,7 @@ class PalettedContainer:
         required = max(self.min_bits, ceil_log2(len(self._palette)))
 
         if self._storage is None:
-            # これまで単一値だったので、全エントリが 0 番目のまま始まる
+            # これまで単一値だったので、全エントリが0番目のまま始まる
             self._storage = BitStorage.create(required, self.entry_count)
             return
 

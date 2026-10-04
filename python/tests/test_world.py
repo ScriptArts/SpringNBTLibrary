@@ -1,10 +1,7 @@
-"""World / Block レイヤ。
+"""World / Blockレイヤ
 
-仕様: docs/spec/30-chunk-format.md / 31-paletted-container.md / 40-world-layout.md
-
-他言語版と同じ検証項目を持つ。
-共通テストベクタによる言語間比較は spec/run-conformance.sh が担当し、
-ここでは API の振る舞いを直接確かめる。
+他言語版と同じ検証項目を持つ
+共通テストベクタによる言語間比較はspec/run-conformance.shが担当し、ここではAPIの振る舞いを直接確かめる
 """
 
 from __future__ import annotations
@@ -41,7 +38,7 @@ VECTORS = os.path.join(REPO_ROOT, "spec", "testdata", "world")
 
 
 def vector_path(name: str) -> str:
-    """共通テストベクタ（world/*.nbt）のパス。"""
+    """共通テストベクタ（world/*.nbt）のパス"""
     path = os.path.join(VECTORS, name + ".nbt")
 
     if not os.path.isfile(path):
@@ -51,19 +48,20 @@ def vector_path(name: str) -> str:
 
 
 def load_chunk(name: str, options: ChunkReadOptions = None) -> Chunk:
-    """テストベクタをチャンクとして読む。"""
+    """テストベクタをチャンクとして読む"""
     return Chunk.from_nbt(read_file(vector_path(name)).tag, options)
 
 
 def block_entry(name: str) -> NbtCompound:
-    """ブロックのパレット要素を作る。"""
+    """ブロックのパレット要素を作る"""
     entry = NbtCompound()
     entry.set("Name", NbtString(name))
     return entry
 
 
 class TestBlockState:
-    """ブロック状態の文字列表現。仕様: docs/spec/30-chunk-format.md 2.1.1章"""
+    """ブロック状態の文字列表現
+    """
 
     def test_名前空間を省略するとminecraftが補われる(self):
         state = BlockState.parse("stone")
@@ -120,7 +118,8 @@ class TestBlockState:
 
 
 class TestBitStorage:
-    """跨ぎなしのビット詰め。仕様: docs/spec/31-paletted-container.md 2章"""
+    """跨ぎなしのビット詰め
+    """
 
     @pytest.mark.parametrize("bits,entry_count,expected", [
         (4, 4096, 256),
@@ -144,7 +143,8 @@ class TestBitStorage:
     def test_long境界を跨がずに詰める(self):
         storage = BitStorage.create(5, 4096)
 
-        # bits=5 なら 1 つの long に 12 個。12 個目は次の long の最下位から始まる
+        # bits=5なら1つのlongに12個
+        # 添字12は次のlongの最下位から始まる
         storage.set(11, 31)
         storage.set(12, 1)
         longs = storage.to_longs()
@@ -172,7 +172,7 @@ class TestBitStorage:
         assert error.value.code == ErrorCode.MALFORMED_DATA
 
     def test_寛容モードなら長さからビット幅を逆算する(self):
-        # 4096 エントリを 342 long で表せるのは bits=5 のときだけ
+        # 4096エントリを342 longで表せるのはbits=5のときだけ
         storage = BitStorage.from_longs([0] * 342, 4, 4096, lenient=True)
         assert storage.bits_per_entry == 5
 
@@ -194,7 +194,8 @@ class TestBitStorage:
 
 
 class TestPalettedContainer:
-    """パレット付きコンテナ。仕様: docs/spec/31-paletted-container.md"""
+    """パレット付きコンテナ
+    """
 
     @pytest.mark.parametrize("count,expected", [(1, 0), (2, 1), (4, 2), (5, 3), (17, 5)])
     def test_必要ビット数はceil_log2(self, count, expected):
@@ -211,7 +212,7 @@ class TestPalettedContainer:
     def test_値を足すとパレットとビット幅が広がる(self):
         container = PalettedContainer.filled(block_entry("minecraft:air"), 4096, 4)
 
-        # パレットを 17 要素まで増やして bits=4 から 5 への拡張を起こす
+        # 17種のブロックを足してパレットを18要素にし、bits=4から5への拡張を起こす
         for index in range(17):
             container.set(index, block_entry("minecraft:block_%d" % index))
 
@@ -234,7 +235,7 @@ class TestPalettedContainer:
 
         container.compact()
 
-        # 残るのは実際に使われている air と dirt の 2 つ
+        # 残るのは実際に使われているairとdirtの2つ
         assert len(container.palette) == 2
         assert container.get(0).get_string("Name") == "minecraft:dirt"
 
@@ -257,7 +258,8 @@ class TestPalettedContainer:
 
 
 class TestChunk:
-    """チャンクの解釈。仕様: docs/spec/30-chunk-format.md"""
+    """チャンクの解釈
+    """
 
     def test_パレット1要素のチャンクを読める(self):
         chunk = load_chunk("palette_1")
@@ -275,7 +277,8 @@ class TestChunk:
         chunk = load_chunk("palette_17")
         head = ["minecraft:air", "minecraft:stone"]
 
-        # ベクタの添字は (位置 * 11) % 17。パレット先頭 2 つだけ名前が違う
+        # ベクタの添字は (位置 * 11) % 17
+        # パレットの先頭2つだけ名前が違う
         for position in range(4096):
             palette_index = (position * 11) % 17
             block = chunk.get_block(position & 15, -64 + (position >> 8), (position >> 4) & 15)
@@ -316,7 +319,7 @@ class TestChunk:
         chunk.set_block(3, -60, 7, "minecraft:stone")
         assert chunk.is_modified is True
 
-        # 保存済みとして印を下ろせる
+        # 保存済みとして印を外せる
         chunk.is_modified = False
         assert chunk.is_modified is False
 
@@ -331,7 +334,7 @@ class TestChunk:
         chunk = load_chunk("palette_1")
         chunk.set_biome(0, -64, 0, "minecraft:desert")
 
-        # 同じ 4×4×4 の枠内はまとめて変わる
+        # 同じ4×4×4の枠内はまとめて変わる
         assert chunk.get_biome(3, -61, 3) == "minecraft:desert"
         assert chunk.get_biome(4, -64, 0) == "minecraft:plains"
 
@@ -361,13 +364,13 @@ class TestChunk:
         assert len(chunk.raw.get_list("block_ticks")) == 2
         assert len(chunk.raw.get_list("fluid_ticks")) == 1
 
-        # (0,-64,0) には chest と block_tick、(1,-64,1) には furnace と fluid_tick がある
+        # (0,-64,0)にはchestとblock_tick、(1,-64,1)にはfurnaceとfluid_tickがある
         chunk.set_block(0, -64, 0, BlockState.parse("minecraft:stone"))
         chunk.set_block(1, -64, 1, BlockState.parse("minecraft:stone"))
 
         entities = chunk.raw.get_list("block_entities")
 
-        # 触っていない (15,-50,15) の barrel だけが残る
+        # 触っていない(15,-50,15)のbarrelだけが残る
         assert len(entities) == 1
         assert entities[0].get_string("id") == "minecraft:barrel"
 
@@ -388,8 +391,7 @@ class TestChunk:
         assert len(chunk.raw.get_list("block_ticks")) == 2
 
     def test_別のチャンクの同じ相対座標は消さない(self):
-        # 付随データは絶対座標で持つので、チャンク座標を取り違えると
-        # 無関係な要素を消してしまう
+        # 付随データは絶対座標で持つので、チャンク座標を間違えると無関係な要素を消してしまう
         root = read_file(vector_path("block_entities")).tag
         root.set("xPos", NbtInt(1))
         root.set("zPos", NbtInt(1))
@@ -397,7 +399,8 @@ class TestChunk:
         chunk = Chunk.from_nbt(root)
         chunk.set_block(0, -64, 0, BlockState.parse("minecraft:stone"))
 
-        # このチャンクの (0,-64,0) は絶対座標 (16,-64,16)。どれとも一致しない
+        # このチャンクの(0,-64,0)は絶対座標(16,-64,16)
+        # どれとも一致しない
         assert len(chunk.raw.get_list("block_entities")) == 3
 
     def test_高さマップと光源を無効化できる(self):
@@ -431,11 +434,12 @@ class TestChunk:
 
 
 class TestDataVersion:
-    """バージョンポリシー。仕様: docs/spec/30-chunk-format.md 5章"""
+    """バージョンポリシー
+    """
 
     @staticmethod
     def foreign_chunk() -> NbtCompound:
-        """DataVersion だけを差し替えたチャンクを作る。"""
+        """DataVersionだけを差し替えたチャンクを作る"""
         root = read_file(vector_path("palette_1")).tag
         root.set("DataVersion", NbtInt(3953))
         return root
@@ -482,7 +486,7 @@ class TestDataVersion:
             self.foreign_chunk(),
             ChunkReadOptions(on_version_mismatch=VersionMismatchAction.IGNORE))
 
-        # DataVersion は読んだ値のまま残す
+        # DataVersionは読んだ値のまま残す
         written = chunk.to_nbt(ChunkWriteOptions(allow_foreign_data_version=True))
         assert written.get_int("DataVersion") == 3953
 
@@ -492,7 +496,7 @@ class TestDataVersion:
 
     @staticmethod
     def newer_chunk() -> NbtCompound:
-        """対象より新しい DataVersion を持つチャンクを作る。"""
+        """対象より新しいDataVersionを持つチャンクを作る"""
         root = read_file(vector_path("palette_1")).tag
         root.set("DataVersion", NbtInt(5015))
         return root
@@ -503,7 +507,7 @@ class TestDataVersion:
             on_version_mismatch=VersionMismatchAction.WARN,
             on_warning=warnings.append)
 
-        # 形式が同じであれば、新しいバージョンでも黙って読める
+        # 形式が同じであれば、新しいバージョンでも警告を出さずに読める
         chunk = Chunk.from_nbt(self.newer_chunk(), options)
         assert chunk.data_version == 5015
         assert warnings == []
@@ -515,12 +519,13 @@ class TestDataVersion:
     def test_新しいバージョンのチャンクはそのまま書き戻せる(self):
         chunk = Chunk.from_nbt(self.newer_chunk())
 
-        # 許可を出さなくても書き戻せて、DataVersion も変わらない
+        # 許可を出さなくても書き戻せて、DataVersionも変わらない
         assert chunk.to_nbt().get_int("DataVersion") == 5015
 
 
 class TestMinecraftWorld:
-    """ワールドを開く。仕様: docs/spec/40-world-layout.md"""
+    """ワールドを開く
+    """
 
     def test_存在しないディレクトリはIO(self, tmp_path):
         with pytest.raises(SpringNbtError) as error:

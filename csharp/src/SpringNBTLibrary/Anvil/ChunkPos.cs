@@ -5,7 +5,6 @@ namespace SpringNBTLibrary.Anvil;
 /// <summary>
 /// チャンクの絶対座標
 /// </summary>
-/// <remarks>仕様: <c>docs/spec/20-anvil-region.md</c> 1章</remarks>
 public readonly struct ChunkPos : IEquatable<ChunkPos>
 {
     /// <summary>座標を指定して作る</summary>
@@ -56,7 +55,7 @@ public readonly struct ChunkPos : IEquatable<ChunkPos>
 
 /// <summary>
 /// リージョンの座標
-/// 1リージョンは 32×32 チャンクを担当する
+/// 1リージョンは32×32チャンクを担当する
 /// </summary>
 public readonly struct RegionPos : IEquatable<RegionPos>
 {
@@ -78,8 +77,8 @@ public readonly struct RegionPos : IEquatable<RegionPos>
         string.Create(CultureInfo.InvariantCulture, $"r.{X}.{Z}.mca");
 
     /// <summary>
-    /// <c>r.X.Z.mca</c> 形式のファイル名から座標を得る
-    /// 解釈できなければ null
+    /// <c>r.X.Z.mca</c>形式のファイル名から座標を得る
+    /// 解釈できなければnull
     /// </summary>
     public static RegionPos? FromFileName(string fileName)
     {
@@ -87,7 +86,7 @@ public readonly struct RegionPos : IEquatable<RegionPos>
 
         string[] parts = fileName.Split('.');
 
-        // "r" "<x>" "<z>" "mca" の 4 つに分かれるはず
+        // "r" "<x>" "<z>" "mca"の4つに分かれるはず
         if (parts.Length != 4 || parts[0] != "r" || parts[3] != "mca")
         {
             return null;

@@ -1,12 +1,10 @@
-"""Anvil のリージョンファイル (``r.X.Z.mca``)
-32×32 チャンクを格納する
+"""Anvilのリージョンファイル (``r.X.Z.mca``)
+32×32チャンクを格納する
 
 ファイル全体をメモリに読み込んで扱う
-実データのリージョンは数 MB 程度で、
-この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
-開いて何も変えずに :meth:`RegionFile.flush` すると、バイト単位で元と同じファイルになる
-
-仕様: ``docs/spec/20-anvil-region.md``
+実データのリージョンは数MB程度で、この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
+開いて何も変えずに:meth:`RegionFile.flush`すると、バイト単位で元と同じファイルになる
+ただし空のファイルは、8KiBのヘッダだけのファイルになる
 """
 
 from __future__ import annotations
@@ -45,11 +43,11 @@ _HEADER_SECTORS = 2
 #: 1リージョンに入るチャンク数
 _CHUNK_COUNT = 1024
 
-#: 1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため）
+#: 1チャンクが確保できるセクタ数の上限（長さフィールドがu8のため）
 _MAX_SECTORS = 255
 
 #: リージョン内に収められるペイロードの上限
-# 超えると外部ファイルへ退避する
+#: 超えると外部ファイルへ退避する
 _MAX_INLINE_PAYLOAD = (_MAX_SECTORS * SECTOR_SIZE) - 5
 
 _REGION_NAME = re.compile(r"^r\.(-?\d+)\.(-?\d+)\.mca$")
@@ -58,30 +56,28 @@ _REGION_NAME = re.compile(r"^r\.(-?\d+)\.(-?\d+)\.mca$")
 class ChunkCompression(enum.Enum):
     """リージョンファイル内でチャンクに使われる圧縮方式
 
-    NBT 層の :class:`~spring_nbt_library.nbt.Compression` とは別物であることに注意
-    あちらはファイル全体の圧縮を表し、こちらはリージョン内の 1 チャンクに付く
-    1 バイトのIDを表す
-
-    仕様: ``docs/spec/20-anvil-region.md`` 3.1章
+    NBT層の:class:`~spring_nbt_library.nbt.Compression`とは違うものであることに注意
+    あちらはファイル全体の圧縮を表し、こちらはリージョン内の1チャンクに付く1バイトのIDを表す
     """
 
     #: GZip (RFC 1952)
-    # 実データではほぼ使われない
+    #: 実データではほぼ使われない
     GZIP = 1
 
     #: Zlib (RFC 1950)
-    # Minecraft が実際に書き出す方式
+    #: Minecraftが実際に書き出す方式
     ZLIB = 2
 
     #: 無圧縮
     NONE = 3
 
-    #: LZ4（ブロック形式）
-    # 任意依存
+    #: LZ4（独自ヘッダ付きのブロック連結）
+    #: 読み込みのみ対応
+    #: 展開は自前で行い、外部の依存は使わない
     LZ4 = 4
 
     #: サードパーティ製サーバのカスタム方式
-    # 中身は解釈できない
+    #: 中身は解釈できない
     CUSTOM = 127
 
     def id(self) -> int:
@@ -94,11 +90,11 @@ class ChunkCompression(enum.Enum):
 
     @staticmethod
     def from_id(value: int) -> "ChunkCompression":
-        """圧縮方式IDから :class:`ChunkCompression` を得る
+        """圧縮方式IDから:class:`ChunkCompression`を得る
 
         :raises SpringNbtError: 未知のIDの場合
         """
-        # 仕様が定めるのは 1・2・3・4・127 の 5 種類だけ
+        # 仕様が定めるのは1・2・3・4・127の5種類だけ
         for candidate in ChunkCompression:
             if candidate.value == value:
                 return candidate
@@ -119,17 +115,17 @@ class RegionFileMode(enum.Enum):
     """リージョンファイルを開くときの動作"""
 
     #: 読み取り専用
-    # 書き込み系の操作はエラーになる
+    #: 書き込み系の操作はエラーになる（flushは何もしない）
     READ_ONLY = "read_only"
 
     #: 読み書き
-    # ファイルが無ければ空のリージョンとして扱う
+    #: ファイルが無ければ空のリージョンとして扱う
     READ_WRITE = "read_write"
 
 
 class RegionPos:
     """リージョンの座標
-    1リージョンは 32×32 チャンクを担当する
+    1リージョンは32×32チャンクを担当する
     """
 
     __slots__ = ("x", "z")
@@ -144,8 +140,8 @@ class RegionPos:
 
     @staticmethod
     def from_file_name(file_name: str) -> Optional["RegionPos"]:
-        """``r.X.Z.mca`` 形式のファイル名から座標を得る
-        解釈できなければ None
+        """``r.X.Z.mca``形式のファイル名から座標を得る
+        解釈できなければNone
         """
         matched = _REGION_NAME.match(file_name)
 
@@ -179,7 +175,7 @@ class ChunkPos:
     def region(self) -> RegionPos:
         """このチャンクを含むリージョンの座標
 
-        Python の ``>>`` は算術右シフトなので負の座標でも正しく求まる
+        Pythonの``>>``は算術右シフトなので負の座標でも正しく求まる
         """
         return RegionPos(self.x >> 5, self.z >> 5)
 
@@ -211,8 +207,7 @@ class ChunkPos:
 class RawChunk:
     """リージョンファイルに格納されたままの、圧縮済みチャンクデータ
 
-    本ライブラリが解釈できない圧縮方式（LZ4 未導入、カスタム方式）でも
-    これなら取り出せる
+    本ライブラリが解釈できない圧縮方式（カスタム方式）のチャンクでも、これなら取り出せる
     バックアップや別ツールへの受け渡しに使う
     """
 
@@ -230,14 +225,14 @@ class RawChunk:
 
 
 class RegionFile:
-    """リージョンファイル 1 つ分"""
+    """リージョンファイル1つ分"""
 
     def __init__(self, path: str, mode: RegionFileMode, position: RegionPos,
                  data: bytearray) -> None:
         self._path = path
         self._directory = os.path.dirname(path)
 
-        # パスが階層を含まない場合、.mcc の置き場としてカレントディレクトリを使う
+        # パスが階層を含まない場合、.mccの置き場としてカレントディレクトリを使う
         if self._directory == "":
             self._directory = "."
 
@@ -258,7 +253,7 @@ class RegionFile:
     def open(path: str, mode: RegionFileMode = RegionFileMode.READ_ONLY) -> "RegionFile":
         """リージョンファイルを開く
 
-        :param path: ``r.X.Z.mca`` という名前のファイル
+        :param path: ``r.X.Z.mca``という名前のファイル
         座標はファイル名から読み取る
         :param mode: 読み取り専用か読み書きか
         """
@@ -293,7 +288,7 @@ class RegionFile:
 
     def _parse_header(self) -> None:
         """ヘッダを解析し、ロケーションとタイムスタンプを取り込む"""
-        # 空ファイルは「チャンクが 1 つも無いリージョン」として受け入れる
+        # 空ファイルは「チャンクが1つも無いリージョン」として受け入れる
         if len(self._data) == 0:
             self._data = bytearray(_HEADER_SECTORS * SECTOR_SIZE)
             return
@@ -310,7 +305,7 @@ class RegionFile:
         total_sectors = len(self._data) // SECTOR_SIZE
         sector_owner: Dict[int, int] = {}
 
-        # ロケーションテーブルの 1024 エントリを順に取り込む
+        # ロケーションテーブルの1024エントリを順に取り込む
         for index in range(_CHUNK_COUNT):
             entry = struct.unpack_from(">I", self._data, index * 4)[0]
             offset = entry >> 8
@@ -334,7 +329,7 @@ class RegionFile:
                 raise SpringNbtError.malformed(
                     "チャンク %d の割り当てがファイル外へはみ出している" % index)
 
-            # 同じセクタを 2 つのチャンクが指していたら、どちらかが壊れている
+            # 同じセクタを2つのチャンクが指していたら、どちらかがおかしくなっている
             for sector in range(offset, offset + count):
                 owner = sector_owner.get(sector)
 
@@ -349,7 +344,8 @@ class RegionFile:
             self._sector_counts[index] = count
 
     def _write_header(self) -> None:
-        """ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す"""
+        """ロケーションテーブルとタイムスタンプテーブルを先頭2セクタへ書き戻す"""
+        # ロケーションテーブルとタイムスタンプテーブルを、添字順に組み立て直す
         for index in range(_CHUNK_COUNT):
             entry = (self._offsets[index] << 8) | self._sector_counts[index]
             struct.pack_into(">I", self._data, index * 4, entry)
@@ -390,7 +386,7 @@ class RegionFile:
         self._ensure_open()
         result = []
 
-        # 添字の昇順に走査する（local_z が外、local_x が内）
+        # 添字の昇順に走査する（local_zが外、local_xが内）
         for index in range(_CHUNK_COUNT):
             if self._sector_counts[index] == 0:
                 continue
@@ -403,8 +399,8 @@ class RegionFile:
         return result
 
     def timestamp(self, chunk_x: int, chunk_z: int) -> int:
-        """チャンクの最終更新時刻（Unix 秒）
-        存在しなければ 0
+        """チャンクの最終更新時刻（Unix秒）
+        タイムスタンプテーブルの値をそのまま返すため、チャンクが無くても0とは限らない
         """
         self._ensure_open()
         return self._timestamps[self._index_of(chunk_x, chunk_z)]
@@ -418,7 +414,7 @@ class RegionFile:
 
     def read_chunk_raw(self, chunk_x: int, chunk_z: int) -> Optional[RawChunk]:
         """チャンクを圧縮されたまま取り出す
-        存在しなければ None
+        存在しなければNone
         """
         self._ensure_open()
         index = self._index_of(chunk_x, chunk_z)
@@ -442,14 +438,14 @@ class RegionFile:
         compression = ChunkCompression.from_id(scheme_byte & 0x7F)
 
         if external:
-            # 最上位ビットが立っている場合、本体は c.X.Z.mcc にある
+            # 最上位ビットが立っている場合、本体はc.X.Z.mccにある
             return RawChunk(compression, self._read_external_file(chunk_x, chunk_z), True)
 
         return RawChunk(compression, bytes(self._data[start + 5:start + 4 + length]), False)
 
     def read_chunk(self, chunk_x: int, chunk_z: int) -> Optional[NbtCompound]:
-        """チャンクを NBT として読む
-        存在しなければ None
+        """チャンクをNBTとして読む
+        存在しなければNone
         """
         raw = self.read_chunk_raw(chunk_x, chunk_z)
 
@@ -463,7 +459,7 @@ class RegionFile:
 
     def write_chunk(self, chunk_x: int, chunk_z: int, tag: NbtCompound,
                     compression: ChunkCompression = ChunkCompression.ZLIB) -> None:
-        """チャンクを NBT として書き込む"""
+        """チャンクをNBTとして書き込む"""
         plain = write_nbt_bytes(NamedTag("", tag),
                                 NbtWriteOptions(compression=Compression.NONE))
         self.write_chunk_raw(
@@ -478,7 +474,7 @@ class RegionFile:
         use_external = len(raw.data) > _MAX_INLINE_PAYLOAD
 
         if use_external:
-            # 1MiB を超えるチャンクは外部ファイルへ退避し、リージョンには目印だけ残す
+            # 255セクタ（約1MiB）に収まらないチャンクは外部ファイルへ退避し、リージョンには目印だけ残す
             self._write_external_file(chunk_x, chunk_z, raw.data)
             payload = b""
             scheme_byte = raw.compression.id() | 0x80
@@ -511,7 +507,7 @@ class RegionFile:
 
     def delete_chunk(self, chunk_x: int, chunk_z: int) -> bool:
         """チャンクを削除する
-        削除できたら True
+        削除できたらTrue
         """
         self._ensure_open()
         self._ensure_writable()
@@ -531,7 +527,7 @@ class RegionFile:
     def _allocate_sectors(self, index: int, needed: int) -> int:
         """必要なセクタ数を確保し、開始セクタ番号を返す
 
-        既存の割り当てがちょうど同じ大きさならその場を使い、
+        既存の割り当てがちょうど同じ大きさなら、その場所をそのまま使う
         そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する
         """
         # 大きさが変わらないなら動かさない
@@ -563,12 +559,12 @@ class RegionFile:
 
     def _build_sector_usage(self, ignore_index: int) -> List[bool]:
         """セクタの使用状況を作る
-        ``ignore_index`` のチャンクは空きとして扱う
+        ``ignore_index``のチャンクは空きとして扱う
         """
         total_sectors = len(self._data) // SECTOR_SIZE
         used = [False] * total_sectors
 
-        # ヘッダの 2 セクタは常に使用中
+        # ヘッダの2セクタは常に使用中
         for sector in range(min(_HEADER_SECTORS, total_sectors)):
             used[sector] = True
 
@@ -732,7 +728,7 @@ def _decompress_chunk(raw: RawChunk) -> bytes:
     if raw.compression == ChunkCompression.NONE:
         return raw.data
 
-    # GZip なら展開して返す
+    # GZipなら展開して返す
     if raw.compression == ChunkCompression.GZIP:
         try:
             return gzip.decompress(raw.data)
@@ -740,7 +736,7 @@ def _decompress_chunk(raw: RawChunk) -> bytes:
             raise SpringNbtError(
                 ErrorCode.MALFORMED_DATA, "チャンクの圧縮データを展開できない") from error
 
-    # Zlib なら展開して返す
+    # Zlibなら展開して返す
     if raw.compression == ChunkCompression.ZLIB:
         try:
             return zlib.decompress(raw.data)
@@ -748,7 +744,7 @@ def _decompress_chunk(raw: RawChunk) -> bytes:
             raise SpringNbtError(
                 ErrorCode.MALFORMED_DATA, "チャンクの圧縮データを展開できない") from error
 
-    # LZ4 は読み込みのみ対応
+    # LZ4は読み込みのみ対応
     if raw.compression == ChunkCompression.LZ4:
         return decompress_lz4(raw.data)
 
@@ -763,7 +759,7 @@ def _compress_chunk(plain: bytes, compression: ChunkCompression) -> bytes:
         return plain
 
     if compression == ChunkCompression.GZIP:
-        # mtime を 0 に固定して、同じ入力から同じバイト列が出るようにする
+        # mtimeを0に固定して、同じ入力から同じバイト列が出るようにする
         return gzip.compress(plain, mtime=0)
 
     if compression == ChunkCompression.ZLIB:

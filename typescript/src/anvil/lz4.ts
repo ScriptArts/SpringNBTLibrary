@@ -1,27 +1,24 @@
 /**
- * 圧縮方式ID 4 (LZ4) のチャンクを展開する
+ * 圧縮方式ID 4（LZ4）のチャンクを展開する
  *
- * 素の LZ4 ブロックでも LZ4 フレーム形式でもなく、
- * 独自ヘッダを持つブロックの連結である
+ * 素のLZ4ブロックでもLZ4フレーム形式でもなく、独自ヘッダを持つブロックの連結である
  *
  * 書き込みには対応しない
- * 書き戻すときは Zlib になる
- *
- * 仕様: `docs/spec/20-anvil-region.md` 3.1.1 / 3.1.2
+ * NBTとして書き戻すときは既定でZlibになり、生バイトのまま書き戻すとLZ4のまま残る
  */
 
 import { SpringNbtError } from "../errors.js";
 
-/** ブロックの先頭に必ず置かれる 8 バイト */
+/** ブロックの先頭に必ず置かれる8バイト */
 const MAGIC = new Uint8Array([0x4c, 0x5a, 0x34, 0x42, 0x6c, 0x6f, 0x63, 0x6b]);
 
 /** ブロックヘッダの長さ */
 const HEADER_LENGTH = 21;
 
-/** トークン上位 4 ビット: 本体が無圧縮 */
+/** トークン上位4ビット: 本体が無圧縮 */
 const METHOD_STORED = 0x10;
 
-/** トークン上位 4 ビット: 本体が LZ4 圧縮 */
+/** トークン上位4ビット: 本体がLZ4圧縮 */
 const METHOD_COMPRESSED = 0x20;
 
 /** マッチの最小長 */
@@ -33,9 +30,9 @@ interface Cursor {
 }
 
 /**
- * LZ4Block の連結を展開する
+ * LZ4Blockの連結を展開する
  *
- * @throws {SpringNbtError} 形式に反する入力 (MALFORMED_DATA)
+ * @throws {SpringNbtError} 形式に反する入力（MALFORMED_DATA）
  */
 export function decompressLz4(payload: Uint8Array): Uint8Array {
   const blocks: Uint8Array[] = [];
@@ -62,7 +59,7 @@ export function decompressLz4(payload: Uint8Array): Uint8Array {
   return output;
 }
 
-/** ブロックを 1 つ展開し、中身と次のブロックの開始位置を返す */
+/** ブロックを1つ展開し、中身と次のブロックの開始位置を返す */
 function decompressBlock(payload: Uint8Array, position: number): { data: Uint8Array; next: number } {
   if (position + HEADER_LENGTH > payload.length) {
     throw SpringNbtError.malformed(
@@ -70,7 +67,7 @@ function decompressBlock(payload: Uint8Array, position: number): { data: Uint8Ar
     );
   }
 
-  // マジックが違えばそもそも LZ4Block ではない
+  // マジックが違えばそもそもLZ4Blockではない
   for (let index = 0; index < MAGIC.length; index++) {
     if (payload[position + index] !== MAGIC[index]) {
       throw SpringNbtError.malformed("LZ4: ブロックが LZ4Block で始まっていない");
@@ -90,7 +87,7 @@ function decompressBlock(payload: Uint8Array, position: number): { data: Uint8Ar
   }
 
   if (method === METHOD_STORED) {
-    // 無圧縮なら 2 つの長さは一致していなければならない
+    // 無圧縮なら2つの長さは一致していなければならない
     if (compressedLength !== originalLength) {
       throw SpringNbtError.malformed(
         `LZ4: 無圧縮ブロックの長さが食い違う（${compressedLength} と ${originalLength}）`,
@@ -113,19 +110,19 @@ function decompressBlock(payload: Uint8Array, position: number): { data: Uint8Ar
   );
 }
 
-/** ヘッダに書かれた 2 つの長さが妥当か調べる */
+/** ヘッダに書かれた2つの長さが妥当か調べる */
 function validateLengths(compressedLength: number, originalLength: number): void {
   if (compressedLength < 0 || originalLength < 0) {
     throw SpringNbtError.malformed("LZ4: ブロックの長さが負値");
   }
 
-  // 片方だけが 0 になることはない
+  // 片方だけが0になることはない
   if ((compressedLength === 0) !== (originalLength === 0)) {
     throw SpringNbtError.malformed("LZ4: ブロックの長さが片方だけ 0");
   }
 }
 
-/** 素の LZ4 ブロックを展開する */
+/** 素のLZ4ブロックを展開する */
 function decompressRawBlock(source: Uint8Array, originalLength: number): Uint8Array {
   const output = new Uint8Array(originalLength);
   const cursor: Cursor = { position: 0 };
@@ -138,7 +135,7 @@ function decompressRawBlock(source: Uint8Array, originalLength: number): Uint8Ar
 
     let literalLength = token >> 4;
 
-    // 15 なら追加バイトで長さが続く
+    // 15なら追加バイトで長さが続く
     if (literalLength === 15) {
       literalLength += readLength(source, cursor);
     }
@@ -163,7 +160,7 @@ function decompressRawBlock(source: Uint8Array, originalLength: number): Uint8Ar
 
     let matchLength = (token & 0x0f) + MIN_MATCH;
 
-    // 下位 4 ビットが 15 なら追加バイトで長さが続く
+    // 下位4ビットが15なら追加バイトで長さが続く
     if ((token & 0x0f) === 15) {
       matchLength += readLength(source, cursor);
     }
@@ -180,11 +177,11 @@ function decompressRawBlock(source: Uint8Array, originalLength: number): Uint8Ar
   return output;
 }
 
-/** 255 が続く形式の追加長さを読む */
+/** 255が続く形式の追加長さを読む */
 function readLength(source: Uint8Array, cursor: Cursor): number {
   let total = 0;
 
-  // 255 未満のバイトが出るまで足し続ける
+  // 255未満のバイトが出るまで足し続ける
   while (true) {
     if (cursor.position >= source.length) {
       throw SpringNbtError.malformed("LZ4: 長さの追加バイトが途中で切れた");
@@ -229,7 +226,7 @@ function copyMatch(output: Uint8Array, written: number, offset: number, length: 
 
   const from = written - offset;
 
-  // コピー元と先は重なりうるので 1 バイトずつ写す
+  // コピー元と先は重なりうるので1バイトずつ写す
   for (let index = 0; index < length; index++) {
     output[written + index] = output[from + index];
   }

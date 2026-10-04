@@ -1,12 +1,9 @@
-"""圧縮方式ID 4 (LZ4) のチャンクを展開する
+"""圧縮方式ID 4（LZ4）のチャンクを展開する
 
-素の LZ4 ブロックでも LZ4 フレーム形式でもなく、
-独自ヘッダを持つブロックの連結である
+素のLZ4ブロックでもLZ4フレーム形式でもなく、独自ヘッダを持つブロックの連結である
 
 書き込みには対応しない
-書き戻すときは Zlib になる
-
-仕様: docs/spec/20-anvil-region.md 3.1.1 / 3.1.2
+NBTとして書き戻すときは既定でZlibになり、生バイトのまま書き戻すとLZ4のまま残る
 """
 
 from __future__ import annotations
@@ -17,16 +14,16 @@ from ..errors import SpringNbtError
 
 __all__ = ["decompress_lz4"]
 
-#: ブロックの先頭に必ず置かれる 8 バイト
+#: ブロックの先頭に必ず置かれる8バイト
 MAGIC = b"LZ4Block"
 
 #: ブロックヘッダの長さ
 HEADER_LENGTH = 21
 
-#: トークン上位 4 ビット: 本体が無圧縮
+#: トークン上位4ビット: 本体が無圧縮
 METHOD_STORED = 0x10
 
-#: トークン上位 4 ビット: 本体が LZ4 圧縮
+#: トークン上位4ビット: 本体がLZ4圧縮
 METHOD_COMPRESSED = 0x20
 
 #: マッチの最小長
@@ -34,9 +31,9 @@ MIN_MATCH = 4
 
 
 def decompress_lz4(payload: bytes) -> bytes:
-    """LZ4Block の連結を展開する
+    """LZ4Blockの連結を展開する
 
-    :raises SpringNbtError: 形式に反する入力の場合 (MALFORMED_DATA)
+    :raises SpringNbtError: 形式に反する入力の場合（MALFORMED_DATA）
     """
     blocks = []
     position = 0
@@ -50,12 +47,12 @@ def decompress_lz4(payload: bytes) -> bytes:
 
 
 def _decompress_block(payload: bytes, position: int):
-    """ブロックを 1 つ展開し、中身と次のブロックの開始位置を返す"""
+    """ブロックを1つ展開し、中身と次のブロックの開始位置を返す"""
     if position + HEADER_LENGTH > len(payload):
         raise SpringNbtError.malformed(
             "LZ4: ブロックヘッダが足りない（%d バイト）" % (len(payload) - position))
 
-    # マジックが違えばそもそも LZ4Block ではない
+    # マジックが違えばそもそもLZ4Blockではない
     if payload[position:position + len(MAGIC)] != MAGIC:
         raise SpringNbtError.malformed("LZ4: ブロックが LZ4Block で始まっていない")
 
@@ -70,7 +67,7 @@ def _decompress_block(payload: bytes, position: int):
         raise SpringNbtError.malformed("LZ4: ブロック本体が入力からはみ出している")
 
     if method == METHOD_STORED:
-        # 無圧縮なら 2 つの長さは一致していなければならない
+        # 無圧縮なら2つの長さは一致していなければならない
         if compressed_length != original_length:
             raise SpringNbtError.malformed(
                 "LZ4: 無圧縮ブロックの長さが食い違う（%d と %d）"
@@ -78,7 +75,7 @@ def _decompress_block(payload: bytes, position: int):
 
         return payload[body:body + compressed_length], body + compressed_length
 
-    # 圧縮されているなら素の LZ4 ブロックとして展開する
+    # 圧縮されているなら素のLZ4ブロックとして展開する
     if method == METHOD_COMPRESSED:
         data = _decompress_raw_block(
             payload[body:body + compressed_length], original_length)
@@ -88,17 +85,17 @@ def _decompress_block(payload: bytes, position: int):
 
 
 def _validate_lengths(compressed_length: int, original_length: int) -> None:
-    """ヘッダに書かれた 2 つの長さが妥当か調べる"""
+    """ヘッダに書かれた2つの長さが妥当か調べる"""
     if compressed_length < 0 or original_length < 0:
         raise SpringNbtError.malformed("LZ4: ブロックの長さが負値")
 
-    # 片方だけが 0 になることはない
+    # 片方だけが0になることはない
     if (compressed_length == 0) != (original_length == 0):
         raise SpringNbtError.malformed("LZ4: ブロックの長さが片方だけ 0")
 
 
 def _decompress_raw_block(source: bytes, original_length: int) -> bytes:
-    """素の LZ4 ブロックを展開する"""
+    """素のLZ4ブロックを展開する"""
     output = bytearray(original_length)
     position = 0
     written = 0
@@ -110,7 +107,7 @@ def _decompress_raw_block(source: bytes, original_length: int) -> bytes:
 
         literal_length = token >> 4
 
-        # 15 なら追加バイトで長さが続く
+        # 15なら追加バイトで長さが続く
         if literal_length == 15:
             extra, position = _read_length(source, position)
             literal_length += extra
@@ -133,7 +130,7 @@ def _decompress_raw_block(source: bytes, original_length: int) -> bytes:
 
         match_length = (token & 0x0F) + MIN_MATCH
 
-        # 下位 4 ビットが 15 なら追加バイトで長さが続く
+        # 下位4ビットが15なら追加バイトで長さが続く
         if (token & 0x0F) == 15:
             extra, position = _read_length(source, position)
             match_length += extra
@@ -148,10 +145,10 @@ def _decompress_raw_block(source: bytes, original_length: int) -> bytes:
 
 
 def _read_length(source: bytes, position: int):
-    """255 が続く形式の追加長さを読む"""
+    """255が続く形式の追加長さを読む"""
     total = 0
 
-    # 255 未満のバイトが出るまで足し続ける
+    # 255未満のバイトが出るまで足し続ける
     while True:
         if position >= len(source):
             raise SpringNbtError.malformed("LZ4: 長さの追加バイトが途中で切れた")
@@ -184,7 +181,7 @@ def _copy_match(output: bytearray, written: int, offset: int, length: int) -> in
 
     start = written - offset
 
-    # コピー元と先は重なりうるので 1 バイトずつ写す
+    # コピー元と先は重なりうるので1バイトずつ写す
     for index in range(length):
         output[written + index] = output[start + index]
 

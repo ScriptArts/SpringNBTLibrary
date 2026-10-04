@@ -1,20 +1,19 @@
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// NBT のルートタグの並び方
+/// NBTのルートタグの並び方
 /// </summary>
-/// <remarks>仕様: <c>docs/spec/10-nbt-binary.md</c> 3章</remarks>
 public enum NbtFormat
 {
     /// <summary>
     /// ファイル形式
     /// ルートは「タグID + 名前長 + 名前 + ペイロード」の順に並ぶ
-    /// <c>level.dat</c> やチャンクなど、保存されるデータはすべてこちら
+    /// <c>level.dat</c>やチャンクなど、保存されるデータはすべてこちら
     /// </summary>
     Java,
 
     /// <summary>
-    /// ネットワーク形式 (1.20.2 以降)
+    /// ネットワーク形式 (1.20.2以降)
     /// ルートに名前が付かない
     /// </summary>
     Network,
@@ -23,7 +22,6 @@ public enum NbtFormat
 /// <summary>
 /// 圧縮方式
 /// </summary>
-/// <remarks>仕様: <c>docs/spec/10-nbt-binary.md</c> 4章</remarks>
 public enum Compression
 {
     /// <summary>無圧縮</summary>
@@ -46,7 +44,7 @@ public enum Compression
 /// ルート名とルートタグの組
 /// </summary>
 /// <remarks>
-/// <see cref="NbtFormat.Java"/> ではルート名は通常空文字列だが、
+/// <see cref="NbtFormat.Java"/>ではルート名は通常空文字列だが、
 /// 読んだ値をそのまま保持し、書き出しでも同じ値を出力する
 /// </remarks>
 public sealed class NamedTag

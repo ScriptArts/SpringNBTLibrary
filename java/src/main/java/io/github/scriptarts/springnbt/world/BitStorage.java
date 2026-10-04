@@ -4,13 +4,11 @@ import io.github.scriptarts.springnbt.SpringNbtException;
 import java.util.Objects;
 
 /**
- * 添字を 64bit 整数の配列へ詰めた表現
- * 1.16 以降の<strong>跨ぎなし</strong>パッキング
+ * 添字を64bit整数の配列へ詰めた表現
+ * 1.16以降の<strong>跨ぎなし</strong>パッキング
  *
- * <p>1 つの {@code long} に入りきらない分は、その {@code long} の残りビットを未使用のまま捨て、
- * 次の {@code long} の最下位ビットから始める
- *
- * <p>仕様: {@code docs/spec/31-paletted-container.md} 2章
+ * <p>1つの{@code long}に入りきらない分は、その{@code long}の残りビットを未使用のまま捨て、
+ * 次の{@code long}の最下位ビットから始める
  */
 public final class BitStorage {
 
@@ -25,7 +23,7 @@ public final class BitStorage {
     }
 
     /**
-     * 1 エントリあたりのビット数
+     * 1エントリあたりのビット数
      *
      * @return ビット数
      */
@@ -35,7 +33,7 @@ public final class BitStorage {
 
     /**
      * エントリ数
-     * ブロックなら 4096、バイオームなら 64
+     * ブロックなら4096、バイオームなら64
      *
      * @return エントリ数
      */
@@ -44,7 +42,7 @@ public final class BitStorage {
     }
 
     /**
-     * 1 つの {@code long} に入るエントリ数
+     * 1つの{@code long}に入るエントリ数
      *
      * @return エントリ数
      */
@@ -68,12 +66,13 @@ public final class BitStorage {
     }
 
     /**
-     * 既存の {@code long} 配列から作る
+     * 既存の{@code long}配列から作る
      *
-     * @param data         packed な配列
+     * @param data         packedな配列
      * @param bitsPerEntry パレット長から求めたビット幅
      * @param entryCount   エントリ数
-     * @param lenient      true なら配列長からビット幅を逆算して読む（第三者ツール由来の救済）
+     * @param lenient      trueなら、配列長が期待値と違う場合に配列長からビット幅を逆算して読む
+     * 第三者ツールが書いたデータの救済用
      * @return 記憶域
      * @throws SpringNbtException 配列長が期待値と一致しない場合
      */
@@ -103,7 +102,7 @@ public final class BitStorage {
     }
 
     /**
-     * 必要な {@code long} の個数を求める
+     * 必要な{@code long}の個数を求める
      *
      * @param bitsPerEntry ビット幅
      * @param entryCount   エントリ数
@@ -156,7 +155,7 @@ public final class BitStorage {
     }
 
     /**
-     * packed な配列を返す
+     * packedな配列を返す
      * 内部の配列をそのまま返す（コピーしない）
      *
      * @return 配列

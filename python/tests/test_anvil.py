@@ -1,10 +1,8 @@
-"""Anvil リージョンファイルの読み書き。
+"""Anvilリージョンファイルの読み書き
 
-仕様: docs/spec/20-anvil-region.md
-
-他言語版と同じ検証項目を持つ。
-共通テストベクタによる言語間比較は spec/run-conformance.sh が担当し、
-ここでは API の振る舞いを直接確かめる。
+他言語版と同じ検証項目を持つ
+共通テストベクタによる言語間比較はspec/run-conformance.shが担当し、
+ここではAPIの振る舞いを直接確かめる
 """
 
 from __future__ import annotations
@@ -31,7 +29,7 @@ VECTORS = os.path.join(REPO_ROOT, "spec", "testdata", "anvil")
 
 
 def vector_dir(name: str) -> str:
-    """共通テストベクタのディレクトリ。"""
+    """共通テストベクタのディレクトリ"""
     path = os.path.join(VECTORS, name)
 
     if not os.path.isdir(path):
@@ -42,12 +40,12 @@ def vector_dir(name: str) -> str:
 
 @pytest.fixture
 def work(tmp_path):
-    """テストごとの一時ディレクトリ。"""
+    """テストごとの一時ディレクトリ"""
     return str(tmp_path)
 
 
 def copy_vector(name: str, work: str) -> str:
-    """ベクタを一時ディレクトリへ複製し、書き込みテストで原本を汚さないようにする。"""
+    """ベクタを一時ディレクトリへ複製し、書き込みテストで原本を汚さないようにする"""
     destination = os.path.join(work, name)
     shutil.copytree(vector_dir(name), destination)
     return destination
@@ -64,11 +62,15 @@ def sample_chunk(x: int, z: int) -> NbtCompound:
 
 
 def incompressible(length: int):
-    """圧縮しても縮まないバイト列を作る。サイズの制御が効くようにするため。"""
+    """圧縮しても縮まないバイト列を作る
+
+    サイズを狙いどおりに制御できるようにするため
+    """
     result = []
     state = 0x12345678
 
-    # 線形合同法で疑似乱数を作る。テストの再現性を保つため固定の種を使う
+    # 線形合同法で疑似乱数を作る
+    # テストの再現性を保つため、固定の種を使う
     for _ in range(length):
         state = ((state * 1664525) + 1013904223) & 0xFFFFFFFF
         value = state >> 24
@@ -151,7 +153,7 @@ def test_reads_every_compression_scheme():
 
 def test_reads_lz4_chunks():
     with RegionFile.open(os.path.join(vector_dir("lz4"), "r.0.0.mca")) as region:
-        # 1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
+        # 1ブロック / 2ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
         for x in range(4):
             assert region.read_chunk_raw(x, 0).compression == ChunkCompression.LZ4
             assert region.read_chunk(x, 0).get_int("xPos") == x
@@ -172,7 +174,7 @@ def test_writing_lz4_is_rejected(tmp_path):
     path = os.path.join(copy_vector("lz4", tmp_path), "r.0.0.mca")
 
     with RegionFile.open(path, RegionFileMode.READ_WRITE) as region:
-        # LZ4 は読み込みのみ対応なので、圧縮して書き出すことはできない
+        # LZ4は読み込みのみ対応なので、圧縮して書き出すことはできない
         chunk = region.read_chunk(0, 0)
 
         with pytest.raises(SpringNbtError) as error:
@@ -187,7 +189,8 @@ def test_untouched_lz4_chunks_keep_their_compression(tmp_path):
     with open(path, "rb") as handle:
         before = handle.read()
 
-    # 触らずに閉じるだけ。生バイトを素通しするので LZ4 のまま残る
+    # 触らずに閉じるだけ
+    # 生バイトに手を加えないので、LZ4のまま残る
     with RegionFile.open(path, RegionFileMode.READ_WRITE):
         pass
 
@@ -218,7 +221,7 @@ def test_broken_headers_are_rejected(vector):
 
 def test_chunk_outside_the_region_is_rejected():
     with RegionFile.open(os.path.join(vector_dir("empty"), "r.0.0.mca")) as region:
-        # r.0.0 が担当するのは 0..31 の範囲だけ
+        # r.0.0が担当するのは0..31の範囲だけ
         with pytest.raises(SpringNbtError) as info:
             region.has_chunk(32, 0)
 
@@ -239,7 +242,7 @@ def test_read_only_region_rejects_writes():
 
 
 def test_opening_and_flushing_without_changes_keeps_bytes_identical(work):
-    # 触っていないチャンクの配置を保つことが、既存ワールドを壊さない前提になる
+    # 触っていないチャンクの配置を保つことが、既存ワールドをおかしくしないための前提になる
     directory = copy_vector("fragmented", work)
     path = os.path.join(directory, "r.0.0.mca")
 
@@ -289,7 +292,7 @@ def test_growing_chunk_is_relocated_without_breaking_others(work):
     directory = copy_vector("fragmented", work)
     path = os.path.join(directory, "r.0.0.mca")
 
-    # 5 セクタぶんになる大きなチャンクを作る
+    # 5セクタぶんになる大きなチャンクを作る
     big = sample_chunk(0, 0)
     big.set("filler", NbtByteArray(incompressible(5 * SECTOR_SIZE)))
 
@@ -298,7 +301,7 @@ def test_growing_chunk_is_relocated_without_breaking_others(work):
         region.flush()
 
     with RegionFile.open(path) as reopened:
-        # 動かした結果、他の 2 チャンクが壊れていないこと
+        # 動かした結果、他の2チャンクがおかしくなっていないこと
         assert len(reopened.chunk_positions()) == 3
         assert reopened.read_chunk(5, 3).get_int("xPos") == 5
         assert reopened.read_chunk(31, 31).get_int("xPos") == 31
@@ -361,7 +364,7 @@ def test_optimize_compacts_the_file(work):
 def test_huge_chunk_goes_to_external_file_and_comes_back(work):
     path = os.path.join(work, "r.0.0.mca")
 
-    # 1MiB を超えるよう、圧縮の効かないデータを詰める
+    # 1MiBを超えるよう、圧縮しても縮まないデータを詰める
     huge = sample_chunk(1, 2)
     huge.set("filler", NbtByteArray(incompressible(1200 * 1024)))
 
@@ -411,7 +414,7 @@ def test_folder_resolves_chunks_across_regions(work):
         folder.write_chunk(40, 40, sample_chunk(40, 40))
         folder.flush()
 
-    # 3 つの異なるリージョンへ振り分けられる
+    # 3つの異なるリージョンへ振り分けられる
     for name in ["r.0.0.mca", "r.-1.-1.mca", "r.1.1.mca"]:
         assert os.path.exists(os.path.join(work, name))
 
@@ -424,8 +427,9 @@ def test_folder_resolves_chunks_across_regions(work):
 
 
 def test_キャッシュ上限を超えると古いリージョンから閉じる(work):
-    """RegionFile はファイル全体をメモリへ載せるので、上限が要る。"""
-    # 上限 2 で 4 リージョンへ書く。古いものは閉じられるが内容は失われない
+    """RegionFileはファイル全体をメモリへ載せるので、上限が要る"""
+    # 上限2で4リージョンへ書く
+    # 古いものは閉じられるが、内容は失われない
     with RegionFolder.open(work, RegionFileMode.READ_WRITE, max_cached_regions=2) as folder:
         for region in range(4):
             folder.write_chunk(region * 32, 0, sample_chunk(region * 32, 0))

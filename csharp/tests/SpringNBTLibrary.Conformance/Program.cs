@@ -8,14 +8,14 @@ using SpringNBTLibrary.World;
 namespace SpringNBTLibrary.Conformance;
 
 /// <summary>
-/// 適合性検証ツール。4言語すべてが同じインターフェースで同じ出力を出す。
+/// 適合性検証ツール
+/// 全言語が同じインターフェースで同じ出力を出す
 /// </summary>
 /// <remarks>
 /// <para>
-/// <c>spec/run-conformance.sh</c> がこのツールを4言語ぶん起動し、
-/// 出力を相互に diff することで「4言語が同一に振る舞う」ことを機械的に確かめる。
+/// <c>spec/run-conformance.sh</c>がこのツールを全言語ぶん起動し、
+/// 出力を相互にdiffすることで「全言語が同一に振る舞う」ことを機械的に確かめる
 /// </para>
-/// <para>仕様: <c>docs/spec/90-conformance.md</c> 2.3章</para>
 /// </remarks>
 internal static class Program
 {
@@ -57,13 +57,13 @@ internal static class Program
         }
         catch (SpringNbtException error)
         {
-            // 4言語で同じ ErrorCode を出すことが検証対象なので、コードを機械可読な形で出す
+            // 言語間で同じErrorCodeを出すことが検証対象なので、コードを機械可読な形で出す
             Console.Error.Write($"ERROR {error.Code.AsString()} {error.Message}\n");
             return 1;
         }
     }
 
-    /// <summary>入力を読み、正規化JSON を書き出す。</summary>
+    /// <summary>入力を読み、正規化JSONを書き出す</summary>
     private static int RunDecode(string[] args)
     {
         if (args.Length < 3)
@@ -80,7 +80,10 @@ internal static class Program
         return 0;
     }
 
-    /// <summary>入力を読み、無圧縮で書き直す。ラウンドトリップ検証に使う。</summary>
+    /// <summary>
+    /// 入力を読み、無圧縮で書き直す
+    /// ラウンドトリップ検証に使う
+    /// </summary>
     private static int RunEncode(string[] args)
     {
         if (args.Length < 3)
@@ -101,7 +104,7 @@ internal static class Program
         return 0;
     }
 
-    /// <summary>入力を読み、1行の SNBT を書き出す。</summary>
+    /// <summary>入力を読み、1行のSNBTを書き出す</summary>
     private static int RunSnbt(string[] args)
     {
         if (args.Length < 3)
@@ -117,7 +120,7 @@ internal static class Program
         return 0;
     }
 
-    /// <summary>連なった NBT を、位置を追いながら一覧として書き出す。</summary>
+    /// <summary>連なったNBTを、位置を追いながら一覧として書き出す</summary>
     private static int RunNbtList(string[] args)
     {
         if (args.Length < 3)
@@ -159,7 +162,7 @@ internal static class Program
         return 0;
     }
 
-    /// <summary>リージョンの中身を一覧として書き出す。</summary>
+    /// <summary>リージョンの中身を一覧として書き出す</summary>
     private static int RunRegionList(string[] args)
     {
         if (args.Length < 3)
@@ -173,7 +176,7 @@ internal static class Program
         return 0;
     }
 
-    /// <summary>リージョンを読み直し、無圧縮で詰め直して書き出す。</summary>
+    /// <summary>リージョンを読み直し、無圧縮で詰め直して書き出す</summary>
     private static int RunRegionRewrite(string[] args)
     {
         if (args.Length < 3)
@@ -187,7 +190,7 @@ internal static class Program
         return 0;
     }
 
-    /// <summary>チャンクの全ブロック・全バイオームを走査して集計を書き出す。</summary>
+    /// <summary>チャンクの全ブロック・全バイオームを走査して集計を書き出す</summary>
     private static int RunChunkReport(string[] args)
     {
         if (args.Length < 3)
@@ -201,7 +204,7 @@ internal static class Program
         return 0;
     }
 
-    /// <summary>決まった手順でチャンクを編集し、無圧縮で書き出す。</summary>
+    /// <summary>決まった手順でチャンクを編集し、無圧縮で書き出す</summary>
     private static int RunChunkEdit(string[] args)
     {
         if (args.Length < 3)
@@ -218,12 +221,12 @@ internal static class Program
         return 0;
     }
 
-    /// <summary>チャンク NBT のファイルを読む。</summary>
+    /// <summary>チャンクNBTのファイルを読む</summary>
     private static Chunk ReadChunkFile(string path)
     {
         NamedTag named = NbtIo.ReadFile(path);
 
-        // 検証では DataVersion の違いを警告にせず、そのまま読む
+        // 検証では、DataVersionが扱える形式より古くても警告にせずそのまま読む
         ChunkReadOptions options = new ChunkReadOptions
         {
             OnVersionMismatch = VersionMismatchAction.Ignore,
@@ -231,10 +234,10 @@ internal static class Program
         return Chunk.FromNbt(named.Tag, options);
     }
 
-    /// <summary><c>--format network</c> が指定されていればネットワーク形式として読む。</summary>
+    /// <summary><c>--format network</c>が指定されていればネットワーク形式として読む</summary>
     private static NbtFormat ParseFormat(string[] args)
     {
-        // 3 番目以降の引数からオプションを探す
+        // 3番目以降の引数からオプションを探す
         for (int i = 3; i < args.Length - 1; i++)
         {
             if (args[i] == "--format" && args[i + 1] == "network")
@@ -246,7 +249,7 @@ internal static class Program
         return NbtFormat.Java;
     }
 
-    /// <summary>改行を変換せず、BOM も付けずに UTF-8 で書く。</summary>
+    /// <summary>改行を変換せず、BOMも付けずにUTF-8で書く</summary>
     private static void WriteTextFile(string path, string content)
     {
         File.WriteAllBytes(path, new UTF8Encoding(false).GetBytes(content));

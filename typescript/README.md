@@ -1,18 +1,18 @@
-# SpringNBTLibrary（TypeScript 版）
+# SpringNBTLibrary（TypeScript版）
 
-Minecraft Java版 26.1 以降のワールド・NBTファイルを読み書きするライブラリです。
-Node.js 20 以上、TypeScript 5.7 以上で動きます。ESM 専用です。
+Minecraft Java版26.1以降のワールド・NBTファイルを読み書きするライブラリです。
+Node.js 20以上、TypeScript 5.7以上で動きます。ESM専用です。
 
-いまのワールド形式は 26.1 で入ったものです。
+いまのワールド形式は26.1で入ったものです。
 それ以降のバージョンなら、形式が変わらない限りそのまま扱えます。
 
-C# / Java / TypeScript / Python / Rust 版があり、どれも同じ仕様書から作っています。
+C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書から作っています。
 同じ入力からは同じ結果が出ます（[対応言語の一覧](../README.md#対応言語)）。
-揃っているかは[適合性テスト](../docs/spec/90-conformance.md)で毎回確かめています。
+結果が揃っているかは[適合性テスト](../docs/spec/90-conformance.md)で毎回確かめています。
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `spring-nbt-library-<版>.tgz` を落として入れます。
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring-nbt-library-<版>.tgz`を落として入れます。
 
 ```bash
 npm install ./spring-nbt-library-1.0.0.tgz
@@ -22,12 +22,12 @@ npm install ./spring-nbt-library-1.0.0.tgz
 
 ## 使い方
 
-- [はじめに（TypeScript）](../docs/getting-started/typescript.md) — まずここから
-- [ガイド](../docs/guide/01-nbt.md) — 目的別の使い方
-- [API 対応表](../docs/api/overview.md) — 他言語版との対応
-- [機能一覧](../docs/features.md) — 何ができて何ができないか
+- [はじめに（TypeScript）](../docs/getting-started/typescript.md): まずここから
+- [ガイド](../docs/guide/01-nbt.md): 目的別の使い方
+- [API対応表](../docs/api/overview.md): 他言語版との対応
+- [機能一覧](../docs/features.md): 何ができて何ができないか
 
-説明は [`docs/`](../docs/README.md) にまとめてあります。
+説明は[`docs/`](../docs/README.md)にまとめてあります。
 
 ## ライセンス
 

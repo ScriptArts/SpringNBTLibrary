@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * TAG_String
- * MUTF-8 で符号化される文字列
+ * MUTF-8で符号化される文字列
  */
 public final class NbtString implements NbtTag {
 
@@ -15,7 +15,7 @@ public final class NbtString implements NbtTag {
      * 値を指定して作る
      *
      * @param value 値
-     * @throws SpringNbtException MUTF-8 に符号化すると 65535 バイトを超える場合
+     * @throws SpringNbtException MUTF-8に符号化すると65535バイトを超える場合
      */
     public NbtString(String value) {
         this.value = validate(value);
@@ -34,7 +34,7 @@ public final class NbtString implements NbtTag {
      * 値を設定する
      *
      * @param newValue 新しい値
-     * @throws SpringNbtException MUTF-8 に符号化すると 65535 バイトを超える場合
+     * @throws SpringNbtException MUTF-8に符号化すると65535バイトを超える場合
      */
     public void setValue(String newValue) {
         this.value = validate(newValue);
@@ -65,13 +65,13 @@ public final class NbtString implements NbtTag {
         return value;
     }
 
-    /** 長さフィールドが u16 のため、符号化後 65535 バイトを超える文字列は保持できない */
+    /** 長さフィールドがu16のため、符号化後65535バイトを超える文字列は保持できない */
     private static String validate(String candidate) {
         Objects.requireNonNull(candidate, "value");
         int byteLength = Mutf8.byteLength(candidate);
 
-        // 長さフィールドは u16
-        // 65535 を超えると書き出せない
+        // 長さフィールドはu16
+        // 65535を超えると書き出せない
         if (byteLength > Mutf8.MAX_BYTE_LENGTH) {
             throw SpringNbtException.invalidArgument(
                     "文字列が長すぎる: MUTF-8 で " + byteLength + " バイト (上限 "

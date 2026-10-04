@@ -19,13 +19,11 @@ import io.github.scriptarts.springnbt.nbt.NbtTag;
 import java.util.Map;
 
 /**
- * NBT を、言語をまたいで文字列として完全一致する JSON へ写す。
+ * NBTを、言語をまたいで文字列として完全一致するJSONへ写す
  *
- * <p>浮動小数点をビットパターンで、64bit 整数を10進文字列で表すのが要。
- * 10進表記の丸めや JSON 数値の精度は処理系ごとに差が出るため、
- * そのまま出すと4言語の出力が一致しない。
- *
- * <p>仕様: {@code docs/spec/00-conventions.md} 6章 / {@code docs/spec/90-conformance.md}
+ * <p>浮動小数点をビットパターンで、64bit整数を10進文字列で表すのが要
+ * 10進表記の丸めやJSON数値の精度は処理系ごとに差が出るため、
+ * そのまま出すと言語間で出力が一致しない
  */
 final class NormalizedJson {
 
@@ -33,7 +31,10 @@ final class NormalizedJson {
         // ユーティリティクラス
     }
 
-    /** ルートを含む全体を JSON 文字列へ変換する。末尾に改行を1つ付ける。 */
+    /**
+     * ルートを含む全体をJSON文字列へ変換する
+     * 末尾に改行を1つ付ける
+     */
     static String write(NamedTag named, NbtFormat format) {
         StringBuilder builder = new StringBuilder();
         builder.append("{\"format\":");
@@ -58,7 +59,7 @@ final class NormalizedJson {
         builder.append("{\"type\":");
         appendString(builder, tag.type().asString());
 
-        // list だけは value の前に element_type が入る（仕様が定めるキー順）
+        // listだけはvalueの前にelement_typeが入る（仕様が定めるキー順）
         if (tag instanceof NbtList listTag) {
             builder.append(",\"element_type\":");
             appendString(builder, listTag.elementType().asString());
@@ -70,7 +71,7 @@ final class NormalizedJson {
             case NbtByte value -> builder.append(value.value());
             case NbtShort value -> builder.append(value.value());
             case NbtInt value -> builder.append(value.value());
-            // 64bit 整数は JSON 数値だと処理系によって精度が落ちるため10進文字列で表す
+            // 64bit整数はJSON数値だと処理系によって精度が落ちるため10進文字列で表す
             case NbtLong value -> appendString(builder, Long.toString(value.value()));
             case NbtFloat value -> appendString(builder,
                     String.format("0x%08x", Float.floatToRawIntBits(value.value())));
@@ -79,7 +80,8 @@ final class NormalizedJson {
             case NbtString value -> {
                 appendString(builder, value.value());
 
-                // MUTF-8 のバイト列も併記する。孤立サロゲートなど UTF-8 に写せない値を厳密に比較するため
+                // MUTF-8のバイト列も併記する
+                // 孤立サロゲートなどUTF-8に写せない値を厳密に比較するため
                 builder.append(",\"mutf8\":");
                 appendString(builder, toHex(Mutf8.encode(value.value())));
             }
@@ -111,7 +113,7 @@ final class NormalizedJson {
     }
 
     private static void appendCompound(StringBuilder builder, NbtCompound compound) {
-        // JSON オブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
+        // JSONオブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
         builder.append('[');
         boolean first = true;
 
@@ -162,7 +164,7 @@ final class NormalizedJson {
     private static void appendLongArray(StringBuilder builder, long[] values) {
         builder.append('[');
 
-        // 64bit 整数は10進文字列の配列で表す
+        // 64bit整数は10進文字列の配列で表す
         for (int index = 0; index < values.length; index++) {
             if (index > 0) {
                 builder.append(',');
@@ -185,9 +187,10 @@ final class NormalizedJson {
     }
 
     /**
-     * JSON 文字列を書き出す。非 ASCII は必ず {@code \\uXXXX} へ逃がす。
+     * JSON文字列を書き出す
+     * 非ASCIIは必ず{@code \\uXXXX}へエスケープする
      *
-     * <p>言語ごとに既定のエスケープ方針が違うため、ここで一律に固定しないと出力が一致しない。
+     * <p>言語ごとに既定のエスケープ方針が違うため、ここで一律に固定しないと出力が一致しない
      */
     private static void appendString(StringBuilder builder, String text) {
         builder.append('"');
@@ -204,7 +207,7 @@ final class NormalizedJson {
                 case '\r' -> builder.append("\\r");
                 case '\t' -> builder.append("\\t");
                 default -> {
-                    // ASCII の印字可能文字だけ生で出し、それ以外は \\uXXXX にする
+                    // ASCIIの印字可能文字だけ生で出し、それ以外は\\uXXXXにする
                     if (c >= 0x20 && c <= 0x7E) {
                         builder.append(c);
                     } else {

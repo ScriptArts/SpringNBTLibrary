@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "spring-nbt-library"
 version = "1.0.0"
-description = "Minecraft Java Edition の NBT / Anvil ワールドデータを読み書きするライブラリ"
+description = "Minecraft Java EditionのNBT / Anvilワールドデータを読み書きするライブラリ"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"

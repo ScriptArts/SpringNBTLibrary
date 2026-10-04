@@ -21,11 +21,11 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
- * NBT レイヤの単体テスト。
+ * NBTレイヤの単体テスト
  *
- * <p>他言語版と同じ検証項目を持つ。
- * 共通テストベクタによる言語間比較は {@code spec/run-conformance.sh} が担当し、
- * ここでは API の振る舞いを直接確かめる。
+ * <p>他言語版と同じ検証項目を持つ
+ * 共通テストベクタによる言語間比較は{@code spec/run-conformance.sh}が担当し、
+ * ここではAPIの振る舞いを直接確かめる
  */
 class NbtTest {
 
@@ -37,7 +37,7 @@ class NbtTest {
         return NbtWriteOptions.uncompressed();
     }
 
-    /** 仕様書どおりに組んだ最小の NBT。 */
+    /** 仕様書どおりに組んだ最小のNBT */
     private static byte[] helloWorldBytes() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -89,7 +89,7 @@ class NbtTest {
 
         @Test
         void supplementaryCharIsCesu8() {
-            // U+1F600 は UTF-16 で D83D DE00。MUTF-8 では 3 バイト × 2 になる
+            // U+1F600はUTF-16でD83D DE00、MUTF-8では3バイト × 2になる
             String sample = "\uD83D\uDE00";
             byte[] expected = {
                 (byte) 0xED, (byte) 0xA0, (byte) 0xBD,
@@ -101,7 +101,7 @@ class NbtTest {
 
         @Test
         void loneSurrogateSurvivesRoundtrip() {
-            // 対にならない上位サロゲート。UTF-8 には写せないが MUTF-8 では往復できる
+            // 対にならない上位サロゲートはUTF-8には写せないが、MUTF-8では往復できる
             String lone = "\uD83D";
             byte[] expected = { (byte) 0xED, (byte) 0xA0, (byte) 0xBD };
             assertArrayEquals(expected, Mutf8.encode(lone));
@@ -116,7 +116,7 @@ class NbtTest {
                     new byte[] { (byte) 0xF0, (byte) 0x9F, (byte) 0x98, (byte) 0x80 },
                     new byte[] { (byte) 0xE3, (byte) 0x81 });
 
-            // 素の 0x00 / 冗長符号化 / 4バイト形式 / 途中で切れた入力 のすべてを拒否する
+            // 素の0x00、冗長符号化、4バイト形式、途中で切れた入力のすべてを拒否する
             for (byte[] data : cases) {
                 assertEquals(ErrorCode.MALFORMED_DATA, codeOf(() -> Mutf8.decode(data)),
                         Arrays.toString(data));
@@ -171,7 +171,7 @@ class NbtTest {
             byte[] encoded = NbtIo.writeBytes(new NamedTag("", root), uncompressedWrite());
             NbtCompound decoded = NbtIo.readBytes(encoded, uncompressedRead()).tag();
 
-            // -0.0 と +0.0 は == では区別できないので、ビットパターンで比較する
+            // -0.0と+0.0は == では区別できないので、ビットパターンで比較する
             assertEquals(Double.doubleToRawLongBits(-0.0),
                     Double.doubleToRawLongBits(decoded.getDouble("negative_zero")));
             assertTrue(Float.isNaN(decoded.getFloat("nan")));
@@ -221,7 +221,7 @@ class NbtTest {
             NbtCompound root = new NbtCompound();
             root.set("value", new NbtString("text"));
 
-            // キーが無い場合は null
+            // キーが無い場合はnull
             assertNull(root.optInt("missing"));
 
             // 型が違う場合はキーの有無に関わらず例外
@@ -238,7 +238,7 @@ class NbtTest {
 
             assertEquals(method, NbtIo.detectCompression(encoded));
 
-            // 既定の ReadOptions は AUTO なので、方式を指定しなくても読める
+            // 既定のReadOptionsはAUTOなので、方式を指定しなくても読める
             assertEquals("Bananrama", NbtIo.readBytes(encoded, null).tag().getString("name"));
         }
 
@@ -252,7 +252,7 @@ class NbtTest {
                             .setFormat(NbtFormat.NETWORK)
                             .setCompression(Compression.NONE));
 
-            // タグID + ペイロード のみで、名前長の 2 バイトが無い
+            // タグID + ペイロードのみで、名前長の2バイトが無い
             assertEquals(0x0A, encoded[0]);
             assertEquals(0x03, encoded[1]);
 
@@ -276,7 +276,7 @@ class NbtTest {
 
         @Test
         void hugeDeclaredLengthIsRejectedBeforeAllocating() {
-            // ルート直下に「長さ 0x7FFFFFFF の ByteArray」を宣言するだけの入力
+            // ルート直下に「長さ0x7FFFFFFFのByteArray」を宣言するだけの入力
             byte[] data = {
                 0x0A, 0x00, 0x00,
                 0x07, 0x00, 0x01, 0x61,
@@ -338,7 +338,7 @@ class NbtTest {
 
         @Test
         void loneSurrogateKeyIsRejected() {
-            // 値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）
+            // 値と違い、キーには孤立サロゲートを許さない
             byte[] data = {
                 0x0A, 0x00, 0x00,
                 0x03, 0x00, 0x03, (byte) 0xED, (byte) 0xA0, (byte) 0xBD,
@@ -374,7 +374,8 @@ class NbtTest {
 
         @Test
         void hexSuffixRuleIsFixed() {
-            // 仕様 11 の 2.1: 16進では b/d/f を数字として読む。幅接尾辞は s/l のみ
+            // 16進ではb/d/fを数字として読む
+            // 幅接尾辞はs/lのみ
             assertEquals(new NbtInt(255), Snbt.parse("0xFF"));
             assertEquals(new NbtInt(4091), Snbt.parse("0xFFb"));
             assertEquals(new NbtLong(255), Snbt.parse("0xFFl"));
@@ -383,7 +384,8 @@ class NbtTest {
 
         @Test
         void zeroByteLiteralIsNotBinary() {
-            // 0b は「10進の 0 に Byte 接尾辞」。真偽値の false として広く使われる形
+            // 0bは「10進の0にByte接尾辞」
+            // 真偽値のfalseとして広く使われる形
             assertEquals(new NbtByte((byte) 0), Snbt.parse("0b"));
             assertEquals(new NbtInt(1), Snbt.parse("0b1"));
             assertEquals(new NbtByte((byte) 9), Snbt.parse("0b1001b"));
@@ -417,7 +419,7 @@ class NbtTest {
             assertEquals(new NbtIntArray(new int[] { 1, 2 }), Snbt.parse("[I; 1, 2]"));
             assertEquals(new NbtLongArray(new long[] { 1, 2 }), Snbt.parse("[L; 1L, 2L]"));
 
-            // 接尾辞なしでも範囲内なら受理する（Minecraft 自身がそう書き出すため）
+            // 接尾辞なしでも範囲内なら受理する（Minecraft自身がそう書き出すため）
             assertEquals(new NbtByteArray(new byte[] { 1, 2 }), Snbt.parse("[B; 1, 2]"));
             assertEquals(ErrorCode.MALFORMED_DATA, codeOf(() -> Snbt.parse("[B; 200]")));
         }
@@ -430,7 +432,7 @@ class NbtTest {
 
         @Test
         void heterogeneousListIsRejected() {
-            // 異種リストはバイナリ NBT へ写せないため受理しない (adr/0006)
+            // 異種リストはバイナリNBTへ写せないため受理しない
             assertEquals(ErrorCode.MALFORMED_DATA, codeOf(() -> Snbt.parse("[1, \"a\"]")));
         }
 
@@ -461,7 +463,7 @@ class NbtTest {
 
         @Test
         void snbtToNbtToSnbtToNbtIsStable() {
-            // 仕様 11 の 5章: 保証するのは「SNBT -> NBT -> SNBT -> NBT」で NBT が一致すること
+            // 保証するのは「SNBT -> NBT -> SNBT -> NBT」でNBTが一致すること
             String source = "{ name : 'Bananrama' , list : [ 1L , 2L ] , nested : { flag : true } , "
                     + "bytes : [B; 1b, -2b] , ratio : 0.5f }";
 
@@ -575,7 +577,10 @@ class NbtTest {
         }
     }
 
-    /** 全13タグ型を含む Compound を作る。 */
+    /**
+     * TAG_Endを除く12種のタグ型をすべて含むCompoundを作る
+     * TAG_EndはCompoundの終端として書き出されるので、往復させれば13種すべてを読み書きする
+     */
     private static NbtCompound buildAllTags() {
         NbtCompound root = new NbtCompound();
         root.set("byte", new NbtByte((byte) -128));
@@ -603,14 +608,14 @@ class NbtTest {
         return root;
     }
 
-    /** 指定した深さまで Compound を入れ子にしたバイト列を作る。 */
+    /** 指定した深さまでCompoundを入れ子にしたバイト列を作る */
     private static byte[] buildNestedCompound(int depth) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write(0x0A);
         out.write(0x00);
         out.write(0x00);
 
-        // ルート + (depth - 1) 段の入れ子
+        // ルート + (depth - 1)段の入れ子
         for (int index = 0; index < depth - 1; index++) {
             out.write(0x0A);
             out.write(0x00);
@@ -734,7 +739,7 @@ class NbtTest {
             assertArrayEquals(new int[] {1, -1}, root.getIntArray("ia"));
             assertArrayEquals(new long[] {1L, -1L}, root.getLongArray("la"));
 
-            // 真偽値は TAG_Byte の 0 / 1 として入る
+            // 真偽値はTAG_Byteの0 / 1として入る
             assertEquals(TagType.BYTE, root.get("t").type());
         }
 

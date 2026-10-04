@@ -1,6 +1,4 @@
 """ブロックの絶対座標と、その範囲
-
-仕様: docs/spec/30-chunk-format.md 5章
 """
 
 from __future__ import annotations
@@ -61,10 +59,10 @@ class BlockPos:
 
 
 class Cuboid:
-    """ブロック座標の直方体な範囲
+    """ブロック座標の直方体の範囲
 
     両端を含む
-    ``Cuboid.of(0, 0, 0, 0, 0, 0)`` は 1 ブロック
+    ``Cuboid.of(0, 0, 0, 0, 0, 0)``は1ブロック
 
     範囲内のブロックを順に処理したいときに使う
     """
@@ -77,17 +75,17 @@ class Cuboid:
         大小の順序は問わない
         内部で小さいほうを最小に揃える
         """
-        #: X の最小値
+        #: Xの最小値
         self.min_x = min(first.x, second.x)
-        #: Y の最小値
+        #: Yの最小値
         self.min_y = min(first.y, second.y)
-        #: Z の最小値
+        #: Zの最小値
         self.min_z = min(first.z, second.z)
-        #: X の最大値（含む）
+        #: Xの最大値（含む）
         self.max_x = max(first.x, second.x)
-        #: Y の最大値（含む）
+        #: Yの最大値（含む）
         self.max_y = max(first.y, second.y)
-        #: Z の最大値（含む）
+        #: Zの最大値（含む）
         self.max_z = max(first.z, second.z)
 
     @staticmethod
@@ -97,17 +95,17 @@ class Cuboid:
 
     @property
     def size_x(self) -> int:
-        """X 方向の長さ"""
+        """X方向の長さ"""
         return self.max_x - self.min_x + 1
 
     @property
     def size_y(self) -> int:
-        """Y 方向の長さ"""
+        """Y方向の長さ"""
         return self.max_y - self.min_y + 1
 
     @property
     def size_z(self) -> int:
-        """Z 方向の長さ"""
+        """Z方向の長さ"""
         return self.max_z - self.min_z + 1
 
     @property
@@ -124,9 +122,9 @@ class Cuboid:
     def positions(self) -> Iterator[BlockPos]:
         """範囲内の座標を順に返す
 
-        並びは Y、Z、X の順で、X がいちばん内側で動く
+        並びはY、Z、Xの順で、Xがいちばん内側で動く
         """
-        # 内側から X が動くので、同じチャンクの並びを続けて触れる
+        # Xがいちばん内側で動くので、同じチャンクの並びを続けて扱える
         for y in range(self.min_y, self.max_y + 1):
             for z in range(self.min_z, self.max_z + 1):
                 for x in range(self.min_x, self.max_x + 1):

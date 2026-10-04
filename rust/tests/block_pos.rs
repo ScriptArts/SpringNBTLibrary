@@ -1,6 +1,4 @@
-//! ブロック座標と範囲の統合テスト。
-//!
-//! 仕様: `docs/spec/30-chunk-format.md` 5章
+//! ブロック座標と範囲の統合テスト
 
 use spring_nbt_library::anvil::ChunkPos;
 use spring_nbt_library::world::{BlockPos, Cuboid};
@@ -52,7 +50,7 @@ fn walks_every_position_inside() {
     assert_eq!(positions.len() as i64, box_.volume());
     assert_eq!(positions.len(), 2 * 3 * 4);
 
-    // 並びは Y、Z、X の順で、X がいちばん内側で動く
+    // 並びはY、Z、Xの順で、Xがいちばん内側で動く
     assert_eq!(positions[0], BlockPos::new(0, 0, 0));
     assert_eq!(positions[1], BlockPos::new(1, 0, 0));
     assert_eq!(positions[2], BlockPos::new(0, 0, 1));

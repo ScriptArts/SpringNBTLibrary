@@ -17,20 +17,18 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**
- * チャンク 1 つ分
- * 地形の読み書きの入口
+ * チャンク1つ分
+ * 地形の読み書きはここから行う
  *
- * <p><strong>読んだ NBT をそのまま保持し、変更した部分だけを書き戻す</strong>
- * 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
- *
- * <p>仕様: {@code docs/spec/30-chunk-format.md}
+ * <p><strong>読んだNBTをそのまま保持し、書き戻すときに作り直すのはセクションだけにする</strong>
+ * 未知のキーを落とさないので、将来の追加要素があってもデータをおかしくしない
  */
 public final class Chunk {
 
-    /** セクション 1 つに入るブロック数 */
+    /** セクション1つに入るブロック数 */
     public static final int BLOCKS_PER_SECTION = 4096;
 
-    /** セクション 1 つに入るバイオームのエントリ数（4×4×4 単位） */
+    /** セクション1つに入るバイオームのエントリ数（4×4×4単位） */
     public static final int BIOMES_PER_SECTION = 64;
 
     /**
@@ -76,7 +74,7 @@ public final class Chunk {
 
     /**
      * 最下段セクションのY位置
-     * オーバーワールドは -4
+     * オーバーワールドは-4
      *
      * @return Y位置
      */
@@ -85,7 +83,7 @@ public final class Chunk {
     }
 
     /**
-     * 生成段階（{@code minecraft:full} など）
+     * 生成段階（{@code minecraft:full}など）
      *
      * @return 生成段階
      */
@@ -97,7 +95,7 @@ public final class Chunk {
      * 生成が完了しているか
      * ブロック改変の対象にしてよいのはこれだけ
      *
-     * @return 完了していれば true
+     * @return 完了していればtrue
      */
     public boolean isFullyGenerated() {
         return "minecraft:full".equals(status());
@@ -107,12 +105,11 @@ public final class Chunk {
      * このチャンクに変更が加わったか
      *
      * <p>ブロックやバイオームを書き換えると立つ
-     * {@link Dimension#flush()} はこれが立っているチャンクだけを書き戻す
+     * {@link Dimension#flush()}はこれが立っているチャンクだけを書き戻す
      *
-     * <p>{@link #raw()} を直接いじった場合はここが立たないので、
-     * 自分で {@link #setIsModified(boolean)} を呼ぶこと
+     * <p>{@link #raw()}を直接いじった場合は立たないので、自分で{@link #setIsModified(boolean)}を呼ぶこと
      *
-     * @return 変更があれば true
+     * @return 変更があればtrue
      */
     public boolean isModified() {
         return modified;
@@ -121,7 +118,7 @@ public final class Chunk {
     /**
      * 変更の印を付け外しする
      *
-     * @param value 立てるなら true
+     * @param value 立てるならtrue
      */
     public void setIsModified(boolean value) {
         modified = value;
@@ -138,7 +135,7 @@ public final class Chunk {
     }
 
     /**
-     * 元の NBT
+     * 元のNBT
      * 解釈していないキーもここに残っている
      *
      * @return NBT
@@ -148,11 +145,11 @@ public final class Chunk {
     }
 
     /**
-     * NBT からチャンクを読む
+     * NBTからチャンクを読む
      *
-     * @param nbt     チャンクの NBT
+     * @param nbt     チャンクのNBT
      * @param options 読み込みオプション
-     * null なら既定値
+     * nullなら既定値
      * @return チャンク
      * @throws SpringNbtException 必須のキーが無い、または構造が想定と違う場合
      */
@@ -174,7 +171,7 @@ public final class Chunk {
             return chunk;
         }
 
-        // 並び順に依存しないよう、Y から索引を作る
+        // 並び順に依存しないよう、Yから索引を作る
         for (NbtTag entry : sectionList) {
             if (!(entry instanceof NbtCompound sectionTag)) {
                 throw SpringNbtException.unexpectedTagType(
@@ -188,7 +185,7 @@ public final class Chunk {
         return chunk;
     }
 
-    /** DataVersion を検査し、オプションに従って警告またはエラーにする */
+    /** DataVersionを検査し、オプションに従って警告またはエラーにする */
     private void checkDataVersion(ChunkReadOptions options) {
         int version = dataVersion();
 
@@ -212,13 +209,13 @@ public final class Chunk {
     }
 
     /**
-     * NBT へ書き戻す
-     * 変更したセクションだけを反映し、他のキーはそのまま残す
+     * NBTへ書き戻す
+     * 全セクションを書き戻し、他のキーはそのまま残す
      *
      * @param options 書き込みオプション
-     * null なら既定値
+     * nullなら既定値
      * @return NBT
-     * @throws SpringNbtException DataVersion が対象と違い、かつ書き戻しが許可されていない場合
+     * @throws SpringNbtException DataVersionが扱える形式より古く、かつ書き戻しが許可されていない場合
      */
     public NbtCompound toNbt(ChunkWriteOptions options) {
         ChunkWriteOptions effective;
@@ -230,7 +227,7 @@ public final class Chunk {
 
         int version = dataVersion();
 
-        // 形式の違う古いチャンクは、書き戻すと壊しかねない
+        // 形式の違う古いチャンクは、書き戻すと使えなくなりかねない
         if (version < SpringNbt.MIN_SUPPORTED_DATA_VERSION && !effective.allowForeignDataVersion()) {
             throw new SpringNbtException(ErrorCode.UNSUPPORTED_DATA_VERSION,
                     "DataVersion " + version + " のチャンクは書き戻せない（"
@@ -239,7 +236,7 @@ public final class Chunk {
                             + " ChunkWriteOptions.setAllowForeignDataVersion(true)");
         }
 
-        // DataVersion は読んだ値のまま残す
+        // DataVersionは読んだ値のまま残す
         // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
         if (sections.isEmpty()) {
@@ -248,7 +245,7 @@ public final class Chunk {
 
         NbtList sectionList = new NbtList(TagType.COMPOUND);
 
-        // Y の昇順で書き出す
+        // Yの昇順で書き出す
         for (ChunkSection section : sections.values()) {
             sectionList.add(section.toNbt());
         }
@@ -262,7 +259,7 @@ public final class Chunk {
      *
      * @param sectionY セクションのY位置
      * @return セクション
-     * 無ければ null
+     * 無ければnull
      */
     public ChunkSection section(int sectionY) {
         return sections.get(sectionY);
@@ -275,7 +272,7 @@ public final class Chunk {
      * @param y 絶対Y座標
      * @param z チャンク内相対Z座標 (0..15)
      * @return ブロック
-     * セクションが無い、または block_states を持たない場合は null
+     * セクションが無い、またはblock_statesを持たない場合はnull
      */
     public BlockState getBlock(int x, int y, int z) {
         checkLocalCoordinates(x, z);
@@ -302,7 +299,7 @@ public final class Chunk {
      * @param y     絶対Y座標
      * @param z     チャンク内相対Z座標 (0..15)
      * @param state ブロック
-     * @throws SpringNbtException 対象のセクションが無い、または block_states を持たない場合
+     * @throws SpringNbtException 対象のセクションが無い、またはblock_statesを持たない場合
      */
     public void setBlock(int x, int y, int z, String state) {
         Objects.requireNonNull(state, "state");
@@ -316,7 +313,7 @@ public final class Chunk {
      * @param y     絶対Y座標
      * @param z     チャンク内相対Z座標 (0..15)
      * @param state ブロック
-     * @throws SpringNbtException 対象のセクションが無い、または block_states を持たない場合
+     * @throws SpringNbtException 対象のセクションが無い、またはblock_statesを持たない場合
      */
     public void setBlock(int x, int y, int z, BlockState state) {
         Objects.requireNonNull(state, "state");
@@ -331,7 +328,7 @@ public final class Chunk {
         }
 
         // 同じ状態を置き直すだけなら、付随データを触る理由がない
-        // プロパティの並び順に左右されないよう、NBT ではなく BlockState として比べる
+        // プロパティの並び順に左右されないよう、NBTではなくBlockStateとして比べる
         BlockState current = getBlock(x, y, z);
 
         if (current != null && current.equals(state)) {
@@ -346,14 +343,14 @@ public final class Chunk {
     /**
      * その座標を指す付随データを取り除く
      *
-     * <p>{@code block_entities} / {@code block_ticks} / {@code fluid_ticks} の要素は
-     * いずれも {@code x} {@code y} {@code z} を<b>絶対座標</b>で持つ
+     * <p>{@code block_entities} / {@code block_ticks} / {@code fluid_ticks}の要素は
+     * いずれも{@code x} {@code y} {@code z}を<b>絶対座標</b>で持つ
      */
     private void removeBlockData(int x, int y, int z) {
         int absoluteX = (x() * 16) + x;
         int absoluteZ = (z() * 16) + z;
 
-        // 3 つのリストは形が同じなので、まとめて同じ処理をかける
+        // 3つのリストは形が同じなので、まとめて同じ処理をかける
         for (String key : BLOCK_DATA_KEYS) {
             NbtList list = root.optList(key);
 
@@ -390,13 +387,13 @@ public final class Chunk {
 
     /**
      * バイオームを取得する
-     * 4×4×4 の単位なので、座標は自動的に丸められる
+     * 4×4×4の単位なので、座標は自動的に丸められる
      *
      * @param x チャンク内相対X座標 (0..15)
      * @param y 絶対Y座標
      * @param z チャンク内相対Z座標 (0..15)
      * @return バイオームID
-     * セクションが無い場合は null
+     * セクションが無い場合はnull
      */
     public String getBiome(int x, int y, int z) {
         checkLocalCoordinates(x, z);
@@ -418,7 +415,7 @@ public final class Chunk {
 
     /**
      * バイオームを設定する
-     * 4×4×4 の単位
+     * 4×4×4の単位
      *
      * @param x     チャンク内相対X座標 (0..15)
      * @param y     絶対Y座標
@@ -442,18 +439,17 @@ public final class Chunk {
     }
 
     /**
-     * {@code Heightmaps} を削除し、Minecraft に再計算させる
+     * {@code Heightmaps}を削除し、Minecraftに再計算させる
      *
      * <p>本ライブラリは高さマップを再計算しない
      * ブロックを改変したら呼ぶこと
-     * （{@code docs/adr/0004-defer-heightmap-recalc.md}）
      */
     public void clearHeightmaps() {
         root.remove("Heightmaps");
         modified = true;
     }
 
-    /** {@code isLightOn} を 0 にし、光源の再計算を促す */
+    /** {@code isLightOn}を0にし、光源の再計算を促す */
     public void invalidateLighting() {
         root.setByte("isLightOn", (byte) 0);
         modified = true;
@@ -472,7 +468,7 @@ public final class Chunk {
     /**
      * セクション内のブロック添字
      *
-     * <p>{@code & 15} により負のY座標でも正しく求まる
+     * <p>{@code & 15}により負のY座標でも正しく求まる
      *
      * @param x X座標
      * @param y Y座標
@@ -485,7 +481,7 @@ public final class Chunk {
 
     /**
      * セクション内のバイオーム添字
-     * 1 エントリが 4×4×4 ブロック
+     * 1エントリが4×4×4ブロック
      *
      * @param x X座標
      * @param y Y座標
@@ -497,7 +493,7 @@ public final class Chunk {
     }
 
     private static void checkLocalCoordinates(int x, int z) {
-        // チャンク内相対座標は 0..15 でなければならない
+        // チャンク内相対座標は0..15でなければならない
         if (x < 0 || x > 15 || z < 0 || z > 15) {
             throw SpringNbtException.invalidArgument(
                     "チャンク内相対座標が範囲外: (" + x + ", " + z + ")。X も Z も 0..15 であること");

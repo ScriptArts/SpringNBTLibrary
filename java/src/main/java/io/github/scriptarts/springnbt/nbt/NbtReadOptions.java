@@ -1,9 +1,7 @@
 package io.github.scriptarts.springnbt.nbt;
 
 /**
- * NBT 読み込みのオプション
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 6章 / {@code docs/spec/00-conventions.md} 5章
+ * NBT読み込みのオプション
  */
 public final class NbtReadOptions {
 
@@ -46,7 +44,7 @@ public final class NbtReadOptions {
 
     /**
      * 圧縮方式
-     * 既定は {@link Compression#AUTO}
+     * 既定は{@link Compression#AUTO}
      *
      * @return 圧縮方式
      */
@@ -67,7 +65,7 @@ public final class NbtReadOptions {
 
     /**
      * ネストの深さ上限
-     * 既定は 512
+     * 既定は512
      *
      * @return 深さ上限
      */

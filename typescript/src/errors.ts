@@ -1,7 +1,5 @@
 /**
- * 4言語で共通のエラーモデル
- *
- * 仕様: `docs/spec/00-conventions.md` 4章 / `docs/adr/0005-unified-error-model.md`
+ * 全言語で共通のエラーモデル
  */
 
 /**
@@ -18,7 +16,7 @@ export enum ErrorCode {
   /** 期待した型と違うタグを取り出した */
   UnexpectedTagType = "UNEXPECTED_TAG_TYPE",
 
-  /** 仕様上は妥当だが、このビルドでは扱えない */
+  /** 仕様上は妥当だが、このライブラリでは扱えない */
   UnsupportedFeature = "UNSUPPORTED_FEATURE",
 
   /** 安全上限を超えた */
@@ -27,7 +25,7 @@ export enum ErrorCode {
   /** 呼び出し側の引数が不正 */
   InvalidArgument = "INVALID_ARGUMENT",
 
-  /** 対象バージョン外のデータ */
+  /** 扱える形式より古いデータ */
   UnsupportedDataVersion = "UNSUPPORTED_DATA_VERSION",
 }
 
@@ -38,7 +36,7 @@ export function errorCodeAsString(code: ErrorCode): string {
 
 /**
  * 本ライブラリが送出する例外
- * 分類は {@link SpringNbtError.code} で判別する
+ * 分類は{@link SpringNbtError.code}で判別する
  */
 export class SpringNbtError extends Error {
   /** エラーの分類 */
@@ -54,27 +52,27 @@ export class SpringNbtError extends Error {
     return `[${this.code}] ${this.message}`;
   }
 
-  /** {@link ErrorCode.MalformedData} の例外を作る */
+  /** {@link ErrorCode.MalformedData}の例外を作る */
   static malformed(message: string): SpringNbtError {
     return new SpringNbtError(ErrorCode.MalformedData, message);
   }
 
-  /** {@link ErrorCode.InvalidArgument} の例外を作る */
+  /** {@link ErrorCode.InvalidArgument}の例外を作る */
   static invalidArgument(message: string): SpringNbtError {
     return new SpringNbtError(ErrorCode.InvalidArgument, message);
   }
 
-  /** {@link ErrorCode.UnexpectedTagType} の例外を作る */
+  /** {@link ErrorCode.UnexpectedTagType}の例外を作る */
   static unexpectedTagType(message: string): SpringNbtError {
     return new SpringNbtError(ErrorCode.UnexpectedTagType, message);
   }
 
-  /** {@link ErrorCode.LimitExceeded} の例外を作る */
+  /** {@link ErrorCode.LimitExceeded}の例外を作る */
   static limitExceeded(message: string): SpringNbtError {
     return new SpringNbtError(ErrorCode.LimitExceeded, message);
   }
 
-  /** {@link ErrorCode.UnsupportedFeature} の例外を作る */
+  /** {@link ErrorCode.UnsupportedFeature}の例外を作る */
   static unsupportedFeature(message: string): SpringNbtError {
     return new SpringNbtError(ErrorCode.UnsupportedFeature, message);
   }

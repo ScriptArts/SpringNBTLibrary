@@ -6,9 +6,8 @@ namespace SpringNBTLibrary.Nbt;
 /// <remarks>
 /// <para>読んだタグと、その直後の位置を持つ</para>
 /// <para>
-/// 続けて読むときは <see cref="End"/> を次の開始位置として渡す
+/// 続けて読むときは<see cref="End"/>を次の開始位置として渡す
 /// </para>
-/// <para>仕様: <c>docs/spec/10-nbt-binary.md</c> 3.1章</para>
 /// </remarks>
 public sealed class NbtReadResult
 {

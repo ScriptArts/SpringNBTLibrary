@@ -1,10 +1,10 @@
 # 40. ワールドのディレクトリ構成
 
-Java版のセーブデータのディレクトリ構成と `level.dat` の扱い。
+Java版のセーブデータのディレクトリ構成と`level.dat`の扱い。
 
-> **この章は Java版 26.2 の実データを走査して確認した内容に基づく。**
-> 1.21.x までの構成（`region/` が直下、`DIM-1` / `DIM1`、`playerdata/`）とは**大きく異なる**。
-> 検証方法は [90 適合性](90-conformance.md) の「実ワールド走査」を参照。
+> **この章は、Java版26.2の実データを走査して確認した内容に基づく。**
+> 1.21.xまでの構成（`region/`が直下、`DIM-1` / `DIM1`、`playerdata/`）とは大きく異なる。
+> 検証方法は[90 適合性](90-conformance.md)の「実ワールド走査」を参照。
 
 ---
 
@@ -48,7 +48,7 @@ Java版のセーブデータのディレクトリ構成と `level.dat` の扱い
 
 ### 1.1 次元の解決
 
-**標準の3次元も `dimensions/` の下に置かれる。** 特別扱いはない。
+**標準の3次元も`dimensions/`の下に置かれる。** 特別扱いはない。
 
 | 次元ID | ディレクトリ |
 |---|---|
@@ -57,9 +57,9 @@ Java版のセーブデータのディレクトリ構成と `level.dat` の扱い
 | `minecraft:the_end` | `dimensions/minecraft/the_end/` |
 | `<ns>:<path>` | `dimensions/<ns>/<path>/` |
 
-つまり解決規則は `dimensions/<名前空間>/<パス>/` の**一本だけ**でよい。
+つまり、解決規則は`dimensions/<名前空間>/<パス>/`の一本だけでよい。
 
-> **1.21.x からの変更点**
+> **1.21.xからの変更点**
 >
 > | 旧 | 新 |
 > |---|---|
@@ -69,139 +69,129 @@ Java版のセーブデータのディレクトリ構成と `level.dat` の扱い
 > | `<world>/playerdata/<uuid>.dat` | `<world>/players/data/<uuid>.dat` |
 > | `<world>/advancements/<uuid>.json` | `<world>/players/advancements/<uuid>.json` |
 > | `<world>/stats/<uuid>.json` | `<world>/players/stats/<uuid>.json` |
-> | `<world>/data/*.dat`（雑多） | `<world>/data/minecraft/<用途>.dat` に整理 |
+> | `<world>/data/*.dat`（雑多） | `<world>/data/minecraft/<用途>.dat`に整理 |
 
-生成されていない次元のディレクトリは存在しないことがある
-（実データでは `the_nether` / `the_end` に `data/` だけがあり `region/` は無かった）。
-**ディレクトリの有無で判断し、無い場合は「チャンクが 1 つも無い次元」として扱う。**
+生成されていない次元のディレクトリは存在しないことがある（実データでは`the_nether` / `the_end`に`data/`だけがあり、`region/`は無かった）。
+**ディレクトリの有無で判断し、無い場合は「チャンクが1つも無い次元」として扱う。**
 
 ---
 
 ## 2. level.dat
 
-Gzip 圧縮された NBT。ルートは空名の `TAG_Compound` で、`Data` キーの下に本体がある。
+Gzip圧縮されたNBT。ルートは空名の`TAG_Compound`で、`Data`キーの下に本体がある。
 
-**26.x では大幅に軽量化されている。** ゲームルール・ワールド生成設定・天候・スコアボードなどは
-`data/minecraft/` 配下の個別ファイルへ分離された。実データでは 430 バイトしかない。
+**26.xでは大幅に軽量化されている。** ゲームルール・ワールド生成設定・天候・スコアボードなどは、`data/minecraft/`配下の個別ファイルへ分離された。実データでは430バイトしかない。
 
 | キー | 型 | 内容 |
 |---|---|---|
 | `Data.DataVersion` | `Int` | `4903` |
-| `Data.version` | `Int` | NBT 保存形式のバージョン。`19133` |
+| `Data.version` | `Int` | NBT保存形式のバージョン。`19133` |
 | `Data.LevelName` | `String` | ワールド名 |
 | `Data.Time` | `Long` | ワールドの経過時間（tick） |
-| `Data.LastPlayed` | `Long` | 最終プレイ時刻（Unix ミリ秒） |
+| `Data.LastPlayed` | `Long` | 最終プレイ時刻（Unixミリ秒） |
 | `Data.GameType` | `Int` | 0=サバイバル 1=クリエイティブ 2=アドベンチャー 3=スペクテイター |
 | `Data.allowCommands` | `Byte` | |
 | `Data.initialized` | `Byte` | |
 | `Data.WasModded` | `Byte` | |
-| `Data.singleplayer_uuid` | `IntArray` | 4 要素 |
+| `Data.singleplayer_uuid` | `IntArray` | 4要素 |
 | `Data.ServerBrands` | `List<String>` | 例: `["vanilla"]` |
 | `Data.difficulty_settings` | `Compound` | `difficulty`(String) / `hardcore`(Byte) / `locked`(Byte) |
 | `Data.spawn` | `Compound` | `pos`(IntArray 3要素) / `pitch`(Float) / `yaw`(Float) / `dimension`(String) |
 | `Data.Version` | `Compound` | `Id`(Int) / `Name`(String) / `Series`(String) / `Snapshot`(Byte) |
-| `Data.DataPacks` | `Compound` | `Enabled` / `Disabled`（どちらも `List<String>`） |
+| `Data.DataPacks` | `Compound` | `Enabled` / `Disabled`（どちらも`List<String>`） |
 
-> **1.21.x からの変更点**
+> **1.21.xからの変更点**
 >
 > | 旧 | 新 |
 > |---|---|
-> | `Data.SpawnX` / `SpawnY` / `SpawnZ` / `SpawnAngle` | `Data.spawn` の compound に統合 |
-> | `Data.Difficulty` / `DifficultyLocked` / `hardcore` | `Data.difficulty_settings` に統合 |
-> | `Data.GameRules` | `data/minecraft/game_rules.dat` へ分離 |
-> | `Data.WorldGenSettings` | `data/minecraft/world_gen_settings.dat` へ分離 |
-> | `Data.raining` / `thundering` / `rainTime` / `thunderTime` | `data/minecraft/weather.dat` へ分離 |
-> | `Data.DayTime` | `data/minecraft/world_clocks.dat` へ分離（次元ごとの `total_ticks`） |
-> | `Data.ScheduledEvents` | `data/minecraft/scheduled_events.dat` へ分離 |
-> | `Data.BorderCenterX` ほか | 次元ごとの `data/minecraft/world_border.dat` へ分離 |
-> | `Data.DragonFight` | `the_end` の `data/minecraft/ender_dragon_fight.dat` へ分離 |
+> | `Data.SpawnX` / `SpawnY` / `SpawnZ` / `SpawnAngle` | `Data.spawn`のcompoundに統合 |
+> | `Data.Difficulty` / `DifficultyLocked` / `hardcore` | `Data.difficulty_settings`に統合 |
+> | `Data.GameRules` | `data/minecraft/game_rules.dat`へ分離 |
+> | `Data.WorldGenSettings` | `data/minecraft/world_gen_settings.dat`へ分離 |
+> | `Data.raining` / `thundering` / `rainTime` / `thunderTime` | `data/minecraft/weather.dat`へ分離 |
+> | `Data.DayTime` | `data/minecraft/world_clocks.dat`へ分離（次元ごとの`total_ticks`） |
+> | `Data.ScheduledEvents` | `data/minecraft/scheduled_events.dat`へ分離 |
+> | `Data.BorderCenterX`ほか | 次元ごとの`data/minecraft/world_border.dat`へ分離 |
+> | `Data.DragonFight` | `the_end`の`data/minecraft/ender_dragon_fight.dat`へ分離 |
 
-`Chunk` と同様、**未知のキーもすべて保持する**。
+`Chunk`と同様、**未知のキーもすべて保持する**。
 
 ### 2.1 分離されたデータファイル
 
-`data/minecraft/*.dat` はどれも同じ形をしている。
+`data/minecraft/*.dat`はどれも同じ形をしている。
 
 ```
 { data: { …本体… }, DataVersion: 4903 }
 ```
 
-ルートは空名の `TAG_Compound`、その直下に `data` と `DataVersion` が並ぶ。
-`level.dat` だけが大文字の `Data` である点に注意。
+ルートは空名の`TAG_Compound`、その直下に`data`と`DataVersion`が並ぶ。
+`level.dat`だけが大文字の`Data`である点に注意。
 
-| ファイル | `data` の中身 |
+| ファイル | `data`の中身 |
 |---|---|
-| `game_rules.dat` | ゲームルール名（`minecraft:` 付きの名前空間つき）→ 値 |
+| `game_rules.dat` | ゲームルール名（名前空間`minecraft:`つき）→ 値 |
 | `weather.dat` | `raining` / `thundering` / `rain_time` / `thunder_time` / `clear_weather_time` |
 | `world_clocks.dat` | 次元ID → `{ total_ticks: Long }` |
 | `world_gen_settings.dat` | `seed`(Long) / `generate_structures` / `bonus_chest` / `dimensions` |
-| `random_sequences.dat` | `salt` と、シーケンス名 → `{ source: LongArray[2] }` |
+| `random_sequences.dat` | `salt`と、シーケンス名 → `{ source: LongArray[2] }` |
 | `scheduled_events.dat` | `events`(List) |
 | `stopwatches.dat` | `stopwatches`(Compound) |
 | `world_border.dat`（次元ごと） | `center_x` / `center_z` / `size` / `damage_per_block` / `safe_zone` / `warning_blocks` / `warning_time` / `lerp_target` / `lerp_time` |
 | `chunk_tickets.dat`（次元ごと） | 読み込み維持チケット。未使用なら空 |
 
-ゲームルール名が**名前空間つきになった**（旧 `doFireTick` → `minecraft:fire_spread_radius_around_player` のように、
-名前自体が変わっているものもある）ことに注意。
+ゲームルール名が名前空間つきになったことに注意。旧`doFireTick` → `minecraft:fire_spread_radius_around_player`のように、名前自体が変わっているものもある。
 
 ### 2.2 書き込み時の安全策
 
-`level.dat` が壊れるとワールド全体が開けなくなるため、書き込みは次の順で行う。
+`level.dat`の中身がおかしくなるとワールド全体が開けなくなるため、書き込みは次の順で行う。
 
-1. 一時ファイル `level.dat.tmp` へ書く
-2. `fsync` 相当でディスクへ確定させる
-3. 既存の `level.dat` を `level.dat_old` へ移す
-4. `level.dat.tmp` を `level.dat` へリネームする
+1. 一時ファイル`level.dat.tmp`へ書く
+2. 既存の`level.dat`を`level.dat_old`へコピーする
+3. `level.dat.tmp`を`level.dat`へリネームする
 
-`players/data/<uuid>.dat` も同じく `.dat_old` を持つので、同じ手順を使う。
+`players/data/<uuid>.dat`も`.dat_old`を持つ。プレイヤーデータを書き込むAPIを設ける場合は、同じ手順を使う。
 
 ---
 
 ## 3. session.lock
 
-Minecraft は起動中このファイルを排他ロックする（実データでは 3 バイトだった）。
-ロックされたワールドへ書き込むとデータが壊れるため、本ライブラリは
-**書き込みモードで開くときに確認する**。
+Minecraftは起動中、このファイルを排他ロックする（実データでは3バイトだった）。
+ロックされたワールドへ書き込むとデータがおかしくなるため、本ライブラリは**書き込みモードで開くときに確認する**。
 
-- ロックを取得できない → `IO`（メッセージで「Minecraft が起動中の可能性」を示す）
-- `WorldOpenOptions.ignore_session_lock = true` で明示的に無視できる（自己責任）
+- ロックを取得できない → `IO`（メッセージで「Minecraftが起動中の可能性」を示す）
+- `WorldOpenOptions.ignore_session_lock = true`で明示的に無視できる（自己責任）
 
-**ファイルの存在では判定できない。** `session.lock` は Minecraft を終了しても
-残り続けるため、「ロックを取れるか」を試すしかない。
+**ファイルの存在では判定できない。** `session.lock`はMinecraftを終了しても残り続けるため、「ロックを取れるか」を試すしかない。
 
 ### 3.1 言語による差異
 
-排他ロックを標準ライブラリで扱えるかは言語で分かれるため、
-**この確認だけは全言語で揃わない**（→ [adr/0008](../adr/0008-session-lock.md)）。
+排他ロックを標準ライブラリで扱えるかは言語で分かれるため、**この確認だけは全言語で揃わない**（→ [adr/0008](../adr/0008-session-lock.md)）。
 
 | 言語 | 確認する | 手段 |
 |---|:--:|---|
-| C# | ✅ | `FileStream` を `FileShare.None` で開く |
-| Java | ✅ | `FileChannel.tryLock()` |
-| Python | 🔶 | `fcntl.flock`。`fcntl` の無い環境（Windows）では確認しない |
-| TypeScript | ❌ | Node に移植性のあるファイルロック API が無い |
-| Rust | ❌ | `std` に無い。外部クレートが要る |
+| C# | ○ | `FileStream`を`FileShare.None`で開く |
+| Java | ○ | `FileChannel.tryLock()` |
+| Python | △ | `fcntl.flock`。`fcntl`の無い環境（Windows）では確認しない |
+| TypeScript | ✕ | Nodeに移植性のあるファイルロックAPIが無い |
+| Rust | ✕ | `std`に無い。外部クレートが要る |
 
-確認しない言語でも `ignore_session_lock` は受け取る（API の形を揃えるため。
-効果は無い）。**確認しない言語を使う場合、Minecraft が起動していないことは
-呼び出し側で担保すること。**
+確認しない言語でも`ignore_session_lock`は受け取る。APIの形を揃えるためで、効果は無い。**確認しない言語を使う場合、Minecraftが起動していないことは呼び出し側で保証すること。**
 
-読み取り専用で開く場合はロックを取得しないが、
-起動中のワールドは書き込み途中の状態を読む可能性があることを警告する。
+読み取り専用で開く場合はロックを取得しないが、起動中のワールドでは書き込み途中の状態を読む可能性があることを警告する。
 
 ---
 
 ## 4. 論理API
 
 ```
-World
-    open(dir, options) -> World
+MinecraftWorld
+    open(dir, options) -> MinecraftWorld
     level() -> LevelData                     -- level.dat の内容
     save_level()
     data_file(name) -> Option<NbtCompound>   -- data/minecraft/<name>.dat
-    dimension(dimension_id) -> Dimension
-    dimensions() -> Iterator<DimensionId>    -- 存在するものだけ
-    players() -> Iterator<Uuid>
+    dimension(dimension_id) -> Option<Dimension>
+    dimension_ids() -> Iterator<DimensionId> -- 存在するものだけ
+    player_ids() -> Iterator<Uuid>
     player(uuid) -> Option<NbtCompound>
     close()
 
@@ -219,9 +209,6 @@ Dimension
     set_biome(x, y, z, biome)
 ```
 
-`get_block` / `set_block` は**絶対ワールド座標**を取り、リージョン・チャンク・セクションを
-内部で解決する。存在しないチャンクに対する `get_block` は `None`、
-`set_block` は `INVALID_ARGUMENT`（チャンクを生成する機能は持たない）。
+`get_block` / `set_block`は**絶対ワールド座標**を取り、リージョン・チャンク・セクションを内部で解決する。存在しないチャンクに対する`get_block`は`None`、`set_block`は`INVALID_ARGUMENT`（チャンクを生成する機能は持たない）。
 
-`region_folder()` などが `Option` を返すのは、
-**生成されていない次元にはディレクトリ自体が無い**ため。
+`dimension()`や`region_folder()`などが`Option`を返すのは、生成されていない次元にはディレクトリ自体が無いため。

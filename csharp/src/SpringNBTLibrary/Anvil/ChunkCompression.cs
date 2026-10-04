@@ -6,10 +6,9 @@ namespace SpringNBTLibrary.Anvil;
 /// </summary>
 /// <remarks>
 /// <para>
-/// NBT 層の <see cref="Nbt.Compression"/> とは別物であることに注意
-/// あちらはファイル全体の圧縮を表し、こちらはリージョン内の 1 チャンクに付く 1 バイトのIDを表す
+/// NBT層の<see cref="Nbt.Compression"/>とは違うものであることに注意
+/// あちらはファイル全体の圧縮を表し、こちらはリージョン内の1チャンクに付く1バイトのIDを表す
 /// </para>
-/// <para>仕様: <c>docs/spec/20-anvil-region.md</c> 3.1章</para>
 /// </remarks>
 public enum ChunkCompression
 {
@@ -20,16 +19,17 @@ public enum ChunkCompression
 
     /// <summary>Zlib (RFC 1950)
     /// ID=2
-    /// Minecraft が実際に書き出す方式</summary>
+    /// Minecraftが実際に書き出す方式</summary>
     Zlib = 2,
 
     /// <summary>無圧縮
     /// ID=3</summary>
     None = 3,
 
-    /// <summary>LZ4（ブロック形式）
+    /// <summary>LZ4（独自ヘッダ付きのブロック連結）
     /// ID=4
-    /// 任意依存</summary>
+    /// 読み込みのみ対応
+    /// 展開は自前で行い、外部の依存は使わない</summary>
     Lz4 = 4,
 
     /// <summary>サードパーティ製サーバのカスタム方式
@@ -38,7 +38,7 @@ public enum ChunkCompression
     Custom = 127,
 }
 
-/// <summary><see cref="ChunkCompression"/> の拡張メソッド</summary>
+/// <summary><see cref="ChunkCompression"/>の拡張メソッド</summary>
 public static class ChunkCompressionExtensions
 {
     /// <summary>適合性テストで言語間比較に使う識別子を返す</summary>
@@ -63,12 +63,12 @@ public static class ChunkCompressionExtensions
     }
 
     /// <summary>
-    /// 圧縮方式IDから <see cref="ChunkCompression"/> を得る
+    /// 圧縮方式IDから<see cref="ChunkCompression"/>を得る
     /// </summary>
     /// <exception cref="SpringNbtException">未知のIDの場合（<see cref="ErrorCode.MalformedData"/>）</exception>
     public static ChunkCompression FromId(int id)
     {
-        // 仕様が定めるのは 1・2・3・4・127 の 5 種類だけ
+        // 仕様が定めるのは1・2・3・4・127の5種類だけ
         if (id == 1 || id == 2 || id == 3 || id == 4 || id == 127)
         {
             return (ChunkCompression)id;

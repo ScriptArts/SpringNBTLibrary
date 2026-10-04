@@ -1,11 +1,9 @@
 /**
- * チャンク 1 つ分
- * 地形の読み書きの入口
+ * チャンク1つ分
+ * 地形の読み書きはここから行う
  *
- * 読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
- * 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
- *
- * 仕様: `docs/spec/30-chunk-format.md`
+ * 読んだNBTをそのまま保持し、書き戻すときに作り直すのはセクションだけにする
+ * 未知のキーを落とさないので、将来の追加要素があってもデータをおかしくしない
  */
 
 import { MIN_SUPPORTED_DATA_VERSION } from "../index.js";
@@ -22,10 +20,10 @@ import {
 import { BlockState } from "./blockState.js";
 import { PalettedContainer } from "./palettedContainer.js";
 
-/** セクション 1 つに入るブロック数 */
+/** セクション1つに入るブロック数 */
 export const BLOCKS_PER_SECTION = 4096;
 
-/** セクション 1 つに入るバイオームのエントリ数（4×4×4 単位） */
+/** セクション1つに入るバイオームのエントリ数（4×4×4単位） */
 export const BIOMES_PER_SECTION = 64;
 
 /**
@@ -48,14 +46,14 @@ function matchesPosition(entry: NbtCompound, x: number, y: number, z: number): b
   return entryX === x && entryY === y && entryZ === z;
 }
 
-/** DataVersion が対象と違ったときの動作 */
+/** DataVersionが扱える形式より古いときの動作 */
 export enum VersionMismatchAction {
   /**
    * 警告コールバックを呼んで続行する
    * 既定
    */
   Warn = "warn",
-  /** `UNSUPPORTED_DATA_VERSION` の例外にする */
+  /** `UNSUPPORTED_DATA_VERSION`の例外にする */
   Error = "error",
   /** 何もしない */
   Ignore = "ignore",
@@ -64,32 +62,32 @@ export enum VersionMismatchAction {
 /** チャンク読み込みのオプション */
 export interface ChunkReadOptions {
   /**
-   * DataVersion が扱える形式より古いときの動作
-   * 既定は `Warn`
+   * DataVersionが扱える形式より古いときの動作
+   * 既定は`Warn`
    */
   onVersionMismatch?: VersionMismatchAction;
   /** 警告の通知先 */
   onWarning?: (message: string) => void;
-  /** data の長さが期待値と違うとき、長さからビット幅を逆算して読むか */
+  /** dataの長さが期待値と違うとき、長さからビット幅を逆算して読むか */
   lenientBitStorage?: boolean;
 }
 
 /** チャンク書き込みのオプション */
 export interface ChunkWriteOptions {
   /**
-   * 対象バージョン以外の DataVersion を持つチャンクの書き戻しを許すか
+   * 扱える形式より古いDataVersionを持つチャンクの書き戻しを許すか
    *
-   * 既定は false
-   * 古いワールドを黙って新形式で上書きし、
-   * 利用者が気づかないうちに壊すことを防ぐため（`docs/adr/0003-version-policy.md`）
+   * 既定はfalse
+   * エラーを出さずに古いワールドを新形式で上書きし、
+   * 利用者が気づかないうちに使えなくすることを防ぐため
    */
   allowForeignDataVersion?: boolean;
 }
 
 /**
- * チャンクを Y 方向に 16 ブロックずつ区切った 16×16×16 の立方体
+ * チャンクをY方向に16ブロックずつ区切った16×16×16の立方体
  *
- * `BlockLight` / `SkyLight` などの解釈していないキーは元の NBT に残り、
+ * `BlockLight` / `SkyLight`などの解釈していないキーは元のNBTに残り、
  * 書き戻しでそのまま出力される
  */
 export class ChunkSection {
@@ -103,7 +101,7 @@ export class ChunkSection {
 
   /**
    * ブロック状態
-   * 持たないセクション（光源専用）では undefined
+   * 持たないセクション（光源専用）ではundefined
    */
   get blockStates(): PalettedContainer | undefined {
     return this.#blockStates;
@@ -111,7 +109,7 @@ export class ChunkSection {
 
   /**
    * バイオーム
-   * 持たないセクションでは undefined
+   * 持たないセクションではundefined
    */
   get biomes(): PalettedContainer | undefined {
     return this.#biomes;
@@ -127,12 +125,12 @@ export class ChunkSection {
     return this.#biomes !== undefined;
   }
 
-  /** NBT からセクションを読む */
+  /** NBTからセクションを読む */
   static fromNbt(nbt: NbtCompound, lenientBitStorage: boolean): ChunkSection {
     const section = new ChunkSection(nbt, nbt.getByte("Y"));
     const blockStates = nbt.optCompound("block_states");
 
-    // 光源専用のセクションは block_states を持たない
+    // 光源専用のセクションはblock_statesを持たない
     if (blockStates !== undefined) {
       section.#blockStates = PalettedContainer.fromNbt(
         blockStates,
@@ -157,7 +155,7 @@ export class ChunkSection {
   }
 
   /**
-   * NBT へ書き戻す
+   * NBTへ書き戻す
    * 解釈していないキーはそのまま残る
    */
   toNbt(): NbtCompound {
@@ -185,11 +183,11 @@ export class ChunkSection {
 }
 
 /**
- * チャンク 1 つ分
- * 地形の読み書きの入口
+ * チャンク1つ分
+ * 地形の読み書きはここから行う
  *
- * 読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
- * 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
+ * 読んだNBTをそのまま保持し、書き戻すときに作り直すのはセクションだけにする
+ * 未知のキーを落とさないので、将来の追加要素があってもデータをおかしくしない
  */
 export class Chunk {
   readonly #sections = new Map<number, ChunkSection>();
@@ -214,13 +212,13 @@ export class Chunk {
 
   /**
    * 最下段セクションのY位置
-   * オーバーワールドは -4
+   * オーバーワールドは-4
    */
   get minSectionY(): number {
     return this.raw.getInt("yPos");
   }
 
-  /** 生成段階（`minecraft:full` など） */
+  /** 生成段階（`minecraft:full`など） */
   get status(): string {
     return this.raw.getString("Status");
   }
@@ -237,9 +235,9 @@ export class Chunk {
    * このチャンクに変更が加わったか
    *
    * ブロックやバイオームを書き換えると立つ
-   * `Dimension.flush()` はこれが立っているチャンクだけを書き戻す
+   * `Dimension.flush()`はこれが立っているチャンクだけを書き戻す
    *
-   * `raw` を直接いじった場合はここが立たないので、自分で true にすること
+   * `raw`を直接いじった場合は立たないので、自分でtrueにすること
    */
   get isModified(): boolean {
     return this.#modified;
@@ -258,7 +256,7 @@ export class Chunk {
     return [...this.#sections.keys()].sort((left, right) => left - right);
   }
 
-  /** NBT からチャンクを読む */
+  /** NBTからチャンクを読む */
   static fromNbt(nbt: NbtCompound, options?: ChunkReadOptions): Chunk {
     const chunk = new Chunk(nbt);
     chunk.#checkDataVersion(options);
@@ -275,7 +273,7 @@ export class Chunk {
       return chunk;
     }
 
-    // 並び順に依存しないよう、Y から索引を作る
+    // 並び順に依存しないよう、Yから索引を作る
     for (const entry of sectionList) {
       if (entry.type !== TagType.Compound) {
         throw SpringNbtError.unexpectedTagType("sections の要素が compound でない");
@@ -288,7 +286,7 @@ export class Chunk {
     return chunk;
   }
 
-  /** DataVersion を検査し、オプションに従って警告またはエラーにする */
+  /** DataVersionを検査し、オプションに従って警告またはエラーにする */
   #checkDataVersion(options?: ChunkReadOptions): void {
     const version = this.dataVersion;
 
@@ -319,8 +317,8 @@ export class Chunk {
   }
 
   /**
-   * NBT へ書き戻す
-   * 変更したセクションだけを反映し、他のキーはそのまま残す
+   * NBTへ書き戻す
+   * 全セクションを書き戻し、他のキーはそのまま残す
    */
   toNbt(options?: ChunkWriteOptions): NbtCompound {
     const version = this.dataVersion;
@@ -330,7 +328,7 @@ export class Chunk {
       allowForeign = true;
     }
 
-    // 形式の違う古いチャンクは、書き戻すと壊しかねない
+    // 形式の違う古いチャンクは、書き戻すと使えなくなりかねない
     if (version < MIN_SUPPORTED_DATA_VERSION && !allowForeign) {
       throw new SpringNbtError(
         ErrorCode.UnsupportedDataVersion,
@@ -340,7 +338,7 @@ export class Chunk {
       );
     }
 
-    // DataVersion は読んだ値のまま残す
+    // DataVersionは読んだ値のまま残す
     // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
     if (this.#sections.size === 0) {
@@ -349,7 +347,7 @@ export class Chunk {
 
     const sectionList = new NbtList(TagType.Compound);
 
-    // Y の昇順で書き出す
+    // Yの昇順で書き出す
     for (const sectionY of this.sectionYs) {
       sectionList.add(this.#sections.get(sectionY)!.toNbt());
     }
@@ -360,7 +358,7 @@ export class Chunk {
 
   /**
    * Y位置からセクションを得る
-   * 無ければ undefined
+   * 無ければundefined
    */
   section(sectionY: number): ChunkSection | undefined {
     return this.#sections.get(sectionY);
@@ -393,10 +391,10 @@ export class Chunk {
   /**
    * ブロックを設定する
    *
-   * `minecraft:oak_stairs[facing=north]` の形の文字列でも指定できる
+   * `minecraft:oak_stairs[facing=north]`の形の文字列でも指定できる
    */
   setBlock(x: number, y: number, z: number, state: BlockState | string): void {
-    // 文字列で渡されたら BlockState へ直してから進む
+    // 文字列で渡されたらBlockStateへ直してから進む
     if (typeof state === "string") {
       this.setBlock(x, y, z, BlockState.parse(state));
       return;
@@ -429,14 +427,14 @@ export class Chunk {
   /**
    * その座標を指す付随データを取り除く
    *
-   * `block_entities` / `block_ticks` / `fluid_ticks` の要素は
-   * いずれも `x` `y` `z` を**絶対座標**で持つ
+   * `block_entities` / `block_ticks` / `fluid_ticks`の要素は
+   * いずれも`x` `y` `z`を**絶対座標**で持つ
    */
   #removeBlockData(x: number, y: number, z: number): void {
     const absoluteX = this.x * 16 + x;
     const absoluteZ = this.z * 16 + z;
 
-    // 3 つのリストは形が同じなので、まとめて同じ処理をかける
+    // 3つのリストは形が同じなので、まとめて同じ処理をかける
     for (const key of BLOCK_DATA_KEYS) {
       const list = this.raw.optList(key);
 
@@ -458,7 +456,7 @@ export class Chunk {
 
   /**
    * バイオームを取得する
-   * 4×4×4 の単位なので、座標は自動的に丸められる
+   * 4×4×4の単位なので、座標は自動的に丸められる
    */
   getBiome(x: number, y: number, z: number): string | undefined {
     checkLocalCoordinates(x, z);
@@ -479,7 +477,7 @@ export class Chunk {
 
   /**
    * バイオームを設定する
-   * 4×4×4 の単位
+   * 4×4×4の単位
    */
   setBiome(x: number, y: number, z: number, biome: string): void {
     checkLocalCoordinates(x, z);
@@ -498,18 +496,17 @@ export class Chunk {
   }
 
   /**
-   * `Heightmaps` を削除し、Minecraft に再計算させる
+   * `Heightmaps`を削除し、Minecraftに再計算させる
    *
    * 本ライブラリは高さマップを再計算しない
    * ブロックを改変したら呼ぶこと
-   * （`docs/adr/0004-defer-heightmap-recalc.md`）
    */
   clearHeightmaps(): void {
     this.raw.remove("Heightmaps");
     this.#modified = true;
   }
 
-  /** `isLightOn` を 0 にし、光源の再計算を促す */
+  /** `isLightOn`を0にし、光源の再計算を促す */
   invalidateLighting(): void {
     this.raw.setByte("isLightOn", 0);
     this.#modified = true;
@@ -527,7 +524,7 @@ export class Chunk {
 /**
  * セクション内のブロック添字
  *
- * `& 15` により負のY座標でも正しく求まる
+ * `& 15`により負のY座標でも正しく求まる
  */
 export function blockIndex(x: number, y: number, z: number): number {
   return (y & 15) * 256 + (z & 15) * 16 + (x & 15);
@@ -535,14 +532,14 @@ export function blockIndex(x: number, y: number, z: number): number {
 
 /**
  * セクション内のバイオーム添字
- * 1 エントリが 4×4×4 ブロック
+ * 1エントリが4×4×4ブロック
  */
 export function biomeIndex(x: number, y: number, z: number): number {
   return Math.floor((y & 15) / 4) * 16 + Math.floor((z & 15) / 4) * 4 + Math.floor((x & 15) / 4);
 }
 
 function checkLocalCoordinates(x: number, z: number): void {
-  // チャンク内相対座標は 0..15 でなければならない
+  // チャンク内相対座標は0..15でなければならない
   if (x < 0 || x > 15 || z < 0 || z > 15) {
     throw SpringNbtError.invalidArgument(
       `チャンク内相対座標が範囲外: (${x}, ${z})。X も Z も 0..15 であること`,

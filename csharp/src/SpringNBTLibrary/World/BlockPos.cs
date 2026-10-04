@@ -6,7 +6,6 @@ namespace SpringNBTLibrary.World;
 /// <summary>
 /// ブロックの絶対座標
 /// </summary>
-/// <remarks>仕様: <c>docs/spec/30-chunk-format.md</c> 5章</remarks>
 public sealed class BlockPos : IEquatable<BlockPos>
 {
     /// <summary>座標を指定して作る</summary>

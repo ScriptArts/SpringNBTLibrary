@@ -2,9 +2,8 @@ namespace SpringNBTLibrary;
 
 /// <summary>
 /// エラーの分類
-/// 4言語すべてで同一の集合を持つ
+/// 全言語で同一の集合を持つ
 /// </summary>
-/// <remarks>仕様: <c>docs/spec/00-conventions.md</c> 4章</remarks>
 public enum ErrorCode
 {
     /// <summary>下位の入出力失敗</summary>
@@ -16,7 +15,7 @@ public enum ErrorCode
     /// <summary>期待した型と違うタグを取り出した</summary>
     UnexpectedTagType,
 
-    /// <summary>仕様上は妥当だが、このビルドでは扱えない</summary>
+    /// <summary>仕様上は妥当だが、このライブラリでは扱えない</summary>
     UnsupportedFeature,
 
     /// <summary>安全上限を超えた</summary>
@@ -25,11 +24,11 @@ public enum ErrorCode
     /// <summary>呼び出し側の引数が不正</summary>
     InvalidArgument,
 
-    /// <summary>対象バージョン外のデータ</summary>
+    /// <summary>扱える形式より古いデータ</summary>
     UnsupportedDataVersion,
 }
 
-/// <summary><see cref="ErrorCode"/> の拡張メソッド</summary>
+/// <summary><see cref="ErrorCode"/>の拡張メソッド</summary>
 public static class ErrorCodeExtensions
 {
     /// <summary>

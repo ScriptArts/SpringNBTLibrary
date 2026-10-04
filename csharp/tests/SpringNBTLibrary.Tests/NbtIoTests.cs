@@ -3,11 +3,11 @@ using SpringNBTLibrary.Nbt;
 namespace SpringNBTLibrary.Tests;
 
 /// <summary>
-/// NBT のバイナリ読み書き。仕様: docs/spec/10-nbt-binary.md
+/// NBTのバイナリ読み書き
 /// </summary>
 /// <remarks>
-/// ここで使うバイト列は仕様書の記述だけを根拠に手で組み立てている。
-/// 実装が生成した値を期待値にすると、実装のバグをそのまま正としてしまうため。
+/// ここで使うバイト列は仕様書の記述だけを根拠に手で組み立てている
+/// 実装が生成した値を期待値にすると、実装のバグをそのまま正としてしまうため
 /// </remarks>
 public class NbtIoTests
 {
@@ -101,7 +101,7 @@ public class NbtIoTests
         Assert.Equal(new int[] { 1, -1 }, root.GetIntArray("ia"));
         Assert.Equal(new long[] { 1L, -1L }, root.GetLongArray("la"));
 
-        // 真偽値は TAG_Byte の 0 / 1 として入る
+        // 真偽値はTAG_Byteの0 / 1として入る
         Assert.Equal(TagType.Byte, root.Get("t").Type);
     }
 
@@ -119,7 +119,7 @@ public class NbtIoTests
         Assert.Equal(3, root.GetInt("a"));
     }
 
-    /// <summary>複数のバイト列をつなぐ。</summary>
+    /// <summary>複数のバイト列をつなぐ</summary>
     private static byte[] Concat(params byte[][] parts)
     {
         List<byte> joined = new List<byte>();
@@ -134,8 +134,8 @@ public class NbtIoTests
     }
 
     /// <summary>
-    /// 仕様書どおりに組んだ最小の NBT。
-    /// ルート名 "hello world" の Compound に、文字列 "Bananrama" が入っている。
+    /// 仕様書どおりに組んだ最小のNBT
+    /// ルート名 "hello world" のCompoundに、文字列 "Bananrama" が入っている
     /// </summary>
     private static byte[] HelloWorldBytes()
     {
@@ -207,7 +207,7 @@ public class NbtIoTests
         byte[] encoded = NbtIo.WriteBytes(new NamedTag(string.Empty, root), NbtWriteOptions.Uncompressed);
         NbtCompound decoded = NbtIo.ReadBytes(encoded, UncompressedRead()).Tag;
 
-        // -0.0 と +0.0 は == では区別できないので、ビットパターンで比較する
+        // -0.0と+0.0は == では区別できないので、ビットパターンで比較する
         Assert.Equal(
             BitConverter.DoubleToInt64Bits(-0.0),
             BitConverter.DoubleToInt64Bits(decoded.GetDouble("negative_zero")));
@@ -263,7 +263,7 @@ public class NbtIoTests
         NbtCompound root = new NbtCompound();
         root.Set("value", new NbtString("text"));
 
-        // キーが無い場合は null
+        // キーが無い場合はnull
         Assert.Null(root.OptInt("missing"));
 
         // 型が違う場合はキーの有無に関わらず例外
@@ -285,7 +285,7 @@ public class NbtIoTests
 
         Assert.Equal(method, NbtIo.DetectCompression(encoded));
 
-        // 既定の ReadOptions は Auto なので、方式を指定しなくても読める
+        // 既定のReadOptionsはAutoなので、方式を指定しなくても読める
         NamedTag decoded = NbtIo.ReadBytes(encoded);
         Assert.Equal("Bananrama", decoded.Tag.GetString("name"));
     }
@@ -303,7 +303,7 @@ public class NbtIoTests
         };
         byte[] encoded = NbtIo.WriteBytes(new NamedTag("ignored", root), write);
 
-        // タグID + ペイロード のみで、名前長の 2 バイトが無い
+        // タグID + ペイロードのみで、名前長の2バイトが無い
         Assert.Equal(0x0A, encoded[0]);
         Assert.Equal(0x03, encoded[1]);
 
@@ -332,7 +332,7 @@ public class NbtIoTests
     [Fact]
     public void HugeDeclaredLengthIsRejectedBeforeAllocating()
     {
-        // ルート直下に「長さ 0x7FFFFFFF の ByteArray」を宣言するだけの入力
+        // ルート直下に「長さ0x7FFFFFFFのByteArray」を宣言するだけの入力
         List<byte> bytes = new List<byte>();
         bytes.Add(0x0A);
         bytes.AddRange(new byte[] { 0x00, 0x00 });
@@ -362,7 +362,7 @@ public class NbtIoTests
     [Fact]
     public void ExcessiveNestingIsRejected()
     {
-        // 上限を超える深さの Compound を組み立てる
+        // 上限を超える深さのCompoundを組み立てる
         byte[] encoded = BuildNestedCompound(600);
 
         NbtReadOptions options = UncompressedRead();
@@ -398,13 +398,16 @@ public class NbtIoTests
         Assert.Equal(ErrorCode.InvalidArgument, error.Code);
     }
 
-    /// <summary>圧縮なしで読むための ReadOptions を作る。</summary>
+    /// <summary>圧縮なしで読むためのReadOptionsを作る</summary>
     private static NbtReadOptions UncompressedRead()
     {
         return new NbtReadOptions { Compression = Compression.None };
     }
 
-    /// <summary>全13タグ型（TAG_End を除く12種 + 入れ子の Compound）を含む Compound を作る。</summary>
+    /// <summary>
+    /// TAG_Endを除く12種のタグ型をすべて含むCompoundを作る
+    /// TAG_EndはCompoundの終端として書き出されるので、往復させれば13種すべてを読み書きする
+    /// </summary>
     private static NbtCompound BuildAllTagsCompound()
     {
         NbtCompound root = new NbtCompound();
@@ -432,12 +435,12 @@ public class NbtIoTests
         return root;
     }
 
-    /// <summary>指定した深さまで Compound を入れ子にしたバイト列を作る。</summary>
+    /// <summary>指定した深さまでCompoundを入れ子にしたバイト列を作る</summary>
     private static byte[] BuildNestedCompound(int depth)
     {
         List<byte> bytes = new List<byte>();
 
-        // ルート + (depth - 1) 段の入れ子
+        // ルート + (depth - 1)段の入れ子
         bytes.Add(0x0A);
         bytes.AddRange(new byte[] { 0x00, 0x00 });
 

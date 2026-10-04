@@ -1,11 +1,9 @@
 /**
- * Anvil リージョンファイルの読み書き。
+ * Anvilリージョンファイルの読み書き
  *
- * 仕様: docs/spec/20-anvil-region.md
- *
- * 他言語版と同じ検証項目を持つ。
- * 共通テストベクタによる言語間比較は spec/run-conformance.sh が担当し、
- * ここでは API の振る舞いを直接確かめる。
+ * 他言語版と同じ検証項目を持つ
+ * 共通テストベクタによる言語間比較はspec/run-conformance.shが担当し、
+ * ここではAPIの振る舞いを直接確かめる
  */
 
 import assert from "node:assert/strict";
@@ -32,7 +30,7 @@ const HERE = fileURLToPath(new URL(".", import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
 const VECTORS = join(REPO_ROOT, "spec", "testdata", "anvil");
 
-/** 共通テストベクタのディレクトリ。 */
+/** 共通テストベクタのディレクトリ */
 function vectorDir(name: string): string {
   const path = join(VECTORS, name);
 
@@ -43,12 +41,12 @@ function vectorDir(name: string): string {
   return path;
 }
 
-/** テストごとの一時ディレクトリを作る。 */
+/** テストごとの一時ディレクトリを作る */
 function makeWorkDir(): string {
   return mkdtempSync(join(tmpdir(), "springnbt-test-"));
 }
 
-/** ベクタを一時ディレクトリへ複製し、書き込みテストで原本を汚さないようにする。 */
+/** ベクタを一時ディレクトリへ複製し、書き込みテストで原本を汚さないようにする */
 function copyVector(name: string, work: string): string {
   const destination = join(work, name);
   cpSync(vectorDir(name), destination, { recursive: true });
@@ -65,12 +63,16 @@ function sampleChunk(x: number, z: number): NbtCompound {
   return chunk;
 }
 
-/** 圧縮しても縮まないバイト列を作る。サイズの制御が効くようにするため。 */
+/**
+ * 圧縮しても縮まないバイト列を作る
+ * サイズを狙いどおりに制御できるようにするため
+ */
 function incompressible(length: number): Int8Array {
   const result = new Int8Array(length);
   let state = 0x12345678;
 
-  // 線形合同法で疑似乱数を作る。テストの再現性を保つため固定の種を使う
+  // 線形合同法で疑似乱数を作る
+  // テストの再現性を保つため、固定の種を使う
   for (let index = 0; index < length; index++) {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
     result[index] = (state >>> 24) << 24 >> 24;
@@ -168,7 +170,7 @@ test("圧縮方式が混在していても読める", () => {
 test("LZ4 圧縮のチャンクを読める", () => {
   const region = RegionFile.open(join(vectorDir("lz4"), "r.0.0.mca"));
 
-  // 1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
+  // 1ブロック / 2ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
   for (let x = 0; x < 4; x++) {
     assert.equal(region.readChunkRaw(x, 0)?.compression, ChunkCompression.Lz4);
     assert.equal(region.readChunk(x, 0)?.getInt("xPos"), x);
@@ -197,7 +199,7 @@ test("LZ4 では書き出せない", () => {
     const directory = copyVector("lz4", work);
     const region = RegionFile.open(join(directory, "r.0.0.mca"), RegionFileMode.ReadWrite);
 
-    // LZ4 は読み込みのみ対応なので、圧縮して書き出すことはできない
+    // LZ4は読み込みのみ対応なので、圧縮して書き出すことはできない
     const chunk = region.readChunk(0, 0)!;
     assert.throws(
       () => region.writeChunk(0, 0, chunk, ChunkCompression.Lz4),
@@ -218,7 +220,8 @@ test("触っていない LZ4 チャンクは圧縮方式が保たれる", () => 
     const path = join(directory, "r.0.0.mca");
     const before = readFileSync(path);
 
-    // 触らずに閉じるだけ。生バイトを素通しするので LZ4 のまま残る
+    // 触らずに閉じるだけ
+    // 生バイトに手を加えないので、LZ4のまま残る
     const region = RegionFile.open(path, RegionFileMode.ReadWrite);
     region.close();
 
@@ -250,7 +253,7 @@ test("壊れたヘッダを弾く", () => {
 test("担当外のチャンク座標を弾く", () => {
   const region = RegionFile.open(join(vectorDir("empty"), "r.0.0.mca"));
 
-  // r.0.0 が担当するのは 0..31 の範囲だけ
+  // r.0.0が担当するのは0..31の範囲だけ
   assertErrorCode(() => region.hasChunk(32, 0), ErrorCode.InvalidArgument);
   region.close();
 });
@@ -266,7 +269,7 @@ test("読み取り専用では書き込めない", () => {
 // ---------------------------------------------------------------------------
 
 test("開いて何も変えずに書き戻すとバイトが変わらない", () => {
-  // 触っていないチャンクの配置を保つことが、既存ワールドを壊さない前提になる
+  // 触っていないチャンクの配置を保つことが、既存ワールドをおかしくしないための前提になる
   const work = makeWorkDir();
 
   try {
@@ -338,7 +341,7 @@ test("大きくなったチャンクは移動し、他を壊さない", () => {
     const directory = copyVector("fragmented", work);
     const path = join(directory, "r.0.0.mca");
 
-    // 5 セクタぶんになる大きなチャンクを作る
+    // 5セクタぶんになる大きなチャンクを作る
     const big = sampleChunk(0, 0);
     big.set("filler", new NbtByteArray(incompressible(5 * SECTOR_SIZE)));
 
@@ -348,7 +351,7 @@ test("大きくなったチャンクは移動し、他を壊さない", () => {
     region.close();
 
     const reopened = RegionFile.open(path);
-    // 動かした結果、他の 2 チャンクが壊れていないこと
+    // 動かした結果、他の2チャンクがおかしくなっていないこと
     assert.equal(reopened.chunkPositions().length, 3);
     assert.equal(reopened.readChunk(5, 3)?.getInt("xPos"), 5);
     assert.equal(reopened.readChunk(31, 31)?.getInt("xPos"), 31);
@@ -442,7 +445,7 @@ test("巨大なチャンクは外部ファイルへ退避され、縮めば戻�
   try {
     const path = join(work, "r.0.0.mca");
 
-    // 1MiB を超えるよう、圧縮の効かないデータを詰める
+    // 1MiBを超えるよう、圧縮しても縮まないデータを詰める
     const huge = sampleChunk(1, 2);
     huge.set("filler", new NbtByteArray(incompressible(1200 * 1024)));
 
@@ -509,7 +512,7 @@ test("フォルダは複数リージョンへチャンクを振り分ける", ()
     folder.flush();
     folder.close();
 
-    // 3 つの異なるリージョンへ振り分けられる
+    // 3つの異なるリージョンへ振り分けられる
     for (const name of ["r.0.0.mca", "r.-1.-1.mca", "r.1.1.mca"]) {
       assert.ok(existsSync(join(work, name)), `${name} が作られていない`);
     }
@@ -530,7 +533,8 @@ test("RegionFolder: キャッシュ上限を超えると古いリージョンか
   const work = mkdtempSync(join(tmpdir(), "springnbt-lru-"));
 
   try {
-    // 上限 2 で 4 リージョンへ書く。古いものは閉じられるが内容は失われない
+    // 上限2で4リージョンへ書く
+    // 古いものは閉じられるが、内容は失われない
     const folder = RegionFolder.open(work, RegionFileMode.ReadWrite, 2);
 
     for (let region = 0; region < 4; region++) {

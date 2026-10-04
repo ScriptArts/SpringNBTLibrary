@@ -1,9 +1,6 @@
-"""Minecraft Java版のセーブデータ 1 つ分と、その中の次元
+"""Minecraft Java版のセーブデータ1つ分と、その中の次元
 
-26.x では構成が大きく変わっており、標準の3次元も
-``dimensions/<名前空間>/<パス>/`` の下に並ぶ
-
-仕様: ``docs/spec/40-world-layout.md``
+26.xでは構成が大きく変わっており、標準の3次元も``dimensions/<名前空間>/<パス>/``の下に並ぶ
 """
 
 from __future__ import annotations
@@ -15,8 +12,8 @@ from typing import Dict, List, Optional, Union
 try:
     import fcntl
 except ImportError:
-    # Windows には fcntl が無い
-    # その場合 session.lock の確認は行わない
+    # Windowsにはfcntlが無い
+    # その場合session.lockの確認は行わない
     fcntl = None
 
 from ..anvil import ChunkPos, RegionFileMode, RegionFolder
@@ -35,14 +32,14 @@ class WorldOpenOptions:
                  chunk_read: Optional[ChunkReadOptions] = None,
                  chunk_write: Optional[ChunkWriteOptions] = None) -> None:
         #: 読み書きで開くか
-        # 既定は読み取り専用
+        #: 既定は読み取り専用
         self.writable = writable
 
-        #: ``session.lock`` の確認を飛ばすか
+        #: ``session.lock``の確認を飛ばすか
         #:
-        #: Minecraft が起動中のワールドへ書き込むとデータが壊れる
+        #: Minecraftが起動中のワールドへ書き込むとデータがおかしくなる
         #: 既定では書き込みモードで開くときに必ず確認する
-        # これを立てるのは自己責任
+        #: これを立てるのは自己責任
         self.ignore_session_lock = ignore_session_lock
 
         #: チャンク読み込みのオプション
@@ -59,12 +56,9 @@ class WorldOpenOptions:
 
 
 class LevelData:
-    """``level.dat`` の内容
+    """``level.dat``の内容
 
-    26.x では大幅に軽量化されており、ゲームルールやワールド生成設定は
-    ``data/minecraft/`` 配下の個別ファイルへ分離されている
-
-    仕様: ``docs/spec/40-world-layout.md`` 2章
+    26.xでは大幅に軽量化されており、ゲームルールやワールド生成設定は``data/minecraft/``配下の個別ファイルへ分離されている
     """
 
     __slots__ = ("_root_name", "raw", "data")
@@ -98,7 +92,7 @@ class LevelData:
 
     @property
     def spawn_pos(self) -> List[int]:
-        """スポーン地点の ``[x, y, z]``"""
+        """スポーン地点の``[x, y, z]``"""
         return self.data.get_compound("spawn").get_int_array("pos")
 
     @property
@@ -108,7 +102,7 @@ class LevelData:
 
     @property
     def difficulty(self) -> str:
-        """難易度（``normal`` など）"""
+        """難易度（``normal``など）"""
         return self.data.get_compound("difficulty_settings").get_string("difficulty")
 
     @property
@@ -118,22 +112,19 @@ class LevelData:
 
     @property
     def version_name(self) -> str:
-        """バージョン名（``26.2`` など）"""
+        """バージョン名（``26.2``など）"""
         return self.data.get_compound("Version").get_string("Name")
 
     def to_named_tag(self) -> NamedTag:
-        """書き出し用の :class:`NamedTag` を作る"""
+        """書き出し用の:class:`NamedTag`を作る"""
         return NamedTag(self._root_name, self.raw)
 
 
 class Dimension:
-    """ワールド内の次元 1 つ分
-    ``region/`` ``entities/`` ``poi/`` をまとめて扱う
+    """ワールド内の次元1つ分
+    ``region/`` ``entities/`` ``poi/``をまとめて扱う
 
-    ブロックの取得・設定は**絶対ワールド座標**で行い、
-    リージョン・チャンク・セクションの解決は内部で済ませる
-
-    仕様: ``docs/spec/40-world-layout.md`` 4章
+    ブロックの取得・設定は**絶対ワールド座標**で行い、リージョン・チャンク・セクションの解決は内部で済ませる
     """
 
     #: オーバーワールドの次元ID
@@ -163,28 +154,30 @@ class Dimension:
 
     def region_folder(self) -> Optional[RegionFolder]:
         """地形のリージョンフォルダ
-        無ければ None
+        無ければNone
         """
         self._regions = self._folder(self._regions, "region")
         return self._regions
 
     def entity_folder(self) -> Optional[RegionFolder]:
         """エンティティのリージョンフォルダ
-        無ければ None
+        無ければNone
         """
         self._entities = self._folder(self._entities, "entities")
         return self._entities
 
     def poi_folder(self) -> Optional[RegionFolder]:
-        """POI のリージョンフォルダ
-        無ければ None
+        """POIのリージョンフォルダ
+        無ければNone
         """
         self._poi = self._folder(self._poi, "poi")
         return self._poi
 
     def data_file(self, name: str) -> Optional[NbtCompound]:
-        """``data/minecraft/<name>.dat`` を読む
-        存在しなければ None
+        """``data/minecraft/<name>.dat``を読む
+        存在しなければNone
+
+        次元ごとの``world_border`` / ``raids`` / ``chunk_tickets``などが入る
         """
         self._ensure_open()
         path = os.path.join(self.directory, "data", "minecraft", name + ".dat")
@@ -206,7 +199,7 @@ class Dimension:
 
     def chunk(self, chunk_x: int, chunk_z: int) -> Optional[Chunk]:
         """チャンクを読む
-        読み込んだチャンクはキャッシュされる
+        読み込んだチャンクはキャッシュされ、次回は同じインスタンスが返る
         """
         self._ensure_open()
         key = "%d,%d" % (chunk_x, chunk_z)
@@ -244,7 +237,7 @@ class Dimension:
 
     def get_block(self, x: int, y: int, z: int) -> Optional[BlockState]:
         """絶対座標でブロックを取得する
-        チャンクが無ければ None
+        チャンクが無ければNone
         """
         chunk = self.chunk(x >> 4, z >> 4)
 
@@ -256,10 +249,10 @@ class Dimension:
     def set_block(self, x: int, y: int, z: int, state: Union[BlockState, str]) -> None:
         """絶対座標でブロックを設定する
 
-        ``minecraft:oak_stairs[facing=north]`` の形の文字列でも指定できる
+        ``minecraft:oak_stairs[facing=north]``の形の文字列でも指定できる
 
-        変更したチャンクには印が付き、:meth:`flush` でまとめて書き戻される
-        本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
+        変更したチャンクには印が付き、:meth:`flush`でまとめて書き戻される
+        本ライブラリはチャンクを新規生成しないので、チャンクが存在しない座標はエラーになる
         """
         self._ensure_writable()
         chunk_x = x >> 4
@@ -275,7 +268,7 @@ class Dimension:
 
     def get_biome(self, x: int, y: int, z: int) -> Optional[str]:
         """絶対座標でバイオームを取得する
-        4×4×4 の単位
+        4×4×4の単位
         """
         chunk = self.chunk(x >> 4, z >> 4)
 
@@ -286,7 +279,7 @@ class Dimension:
 
     def set_biome(self, x: int, y: int, z: int, biome: str) -> None:
         """絶対座標でバイオームを設定する
-        4×4×4 の単位
+        4×4×4の単位
         """
         self._ensure_writable()
         chunk_x = x >> 4
@@ -341,7 +334,7 @@ class Dimension:
 
     def _folder(self, slot: Optional[RegionFolder], name: str) -> Optional[RegionFolder]:
         """フォルダを遅延して開く
-        存在しなければ None のまま
+        存在しなければNoneのまま
         """
         self._ensure_open()
 
@@ -372,7 +365,7 @@ class Dimension:
 
 
 class MinecraftWorld:
-    """Minecraft Java版のセーブデータ 1 つ分"""
+    """Minecraft Java版のセーブデータ1つ分"""
 
     def __init__(self, directory: str, options: WorldOpenOptions, level: NamedTag) -> None:
         self.directory = directory
@@ -386,7 +379,8 @@ class MinecraftWorld:
              options: Optional[WorldOpenOptions] = None) -> "MinecraftWorld":
         """ワールドを開く
 
-        :raises SpringNbtError: ディレクトリや ``level.dat`` が無い場合
+        :raises SpringNbtError: ディレクトリや``level.dat``が無い場合、
+            または書き込みモードで``session.lock``を取得できない場合（``fcntl``が使える環境のみ確かめる）
         """
         if options is None:
             effective = WorldOpenOptions()
@@ -401,7 +395,7 @@ class MinecraftWorld:
         if not os.path.exists(level_path):
             raise SpringNbtError(ErrorCode.IO, "level.dat が無い: %s" % level_path)
 
-        # 書き込みで開くときだけ、Minecraft が起動中でないかを確かめる
+        # 書き込むなら、Minecraftが起動中でないことを先に確かめる
         if effective.writable and not effective.ignore_session_lock:
             _check_session_lock(directory)
 
@@ -414,11 +408,10 @@ class MinecraftWorld:
         self.close()
 
     def data_file(self, name: str) -> Optional[NbtCompound]:
-        """``data/minecraft/<name>.dat`` を読む
-        存在しなければ None
+        """``data/minecraft/<name>.dat``を読む
+        存在しなければNone
 
-        26.x では ``game_rules`` / ``weather`` / ``world_gen_settings`` などが
-        この形で ``level.dat`` から分離されている
+        26.xでは``game_rules`` / ``weather`` / ``world_gen_settings``などがこの形で``level.dat``から分離されている
         """
         self._ensure_open()
         path = os.path.join(self.directory, "data", "minecraft", name + ".dat")
@@ -438,14 +431,14 @@ class MinecraftWorld:
 
         found = []
 
-        # dimensions/<名前空間>/<パス>/ の 2 段を辿る
+        # dimensions/<名前空間>/<パス>/の2段を辿る
         for namespace_name in os.listdir(root):
             namespace_dir = os.path.join(root, namespace_name)
 
             if not os.path.isdir(namespace_dir):
                 continue
 
-            # 2 段目が次元のパス
+            # 2段目が次元のパス
             for path_name in os.listdir(namespace_dir):
                 # ディレクトリだけを次元として数える
                 if os.path.isdir(os.path.join(namespace_dir, path_name)):
@@ -457,7 +450,7 @@ class MinecraftWorld:
 
     def dimension(self, dimension_id: str) -> Optional[Dimension]:
         """次元を得る
-        ディレクトリが無ければ None
+        ディレクトリが無ければNone
         """
         self._ensure_open()
         normalized = _normalize_dimension_id(dimension_id)
@@ -491,7 +484,7 @@ class MinecraftWorld:
 
     def player(self, uuid: str) -> Optional[NbtCompound]:
         """プレイヤーデータを読む
-        存在しなければ None
+        存在しなければNone
         """
         self._ensure_open()
         path = os.path.join(self.directory, "players", "data", uuid + ".dat")
@@ -502,10 +495,10 @@ class MinecraftWorld:
         return read_file(path).tag
 
     def save_level(self) -> None:
-        """``level.dat`` を書き戻す
+        """``level.dat``を書き戻す
 
-        壊れるとワールド全体が開けなくなるため、
-        一時ファイルへ書いてから ``level.dat_old`` へ退避し、最後に置き換える
+        ``level.dat``がおかしくなるとワールド全体が開けなくなるため、
+        一時ファイルへ書いてから既存の``level.dat``を``level.dat_old``へ退避し、最後に置き換える
         """
         self._ensure_open()
 
@@ -518,7 +511,7 @@ class MinecraftWorld:
 
         write_file(temporary, self.level.to_named_tag())
 
-        # 既存の level.dat は、置き換える前に level.dat_old へ退避する
+        # 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
         if os.path.exists(path):
             shutil.copyfile(path, backup)
 
@@ -542,20 +535,18 @@ class MinecraftWorld:
 
 
 def _check_session_lock(directory: str) -> None:
-    """``session.lock`` を排他で開けるか確かめる
+    """``session.lock``を排他で開けるか確かめる
 
-    Minecraft は起動中このファイルのロックを保持し続ける
+    Minecraftは起動中このファイルのロックを保持し続ける
     ファイルの存在自体は起動していなくても残るので、
     ロックが取れるかどうかで判定する
-
-    仕様: ``docs/spec/40-world-layout.md`` 3章
     """
     lock_path = os.path.join(directory, "session.lock")
 
     if not os.path.exists(lock_path):
         return
 
-    # ロックの手段が無い環境では確認できないので素通しする
+    # ロックの手段が無い環境では確認できないので、確認せずに進める
     if fcntl is None:
         return
 
@@ -576,7 +567,7 @@ def _check_session_lock(directory: str) -> None:
 
 
 def _normalize_dimension_id(dimension_id: str) -> str:
-    """名前空間が省略されていたら ``minecraft:`` を補う"""
+    """名前空間が省略されていたら``minecraft:``を補う"""
     if ":" in dimension_id:
         return dimension_id
 

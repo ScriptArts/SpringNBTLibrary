@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 """全言語の適合性検証を走らせる。
 
-仕様: docs/spec/90-conformance.md
-
-やること:
+次のことを行う。
     1. 各言語の検証ツールを起動できるようにビルドする
-    2. 全テストベクタについて、各言語で decode / encode / snbt を実行する
-    3. decode の結果を expect/ の正規化JSON と突き合わせる
-    4. encode の結果を展開後の入力バイト列と突き合わせる（ラウンドトリップ）
-    5. 言語どうしの出力を相互に diff する
+    2. NBTのテストベクタについて、各言語でdecode / encode / snbtを実行する
+    3. decodeの結果をexpect/の正規化JSONと比べる
+    4. encodeの結果を展開後の入力バイト列と比べる（ラウンドトリップ）
+    5. 連なったNBTのテストベクタについて、各言語でnbt-listを実行する
+    6. リージョンのテストベクタについて、各言語でregion-list / region-rewriteを実行し、
+       詰め直した結果がセクタ境界に揃っていることと、読み直しても中身が変わらないことを確かめる
+    7. チャンクのテストベクタについて、各言語でchunk-report / chunk-editを実行し、
+       編集した結果を読み直せることを確かめる
+    8. エラーになるはずのテストベクタでは、出力されたエラーコードを確かめる
+    9. 言語どうしの出力を相互にdiffする
 
 使い方:
     python3 spec/tools/run_conformance.py                # 全言語を検証
     python3 spec/tools/run_conformance.py --only csharp  # 言語を絞る
     python3 spec/tools/run_conformance.py --generate-expect
-        基準実装 (C#) の出力から expect/ を作り直す
+        基準実装（C#）の出力からexpect/を作り直す
 """
 
 from __future__ import annotations
@@ -33,14 +37,14 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 TESTDATA = os.path.join(REPO_ROOT, "spec", "testdata")
 MANIFEST = os.path.join(TESTDATA, "manifest.json")
 
-# 基準実装。expect/ の生成元になる（docs/adr/0002-idiomatic-naming.md）
+# 基準実装。expect/の生成元になる
 REFERENCE_LANGUAGE = "csharp"
 
 LANGUAGE_ORDER = ["csharp", "java", "typescript", "python", "rust"]
 
 
 class Runner:
-    """1 言語ぶんの検証ツールを起動する。"""
+    """1言語ぶんの検証ツールを起動する。"""
 
     def __init__(self, name, build_command, invoke_command):
         self.name = name
@@ -64,10 +68,10 @@ class Runner:
         return True
 
     def run(self, args):
-        """検証ツールを起動し、(終了コード, 標準エラー) を返す。"""
+        """検証ツールを起動し、(終了コード, 標準エラー)を返す。"""
         environment = dict(os.environ)
 
-        # Python 版はインストールせずソースツリーから直接動かせるようにする
+        # Python版はインストールせずソースツリーから直接動かせるようにする
         if self.name == "python":
             environment["PYTHONPATH"] = os.path.join(REPO_ROOT, "python", "src")
 
@@ -131,7 +135,7 @@ def build_runners():
 
 
 def decompress(data, method):
-    """マニフェストの compression に従って展開する。"""
+    """マニフェストのcompressionに従って展開する。"""
     if method == "gzip":
         return gzip.decompress(data)
 
@@ -175,7 +179,7 @@ class Report:
 
 
 def run_vector(runner, vector, workdir, report, outputs):
-    """1 言語 × 1 ベクタを検証する。ベクタの種別で扱いを分ける。"""
+    """1言語 × 1ベクタを検証する。ベクタの種別で扱いを分ける。"""
     if vector.get("kind") == "anvil":
         run_anvil_vector(runner, vector, workdir, report, outputs)
         return
@@ -271,7 +275,7 @@ def run_vector(runner, vector, workdir, report, outputs):
 
 
 def run_concat_vector(runner, vector, workdir, report, outputs):
-    """連なった NBT のベクタを検証する。
+    """連なったNBTのベクタを検証する。
 
     期待値ファイルは持たず、言語間の一致だけを見る。
     出力には位置を指定した読み込みの結果も含めるので、
@@ -295,10 +299,10 @@ def run_concat_vector(runner, vector, workdir, report, outputs):
 
 
 def run_world_vector(runner, vector, workdir, report, outputs):
-    """チャンク（World レイヤ）のベクタを検証する。
+    """チャンク（Worldレイヤ）のベクタを検証する。
 
     全ブロックを走査した集計と、決まった手順で編集した結果のバイト列を
-    言語間で突き合わせる。パレットとビット詰めが 1 か所でもずれれば必ず出る。
+    言語間で比べる。パレットとビット詰めに1か所でもずれがあれば、必ず見つかる。
     """
     vector_id = vector["id"]
     input_path = os.path.join(TESTDATA, vector["input"])
@@ -344,7 +348,7 @@ def run_world_vector(runner, vector, workdir, report, outputs):
         read_bytes(edited_path)
     report.ok()
 
-    # 編集した結果をもう一度読めること。壊れた出力を作っていないかの確認
+    # 編集した結果をもう一度読めること。おかしな出力を作っていないかの確認
     reread_path = prefix + ".reread.txt"
     code, stderr = runner.run(["chunk-report", edited_path, reread_path])
 
@@ -359,18 +363,18 @@ def run_world_vector(runner, vector, workdir, report, outputs):
 
 
 def strip_storage_fields(listing):
-    """region-list の出力から「格納のしかた」に依る項目を落とす。
+    """region-listの出力から「格納のしかた」に依る項目を落とす。
 
-    行の形は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 キー数」。
+    行の形は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 ルート直下キー数」。
     詰め直すと圧縮方式と圧縮後バイト数は当然変わるので、
-    中身が保たれたかを見たいときはこの 2 つを外して比べる。
+    中身が保たれたかを見たいときはこの2つを外して比べる。
     """
     lines = []
 
     for line in listing.splitlines():
         fields = line.split(" ")
 
-        # チャンク行だけが 7 項目。region / total の行はそのまま残す
+        # チャンク行だけが7項目。region / totalの行はそのまま残す
         if len(fields) == 7:
             lines.append(" ".join([fields[0], fields[1], fields[2], fields[5], fields[6]]))
         else:
@@ -382,15 +386,15 @@ def strip_storage_fields(listing):
 def run_anvil_vector(runner, vector, workdir, report, outputs):
     """リージョンファイルのベクタを検証する。
 
-    NBT ベクタと違い期待値ファイルは持たず、言語間の一致だけを見る。
+    NBTベクタと違い期待値ファイルは持たず、言語間の一致だけを見る。
     セクタ確保のロジックは実装ごとに書き方が変わりやすいので、
-    「詰め直した結果のバイト列」が全言語で同じになることを要にする。
+    「詰め直した結果のバイト列」が全言語で同じになるかどうかを中心に見る。
     """
     vector_id = vector["id"]
     input_path = os.path.join(TESTDATA, vector["input"])
     prefix = os.path.join(workdir, "%s_%s" % (runner.name, vector_id.replace("/", "_")))
 
-    # 詰め直した結果も r.X.Z.mca でなければ座標を読み取れないので、専用のディレクトリへ置く
+    # 詰め直した結果もr.X.Z.mcaでなければ座標を読み取れないので、専用のディレクトリへ置く
     rewrite_dir = prefix + ".out"
     os.makedirs(rewrite_dir, exist_ok=True)
     rewritten_path = os.path.join(rewrite_dir, os.path.basename(input_path))
@@ -450,7 +454,7 @@ def run_anvil_vector(runner, vector, workdir, report, outputs):
                     % (runner.name, vector_id, stderr.strip()))
         return
 
-    # 詰め直しでは圧縮方式が無圧縮に変わるため、その 2 項目を外して比べる
+    # 詰め直しでは圧縮方式が無圧縮に変わるため、その2項目を外して比べる
     if strip_storage_fields(read_text(relist_path)) != strip_storage_fields(read_text(list_path)):
         report.fail("%s / %s: 詰め直しの前後でチャンクの中身が変わった" % (runner.name, vector_id))
         return
@@ -459,7 +463,7 @@ def run_anvil_vector(runner, vector, workdir, report, outputs):
 
 
 def compare_languages(outputs, report):
-    """同じベクタに対する言語ごとの出力を相互に突き合わせる。"""
+    """同じベクタに対する言語ごとの出力を相互に比べる。"""
     for vector_id in sorted(outputs.keys()):
         for kind in sorted(outputs[vector_id].keys()):
             by_language = outputs[vector_id][kind]
@@ -481,14 +485,14 @@ def compare_languages(outputs, report):
 
 
 def generate_expect(runner, vectors, report):
-    """基準実装の出力から expect/ を作り直す。"""
+    """基準実装の出力からexpect/を作り直す。"""
     generated = 0
 
     for vector in vectors:
         if vector.get("expect_error") is not None:
             continue
 
-        # Anvil / World / 連結 のベクタは正規化JSON の期待値を持たない
+        # Anvil / World / 連結のベクタは正規化JSONの期待値を持たない
         if vector.get("kind") in ("anvil", "world", "concat"):
             continue
 

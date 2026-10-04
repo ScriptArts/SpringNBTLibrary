@@ -4,7 +4,7 @@ using SpringNBTLibrary.Nbt;
 namespace SpringNBTLibrary.Tests;
 
 /// <summary>
-/// Anvil リージョンファイルの読み書き。仕様: docs/spec/20-anvil-region.md
+/// Anvilリージョンファイルの読み書き
 /// </summary>
 public class RegionFileTests : IDisposable
 {
@@ -27,12 +27,12 @@ public class RegionFileTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>共通テストベクタのディレクトリ。</summary>
+    /// <summary>共通テストベクタのディレクトリ</summary>
     private static string VectorDirectory(string name)
     {
         string current = AppContext.BaseDirectory;
 
-        // ビルド出力からリポジトリ直下まで遡って spec/testdata を探す
+        // ビルド出力からリポジトリ直下まで遡ってspec/testdataを探す
         while (current is not null)
         {
             string candidate = Path.Combine(current, "spec", "testdata", "anvil", name);
@@ -55,7 +55,7 @@ public class RegionFileTests : IDisposable
         throw new DirectoryNotFoundException($"テストベクタが見つからない: anvil/{name}");
     }
 
-    /// <summary>ベクタを一時ディレクトリへ複製し、書き込みテストで原本を汚さないようにする。</summary>
+    /// <summary>ベクタを一時ディレクトリへ複製し、書き込みテストで原本を汚さないようにする</summary>
     private string CopyVector(string name)
     {
         string source = VectorDirectory(name);
@@ -170,7 +170,7 @@ public class RegionFileTests : IDisposable
         using RegionFile region = RegionFile.Open(
             Path.Combine(VectorDirectory("lz4"), "r.0.0.mca"));
 
-        // 1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
+        // 1ブロック / 2ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
         for (int x = 0; x < 4; x++)
         {
             Assert.Equal(ChunkCompression.Lz4, region.ReadChunkRaw(x, 0)!.Compression);
@@ -199,7 +199,7 @@ public class RegionFileTests : IDisposable
         using RegionFile region = RegionFile.Open(
             Path.Combine(directory, "r.0.0.mca"), RegionFileMode.ReadWrite);
 
-        // LZ4 は読み込みのみ対応なので、圧縮して書き出すことはできない
+        // LZ4は読み込みのみ対応なので、圧縮して書き出すことはできない
         NbtCompound chunk = region.ReadChunk(0, 0)!;
         SpringNbtException error = Assert.Throws<SpringNbtException>(
             () => region.WriteChunk(0, 0, chunk, ChunkCompression.Lz4));
@@ -215,7 +215,8 @@ public class RegionFileTests : IDisposable
 
         using (RegionFile region = RegionFile.Open(path, RegionFileMode.ReadWrite))
         {
-            // 触らずに閉じるだけ。生バイトを素通しするので LZ4 のまま残る
+            // 触らずに閉じるだけ
+            // 生バイトに手を加えないので、LZ4のまま残る
         }
 
         Assert.Equal(before, File.ReadAllBytes(path));
@@ -254,7 +255,7 @@ public class RegionFileTests : IDisposable
         using RegionFile region = RegionFile.Open(
             Path.Combine(VectorDirectory("empty"), "r.0.0.mca"));
 
-        // r.0.0 が担当するのは 0..31 の範囲だけ
+        // r.0.0が担当するのは0..31の範囲だけ
         SpringNbtException error = Assert.Throws<SpringNbtException>(() => region.HasChunk(32, 0));
         Assert.Equal(ErrorCode.InvalidArgument, error.Code);
     }
@@ -275,7 +276,7 @@ public class RegionFileTests : IDisposable
     [Fact]
     public void OpeningAndFlushingWithoutChangesKeepsBytesIdentical()
     {
-        // 触っていないチャンクの配置を保つことが、既存ワールドを壊さない前提になる
+        // 触っていないチャンクの配置を保つことが、既存ワールドをおかしくしないための前提になる
         string directory = CopyVector("fragmented");
         string path = Path.Combine(directory, "r.0.0.mca");
         byte[] original = File.ReadAllBytes(path);
@@ -336,7 +337,7 @@ public class RegionFileTests : IDisposable
         string directory = CopyVector("fragmented");
         string path = Path.Combine(directory, "r.0.0.mca");
 
-        // 5 セクタぶんになる大きなチャンクを作る
+        // 5セクタぶんになる大きなチャンクを作る
         NbtCompound big = SampleChunk(0, 0);
         big.Set("filler", new NbtByteArray(BuildIncompressibleBytes(5 * RegionFile.SectorSize)));
 
@@ -348,7 +349,7 @@ public class RegionFileTests : IDisposable
 
         using RegionFile reopened = RegionFile.Open(path);
 
-        // 動かした結果、他の 2 チャンクが壊れていないこと
+        // 動かした結果、他の2チャンクがおかしくなっていないこと
         Assert.Equal(3, reopened.ChunkPositions().Count());
         Assert.Equal(5, reopened.ReadChunk(5, 3)!.GetInt("xPos"));
         Assert.Equal(31, reopened.ReadChunk(31, 31)!.GetInt("xPos"));
@@ -428,7 +429,7 @@ public class RegionFileTests : IDisposable
     {
         string path = Path.Combine(workDirectory, "r.0.0.mca");
 
-        // 1MiB を超えるよう、圧縮の効かないデータを詰める
+        // 1MiBを超えるよう、圧縮しても縮まないデータを詰める
         NbtCompound huge = SampleChunk(1, 2);
         huge.Set("filler", new NbtByteArray(BuildIncompressibleBytes(1200 * 1024)));
 
@@ -491,7 +492,7 @@ public class RegionFileTests : IDisposable
             folder.Flush();
         }
 
-        // 3 つの異なるリージョンへ振り分けられる
+        // 3つの異なるリージョンへ振り分けられる
         Assert.True(File.Exists(Path.Combine(workDirectory, "r.0.0.mca")));
         Assert.True(File.Exists(Path.Combine(workDirectory, "r.-1.-1.mca")));
         Assert.True(File.Exists(Path.Combine(workDirectory, "r.1.1.mca")));
@@ -507,7 +508,8 @@ public class RegionFileTests : IDisposable
     [Fact]
     public void FolderKeepsCachedRegionsUnderTheLimit()
     {
-        // 上限 2 で 4 リージョンへ書く。古いものは閉じられるが内容は失われない
+        // 上限2で4リージョンへ書く
+        // 古いものは閉じられるが、内容は失われない
         using (RegionFolder folder = RegionFolder.Open(
             workDirectory, RegionFileMode.ReadWrite, maxCachedRegions: 2))
         {
@@ -538,13 +540,17 @@ public class RegionFileTests : IDisposable
         Assert.Equal(ErrorCode.InvalidArgument, error.Code);
     }
 
-    /// <summary>圧縮しても縮まないバイト列を作る。サイズの制御が効くようにするため。</summary>
+    /// <summary>
+    /// 圧縮しても縮まないバイト列を作る
+    /// サイズを狙いどおりに制御できるようにするため
+    /// </summary>
     private static sbyte[] BuildIncompressibleBytes(int length)
     {
         sbyte[] result = new sbyte[length];
         uint state = 0x12345678;
 
-        // 線形合同法で疑似乱数を作る。テストの再現性を保つため固定の種を使う
+        // 線形合同法で疑似乱数を作る
+        // テストの再現性を保つため、固定の種を使う
         for (int index = 0; index < length; index++)
         {
             state = (state * 1664525) + 1013904223;

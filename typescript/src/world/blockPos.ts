@@ -1,7 +1,5 @@
 /**
  * ブロックの絶対座標と、その範囲
- *
- * 仕様: `docs/spec/30-chunk-format.md` 5章
  */
 
 import { ChunkPos } from "../anvil/index.js";
@@ -44,17 +42,17 @@ export class BlockPos {
     );
   }
 
-  /** `(x, y, z)` の形の文字列にする */
+  /** `(x, y, z)`の形の文字列にする */
   toString(): string {
     return `(${this.x}, ${this.y}, ${this.z})`;
   }
 }
 
 /**
- * ブロック座標の直方体な範囲
+ * ブロック座標の直方体の範囲
  *
  * 両端を含む
- * `Cuboid.of(0, 0, 0, 0, 0, 0)` は 1 ブロック
+ * `Cuboid.of(0, 0, 0, 0, 0, 0)`は1ブロック
  *
  * 範囲内のブロックを順に処理したいときに使う
  */
@@ -68,7 +66,8 @@ export class Cuboid {
 
   /**
    * 両端の座標から作る
-   * 大小の順序は問わない。内部で小さいほうを最小に揃える
+   * 大小の順序は問わない
+   * 内部で小さいほうを最小に揃える
    */
   constructor(first: BlockPos, second: BlockPos) {
     this.minX = Math.min(first.x, second.x);
@@ -84,17 +83,17 @@ export class Cuboid {
     return new Cuboid(new BlockPos(x1, y1, z1), new BlockPos(x2, y2, z2));
   }
 
-  /** X 方向の長さ */
+  /** X方向の長さ */
   get sizeX(): number {
     return this.maxX - this.minX + 1;
   }
 
-  /** Y 方向の長さ */
+  /** Y方向の長さ */
   get sizeY(): number {
     return this.maxY - this.minY + 1;
   }
 
-  /** Z 方向の長さ */
+  /** Z方向の長さ */
   get sizeZ(): number {
     return this.maxZ - this.minZ + 1;
   }
@@ -118,10 +117,10 @@ export class Cuboid {
 
   /**
    * 範囲内の座標を順に返す
-   * 並びは Y、Z、X の順で、X がいちばん内側で動く
+   * 並びはY、Z、Xの順で、Xがいちばん内側で動く
    */
   *positions(): IterableIterator<BlockPos> {
-    // 内側から X が動くので、同じチャンクの並びを続けて触れる
+    // Xがいちばん内側で動くので、同じチャンクの並びを続けて扱える
     for (let y = this.minY; y <= this.maxY; y++) {
       for (let z = this.minZ; z <= this.maxZ; z++) {
         for (let x = this.minX; x <= this.maxX; x++) {

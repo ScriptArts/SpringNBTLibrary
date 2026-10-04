@@ -2,8 +2,6 @@ package io.github.scriptarts.springnbt.nbt;
 
 /**
  * 圧縮方式
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 4章
  */
 public enum Compression {
 

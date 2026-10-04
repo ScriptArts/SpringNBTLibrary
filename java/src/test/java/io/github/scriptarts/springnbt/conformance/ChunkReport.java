@@ -8,9 +8,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**
- * チャンクの中身を、言語をまたいで文字列として完全一致する形へ写す。
- *
- * <p>仕様: {@code docs/spec/90-conformance.md} 2.3章
+ * チャンクの中身を、言語をまたいで文字列として完全一致する形へ写す
  */
 final class ChunkReport {
 
@@ -19,10 +17,10 @@ final class ChunkReport {
     }
 
     /**
-     * チャンクの全ブロック・全バイオームを走査して集計する。
+     * チャンクの全ブロック・全バイオームを走査して集計する
      *
      * <p>パレットとビットストレージを端から端まで通すので、
-     * ビット詰めの実装が 1 か所でもずれれば集計値が変わる。
+     * ビット詰めの実装が1か所でもずれれば集計値が変わる
      */
     static String describe(Chunk chunk) {
         StringBuilder builder = new StringBuilder();
@@ -53,7 +51,7 @@ final class ChunkReport {
                     .append(blockPalette).append(' ').append(blockBits).append(' ')
                     .append(biomePalette).append(' ').append(biomeBits).append('\n');
 
-            // 全ブロックを 1 つずつ読んで、状態の文字列表現ごとに数える
+            // 全ブロックを1つずつ読んで、状態の文字列表現ごとに数える
             for (int y = 0; y < 16; y++) {
                 for (int z = 0; z < 16; z++) {
                     for (int x = 0; x < 16; x++) {
@@ -68,7 +66,7 @@ final class ChunkReport {
                 }
             }
 
-            // バイオームは 4×4×4 単位なので、4 ブロックおきに見る
+            // バイオームは4×4×4単位なので、4ブロックおきに見る
             for (int y = 0; y < 16; y += 4) {
                 for (int z = 0; z < 16; z += 4) {
                     for (int x = 0; x < 16; x += 4) {
@@ -99,9 +97,10 @@ final class ChunkReport {
     }
 
     /**
-     * 決まった手順でチャンクを編集する。全言語で同じ結果になるはず。
+     * 決まった手順でチャンクを編集する
+     * 全言語で同じ結果になるはず
      *
-     * <p>パレット拡張・ビット幅の再計算・未使用要素の掃除を一通り通す。
+     * <p>パレット拡張・ビット幅の再計算・未使用要素の掃除を一通り通す
      */
     static void edit(Chunk chunk) {
         int baseY = chunk.minSectionY() * 16;
@@ -113,7 +112,8 @@ final class ChunkReport {
             chunk.setBlock(index % 16, baseY + (index / 16), index % 16, state);
         }
 
-        // プロパティ付きのブロックを、名前は同じで状態違いで置く
+        // プロパティ付きのブロックを置く
+        // 1つ目と2つ目はプロパティの並び順だけが違う同じ状態、3つ目は名前空間を省いて書いた別の状態
         chunk.setBlock(1, baseY + 2, 1, BlockState.parse("minecraft:oak_stairs[facing=north,half=top]"));
         chunk.setBlock(2, baseY + 2, 2, BlockState.parse("minecraft:oak_stairs[half=top,facing=north]"));
         chunk.setBlock(3, baseY + 2, 3, BlockState.parse("oak_stairs[facing=south]"));
@@ -125,7 +125,7 @@ final class ChunkReport {
         // 使われなくなったパレット要素を掃除する
         chunk.compact();
 
-        // 高さマップと光源は再計算しないので、無効化して Minecraft に任せる
+        // 高さマップと光源は再計算しないので、無効化してMinecraftに任せる
         chunk.clearHeightmaps();
         chunk.invalidateLighting();
     }

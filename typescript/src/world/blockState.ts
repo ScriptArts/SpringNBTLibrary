@@ -3,13 +3,9 @@
  * 名前と、任意のプロパティの組
  *
  * プロパティは**常に名前の昇順で保持する**
- * こうしておくと文字列表現が一意になり、
- * 全言語で同じ出力になる
- * Minecraft が書き出した並び順は
- * `PalettedContainer` がパレットを生の NBT のまま持つことで守られるので、
- * 触っていないブロックの並びが崩れることはない
- *
- * 仕様: `docs/spec/30-chunk-format.md` 2.1章
+ * こうしておくと文字列表現が一意になり、全言語で同じ出力になる
+ * Minecraftが書き出した並び順は、`PalettedContainer`がパレットを生のNBTのまま持つことで守られる
+ * そのため、触っていないブロックの並びが崩れることはない
  */
 
 import { SpringNbtError } from "../errors.js";
@@ -20,8 +16,7 @@ import { NbtCompound, NbtString, TagType } from "../nbt/index.js";
  * 名前と、任意のプロパティの組
  *
  * プロパティは**常に名前の昇順で保持する**
- * こうしておくと文字列表現が一意になり、
- * 全言語で同じ出力になる
+ * こうしておくと文字列表現が一意になり、全言語で同じ出力になる
  */
 export class BlockState {
   readonly #name: string;
@@ -56,20 +51,20 @@ export class BlockState {
 
   /**
    * プロパティを取得する
-   * 無ければ undefined
+   * 無ければundefined
    */
   property(key: string): string | undefined {
     return this.#properties.get(key);
   }
 
-  /** プロパティを 1 つ差し替えた新しい状態を返す */
+  /** プロパティを1つ差し替えた新しい状態を返す */
   with(key: string, value: string): BlockState {
     const entries = [...this.#properties];
     entries.push([key, value]);
     return new BlockState(this.#name, entries);
   }
 
-  /** `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列から作る */
+  /** `minecraft:oak_stairs[facing=north,half=top]`形式の文字列から作る */
   static parse(text: string): BlockState {
     const bracket = text.indexOf("[");
 
@@ -90,7 +85,7 @@ export class BlockState {
     const seen = new Set<string>();
 
     if (body.length > 0) {
-      // "key=value" をカンマ区切りで読む
+      // "key=value"をカンマ区切りで読む
       for (const pair of body.split(",")) {
         const equals = pair.indexOf("=");
 
@@ -117,14 +112,14 @@ export class BlockState {
     return new BlockState(text.slice(0, bracket), entries);
   }
 
-  /** パレット要素の NBT から作る */
+  /** パレット要素のNBTから作る */
   static fromNbt(nbt: NbtCompound): BlockState {
     const entries: Array<[string, string]> = [];
     const seen = new Set<string>();
     const propertiesTag = nbt.optCompound("Properties");
 
     if (propertiesTag !== undefined) {
-      // Properties の値はすべて文字列（数値や真偽値も文字列で入る）
+      // Propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
       for (const [key, value] of propertiesTag.entries()) {
         if (value.type !== TagType.String) {
           throw SpringNbtError.unexpectedTagType(
@@ -140,10 +135,10 @@ export class BlockState {
   }
 
   /**
-   * パレット要素の NBT へ変換する
+   * パレット要素のNBTへ変換する
    *
-   * プロパティが空なら `Properties` キー自体を出力しない
-   * Minecraft と同じ振る舞い
+   * プロパティが空なら`Properties`キー自体を出力しない
+   * Minecraftと同じ振る舞い
    */
   toNbt(): NbtCompound {
     const result = new NbtCompound();
@@ -180,7 +175,7 @@ export class BlockState {
     return true;
   }
 
-  /** `minecraft:oak_stairs[facing=north,half=top]` 形式の文字列を返す */
+  /** `minecraft:oak_stairs[facing=north,half=top]`形式の文字列を返す */
   toString(): string {
     if (this.#properties.size === 0) {
       return this.#name;
@@ -219,7 +214,7 @@ export class BlockState {
   }
 }
 
-/** 名前空間が省略されていたら `minecraft:` を補う */
+/** 名前空間が省略されていたら`minecraft:`を補う */
 function normalize(name: string): string {
   if (name.includes(":")) {
     return name;

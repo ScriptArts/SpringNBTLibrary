@@ -1,15 +1,12 @@
-"""Modified UTF-8 (MUTF-8) の符号化・復号
+"""Modified UTF-8 (MUTF-8)の符号化・復号
 
-標準 UTF-8 との違いは 2 点だけ
+標準UTF-8との違いは2点だけ
 
-* ``U+0000`` を ``C0 80`` の 2 バイトで表す
-* ``U+10000`` 以上をサロゲートペアへ分解し、3 バイト × 2 で表す (CESU-8)
+* ``U+0000``を``C0 80``の2バイトで表す
+* ``U+10000``以上をサロゲートペアへ分解し、3バイト × 2で表す (CESU-8)
 
-Python の :class:`str` はコードポイント単位だが、
-``surrogatepass`` 相当の扱いで孤立サロゲートも保持できるため、
-C# / Java と同じく文字列としてそのまま往復できる
-
-仕様: ``docs/spec/10-nbt-binary.md`` 2章
+Pythonの:class:`str`はコードポイント単位だが、``surrogatepass``相当の扱いで孤立サロゲートも保持できる
+そのため、C# / Javaと同じく、MUTF-8のバイト列を文字列へ復号しても同じバイト列へ戻せる
 """
 
 from __future__ import annotations
@@ -18,19 +15,19 @@ from ..errors import SpringNbtError
 
 __all__ = ["MAX_BYTE_LENGTH", "decode", "encode", "byte_length"]
 
-#: MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため）
+#: MUTF-8の文字列が取りうる最大バイト長（長さフィールドがu16のため）
 MAX_BYTE_LENGTH = 65535
 
 
 def _to_utf16_units(text: str):
-    """文字列を UTF-16 コード単位の列へ落とす"""
+    """文字列をUTF-16コード単位の列へ落とす"""
     units = []
 
     # コードポイントごとに、補助文字ならサロゲートペアへ分解する
     for character in text:
         code = ord(character)
 
-        # BMP 外の文字は、UTF-16 のサロゲート対へ分解して持つ
+        # BMP外の文字は、UTF-16のサロゲート対へ分解して持つ
         if code >= 0x10000:
             code -= 0x10000
             units.append(0xD800 + (code >> 10))
@@ -42,7 +39,7 @@ def _to_utf16_units(text: str):
 
 
 def _from_utf16_units(units) -> str:
-    """UTF-16 コード単位の列を文字列へ戻す
+    """UTF-16コード単位の列を文字列へ戻す
     孤立サロゲートはそのまま保持する
     """
     result = []
@@ -52,7 +49,7 @@ def _from_utf16_units(units) -> str:
     while index < len(units):
         unit = units[index]
 
-        # サロゲート対が揃っていれば 1 つのコードポイントへ戻す
+        # サロゲート対が揃っていれば1つのコードポイントへ戻す
         if 0xD800 <= unit <= 0xDBFF and index + 1 < len(units) and 0xDC00 <= units[index + 1] <= 0xDFFF:
             low = units[index + 1]
             code = 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00)
@@ -66,27 +63,27 @@ def _from_utf16_units(units) -> str:
 
 
 def decode(data: bytes) -> str:
-    """MUTF-8 バイト列を文字列へ復号する
+    """MUTF-8バイト列を文字列へ復号する
 
-    :raises SpringNbtError: バイト列が MUTF-8 として不正な場合
+    :raises SpringNbtError: バイト列がMUTF-8として不正な場合
     """
     units = []
     index = 0
 
-    # 先頭から 1 文字ずつ取り出す
+    # 先頭から1文字ずつ取り出す
     while index < len(data):
         b0 = data[index]
 
         if b0 & 0x80 == 0x00:
-            # 1 バイト形式: 0xxxxxxx (U+0001..U+007F)
+            # 1バイト形式: 0xxxxxxx (U+0001..U+007F)
             if b0 == 0x00:
-                # 素の 0x00 は MUTF-8 では現れてはならない (C0 80 を使う)
+                # 素の0x00はMUTF-8では現れてはならない (C0 80を使う)
                 raise SpringNbtError.malformed("MUTF-8: 素の 0x00 が現れた (U+0000 は C0 80 で表す)")
 
             units.append(b0)
             index += 1
         elif b0 & 0xE0 == 0xC0:
-            # 2 バイト形式: 110xxxxx 10xxxxxx
+            # 2バイト形式: 110xxxxx 10xxxxxx
             if index + 1 >= len(data):
                 raise SpringNbtError.malformed("MUTF-8: 2バイト形式が途中で切れた")
 
@@ -97,15 +94,15 @@ def decode(data: bytes) -> str:
 
             value = ((b0 & 0x1F) << 6) | (b1 & 0x3F)
 
-            # C0 80 (U+0000) だけは正当
-            # それ以外の 0x80 未満は冗長符号化
+            # C0 80 (U+0000)だけは正当
+            # それ以外の0x80未満は冗長符号化
             if value < 0x80 and not (b0 == 0xC0 and b1 == 0x80):
                 raise SpringNbtError.malformed("MUTF-8: 冗長な2バイト符号化")
 
             units.append(value)
             index += 2
         elif b0 & 0xF0 == 0xE0:
-            # 3 バイト形式: 1110xxxx 10xxxxxx 10xxxxxx
+            # 3バイト形式: 1110xxxx 10xxxxxx 10xxxxxx
             if index + 2 >= len(data):
                 raise SpringNbtError.malformed("MUTF-8: 3バイト形式が途中で切れた")
 
@@ -117,35 +114,34 @@ def decode(data: bytes) -> str:
 
             value = ((b0 & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F)
 
-            # 3 バイトで表すべき範囲は U+0800 以上
+            # 3バイトで表すべき範囲はU+0800以上
             if value < 0x800:
                 raise SpringNbtError.malformed("MUTF-8: 冗長な3バイト符号化")
 
             units.append(value)
             index += 3
         else:
-            # 4 バイト形式 (標準 UTF-8) や継続バイト単独は MUTF-8 では不正
+            # 4バイト形式 (標準UTF-8)や継続バイト単独はMUTF-8では不正
             raise SpringNbtError.malformed("MUTF-8: 不正な先頭バイト 0x%02X" % b0)
 
     return _from_utf16_units(units)
 
 
 def encode(text: str) -> bytes:
-    """文字列を MUTF-8 バイト列へ符号化する
+    """文字列をMUTF-8バイト列へ符号化する
 
-    サロゲートは対になっているかどうかに関わらず 1 つずつ 3 バイトで符号化されるため、
-    孤立サロゲートもそのまま往復できる
+    サロゲートは対になっているかどうかに関わらず1つずつ3バイトで符号化されるため、孤立サロゲートもそのまま往復できる
     """
     out = bytearray()
 
-    # コード単位ごとに 1〜3 バイトへ展開する
+    # コード単位ごとに1〜3バイトへ展開する
     for unit in _to_utf16_units(text):
-        # U+0001..U+007F だけが 1 バイト
-        # U+0000 は 2 バイトになる
+        # U+0001..U+007Fだけが1バイト
+        # U+0000は2バイトになる
         if 0x0001 <= unit <= 0x007F:
             out.append(unit)
         elif unit == 0x0000 or unit <= 0x07FF:
-            # U+0000 もこの経路で C0 80 になる
+            # U+0000もこの経路でC0 80になる
             out.append(0xC0 | ((unit >> 6) & 0x1F))
             out.append(0x80 | (unit & 0x3F))
         else:
@@ -157,15 +153,15 @@ def encode(text: str) -> bytes:
 
 
 def byte_length(text: str) -> int:
-    """文字列を MUTF-8 で符号化したときのバイト長を求める
+    """文字列をMUTF-8で符号化したときのバイト長を求める
     実際に符号化はしない
     """
     length = 0
 
     # 各コード単位が何バイトになるかを数える
     for unit in _to_utf16_units(text):
-        # U+0001..U+007F だけが 1 バイト
-        # U+0000 は 2 バイトになる
+        # U+0001..U+007Fだけが1バイト
+        # U+0000は2バイトになる
         if 0x0001 <= unit <= 0x007F:
             length += 1
         elif unit == 0x0000 or unit <= 0x07FF:

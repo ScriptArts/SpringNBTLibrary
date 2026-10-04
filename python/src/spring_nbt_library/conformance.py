@@ -1,10 +1,8 @@
 """適合性検証ツール
-4言語すべてが同じインターフェースで同じ出力を出す
+全言語が同じインターフェースで同じ出力を出す
 
-``spec/run-conformance.sh`` がこのツールを4言語ぶん起動し、
-出力を相互に diff することで「4言語が同一に振る舞う」ことを機械的に確かめる
-
-仕様: ``docs/spec/90-conformance.md`` 2.3章
+``spec/run-conformance.sh``がこのツールを全言語ぶん起動し、
+出力を相互にdiffすることで「全言語が同一に振る舞う」ことを機械的に確かめる
 """
 
 from __future__ import annotations
@@ -44,7 +42,7 @@ from .nbt import (
 from .nbt import snbt as snbt_module
 
 def nbt_list(data: bytes, fmt) -> str:
-    """連なった NBT を、位置を追いながら一覧として書き出す"""
+    """連なったNBTを、位置を追いながら一覧として書き出す"""
     options = NbtReadOptions(fmt=fmt, compression=Compression.NONE)
     all_tags = read_bytes_all(data, options)
     lines = ["count %d" % len(all_tags)]
@@ -80,11 +78,10 @@ USAGE = """使い方:
 # ---------------------------------------------------------------------------
 # 正規化JSON
 #
-# 浮動小数点をビットパターンで、64bit 整数を10進文字列で表すのが要
-# 10進表記の丸めや JSON 数値の精度は処理系ごとに差が出るため、
-# そのまま出すと4言語の出力が一致しない
+# 浮動小数点をビットパターンで、64bit整数を10進文字列で表すのが要
+# 10進表記の丸めやJSON数値の精度は処理系ごとに差が出るため、
+# そのまま出すと言語間で出力が一致しない
 #
-# 仕様: docs/spec/00-conventions.md 6章
 # ---------------------------------------------------------------------------
 
 _JSON_ESCAPES = {
@@ -99,15 +96,15 @@ _JSON_ESCAPES = {
 
 
 def _json_string(text: str) -> str:
-    """JSON 文字列を書き出す
-    非 ASCII は必ず ``\\uXXXX`` へ逃がす
+    """JSON文字列を書き出す
+    非ASCIIは必ず``\\uXXXX``へエスケープする
 
-    エスケープの単位は **UTF-16 コード単位**
-    C# / Java と桁数を揃えるため、補助文字はサロゲートペアの 2 つに分けて出す
+    エスケープの単位は**UTF-16コード単位**
+    C# / Javaと桁数を揃えるため、補助文字はサロゲートペアの2つに分けて出す
     """
     parts = ['"']
 
-    # コードポイントごとに、必要なら UTF-16 コード単位へ分解して書く
+    # コードポイントごとに、必要ならUTF-16コード単位へ分解して書く
     for character in text:
         # 決まった置き換えがある文字は、そのまま使う
         if character in _JSON_ESCAPES:
@@ -116,7 +113,7 @@ def _json_string(text: str) -> str:
 
         code = ord(character)
 
-        # ASCII の印字可能文字だけ生で出す
+        # ASCIIの印字可能文字だけ生で出す
         if 0x20 <= code <= 0x7E:
             parts.append(character)
         elif code >= 0x10000:
@@ -141,7 +138,7 @@ def _to_hex(data: bytes) -> str:
 def _json_tag(tag: NbtTag) -> str:
     parts = ['{"type":', _json_string(tag.type.as_string())]
 
-    # list だけは value の前に element_type が入る（仕様が定めるキー順）
+    # listだけはvalueの前にelement_typeが入る（仕様が定めるキー順）
     if isinstance(tag, NbtList):
         parts.append(',"element_type":')
         parts.append(_json_string(tag.element_type.as_string()))
@@ -150,11 +147,11 @@ def _json_tag(tag: NbtTag) -> str:
 
     import struct
 
-    # 型ごとに、正規化 JSON での表し方を変える
+    # 型ごとに、正規化JSONでの表し方を変える
     if isinstance(tag, (NbtByte, NbtShort, NbtInt)):
         parts.append("%d" % tag.value)
     elif isinstance(tag, NbtLong):
-        # 64bit 整数は JSON 数値だと処理系によって精度が落ちるため10進文字列で表す
+        # 64bit整数はJSON数値だと処理系によって精度が落ちるため10進文字列で表す
         parts.append(_json_string("%d" % tag.value))
     elif isinstance(tag, NbtFloat):
         parts.append(_json_string(_hex_bits(struct.pack(">f", tag.value))))
@@ -163,21 +160,21 @@ def _json_tag(tag: NbtTag) -> str:
     elif isinstance(tag, NbtString):
         parts.append(_json_string(tag.value))
 
-        # MUTF-8 のバイト列も併記する
-        # 孤立サロゲートなど UTF-8 に写せない値を厳密に比較するため
+        # MUTF-8のバイト列も併記する
+        # 孤立サロゲートなどUTF-8に写せない値を厳密に比較するため
         parts.append(',"mutf8":')
         parts.append(_json_string(_to_hex(mutf8.encode(tag.value))))
     elif isinstance(tag, (NbtByteArray, NbtIntArray)):
         parts.append("[" + ",".join("%d" % value for value in tag.value) + "]")
     elif isinstance(tag, NbtLongArray):
-        # 64bit 整数は10進文字列の配列で表す
+        # 64bit整数は10進文字列の配列で表す
         parts.append("[" + ",".join(_json_string("%d" % value) for value in tag.value) + "]")
     elif isinstance(tag, NbtList):
         parts.append("[" + ",".join(_json_tag(item) for item in tag) + "]")
     elif isinstance(tag, NbtCompound):
-        # JSON オブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
+        # JSONオブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
         entries = []
-        # compound はキーと値の組の配列として写す
+        # compoundはキーと値の組の配列として写す
         # 挿入順を保つため
         for key, value in tag.items():
             entries.append("[" + _json_string(key) + "," + _json_tag(value) + "]")
@@ -190,7 +187,7 @@ def _json_tag(tag: NbtTag) -> str:
 
 
 def normalized_json(named: NamedTag, fmt: NbtFormat) -> str:
-    """ルートを含む全体を JSON 文字列へ変換する
+    """ルートを含む全体をJSON文字列へ変換する
     末尾に改行を1つ付ける
     """
     return "".join([
@@ -205,15 +202,14 @@ def normalized_json(named: NamedTag, fmt: NbtFormat) -> str:
 # ---------------------------------------------------------------------------
 # リージョンファイル
 #
-# 仕様: docs/spec/90-conformance.md 2.3章
 # ---------------------------------------------------------------------------
 
 
 def region_list(region: RegionFile) -> str:
-    """存在するチャンクを 1 行 1 チャンクで書き出す
+    """存在するチャンクを1行1チャンクで書き出す
     並びはロケーションテーブルの添字順
 
-    各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 キー数」
+    各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 ルート直下キー数」
     """
     lines = ["region %d %d" % (region.region_x, region.region_z)]
     total = 0
@@ -247,7 +243,7 @@ def region_list(region: RegionFile) -> str:
 def region_rewrite(source: RegionFile, output_path: str) -> None:
     """全チャンクを読み直し、無圧縮で新しいリージョンへ詰め直して書き出す
 
-    無圧縮にするのは、zlib の出力が処理系ごとに違い、
+    無圧縮にするのは、zlibの出力が処理系ごとに違い、
     圧縮したままでは言語間でバイトが一致しないため
     """
     # 途中結果が残らないよう、書き出し先は必ず作り直す
@@ -271,9 +267,8 @@ def region_rewrite(source: RegionFile, output_path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# チャンク（World レイヤ）
+# チャンク（Worldレイヤ）
 #
-# 仕様: docs/spec/90-conformance.md 2.3章
 # ---------------------------------------------------------------------------
 
 
@@ -281,7 +276,7 @@ def chunk_describe(chunk: Chunk) -> str:
     """チャンクの全ブロック・全バイオームを走査して集計する
 
     パレットとビットストレージを端から端まで通すので、
-    ビット詰めの実装が 1 か所でもずれれば集計値が変わる
+    ビット詰めの実装が1か所でもずれれば集計値が変わる
     """
     lines = ["chunk %d %d %d %s" % (chunk.x, chunk.z, chunk.min_section_y, chunk.status)]
     blocks = {}
@@ -308,7 +303,7 @@ def chunk_describe(chunk: Chunk) -> str:
         lines.append("section %d %d %d %d %d"
                      % (section_y, block_palette, block_bits, biome_palette, biome_bits))
 
-        # 全ブロックを 1 つずつ読んで、状態の文字列表現ごとに数える
+        # 全ブロックを1つずつ読んで、状態の文字列表現ごとに数える
         for y in range(16):
             for z in range(16):
                 for x in range(16):
@@ -320,7 +315,7 @@ def chunk_describe(chunk: Chunk) -> str:
                     key = str(block)
                     blocks[key] = blocks.get(key, 0) + 1
 
-        # バイオームは 4×4×4 単位なので、4 ブロックおきに見る
+        # バイオームは4×4×4単位なので、4ブロックおきに見る
         for y in range(0, 16, 4):
             for z in range(0, 16, 4):
                 for x in range(0, 16, 4):
@@ -355,7 +350,8 @@ def chunk_edit(chunk: Chunk) -> None:
         state = BlockState.parse("minecraft:edited_%d[step=%d]" % (index, index))
         chunk.set_block(index % 16, base_y + (index // 16), index % 16, state)
 
-    # プロパティ付きのブロックを、名前は同じで状態違いで置く
+    # プロパティ付きのブロックを置く
+    # 1つ目と2つ目はプロパティの並び順だけが違う同じ状態、3つ目は名前空間を省いて書いた別の状態
     chunk.set_block(1, base_y + 2, 1, BlockState.parse("minecraft:oak_stairs[facing=north,half=top]"))
     chunk.set_block(2, base_y + 2, 2, BlockState.parse("minecraft:oak_stairs[half=top,facing=north]"))
     chunk.set_block(3, base_y + 2, 3, BlockState.parse("oak_stairs[facing=south]"))
@@ -367,16 +363,16 @@ def chunk_edit(chunk: Chunk) -> None:
     # 使われなくなったパレット要素を掃除する
     chunk.compact()
 
-    # 高さマップと光源は再計算しないので、無効化して Minecraft に任せる
+    # 高さマップと光源は再計算しないので、無効化してMinecraftに任せる
     chunk.clear_heightmaps()
     chunk.invalidate_lighting()
 
 
 def read_chunk_file(path: str) -> Chunk:
-    """チャンク NBT のファイルを読む"""
+    """チャンクNBTのファイルを読む"""
     named = read_file(path)
 
-    # 検証では DataVersion の違いを警告にせず、そのまま読む
+    # 検証では、DataVersionが扱える形式より古くても警告にせずそのまま読む
     options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.IGNORE)
     return Chunk.from_nbt(named.tag, options)
 
@@ -387,8 +383,8 @@ def read_chunk_file(path: str) -> Chunk:
 
 
 def _parse_format(args) -> NbtFormat:
-    """``--format network`` が指定されていればネットワーク形式として読む"""
-    # 3 番目以降の引数からオプションを探す
+    """``--format network``が指定されていればネットワーク形式として読む"""
+    # 3番目以降の引数からオプションを探す
     for index in range(3, len(args) - 1):
         if args[index] == "--format" and args[index + 1] == "network":
             return NbtFormat.NETWORK
@@ -397,9 +393,9 @@ def _parse_format(args) -> NbtFormat:
 
 
 def _write_text_file(path: str, content: str) -> None:
-    """改行を変換せず、BOM も付けずに UTF-8 で書く
+    """改行を変換せず、BOMも付けずにUTF-8で書く
 
-    孤立サロゲートを含みうるため ``surrogatepass`` で符号化する
+    孤立サロゲートを含みうるため``surrogatepass``で符号化する
     """
     with open(path, "wb") as handle:
         handle.write(content.encode("utf-8", "surrogatepass"))
@@ -417,7 +413,7 @@ def main(argv=None) -> int:
 
     command = argv[0]
 
-    # version は入力ファイルを取らない
+    # versionは入力ファイルを取らない
     if command == "version":
         sys.stdout.write(
             "python spring-nbt-library 1.0.0 target_data_version=%d\n" % TARGET_DATA_VERSION)
@@ -454,7 +450,7 @@ def main(argv=None) -> int:
 
             return 0
 
-        # 連なった NBT を一覧にする
+        # 連なったNBTを一覧にする
         if command == "nbt-list":
             with open(argv[1], "rb") as handle:
                 data = handle.read()
@@ -462,7 +458,7 @@ def main(argv=None) -> int:
             _write_text_file(argv[2], nbt_list(data, fmt))
             return 0
 
-        # リージョン系は NBT の読み込みを経由しない
+        # リージョン系はNBTの読み込みを経由しない
         if command in ("region-list", "region-rewrite"):
             with RegionFile.open(argv[1], RegionFileMode.READ_ONLY) as region:
                 # チャンク一覧を書き出す
@@ -475,7 +471,7 @@ def main(argv=None) -> int:
 
         named = read_file(argv[1], NbtReadOptions(fmt=fmt))
 
-        # 正規化 JSON を書き出す
+        # 正規化JSONを書き出す
         if command == "decode":
             _write_text_file(argv[2], normalized_json(named, fmt))
         elif command == "encode":
@@ -485,7 +481,7 @@ def main(argv=None) -> int:
         else:
             _write_text_file(argv[2], snbt_module.write(named.tag) + "\n")
     except SpringNbtError as error:
-        # 4言語で同じ ErrorCode を出すことが検証対象なので、コードを機械可読な形で出す
+        # 言語間で同じErrorCodeを出すことが検証対象なので、コードを機械可読な形で出す
         sys.stderr.write("ERROR %s %s\n" % (error.code.as_string(), error.message))
         return 1
 

@@ -1,9 +1,7 @@
-//! SNBT (Stringified NBT) のパースと出力
+//! SNBT (Stringified NBT)のパースと出力
 //!
-//! 対応範囲は「バイナリ NBT へ損失なく写せる部分集合」
-//! 1.21.5 以降の異種リスト（`[1, "a"]`）は受理しない
-//!
-//! 仕様: `docs/spec/11-snbt.md` / `docs/adr/0006-snbt-scope.md`
+//! 対応範囲は「バイナリNBTへ損失なく写せる部分集合」
+//! 1.21.5以降の異種リスト（`[1, "a"]`）は受理しない
 
 use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::canonical;
@@ -13,12 +11,12 @@ const INDENT_UNIT: &str = "    ";
 
 const WIDTH_SUFFIXES: &str = "bBsSlLfFdD";
 
-/// SNBT 文字列をタグへ変換する
+/// SNBT文字列をタグへ変換する
 pub fn parse(text: &str) -> Result<NbtTag> {
     Parser::new(text).parse_whole()
 }
 
-/// SNBT 文字列を Compound へ変換する
+/// SNBT文字列をCompoundへ変換する
 pub fn parse_compound(text: &str) -> Result<NbtCompound> {
     match parse(text)? {
         NbtTag::Compound(compound) => Ok(compound),
@@ -29,15 +27,15 @@ pub fn parse_compound(text: &str) -> Result<NbtCompound> {
     }
 }
 
-/// タグを 1 行の SNBT へ変換する
+/// タグを1行のSNBTへ変換する
 pub fn write(tag: &NbtTag) -> String {
     let mut out = String::new();
     write_tag(&mut out, tag, -1);
     out
 }
 
-/// タグを整形した SNBT へ変換する
-/// インデントは空白 4 個
+/// タグを整形したSNBTへ変換する
+/// インデントは空白4個
 pub fn write_pretty(tag: &NbtTag) -> String {
     let mut out = String::new();
     write_tag(&mut out, tag, 0);
@@ -104,13 +102,13 @@ impl Parser {
         let mut compound = NbtCompound::new();
         self.skip_whitespace();
 
-        // 空の Compound
+        // 空のCompound
         if self.peek()? == '}' {
             self.position += 1;
             return Ok(compound);
         }
 
-        // 要素を 1 つずつ読む
+        // 要素を1つずつ読む
         loop {
             self.skip_whitespace();
 
@@ -145,12 +143,12 @@ impl Parser {
     fn parse_list_or_array(&mut self) -> Result<NbtTag> {
         self.expect('[')?;
 
-        // "[B;" のような型付き配列かどうかを先に判定する
+        // "[B;"のような型付き配列かどうかを先に判定する
         if self.position + 1 < self.chars.len() && self.chars[self.position + 1] == ';' {
             let marker = self.chars[self.position];
 
-            // [B; [I; [L; は型付き配列の印
-            // ただの List と見分ける
+            // [B; [I; [L;は型付き配列の印
+            // ただのListと見分ける
             if marker == 'B' || marker == 'I' || marker == 'L' {
                 self.position += 2;
                 return self.parse_typed_array(marker);
@@ -170,7 +168,7 @@ impl Parser {
             return Ok(list);
         }
 
-        // 要素を 1 つずつ読む
+        // 要素を1つずつ読む
         loop {
             self.skip_whitespace();
 
@@ -182,7 +180,7 @@ impl Parser {
 
             let value = self.parse_value()?;
 
-            // 異種リストはバイナリ NBT へ写せないため受理しない (adr/0006)
+            // 異種リストはバイナリNBTへ写せないため受理しない
             if list.element_type() != TagType::End && list.element_type() != value.tag_type() {
                 return Err(self.malformed(format!(
                     "リストに異なる型が混在している: {} と {}",
@@ -246,11 +244,11 @@ impl Parser {
             }
         }
 
-        // [B; は TAG_Byte_Array
+        // [B;はTAG_Byte_Array
         if marker == 'B' {
             let mut result: Vec<i8> = Vec::with_capacity(values.len());
 
-            // 各要素が Byte の範囲に収まるか確認しながら詰める
+            // 各要素がByteの範囲に収まるか確認しながら詰める
             for value in &values {
                 if *value < i8::MIN as i64 || *value > i8::MAX as i64 {
                     return Err(self.malformed(format!("ByteArray の要素が範囲外: {value}")));
@@ -262,12 +260,12 @@ impl Parser {
             return Ok(NbtTag::ByteArray(result));
         }
 
-        // [I; は TAG_Int_Array
-        // 残りは TAG_Long_Array
+        // [I;はTAG_Int_Array
+        // 残りはTAG_Long_Array
         if marker == 'I' {
             let mut result: Vec<i32> = Vec::with_capacity(values.len());
 
-            // 各要素が Int の範囲に収まるか確認しながら詰める
+            // 各要素がIntの範囲に収まるか確認しながら詰める
             for value in &values {
                 if *value < i32::MIN as i64 || *value > i32::MAX as i64 {
                     return Err(self.malformed(format!("IntArray の要素が範囲外: {value}")));
@@ -321,9 +319,9 @@ impl Parser {
         Ok(bare)
     }
 
-    /// 引用符つき文字列を UTF-16 コード単位の列として読む
+    /// 引用符つき文字列をUTF-16コード単位の列として読む
     ///
-    /// `\uXXXX` で孤立サロゲートを書けるため、`String` ではなくコード単位で受ける
+    /// `\uXXXX`で孤立サロゲートを書けるため、`String`ではなくコード単位で受ける
     fn parse_quoted_string(&mut self) -> Result<Vec<u16>> {
         let quote = self.chars[self.position];
         self.position += 1;
@@ -376,31 +374,31 @@ impl Parser {
             _ => None,
         };
 
-        // 1 文字で置き換えられるエスケープはここで片付く
+        // 1文字で置き換えられるエスケープはここで片付く
         if let Some(value) = simple {
             let mut buffer = [0u16; 2];
             units.extend_from_slice(value.encode_utf16(&mut buffer));
             return Ok(());
         }
 
-        // \x は 2 桁の 16 進表記
+        // \xは2桁の16進表記
         if c == 'x' {
             units.push(self.read_hex_digits(2)? as u16);
             return Ok(());
         }
 
         if c == 'u' {
-            // \uXXXX は UTF-16 コード単位を直接指定する
+            // \uXXXXはUTF-16コード単位を直接指定する
             // 孤立サロゲートもここで書ける
             units.push(self.read_hex_digits(4)? as u16);
             return Ok(());
         }
 
-        // \U は 8 桁のコードポイント表記
+        // \Uは8桁のコードポイント表記
         if c == 'U' {
             let code_point = self.read_hex_digits(8)?;
 
-            // Unicode のコードポイント範囲を外れていないか確認する
+            // Unicodeのコードポイント範囲外とサロゲート領域（U+D800..U+DFFF）を弾く
             let value = match char::from_u32(code_point as u32) {
                 Some(value) => value,
                 None => {
@@ -429,7 +427,7 @@ impl Parser {
 
         let mut value: u64 = 0;
 
-        // 指定桁数ぶん 16進数字を読む
+        // 指定桁数ぶん16進数字を読む
         for offset in 0..count {
             let c = self.chars[self.position + offset];
             let digit = hex_digit_value(c);
@@ -447,9 +445,9 @@ impl Parser {
         Ok(value)
     }
 
-    /// Unicode 文字名によるエスケープ `\N{...}` を読む
+    /// Unicode文字名によるエスケープ`\N{...}`を読む
     fn read_named_character(&mut self) -> Error {
-        // 実装間で Unicode 文字名の表が揃わないため対応しない（C# / Rust には表が無い）
+        // 実装間でUnicode文字名の表が揃わないため対応しない（C# / TypeScript / Rustには表が無い）
         let start = self.position;
 
         // 閉じ波括弧まで読み飛ばす
@@ -475,7 +473,7 @@ impl Parser {
             )));
         }
 
-        // bool(...) / uuid(...) の関数呼び出し
+        // bool(...) / uuid(...)の関数呼び出し
         self.skip_whitespace();
         if self.peek_or_nul() == '(' && (token == "bool" || token == "uuid") {
             return self.parse_function(&token);
@@ -502,7 +500,7 @@ impl Parser {
         self.expect(')')?;
 
         if name == "bool" {
-            // 0 以外を真とする
+            // 0以外を真とする
             if self.to_integral(&argument)? != 0 {
                 return Ok(NbtTag::Byte(1));
             }
@@ -536,7 +534,7 @@ impl Parser {
 
         let mut values: Vec<i32> = Vec::with_capacity(4);
 
-        // UUID を上位から 32bit ずつ 4 要素の IntArray へ写す
+        // UUIDを上位から32bitずつ4要素のIntArrayへ写す
         for index in 0..4 {
             let chunk = &hex[index * 8..(index + 1) * 8];
 
@@ -550,7 +548,7 @@ impl Parser {
     }
 
     /// 数値トークンを解釈する
-    /// 数値として読めなければ `None`（文字列として扱われる）
+    /// 数値として読めなければ`None`を返す（文字列として扱われる）
     fn try_parse_number(&self, token: &str) -> Result<Option<NbtTag>> {
         let chars: Vec<char> = token.chars().collect();
         let mut negative = false;
@@ -574,7 +572,7 @@ impl Parser {
         let is_hex = is_hex_body(&body);
 
         // 幅接尾辞を末尾から剥がす
-        // 16進では b/d/f が数字と紛れるため s/l だけを認める
+        // 16進ではb/d/fが数字と紛れるためs/lだけを認める
         let last = body.chars().last().unwrap();
         let suffix_allowed = if is_hex {
             last == 's' || last == 'S' || last == 'l' || last == 'L'
@@ -582,18 +580,18 @@ impl Parser {
             WIDTH_SUFFIXES.contains(last)
         };
 
-        // 末尾 1 文字が型の印なら切り離す
-        // 1 文字だけの token は数字そのもの
+        // 末尾1文字が型の印なら切り離す
+        // 符号を除いた本体が1文字だけなら、接尾辞とみなさず剥がさない
         if suffix_allowed && body.chars().count() >= 2 {
             width_suffix = last.to_ascii_lowercase();
             body.pop();
 
-            // 符号接尾辞 u / s は幅接尾辞の手前に置かれる
+            // 符号接尾辞u / sは幅接尾辞の手前に置かれる
             if body.chars().count() >= 2 {
                 let sign_char = body.chars().last().unwrap();
 
-                // u / U は符号なしの印
-                // 1.21.5 以降の拡張構文
+                // u / Uは符号なしの印
+                // 1.21.5以降の拡張構文
                 if sign_char == 'u' || sign_char == 'U' {
                     unsigned_suffix = true;
                     body.pop();
@@ -646,7 +644,7 @@ impl Parser {
             return Ok(NbtTag::Float(signed as f32));
         }
 
-        // 接尾辞なしの小数は Double
+        // 接尾辞なしの小数はDouble
         if width_suffix == '\0' || width_suffix == 'd' {
             return Ok(NbtTag::Double(signed));
         }
@@ -731,8 +729,8 @@ impl Parser {
             'l' => Ok(NbtTag::Long(value)),
             'f' => Ok(NbtTag::Float(value as f32)),
             'd' => Ok(NbtTag::Double(value as f64)),
-            // 接尾辞なしの整数は Int
-            // 暗黙に Long へ格上げしない
+            // 接尾辞なしの整数はInt
+            // 暗黙にLongへ格上げしない
             _ => Ok(NbtTag::Int(self.check_range(
                 value,
                 i32::MIN as i64,
@@ -754,7 +752,7 @@ impl Parser {
 
     fn to_signed(&self, magnitude: u64, negative: bool) -> Result<i64> {
         if negative {
-            // i64::MIN の絶対値は i64 に収まらないため個別に扱う
+            // i64::MINの絶対値はi64に収まらないため個別に扱う
             if magnitude == 9223372036854775808 {
                 return Ok(i64::MIN);
             }
@@ -808,7 +806,7 @@ impl Parser {
     }
 
     /// 末尾でもエラーにしない先読み
-    /// 入力が尽きていれば NUL を返す
+    /// 入力が尽きていればNULを返す
     fn peek_or_nul(&self) -> char {
         if self.position >= self.chars.len() {
             return '\0';
@@ -855,7 +853,7 @@ fn is_binary_body(body: &str) -> bool {
         return false;
     }
 
-    // 2進リテラルの本体は 0 と 1 だけ
+    // 2進リテラルの本体は0と1だけ
     for c in &chars[2..] {
         if *c != '0' && *c != '1' {
             return false;
@@ -905,7 +903,7 @@ fn is_bare_char(c: char) -> bool {
 // ---------------------------------------------------------------------------
 
 /// タグを書き出す
-/// `depth` が負なら 1 行、0 以上なら整形して出力する
+/// `depth`が負なら1行、0以上なら整形して出力する
 fn write_tag(out: &mut String, tag: &NbtTag, depth: i32) {
     match tag {
         NbtTag::Byte(value) => {
@@ -949,7 +947,7 @@ fn write_compound(out: &mut String, compound: &NbtCompound, depth: i32) {
 
     // 挿入順のまま「キー: 値」を並べる
     for (key, value) in compound.iter() {
-        // 2 つ目以降の前に区切りのカンマを置く
+        // 2つ目以降の前に区切りのカンマを置く
         if !first {
             out.push(',');
         }
@@ -982,7 +980,7 @@ fn write_list(out: &mut String, list: &NbtList, depth: i32) {
 
     // 要素型は共通なので値だけを並べる
     for item in list.iter() {
-        // 2 つ目以降の前に区切りのカンマを置く
+        // 2つ目以降の前に区切りのカンマを置く
         if !first {
             out.push(',');
         }
@@ -1006,9 +1004,9 @@ fn write_typed_array<T: std::fmt::Display>(
     out.push(marker);
     out.push(';');
 
-    // 型付き配列は 1 行に収める
+    // 型付き配列は1行に収める
     for (index, value) in values.iter().enumerate() {
-        // 2 つ目以降の前に区切りのカンマを置く
+        // 2つ目以降の前に区切りのカンマを置く
         if index > 0 {
             out.push(',');
         }
@@ -1020,7 +1018,7 @@ fn write_typed_array<T: std::fmt::Display>(
     out.push(']');
 }
 
-/// 整形出力なら改行とインデントを、1 行出力なら何も入れない
+/// 整形出力なら改行とインデントを、1行出力なら何も入れない
 fn append_separator(out: &mut String, depth: i32) {
     if depth < 0 {
         return;
@@ -1034,7 +1032,7 @@ fn append_separator(out: &mut String, depth: i32) {
     }
 }
 
-/// 整形出力のときだけ深さを 1 段進める
+/// 整形出力のときだけ深さを1段進める
 fn next_depth(depth: i32) -> i32 {
     if depth < 0 {
         return -1;
@@ -1070,14 +1068,13 @@ fn is_bare_writable(text: &str) -> bool {
 
 /// 文字列を二重引用符で囲み、必要な文字だけエスケープする
 ///
-/// UTF-16 コード単位で処理するのは、正しいサロゲートペアと孤立サロゲートを
-/// 区別するため
-/// C# / Java と同じ判定にしないと出力が食い違う
+/// UTF-16コード単位で処理するのは、正しいサロゲートペアと孤立サロゲートを区別するため
+/// C# / Javaと同じ判定にしないと出力が食い違う
 fn quote_string(units: &[u16]) -> String {
     let mut out = String::from("\"");
     let mut index = 0usize;
 
-    // 1 コード単位ずつ見てエスケープが要るものだけ置き換える
+    // 1コード単位ずつ見てエスケープが要るものだけ置き換える
     while index < units.len() {
         let unit = units[index];
 
@@ -1106,7 +1103,7 @@ fn quote_string(units: &[u16]) -> String {
 
                     index += 1;
                 } else if unit < 0x20 || unit == 0x7F || (0xD800..=0xDFFF).contains(&unit) {
-                    // 制御文字と孤立サロゲートは \uXXXX で表す
+                    // 制御文字と孤立サロゲートは\uXXXXで表す
                     out.push_str(&format!("\\u{unit:04x}"));
                 } else if let Some(value) = char::from_u32(unit as u32) {
                     out.push(value);

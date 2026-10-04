@@ -3,8 +3,6 @@ package io.github.scriptarts.springnbt.anvil;
 /**
  * チャンクの絶対座標
  *
- * <p>仕様: {@code docs/spec/20-anvil-region.md} 1章
- *
  * @param x 絶対チャンクX座標
  * @param z 絶対チャンクZ座標
  */

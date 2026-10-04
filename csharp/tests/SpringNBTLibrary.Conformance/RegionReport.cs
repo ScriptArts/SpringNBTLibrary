@@ -6,17 +6,17 @@ using SpringNBTLibrary.Nbt;
 namespace SpringNBTLibrary.Conformance;
 
 /// <summary>
-/// リージョンファイルの中身を、言語をまたいで文字列として完全一致する形へ写す。
+/// リージョンファイルの中身を、言語をまたいで文字列として完全一致する形へ写す
 /// </summary>
-/// <remarks>仕様: <c>docs/spec/90-conformance.md</c> 2.3章</remarks>
 internal static class RegionReport
 {
     /// <summary>
-    /// 存在するチャンクを 1 行 1 チャンクで書き出す。並びはロケーションテーブルの添字順。
+    /// 存在するチャンクを1行1チャンクで書き出す
+    /// 並びはロケーションテーブルの添字順
     /// </summary>
     /// <remarks>
-    /// 各行は「絶対X 絶対Z セクタ数 タイムスタンプ 圧縮方式 展開後バイト数 ルート直下キー数」。
-    /// 展開後バイト数を含めるのは、ヘッダ解析だけでなく展開と NBT 解釈まで通ったことを確かめるため。
+    /// 各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 ルート直下キー数」
+    /// 展開後バイト数を含めるのは、ヘッダ解析だけでなく展開とNBT解釈まで通ったことを確かめるため
     /// </remarks>
     internal static string List(RegionFile region)
     {
@@ -63,12 +63,12 @@ internal static class RegionReport
     }
 
     /// <summary>
-    /// 全チャンクを読み直し、無圧縮で新しいリージョンへ詰め直して書き出す。
+    /// 全チャンクを読み直し、無圧縮で新しいリージョンへ詰め直して書き出す
     /// </summary>
     /// <remarks>
-    /// 無圧縮にするのは、zlib の出力が処理系ごとに違い、
-    /// 圧縮したままでは言語間でバイトが一致しないため。
-    /// これによりセクタ確保とヘッダ生成のロジックを直接比較できる。
+    /// 無圧縮にするのは、zlibの出力が処理系ごとに違い、
+    /// 圧縮したままでは言語間でバイトが一致しないため
+    /// これによりセクタ確保とヘッダ生成のロジックを直接比較できる
     /// </remarks>
     internal static void Rewrite(RegionFile source, string outputPath)
     {

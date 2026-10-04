@@ -4,16 +4,16 @@ using SpringNBTLibrary.World;
 namespace SpringNBTLibrary.Tests;
 
 /// <summary>
-/// World / Block レイヤ。仕様: docs/spec/30-chunk-format.md / 31-paletted-container.md / 40-world-layout.md
+/// World / Blockレイヤ
 /// </summary>
 public class WorldTests
 {
-    /// <summary>共通テストベクタ（world/*.nbt）のパス。</summary>
+    /// <summary>共通テストベクタ（world/*.nbt）のパス</summary>
     private static string VectorPath(string name)
     {
         string current = AppContext.BaseDirectory;
 
-        // ビルド出力からリポジトリ直下まで遡って spec/testdata を探す
+        // ビルド出力からリポジトリ直下まで遡ってspec/testdataを探す
         while (current is not null)
         {
             string candidate = Path.Combine(current, "spec", "testdata", "world", name + ".nbt");
@@ -36,7 +36,7 @@ public class WorldTests
         throw new InvalidOperationException("テストベクタが見つからない: world/" + name + ".nbt");
     }
 
-    /// <summary>テストベクタをチャンクとして読む。</summary>
+    /// <summary>テストベクタをチャンクとして読む</summary>
     private static Chunk LoadChunk(string name, ChunkReadOptions? options = null)
     {
         NamedTag named = NbtIo.ReadFile(VectorPath(name));
@@ -164,7 +164,8 @@ public class WorldTests
         {
             BitStorage storage = BitStorage.Create(5, 4096);
 
-            // bits=5 なら 1 つの long に 12 個。12 個目は次の long の最下位から始まる
+            // bits=5なら1つのlongに12個
+            // 添字12は次のlongの最下位から始まる
             storage.Set(11, 31);
             storage.Set(12, 1);
             long[] longs = storage.ToLongs();
@@ -204,7 +205,7 @@ public class WorldTests
         [Fact]
         public void 寛容モードなら長さからビット幅を逆算する()
         {
-            // 4096 エントリを 342 long で表せるのは bits=5 のときだけ
+            // 4096エントリを342 longで表せるのはbits=5のときだけ
             BitStorage storage = BitStorage.FromLongs(new long[342], 4, 4096, lenient: true);
             Assert.Equal(5, storage.BitsPerEntry);
         }
@@ -266,7 +267,7 @@ public class WorldTests
         {
             PalettedContainer container = PalettedContainer.Filled(BlockEntry("minecraft:air"), 4096, 4);
 
-            // パレットを 17 要素まで増やして bits=4 から 5 への拡張を起こす
+            // 17種のブロックを足してパレットを18要素にし、bits=4から5への拡張を起こす
             for (int index = 0; index < 17; index++)
             {
                 container.Set(index, BlockEntry("minecraft:block_" + index));
@@ -297,7 +298,7 @@ public class WorldTests
 
             container.Compact();
 
-            // 残るのは実際に使われている air と dirt の 2 つ
+            // 残るのは実際に使われているairとdirtの2つ
             Assert.Equal(2, container.Palette.Count);
             Assert.Equal("minecraft:dirt", ((NbtCompound)container.Get(0)).GetString("Name"));
         }
@@ -354,7 +355,8 @@ public class WorldTests
                 "minecraft:stone",
             };
 
-            // ベクタの添字は (位置 * 11) % 17。パレット先頭 2 つだけ名前が違う
+            // ベクタの添字は (位置 * 11) % 17
+            // パレットの先頭2つだけ名前が違う
             for (int position = 0; position < 4096; position++)
             {
                 int paletteIndex = (position * 11) % 17;
@@ -421,7 +423,7 @@ public class WorldTests
             chunk.SetBlock(3, -60, 7, "minecraft:stone");
             Assert.True(chunk.IsModified);
 
-            // 保存済みとして印を下ろせる
+            // 保存済みとして印を外せる
             chunk.IsModified = false;
             Assert.False(chunk.IsModified);
 
@@ -439,7 +441,7 @@ public class WorldTests
             Chunk chunk = LoadChunk("palette_1");
             chunk.SetBiome(0, -64, 0, "minecraft:desert");
 
-            // 同じ 4×4×4 の枠内はまとめて変わる
+            // 同じ4×4×4の枠内はまとめて変わる
             Assert.Equal("minecraft:desert", chunk.GetBiome(3, -61, 3));
             Assert.Equal("minecraft:plains", chunk.GetBiome(4, -64, 0));
         }
@@ -479,18 +481,18 @@ public class WorldTests
             Assert.Equal(2, before.GetList("block_ticks").Count);
             Assert.Single(before.GetList("fluid_ticks"));
 
-            // (0,-64,0) には chest と block_tick、(1,-64,1) には furnace と fluid_tick がある
+            // (0,-64,0)にはchestとblock_tick、(1,-64,1)にはfurnaceとfluid_tickがある
             chunk.SetBlock(0, -64, 0, BlockState.Parse("minecraft:stone"));
             chunk.SetBlock(1, -64, 1, BlockState.Parse("minecraft:stone"));
 
             NbtCompound after = chunk.Raw;
             NbtList entities = after.GetList("block_entities");
 
-            // 触っていない (15,-50,15) の barrel だけが残る
+            // 触っていない(15,-50,15)のbarrelだけが残る
             Assert.Single(entities);
             Assert.Equal("minecraft:barrel", ((NbtCompound)entities[0]).GetString("id"));
 
-            // block_ticks も同様に、対象の座標のものだけ消える
+            // block_ticksも同様に、対象の座標のものだけ消える
             NbtList ticks = after.GetList("block_ticks");
             Assert.Single(ticks);
             Assert.Equal(15, ((NbtCompound)ticks[0]).GetInt("x"));
@@ -514,8 +516,7 @@ public class WorldTests
         [Fact]
         public void 別のチャンクの同じ相対座標は消さない()
         {
-            // 付随データは絶対座標で持つので、チャンク座標を取り違えると
-            // 無関係な要素を消してしまう
+            // 付随データは絶対座標で持つので、チャンク座標を間違えると無関係な要素を消してしまう
             NamedTag named = NbtIo.ReadFile(VectorPath("block_entities"));
             NbtCompound root = (NbtCompound)named.Tag;
             root.Set("xPos", new NbtInt(1));
@@ -524,7 +525,8 @@ public class WorldTests
             Chunk chunk = Chunk.FromNbt(root);
             chunk.SetBlock(0, -64, 0, BlockState.Parse("minecraft:stone"));
 
-            // このチャンクの (0,-64,0) は絶対座標 (16,-64,16)。どれとも一致しない
+            // このチャンクの(0,-64,0)は絶対座標(16,-64,16)
+            // どれとも一致しない
             Assert.Equal(3, chunk.Raw.GetList("block_entities").Count);
         }
 
@@ -566,12 +568,12 @@ public class WorldTests
     }
 
     // ------------------------------------------------------------------
-    // DataVersion の扱い
+    // DataVersionの扱い
     // ------------------------------------------------------------------
 
     public class DataVersionTests
     {
-        /// <summary>DataVersion だけを差し替えたチャンクを作る。</summary>
+        /// <summary>DataVersionだけを差し替えたチャンクを作る</summary>
         private static NbtCompound ForeignChunk()
         {
             NamedTag named = NbtIo.ReadFile(VectorPath("palette_1"));
@@ -639,11 +641,11 @@ public class WorldTests
             Chunk chunk = Chunk.FromNbt(ForeignChunk(), read);
             ChunkWriteOptions write = new ChunkWriteOptions { AllowForeignDataVersion = true };
 
-            // DataVersion は読んだ値のまま残す
+            // DataVersionは読んだ値のまま残す
             Assert.Equal(3953, chunk.ToNbt(write).GetInt("DataVersion"));
         }
 
-        /// <summary>対象より新しい DataVersion を持つチャンクを作る。</summary>
+        /// <summary>対象より新しいDataVersionを持つチャンクを作る</summary>
         private static NbtCompound NewerChunk()
         {
             NamedTag named = NbtIo.ReadFile(VectorPath("palette_1"));
@@ -662,7 +664,7 @@ public class WorldTests
                 OnWarning = warnings.Add,
             };
 
-            // 形式が同じであれば、新しいバージョンでも黙って読める
+            // 形式が同じであれば、新しいバージョンでも警告を出さずに読める
             Chunk chunk = Chunk.FromNbt(NewerChunk(), options);
             Assert.Equal(5015, chunk.DataVersion);
             Assert.Empty(warnings);
@@ -684,7 +686,7 @@ public class WorldTests
         {
             Chunk chunk = Chunk.FromNbt(NewerChunk());
 
-            // 許可を出さなくても書き戻せて、DataVersion も変わらない
+            // 許可を出さなくても書き戻せて、DataVersionも変わらない
             Assert.Equal(5015, chunk.ToNbt().GetInt("DataVersion"));
         }
 

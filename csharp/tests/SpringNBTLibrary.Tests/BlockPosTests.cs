@@ -4,7 +4,7 @@ using SpringNBTLibrary.World;
 namespace SpringNBTLibrary.Tests;
 
 /// <summary>
-/// ブロック座標と範囲。仕様: docs/spec/30-chunk-format.md 5章
+/// ブロック座標と範囲
 /// </summary>
 public class BlockPosTests
 {
@@ -31,7 +31,7 @@ public class BlockPosTests
     [Fact]
     public void NormalizesTheOrderOfTheTwoCorners()
     {
-        // 端の順序は問わない
+        // 両端の順序は問わない
         Cuboid box = Cuboid.Of(10, 20, 30, 0, 5, 15);
 
         Assert.Equal(0, box.MinX);
@@ -61,7 +61,7 @@ public class BlockPosTests
         Assert.Equal(box.Volume, positions.Count);
         Assert.Equal(2 * 3 * 4, positions.Count);
 
-        // 並びは Y、Z、X の順で、X がいちばん内側で動く
+        // 並びはY、Z、Xの順で、Xがいちばん内側で動く
         Assert.Equal(new BlockPos(0, 0, 0), positions[0]);
         Assert.Equal(new BlockPos(1, 0, 0), positions[1]);
         Assert.Equal(new BlockPos(0, 0, 1), positions[2]);

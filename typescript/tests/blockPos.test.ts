@@ -1,7 +1,5 @@
 /**
  * ブロック座標と範囲
- *
- * 仕様: `docs/spec/30-chunk-format.md` 5章
  */
 
 import assert from "node:assert/strict";
@@ -52,7 +50,7 @@ test("範囲内の座標をすべて返す", () => {
   assert.equal(positions.length, box.volume);
   assert.equal(positions.length, 2 * 3 * 4);
 
-  // 並びは Y、Z、X の順で、X がいちばん内側で動く
+  // 並びはY、Z、Xの順で、Xがいちばん内側で動く
   assert.ok(positions[0].equals(new BlockPos(0, 0, 0)));
   assert.ok(positions[1].equals(new BlockPos(1, 0, 0)));
   assert.ok(positions[2].equals(new BlockPos(0, 0, 1)));

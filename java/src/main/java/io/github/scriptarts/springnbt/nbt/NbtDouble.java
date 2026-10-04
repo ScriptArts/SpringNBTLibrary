@@ -47,7 +47,7 @@ public final class NbtDouble implements NbtTag {
 
     @Override
     public boolean equals(Object other) {
-        // NaN や -0.0 を区別するため、値ではなくビットパターンで比較する
+        // NaNや-0.0を区別するため、値ではなくビットパターンで比較する
         return other instanceof NbtDouble tag
                 && Double.doubleToRawLongBits(tag.value) == Double.doubleToRawLongBits(value);
     }

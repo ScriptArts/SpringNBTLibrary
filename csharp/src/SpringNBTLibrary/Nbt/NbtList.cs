@@ -4,15 +4,14 @@ namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
 /// TAG_List
-/// 要素型が 1 つに固定されたタグの列
+/// 要素型が1つに固定されたタグの列
 /// </summary>
 /// <remarks>
 /// <para>
-/// 空リストの要素型は <see cref="TagType.End"/>
+/// 空リストの要素型は<see cref="TagType.End"/>
 /// 最初の要素を追加した時点で型が確定する
-/// 全要素を削除しても確定済みの要素型は維持される（読み書きの往復で型が消えないようにするため）
+/// 読み書きの往復で型が消えないよう、全要素を削除しても確定済みの要素型は維持される
 /// </para>
-/// <para>仕様: <c>docs/spec/10-nbt-binary.md</c> 7.2章</para>
 /// </remarks>
 public sealed class NbtList : NbtTag, IList<NbtTag>
 {
@@ -40,7 +39,7 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
     {
         ArgumentNullException.ThrowIfNull(elements);
 
-        // 1 要素ずつ型検査しながら追加する
+        // 1要素ずつ型検査しながら追加する
         foreach (NbtTag element in elements)
         {
             Add(element);
@@ -48,7 +47,7 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
     }
 
     /// <summary>要素の型
-    /// 空で未確定なら <see cref="TagType.End"/></summary>
+    /// 空で未確定なら<see cref="TagType.End"/></summary>
     public TagType ElementType { get; private set; }
 
     /// <inheritdoc/>
@@ -172,7 +171,7 @@ public sealed class NbtList : NbtTag, IList<NbtTag>
     /// </summary>
     private void EnsureElementType(NbtTag item)
     {
-        // TAG_End はリストの要素になれない
+        // TAG_Endはリストの要素になれない
         if (item.Type == TagType.End)
         {
             throw SpringNbtException.UnexpectedTagType("TAG_End はリストの要素にできない");

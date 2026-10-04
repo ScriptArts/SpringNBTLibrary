@@ -17,7 +17,7 @@
 # --- TypeScript / Node ---
 node_modules/
 /typescript/dist/
-# npm pack が作る配布用の tarball
+# npm packが作る配布用のtarball
 /typescript/*.tgz
 
 # --- Python ---

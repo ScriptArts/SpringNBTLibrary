@@ -21,12 +21,9 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Minecraft Java版のセーブデータ 1 つ分
+ * Minecraft Java版のセーブデータ1つ分
  *
- * <p>26.x では構成が大きく変わっており、標準の3次元も
- * {@code dimensions/<名前空間>/<パス>/} の下に並ぶ
- *
- * <p>仕様: {@code docs/spec/40-world-layout.md}
+ * <p>26.xでは構成が大きく変わっており、標準の3次元も{@code dimensions/<名前空間>/<パス>/}の下に並ぶ
  */
 public final class MinecraftWorld implements AutoCloseable {
 
@@ -52,7 +49,7 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * {@code level.dat} の内容
+     * {@code level.dat}の内容
      *
      * @return level.dat
      */
@@ -65,10 +62,10 @@ public final class MinecraftWorld implements AutoCloseable {
      *
      * @param directory ワールドディレクトリ
      * @param options   オプション
-     * null なら既定値
+     * nullなら既定値
      * @return ワールド
-     * @throws SpringNbtException ディレクトリや level.dat が無い場合、
-     *                            または書き込みモードで session.lock を取得できない場合
+     * @throws SpringNbtException ディレクトリやlevel.datが無い場合、
+     *                            または書き込みモードでsession.lockを取得できない場合
      */
     public static MinecraftWorld open(Path directory, WorldOpenOptions options) {
         Objects.requireNonNull(directory, "directory");
@@ -90,7 +87,7 @@ public final class MinecraftWorld implements AutoCloseable {
             throw new SpringNbtException(ErrorCode.IO, "level.dat が無い: " + levelPath);
         }
 
-        // 書き込むなら、Minecraft が起動中でないことを先に確かめる
+        // 書き込むなら、Minecraftが起動中でないことを先に確かめる
         if (effective.writable() && !effective.ignoreSessionLock()) {
             checkSessionLock(directory);
         }
@@ -108,7 +105,7 @@ public final class MinecraftWorld implements AutoCloseable {
         return open(directory, null);
     }
 
-    /** {@code session.lock} を排他で開けるか確かめる */
+    /** {@code session.lock}を排他で開けるか確かめる */
     private static void checkSessionLock(Path directory) {
         Path lockPath = directory.resolve("session.lock");
 
@@ -134,14 +131,13 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * {@code data/minecraft/<name>.dat} を読む
+     * {@code data/minecraft/<name>.dat}を読む
      *
-     * <p>26.x では {@code game_rules} / {@code weather} / {@code world_gen_settings} などが
-     * この形で {@code level.dat} から分離されている
+     * <p>26.xでは{@code game_rules} / {@code weather} / {@code world_gen_settings}などがこの形で{@code level.dat}から分離されている
      *
      * @param name ファイル名（拡張子なし）
      * @return NBT
-     * 存在しなければ null
+     * 存在しなければnull
      */
     public NbtCompound dataFile(String name) {
         ensureOpen();
@@ -168,16 +164,16 @@ public final class MinecraftWorld implements AutoCloseable {
             return found;
         }
 
-        // dimensions/<名前空間>/<パス>/ の 2 段を辿る
+        // dimensions/<名前空間>/<パス>/の2段を辿る
         try (DirectoryStream<Path> namespaces = Files.newDirectoryStream(root)) {
-            // 1 段目が名前空間
+            // 1段目が名前空間
             for (Path namespaceDir : namespaces) {
                 if (!Files.isDirectory(namespaceDir)) {
                     continue;
                 }
 
                 try (DirectoryStream<Path> paths = Files.newDirectoryStream(namespaceDir)) {
-                    // 2 段目が次元のパス
+                    // 2段目が次元のパス
                     for (Path pathDir : paths) {
                         // ディレクトリだけを次元として数える
                         if (Files.isDirectory(pathDir)) {
@@ -198,10 +194,10 @@ public final class MinecraftWorld implements AutoCloseable {
     /**
      * 次元を得る
      *
-     * @param dimensionId {@code minecraft:overworld} のような名前空間つきのID
-     *                    名前空間が省略されていたら {@code minecraft:} を補う
+     * @param dimensionId {@code minecraft:overworld}のような名前空間つきのID
+     *                    名前空間が省略されていたら{@code minecraft:}を補う
      * @return 次元
-     * ディレクトリが無ければ null
+     * ディレクトリが無ければnull
      */
     public Dimension dimension(String dimensionId) {
         ensureOpen();
@@ -243,7 +239,7 @@ public final class MinecraftWorld implements AutoCloseable {
         }
 
         try (DirectoryStream<Path> files = Files.newDirectoryStream(path, "*.dat")) {
-            // <uuid>.dat の名前部分が UUID にあたる
+            // <uuid>.datの名前部分がUUIDにあたる
             for (Path file : files) {
                 String name = file.getFileName().toString();
                 found.add(name.substring(0, name.length() - 4));
@@ -261,7 +257,7 @@ public final class MinecraftWorld implements AutoCloseable {
      *
      * @param uuid プレイヤーのUUID
      * @return NBT
-     * 存在しなければ null
+     * 存在しなければnull
      */
     public NbtCompound player(String uuid) {
         ensureOpen();
@@ -276,10 +272,10 @@ public final class MinecraftWorld implements AutoCloseable {
     }
 
     /**
-     * {@code level.dat} を書き戻す
+     * {@code level.dat}を書き戻す
      *
-     * <p>壊れるとワールド全体が開けなくなるため、
-     * 一時ファイルへ書いてから {@code level.dat_old} へ退避し、最後に置き換える
+     * <p>{@code level.dat}がおかしくなるとワールド全体が開けなくなるため、
+     * 一時ファイルへ書いてから既存の{@code level.dat}を{@code level.dat_old}へ退避し、最後に置き換える
      */
     public void saveLevel() {
         ensureOpen();
@@ -295,7 +291,7 @@ public final class MinecraftWorld implements AutoCloseable {
         try {
             NbtIo.writeFile(temporary, level.toNamedTag(), null);
 
-            // 既存の level.dat は、置き換える前に level.dat_old へ退避する
+            // 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
             if (Files.exists(path)) {
                 Files.copy(path, backup, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -328,7 +324,7 @@ public final class MinecraftWorld implements AutoCloseable {
         }
     }
 
-    /** 名前空間が省略されていたら {@code minecraft:} を補う */
+    /** 名前空間が省略されていたら{@code minecraft:}を補う */
     private static String normalizeDimensionId(String dimensionId) {
         if (dimensionId.indexOf(':') >= 0) {
             return dimensionId;

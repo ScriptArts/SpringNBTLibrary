@@ -1,14 +1,14 @@
-# 04. ワールドと level.dat
+# 04. ワールドとlevel.dat
 
-ワールド全体を開き、`level.dat` と次元を扱います。
+ワールド全体を開き、`level.dat`と次元を扱います。
 
-> コード例は基準実装の C#。他言語での綴りは [API 対応表](../api/world.md)。
+> コード例は基準実装のC#で示します。他の言語での綴りは[API対応表](../api/world.md)を参照してください。
 
 ---
 
-## 1. 26.x のディレクトリ構成
+## 1. 26.xのディレクトリ構成
 
-1.21.x から大きく変わっています。
+1.21.xから大きく変わっています。
 
 ```
 <ワールド名>/
@@ -35,16 +35,16 @@
     └─ data/minecraft/
 ```
 
-変更点のまとめ
+変更点をまとめると次のとおりです。
 
 | 1.21.x | 26.x |
 |---|---|
 | `region/`（オーバーワールドは直下） | `dimensions/minecraft/overworld/region/` |
 | `DIM-1/` `DIM1/` | `dimensions/minecraft/the_nether/` `.../the_end/` |
 | `playerdata/` | `players/data/` |
-| `level.dat` にゲームルール等を同梱 | `data/minecraft/*.dat` へ分離 |
+| `level.dat`にゲームルール等を同梱 | `data/minecraft/*.dat`へ分離 |
 
-この構成は[実際の 26.2 ワールドを走査して確かめた](../spec/40-world-layout.md)。
+この構成は、[実際の26.2ワールドを走査して確かめました](../spec/40-world-layout.md)。
 
 ---
 
@@ -58,20 +58,19 @@ Console.WriteLine(world.Level.VersionName);      // 26.2
 Console.WriteLine(world.Level.DataVersion);      // 4903
 ```
 
-既定は読み取り専用。 書き込むには明示的に許可します。
+既定は読み取り専用です。書き込むには明示的に許可します。
 
 ```csharp
 WorldOpenOptions options = new WorldOpenOptions { Writable = true };
 using MinecraftWorld world = MinecraftWorld.Open(worldPath, options);
 ```
 
-> 書き込みで開くと `session.lock` を確認する（C# / Java / Python(POSIX) のみ）。
-> TypeScript と Rust は確認しないので、
-> Minecraft が起動していないことを呼び出し側で担保すること（[adr/0008](../adr/0008-session-lock.md)）。
+> 書き込みで開くと`session.lock`を確認します（C# / Java / Python(POSIX)のみ）。
+> TypeScriptとRustは確認しないので、Minecraftが起動していないことを呼び出し側で確かめてください（[adr/0008](../adr/0008-session-lock.md)）。
 
 ---
 
-## 3. level.dat の中身
+## 3. level.datの中身
 
 よく使う項目には名前つきの取得子があります。
 
@@ -81,7 +80,7 @@ LevelData level = world.Level;
 level.LevelName;         // ワールド名
 level.DataVersion;       // 4903
 level.VersionName;       // "26.2"
-level.Time;              // 経過 tick
+level.Time;              // 経過tick
 level.GameType;          // 0=サバイバル 1=クリエイティブ 2=アドベンチャー 3=スペクテイター
 level.SpawnPos;          // [x, y, z]
 level.SpawnDimension;    // "minecraft:overworld"
@@ -89,7 +88,7 @@ level.Difficulty;        // "normal"
 level.IsHardcore;
 ```
 
-それ以外は生の NBT を直接たどります。
+それ以外は生のNBTを直接たどります。
 
 ```csharp
 NbtCompound data = level.Data;
@@ -97,7 +96,7 @@ NbtCompound data = level.Data;
 
 ### 分離されたデータファイル
 
-ゲームルールなどは `level.dat` にはもう入っていません。
+ゲームルールなどは`level.dat`にはもう入っていません。
 
 ```csharp
 NbtCompound? rules = world.DataFile("game_rules");
@@ -118,11 +117,10 @@ foreach (string id in world.DimensionIds())
 Dimension? overworld = world.Dimension("minecraft:overworld");
 ```
 
-名前空間を省くと `minecraft:` を補う。`world.Dimension("overworld")` でも構いません。
-存在しない次元（まだ生成されていない、など）は `null` になります。
+名前空間を省くと`minecraft:`を補います。`world.Dimension("overworld")`でも構いません。
+存在しない次元（まだ生成されていない、など）は`null`になります。
 
-カスタム次元も同じように扱えます。データパックが作った
-`dimensions/mypack/mydim/` は `"mypack:mydim"` で開けます。
+カスタム次元も同じように扱えます。データパックが作った`dimensions/mypack/mydim/`は`"mypack:mydim"`で開けます。
 
 ### 次元の中身
 
@@ -134,7 +132,7 @@ foreach (ChunkPos pos in overworld.ChunkPositions())
 }
 ```
 
-`entities/` と `poi/` は生の NBT として読めます。
+`entities/`と`poi/`は生のNBTとして読めます。
 
 ```csharp
 RegionFolder? entities = overworld.EntityFolder;
@@ -159,22 +157,21 @@ foreach (string uuid in world.PlayerIds())
 
 ```csharp
 overworld.Flush();     // 変更したチャンクを書き戻す
-world.SaveLevel();     // level.dat を書き戻す
+world.SaveLevel();     // level.datを書き戻す
 ```
 
-`SaveLevel` は一時ファイルへ書いてから置き換えます。
-書き込み中に落ちても `level.dat` が壊れないようにするためで、
-直前の内容は `level.dat_old` へ退避されます。
+`SaveLevel`は一時ファイルへ書いてから置き換えます。
+書き込み中に落ちても`level.dat`が破損しないようにするためです。直前の内容は`level.dat_old`へ退避されます。
 
-`using`（Java は try-with-resources、Python は `with`）を抜けるときに
-`Close` が呼ばれ、書き込みモードなら自動で `Flush` されます。
+`using`（Javaはtry-with-resources、Pythonは`with`）を抜けるときに`Close`が呼ばれ、書き込みモードなら自動で`Flush`されます。
 
 ---
 
 ## 7. バージョンが違うワールド
 
-読み込みは寛容に、書き込みは対象バージョン固定にしています
-（[adr/0003](../adr/0003-version-policy.md)）。詳しくは [07](07-version-policy.md)。
+読み込みは寛容にしています。
+書き込みを既定で止めるのは、形式の違う古いチャンク（DataVersion 4786未満）だけです。`DataVersion`は読んだ値のまま残します（[adr/0003](../adr/0003-version-policy.md)）。
+詳しくは[07](07-version-policy.md)。
 
 ---
 
@@ -182,4 +179,4 @@ world.SaveLevel();     // level.dat を書き戻す
 
 - [05. ブロックとバイオーム](05-blocks-and-biomes.md)
 - [07. バージョンポリシー](07-version-policy.md)
-- [仕様 40: ワールドのディレクトリ構成](../spec/40-world-layout.md)
+- [仕様40: ワールドのディレクトリ構成](../spec/40-world-layout.md)

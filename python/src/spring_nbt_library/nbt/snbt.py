@@ -1,9 +1,7 @@
-"""SNBT (Stringified NBT) のパースと出力
+"""SNBT (Stringified NBT)のパースと出力
 
-対応範囲は「バイナリ NBT へ損失なく写せる部分集合」
-1.21.5 以降の異種リスト（``[1, "a"]``）は受理しない
-
-仕様: ``docs/spec/11-snbt.md`` / ``docs/adr/0006-snbt-scope.md``
+対応範囲は「バイナリNBTへ損失なく写せる部分集合」
+1.21.5以降の異種リスト（``[1, "a"]``）は受理しない
 """
 
 from __future__ import annotations
@@ -76,7 +74,7 @@ class _Parser:
         self._position = 0
 
     def parse_whole(self) -> NbtTag:
-        """入力全体を 1 つのタグとして読む
+        """入力全体を1つのタグとして読む
         末尾に余りがあればエラーにする
         """
         value = self._parse_value()
@@ -112,12 +110,12 @@ class _Parser:
         compound = NbtCompound()
         self._skip_whitespace()
 
-        # 空の Compound
+        # 空のCompound
         if self._peek() == "}":
             self._position += 1
             return compound
 
-        # 要素を 1 つずつ読む
+        # 要素を1つずつ読む
         while True:
             self._skip_whitespace()
 
@@ -147,12 +145,12 @@ class _Parser:
     def _parse_list_or_array(self) -> NbtTag:
         self._expect("[")
 
-        # "[B;" のような型付き配列かどうかを先に判定する
+        # "[B;"のような型付き配列かどうかを先に判定する
         if self._position + 1 < len(self._text) and self._text[self._position + 1] == ";":
             marker = self._text[self._position]
 
-            # [B; [I; [L; は型付き配列の印
-            # ただの List と見分ける
+            # [B; [I; [L;は型付き配列の印
+            # ただのListと見分ける
             if marker in "BIL":
                 self._position += 2
                 return self._parse_typed_array(marker)
@@ -168,7 +166,7 @@ class _Parser:
             self._position += 1
             return result
 
-        # 要素を 1 つずつ読む
+        # 要素を1つずつ読む
         while True:
             self._skip_whitespace()
 
@@ -179,7 +177,7 @@ class _Parser:
 
             value = self._parse_value()
 
-            # 異種リストはバイナリ NBT へ写せないため受理しない (adr/0006)
+            # 異種リストはバイナリNBTへ写せないため受理しない
             if result.element_type != TagType.END and result.element_type != value.type:
                 raise self._malformed(
                     "リストに異なる型が混在している: %s と %s"
@@ -232,13 +230,13 @@ class _Parser:
                 else:
                     raise self._malformed("配列の区切りが不正: '%s'" % following)
 
-        # 各要素が対象の幅に収まるか確認しながら詰める
+        # 各要素が対象の幅に収まるか確認してから詰める
         if marker == "B":
             self._check_elements(values, -128, 127, "ByteArray")
             return NbtByteArray(values)
 
-        # [I; は TAG_Int_Array
-        # 残りは TAG_Long_Array
+        # [I;はTAG_Int_Array
+        # 残りはTAG_Long_Array
         if marker == "I":
             self._check_elements(values, -2147483648, 2147483647, "IntArray")
             return NbtIntArray(values)
@@ -247,7 +245,7 @@ class _Parser:
         return NbtLongArray(values)
 
     def _check_elements(self, values, minimum: int, maximum: int, name: str) -> None:
-        # 範囲を確かめながら詰め直す
+        # 各要素が範囲に収まるか確かめる
         for value in values:
             if value < minimum or value > maximum:
                 raise self._malformed("%s の要素が範囲外: %d" % (name, value))
@@ -315,11 +313,11 @@ class _Parser:
         if character == "u":
             return chr(self._read_hex_digits(4))
 
-        # \U は 8 桁のコードポイント表記
+        # \Uは8桁のコードポイント表記
         if character == "U":
             code_point = self._read_hex_digits(8)
 
-            # Unicode のコードポイント範囲を外れていないか確認する
+            # Unicodeのコードポイント範囲を外れていないか確認する
             if code_point > 0x10FFFF:
                 raise self._malformed("コードポイントが範囲外: U+%X" % code_point)
 
@@ -345,7 +343,7 @@ class _Parser:
         return int(chunk, 16)
 
     def _read_named_character(self) -> str:
-        """Unicode 文字名によるエスケープ ``\\N{...}`` を読む"""
+        """Unicode文字名によるエスケープ``\\N{...}``を読む"""
         self._expect("{")
         start = self._position
 
@@ -359,7 +357,7 @@ class _Parser:
         name = self._text[start:self._position]
         self._position += 1
 
-        # 実装間で Unicode 文字名の表が揃わないため対応しない（C# / Rust には表が無い）
+        # 実装間でUnicode文字名の表が揃わないため対応しない（C# / TypeScript / Rustには表が無い）
         raise SpringNbtError(
             ErrorCode.UNSUPPORTED_FEATURE,
             "文字名によるエスケープには対応していない: \\N{%s}" % name)
@@ -370,7 +368,7 @@ class _Parser:
         if len(token) == 0:
             raise self._malformed("値が来るべき位置に解釈できない文字がある: '%s'" % self._peek_or_empty())
 
-        # bool(...) / uuid(...) の関数呼び出し
+        # bool(...) / uuid(...)の関数呼び出し
         self._skip_whitespace()
         if self._peek_or_empty() == "(" and token in ("bool", "uuid"):
             return self._parse_function(token)
@@ -395,7 +393,7 @@ class _Parser:
         self._expect(")")
 
         if name == "bool":
-            # 0 以外を真とする
+            # 0以外を真とする
             if self._to_integral(argument) != 0:
                 return NbtByte(1)
 
@@ -412,11 +410,11 @@ class _Parser:
         except ValueError as error:
             raise self._malformed("UUID として解釈できない: %s" % argument.value) from error
 
-        # UUID を上位から 32bit ずつ 4 要素の IntArray へ写す
+        # UUIDを上位から32bitずつ4要素のIntArrayへ写す
         raw = parsed.bytes
         values = []
 
-        # UUID の 16 バイトを、4 バイトずつ 4 つの i32 へ詰める
+        # UUIDの16バイトを、4バイトずつ4つのi32へ詰める
         for index in range(4):
             chunk = int.from_bytes(raw[index * 4:(index * 4) + 4], "big", signed=True)
             values.append(chunk)
@@ -425,7 +423,7 @@ class _Parser:
 
     def _try_parse_number(self, token: str) -> Optional[NbtTag]:
         """数値トークンを解釈する
-        数値として読めなければ None（文字列として扱われる）
+        数値として読めなければNoneを返す（文字列として扱われる）
         """
         negative = False
         start = 0
@@ -446,27 +444,26 @@ class _Parser:
         is_hex = _is_hex_body(body)
 
         # 幅接尾辞を末尾から剥がす
-        # 16進では b/d/f が数字と紛れるため s/l だけを認める
         last = body[-1]
 
-        # 16 進では b/d/f が数字なので、型の印として使えるのは s と l だけ
+        # 16進ではb/d/fが数字と紛れるためs/lだけを認める
         if is_hex:
             suffix_allowed = last in "sSlL"
         else:
             suffix_allowed = last in _WIDTH_SUFFIXES
 
-        # 末尾 1 文字が型の印なら切り離す
-        # 1 文字だけの token は数字そのもの
+        # 末尾1文字が型の印なら切り離す
+        # 符号を除いた本体が1文字だけなら、接尾辞とみなさず剥がさない
         if suffix_allowed and len(body) >= 2:
             width_suffix = last.lower()
             body = body[:-1]
 
-            # 符号接尾辞 u / s は幅接尾辞の手前に置かれる
+            # 符号接尾辞u / sは幅接尾辞の手前に置かれる
             if len(body) >= 2:
                 sign_char = body[-1]
 
-                # u / U は符号なしの印
-                # 1.21.5 以降の拡張構文
+                # u / Uは符号なしの印
+                # 1.21.5以降の拡張構文
                 if sign_char in "uU":
                     unsigned_suffix = True
                     body = body[:-1]
@@ -493,7 +490,7 @@ class _Parser:
 
         looks_floating = "." in body or "e" in body or "E" in body
 
-        # 小数点・指数・f/d の印があれば浮動小数点として読む
+        # 小数点・指数・f/dの印があれば浮動小数点として読む
         if looks_floating or width_suffix in ("f", "d"):
             try:
                 parsed = float(body)
@@ -514,7 +511,7 @@ class _Parser:
         if width_suffix == "f":
             return NbtFloat(signed)
 
-        # 接尾辞なしの小数は Double
+        # 接尾辞なしの小数はDouble
         if width_suffix in ("", "d"):
             return NbtDouble(signed)
 
@@ -578,8 +575,8 @@ class _Parser:
         if width_suffix == "d":
             return NbtDouble(float(value))
 
-        # 接尾辞なしの整数は Int
-        # 暗黙に Long へ格上げしない
+        # 接尾辞なしの整数はInt
+        # 暗黙にLongへ格上げしない
         return NbtInt(self._check_range(value, -2147483648, 2147483647, "int"))
 
     def _check_unsigned(self, magnitude: int, maximum: int) -> int:
@@ -647,7 +644,7 @@ def _is_binary_body(body: str) -> bool:
     if not (len(body) > 2 and body[0] == "0" and body[1] in "bB"):
         return False
 
-    # 2進リテラルの本体は 0 と 1 だけ
+    # 2進リテラルの本体は0と1だけ
     for character in body[2:]:
         if character not in "01":
             return False
@@ -678,20 +675,15 @@ def _wrap_unsigned(magnitude: int, bits: int) -> int:
     return magnitude
 
 
-# ---------------------------------------------------------------------------
-# ライタ
-# ---------------------------------------------------------------------------
-
-
 def parse(text: str) -> NbtTag:
-    """SNBT 文字列をタグへ変換する"""
-    # Python は既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
+    """SNBT文字列をタグへ変換する"""
+    # Pythonは既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
     with _recursion.guard(_recursion.DEFAULT_MAX_DEPTH, "SNBT のネストが深すぎる"):
         return _Parser(text).parse_whole()
 
 
 def parse_compound(text: str) -> NbtCompound:
-    """SNBT 文字列を Compound へ変換する"""
+    """SNBT文字列をCompoundへ変換する"""
     tag = parse(text)
 
     if isinstance(tag, NbtCompound):
@@ -700,8 +692,13 @@ def parse_compound(text: str) -> NbtCompound:
     raise SpringNbtError.unexpected_tag_type("ルートが compound でない: %s" % tag.type.as_string())
 
 
+# ---------------------------------------------------------------------------
+# ライタ
+# ---------------------------------------------------------------------------
+
+
 def write(tag: NbtTag) -> str:
-    """タグを 1 行の SNBT へ変換する"""
+    """タグを1行のSNBTへ変換する"""
     parts = []
 
     with _recursion.guard(_recursion.DEFAULT_MAX_DEPTH, "SNBT のネストが深すぎる"):
@@ -711,8 +708,8 @@ def write(tag: NbtTag) -> str:
 
 
 def write_pretty(tag: NbtTag) -> str:
-    """タグを整形した SNBT へ変換する
-    インデントは空白 4 個
+    """タグを整形したSNBTへ変換する
+    インデントは空白4個
     """
     parts = []
 
@@ -724,7 +721,7 @@ def write_pretty(tag: NbtTag) -> str:
 
 def _write_tag(parts, tag: NbtTag, depth: int) -> None:
     """タグを書き出す
-    ``depth`` が負なら 1 行、0 以上なら整形して出力する
+    ``depth``が負なら1行、0以上なら整形して出力する
     """
     if isinstance(tag, NbtByte):
         parts.append("%db" % tag.value)
@@ -755,7 +752,7 @@ def _write_tag(parts, tag: NbtTag, depth: int) -> None:
 
 
 def _write_compound(parts, compound: NbtCompound, depth: int) -> None:
-    # 空の compound は改行もインデントも入れず {} と書く
+    # 空のcompoundは改行もインデントも入れず{}と書く
     if len(compound) == 0:
         parts.append("{}")
         return
@@ -765,7 +762,7 @@ def _write_compound(parts, compound: NbtCompound, depth: int) -> None:
 
     # 挿入順のまま「キー: 値」を並べる
     for key, value in compound.items():
-        # 2 つ目以降の前に区切りのカンマを置く
+        # 2つ目以降の前に区切りのカンマを置く
         if not first:
             parts.append(",")
 
@@ -785,7 +782,7 @@ def _write_compound(parts, compound: NbtCompound, depth: int) -> None:
 
 
 def _write_list(parts, value: NbtList, depth: int) -> None:
-    # 空のリストは改行もインデントも入れず [] と書く
+    # 空のリストは改行もインデントも入れず[]と書く
     if len(value) == 0:
         parts.append("[]")
         return
@@ -795,7 +792,7 @@ def _write_list(parts, value: NbtList, depth: int) -> None:
 
     # 要素型は共通なので値だけを並べる
     for item in value:
-        # 2 つ目以降の前に区切りのカンマを置く
+        # 2つ目以降の前に区切りのカンマを置く
         if not first:
             parts.append(",")
 
@@ -810,9 +807,9 @@ def _write_list(parts, value: NbtList, depth: int) -> None:
 def _write_typed_array(parts, marker: str, values, element_suffix: str) -> None:
     parts.append("[%s;" % marker)
 
-    # 型付き配列は 1 行に収める
+    # 型付き配列は1行に収める
     for index, value in enumerate(values):
-        # 2 つ目以降の前に区切りのカンマを置く
+        # 2つ目以降の前に区切りのカンマを置く
         if index > 0:
             parts.append(",")
 
@@ -822,7 +819,7 @@ def _write_typed_array(parts, marker: str, values, element_suffix: str) -> None:
 
 
 def _append_separator(parts, depth: int) -> None:
-    """整形出力なら改行とインデントを、1 行出力なら何も入れない"""
+    """整形出力なら改行とインデントを、1行出力なら何も入れない"""
     if depth < 0:
         return
 
@@ -831,7 +828,7 @@ def _append_separator(parts, depth: int) -> None:
 
 
 def _next_depth(depth: int) -> int:
-    """整形出力のときだけ深さを 1 段進める"""
+    """整形出力のときだけ深さを1段進める"""
     if depth < 0:
         return -1
 
@@ -875,16 +872,16 @@ def _quote_string(text: str) -> str:
     """文字列を二重引用符で囲み、必要な文字だけエスケープする"""
     parts = ['"']
 
-    # 1 文字ずつ見てエスケープが要るものだけ置き換える
+    # 1文字ずつ見てエスケープが要るものだけ置き換える
     for character in text:
-        # 引用符と逆スラッシュだけを機械的に置き換える
+        # 引用符、逆スラッシュ、\b \t \n \f \rは対応するエスケープ表記に置き換える
         if character in _QUOTE_ESCAPES:
             parts.append(_QUOTE_ESCAPES[character])
             continue
 
         code = ord(character)
 
-        # 制御文字とサロゲートは \uXXXX で表す
+        # 制御文字とサロゲートは\uXXXXで表す
         if code < 0x20 or code == 0x7F or 0xD800 <= code <= 0xDFFF:
             parts.append("\\u%04x" % code)
         else:

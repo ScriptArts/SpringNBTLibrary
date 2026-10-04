@@ -27,24 +27,22 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Anvil リージョンファイルの読み書き。
+ * Anvilリージョンファイルの読み書き
  *
- * <p>仕様: {@code docs/spec/20-anvil-region.md}
- *
- * <p>他言語版と同じ検証項目を持つ。
- * 共通テストベクタによる言語間比較は {@code spec/run-conformance.sh} が担当し、
- * ここでは API の振る舞いを直接確かめる。
+ * <p>他言語版と同じ検証項目を持つ
+ * 共通テストベクタによる言語間比較は{@code spec/run-conformance.sh}が担当し、
+ * ここではAPIの振る舞いを直接確かめる
  */
 class RegionFileTest {
 
     @TempDir
     Path work;
 
-    /** 共通テストベクタのディレクトリ。 */
+    /** 共通テストベクタのディレクトリ */
     private static Path vectorDir(String name) {
         Path current = Path.of("").toAbsolutePath();
 
-        // 実行ディレクトリからリポジトリ直下まで遡って spec/testdata を探す
+        // 実行ディレクトリからリポジトリ直下まで遡ってspec/testdataを探す
         while (current != null) {
             Path candidate = current.resolve("spec").resolve("testdata").resolve("anvil").resolve(name);
 
@@ -58,7 +56,7 @@ class RegionFileTest {
         throw new IllegalStateException("テストベクタが見つからない: anvil/" + name);
     }
 
-    /** ベクタを一時ディレクトリへ複製し、書き込みテストで原本を汚さないようにする。 */
+    /** ベクタを一時ディレクトリへ複製し、書き込みテストで原本を汚さないようにする */
     private Path copyVector(String name) throws IOException {
         Path source = vectorDir(name);
         Path destination = work.resolve(name);
@@ -85,7 +83,8 @@ class RegionFileTest {
 
     @Test
     void キャッシュ上限を超えると古いリージョンから閉じる() {
-        // 上限 2 で 4 リージョンへ書く。古いものは閉じられるが内容は失われない
+        // 上限2で4リージョンへ書く
+        // 古いものは閉じられるが、内容は失われない
         try (RegionFolder folder = RegionFolder.open(work, RegionFileMode.READ_WRITE, 2)) {
             for (int region = 0; region < 4; region++) {
                 folder.writeChunk(region * 32, 0, sampleChunk(region * 32, 0));
@@ -112,12 +111,16 @@ class RegionFileTest {
         assertEquals(ErrorCode.INVALID_ARGUMENT, error.code());
     }
 
-    /** 圧縮しても縮まないバイト列を作る。サイズの制御が効くようにするため。 */
+    /**
+     * 圧縮しても縮まないバイト列を作る
+     * サイズを狙いどおりに制御できるようにするため
+     */
     private static byte[] incompressible(int length) {
         byte[] result = new byte[length];
         int state = 0x12345678;
 
-        // 線形合同法で疑似乱数を作る。テストの再現性を保つため固定の種を使う
+        // 線形合同法で疑似乱数を作る
+        // テストの再現性を保つため、固定の種を使う
         for (int index = 0; index < length; index++) {
             state = (state * 1664525) + 1013904223;
             result[index] = (byte) (state >>> 24);
@@ -206,7 +209,7 @@ class RegionFileTest {
     @Test
     void readsLz4Chunks() {
         try (RegionFile region = RegionFile.open(vectorDir("lz4").resolve("r.0.0.mca"))) {
-            // 1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
+            // 1ブロック / 2ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
             for (int x = 0; x < 4; x++) {
                 assertEquals(ChunkCompression.LZ4, region.readChunkRaw(x, 0).compression());
                 assertEquals(x, region.readChunk(x, 0).getInt("xPos"));
@@ -232,7 +235,7 @@ class RegionFileTest {
         Path path = copyVector("lz4").resolve("r.0.0.mca");
 
         try (RegionFile region = RegionFile.open(path, RegionFileMode.READ_WRITE)) {
-            // LZ4 は読み込みのみ対応なので、圧縮して書き出すことはできない
+            // LZ4は読み込みのみ対応なので、圧縮して書き出すことはできない
             NbtCompound chunk = region.readChunk(0, 0);
             SpringNbtException error = assertThrows(
                     SpringNbtException.class,
@@ -247,7 +250,8 @@ class RegionFileTest {
         byte[] before = Files.readAllBytes(path);
 
         try (RegionFile region = RegionFile.open(path, RegionFileMode.READ_WRITE)) {
-            // 触らずに閉じるだけ。生バイトを素通しするので LZ4 のまま残る
+            // 触らずに閉じるだけ
+            // 生バイトに手を加えないので、LZ4のまま残る
             assertNotNull(region);
         }
 
@@ -278,7 +282,7 @@ class RegionFileTest {
     @Test
     void chunkOutsideTheRegionIsRejected() {
         try (RegionFile region = RegionFile.open(vectorDir("empty").resolve("r.0.0.mca"))) {
-            // r.0.0 が担当するのは 0..31 の範囲だけ
+            // r.0.0が担当するのは0..31の範囲だけ
             assertEquals(ErrorCode.INVALID_ARGUMENT, codeOf(() -> region.hasChunk(32, 0)));
         }
     }
@@ -295,7 +299,7 @@ class RegionFileTest {
 
     @Test
     void openingAndFlushingWithoutChangesKeepsBytesIdentical() throws IOException {
-        // 触っていないチャンクの配置を保つことが、既存ワールドを壊さない前提になる
+        // 触っていないチャンクの配置を保つことが、既存ワールドをおかしくしないための前提になる
         Path path = copyVector("fragmented").resolve("r.0.0.mca");
         byte[] original = Files.readAllBytes(path);
 
@@ -347,7 +351,7 @@ class RegionFileTest {
     void growingChunkIsRelocatedWithoutBreakingOthers() throws IOException {
         Path path = copyVector("fragmented").resolve("r.0.0.mca");
 
-        // 5 セクタぶんになる大きなチャンクを作る
+        // 5セクタぶんになる大きなチャンクを作る
         NbtCompound big = sampleChunk(0, 0);
         big.set("filler", new NbtByteArray(incompressible(5 * RegionFile.SECTOR_SIZE)));
 
@@ -357,7 +361,7 @@ class RegionFileTest {
         }
 
         try (RegionFile reopened = RegionFile.open(path)) {
-            // 動かした結果、他の 2 チャンクが壊れていないこと
+            // 動かした結果、他の2チャンクがおかしくなっていないこと
             assertEquals(3, reopened.chunkPositions().size());
             assertEquals(5, reopened.readChunk(5, 3).getInt("xPos"));
             assertEquals(31, reopened.readChunk(31, 31).getInt("xPos"));
@@ -430,7 +434,7 @@ class RegionFileTest {
     void hugeChunkGoesToExternalFileAndComesBack() throws IOException {
         Path path = work.resolve("r.0.0.mca");
 
-        // 1MiB を超えるよう、圧縮の効かないデータを詰める
+        // 1MiBを超えるよう、圧縮しても縮まないデータを詰める
         NbtCompound huge = sampleChunk(1, 2);
         huge.set("filler", new NbtByteArray(incompressible(1200 * 1024)));
 
@@ -486,7 +490,7 @@ class RegionFileTest {
             folder.flush();
         }
 
-        // 3 つの異なるリージョンへ振り分けられる
+        // 3つの異なるリージョンへ振り分けられる
         assertTrue(Files.exists(work.resolve("r.0.0.mca")));
         assertTrue(Files.exists(work.resolve("r.-1.-1.mca")));
         assertTrue(Files.exists(work.resolve("r.1.1.mca")));

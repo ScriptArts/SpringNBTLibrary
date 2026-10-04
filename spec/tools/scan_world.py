@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 """実ワールドを読み取り専用で走査し、実データ耐性を確かめる。
 
-合成のテストベクタだけでは、実際の Minecraft が書き出すデータの網羅性に届かない。
+合成のテストベクタだけでは、実際のMinecraftが書き出すデータを網羅できない。
 このツールは手元のワールドを丸ごと読んで、次を確認する。
 
-  1. すべての `.dat` / `.nbt` を読み、ラウンドトリップ（読む→書く→バイト一致）を検証
-  2. すべての `.mca` のヘッダを解析し、全チャンクを展開して NBT として読み、同じく検証
+  1. すべての`.dat` / `.nbt`を読み、ラウンドトリップ（読む→書く→バイト一致）を検証
+  2. すべての`.mca`のヘッダを解析し、無変更で書き戻した結果が原本とバイト一致するかを検証。
+     さらに全チャンクを展開してNBTとして読み、同じくラウンドトリップを検証
   3. 使われている圧縮方式・チャンク構造の統計を出す（仕様書とのズレを見つけるため）
-  4. World レイヤ（`MinecraftWorld` / `Chunk` / `PalettedContainer`）で解釈し直し、
-     NBT へ書き戻したものが元と一致するか、ブロックが読み出せるかを検証
+  4. Worldレイヤ（`MinecraftWorld` / `Chunk` / `PalettedContainer`）で解釈し直し、
+     NBTへ書き戻したものが元と一致するか、ブロックが読み出せるかを検証
 
 **このツールは一切書き込まない。** 引数のワールドは読み取りのみで開く。
-とはいえ Minecraft が起動していない状態で実行すること（書き込み途中を読む可能性があるため）。
+とはいえMinecraftが起動していない状態で実行すること（書き込み途中を読む可能性があるため）。
 
 使い方:
     python3 spec/tools/scan_world.py "<ワールドのパス>"
     python3 spec/tools/scan_world.py "<ワールドのパス>" --verbose
-
-仕様: docs/spec/90-conformance.md
 """
 
 from __future__ import annotations
@@ -234,9 +233,9 @@ class Scanner:
 
     def check_paletted_container(self, section: NbtCompound, key: str,
                                  entry_count: int, min_bits: int) -> None:
-        """パレットの長さから求めたビット幅と、実際の data 長が一致するか確かめる。
+        """パレットの長さから求めたビット幅と、実際のdata長が一致するか確かめる。
 
-        仕様 31 の計算式が実データに合っているかを直接検証する部分。
+        ビット幅の計算式が実データに合っているかを直接検証する部分。
         """
         container = section.opt_compound(key)
 
@@ -256,7 +255,7 @@ class Scanner:
         data = container.opt_long_array("data")
 
         if data is None:
-            # パレットが 1 要素なら data は無くてよい
+            # パレットが1要素ならdataは無くてよい
             if len(palette) != 1:
                 self.failures.append(
                     "%s: palette=%d なのに data が無い" % (key, len(palette)))
@@ -334,14 +333,14 @@ class Scanner:
 
 
 class WorldScanner:
-    """World レイヤを通してワールドを読み直し、解釈が正しいかを確かめる。
+    """Worldレイヤを通してワールドを読み直し、解釈が正しいかを確かめる。
 
-    Anvil レイヤの走査は「NBT として読めるか」までしか見ない。
-    ここではさらに `Chunk` / `PalettedContainer` を通して、
+    Anvilレイヤの走査は「NBTとして読めるか」までしか見ない。
+    ここではさらに`Chunk` / `PalettedContainer`を通して、
     パレットとビット詰めの解釈・再エンコードが元データと一致するかを確認する。
     """
 
-    #: 全ブロックを 1 つずつ読む対象のチャンク数の既定値。全チャンクだと時間がかかりすぎる。
+    #: 全ブロックを1つずつ読む対象のチャンク数の既定値。全チャンクだと時間がかかりすぎる。
     DEFAULT_BLOCK_SAMPLE = 40
 
     def __init__(self, verbose: bool, block_sample: int) -> None:
@@ -355,7 +354,7 @@ class WorldScanner:
 
     def scan(self, directory: str) -> None:
         """ワールドを読み取り専用で開いて走査する。"""
-        # writable=False なので、この先どの経路でも書き込みは起きない
+        # writable=Falseなので、この先どの経路でも書き込みは起きない
         world = MinecraftWorld.open(directory, WorldOpenOptions(writable=False))
 
         try:
@@ -375,12 +374,12 @@ class WorldScanner:
             world.close()
 
     def _scan_level(self, world: MinecraftWorld) -> None:
-        """level.dat と、そこから分離されたデータファイルを読む。"""
+        """level.datと、そこから分離されたデータファイルを読む。"""
         level = world.level
         self.stats["level_data_version=%d" % level.data_version] += 1
         self.stats["level_version=%s" % level.version_name] += 1
 
-        # 26.x で level.dat から分離された各ファイルが読めるか確かめる
+        # 26.xでlevel.datから分離された各ファイルが読めるか確かめる
         for name in ("game_rules", "weather", "world_gen_settings", "world_clocks",
                      "random_sequences", "scoreboard", "custom_boss_events"):
             if world.data_file(name) is not None:
@@ -393,12 +392,12 @@ class WorldScanner:
                 self.stats["player_files"] += 1
 
     def _scan_dimension(self, dimension_id: str, dimension) -> None:
-        """1 つの次元の全チャンクを World レイヤで解釈する。"""
+        """1つの次元の全チャンクをWorldレイヤで解釈する。"""
         positions = dimension.chunk_positions()
         self.stats["dimension_chunks"] += len(positions)
         sampled = 0
 
-        # チャンクを 1 つずつ読み、再エンコードが元と一致するかを見る
+        # チャンクを1つずつ読み、再エンコードが元と一致するかを見る
         for position in positions:
             label = "%s (%d, %d)" % (dimension_id, position.x, position.z)
             folder = dimension.region_folder()
@@ -430,12 +429,12 @@ class WorldScanner:
         self.stats["block_sampled_chunks"] += sampled
 
     def _check_roundtrip(self, label: str, original: NbtCompound, chunk: Chunk) -> bool:
-        """World レイヤで読んで書き戻した結果が、元の NBT と一致するかを見る。
+        """Worldレイヤで読んで書き戻した結果が、元のNBTと一致するかを見る。
 
         セクションは毎回パレットとビット詰めを組み直して書き出されるので、
         これが一致するならエンコード側の解釈も正しいことになる。
         """
-        # to_nbt は raw を書き換えるので、比較用のバイト列は先に取っておく
+        # to_nbtはrawを書き換えるので、比較用のバイト列は先に取っておく
         expected = write_bytes(NamedTag("", original), WRITE_OPTIONS)
 
         try:
@@ -456,15 +455,15 @@ class WorldScanner:
         return True
 
     def _walk_blocks(self, label: str, chunk: Chunk) -> None:
-        """チャンク内のブロックとバイオームを 1 つずつ読み出す。
+        """チャンク内のブロックとバイオームを1つずつ読み出す。
 
         ビット詰めの取り出しを端から端まで通すので、
-        どこか 1 か所でも境界の扱いを誤っていれば例外か異常な値になる。
+        どこか1か所でも境界の扱いを誤っていれば例外か異常な値になる。
         """
         for section_y in chunk.section_ys:
             base = section_y * 16
 
-            # セクション内の 16×16×16 をすべて読む
+            # セクション内の16×16×16をすべて読む
             for y in range(16):
                 for z in range(16):
                     for x in range(16):
@@ -473,7 +472,7 @@ class WorldScanner:
                         if block is not None:
                             self.blocks[block.name] += 1
 
-            # バイオームは 4×4×4 単位なので 4 ブロックおきに読む
+            # バイオームは4×4×4単位なので4ブロックおきに読む
             for y in range(0, 16, 4):
                 for z in range(0, 16, 4):
                     for x in range(0, 16, 4):
@@ -542,10 +541,10 @@ def _decompress_for_scan(raw):
 
 
 def ceil_log2(value: int) -> int:
-    """value 個の値を表すのに必要な最小ビット数。value == 1 なら 0。"""
+    """value個の値を表すのに必要な最小ビット数。value == 1なら0。"""
     bits = 0
 
-    # 1 を超える分だけシフトして数える
+    # 1を超える分だけシフトして数える
     while (1 << bits) < value:
         bits += 1
 
@@ -605,7 +604,7 @@ def main() -> int:
 
     status = scanner.report()
 
-    # World レイヤでも読み直して、パレットとビット詰めの解釈を確かめる
+    # Worldレイヤでも読み直して、パレットとビット詰めの解釈を確かめる
     world_scanner = WorldScanner(args.verbose, args.block_sample)
 
     try:

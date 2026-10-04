@@ -10,7 +10,9 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** ブロック座標と範囲。仕様: {@code docs/spec/30-chunk-format.md} 5章 */
+/**
+ * ブロック座標と範囲
+ */
 class BlockPosTest {
 
     @Test
@@ -70,7 +72,7 @@ class BlockPosTest {
         assertEquals(box.volume(), positions.size());
         assertEquals(2 * 3 * 4, positions.size());
 
-        // 並びは Y、Z、X の順で、X がいちばん内側で動く
+        // 並びはY、Z、Xの順で、Xがいちばん内側で動く
         assertEquals(new BlockPos(0, 0, 0), positions.get(0));
         assertEquals(new BlockPos(1, 0, 0), positions.get(1));
         assertEquals(new BlockPos(0, 0, 1), positions.get(2));
@@ -85,7 +87,7 @@ class BlockPosTest {
 
         int count = 0;
 
-        // 1 つだけ返ることを数えて確かめる
+        // 1つだけ返ることを数えて確かめる
         for (BlockPos pos : box.positions()) {
             count++;
         }

@@ -1,11 +1,8 @@
-"""チャンク 1 つ分
-地形の読み書きの入口
+"""チャンク1つ分
+地形の読み書きはここから行う
 
-**読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
-**
-未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
-
-仕様: ``docs/spec/30-chunk-format.md``
+**読んだNBTをそのまま保持し、書き戻すときに作り直すのはセクションだけにする**
+未知のキーを落とさないので、将来の追加要素があってもデータをおかしくしない
 """
 
 from __future__ import annotations
@@ -31,14 +28,14 @@ __all__ = [
     "block_index",
 ]
 
-#: セクション 1 つに入るブロック数
+#: セクション1つに入るブロック数
 BLOCKS_PER_SECTION = 4096
 
-#: セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）
+#: セクション1つに入るバイオームのエントリ数（4×4×4単位）
 BIOMES_PER_SECTION = 64
 
 #: ブロックに紐づく付随データのキー
-# ブロックを置き換えたら整合が崩れる
+#: ブロックを置き換えたら整合が崩れる
 _BLOCK_DATA_KEYS = ("block_entities", "block_ticks", "fluid_ticks")
 
 
@@ -56,13 +53,13 @@ def _matches_position(entry: NbtCompound, x: int, y: int, z: int) -> bool:
 
 
 class VersionMismatchAction(enum.Enum):
-    """DataVersion が対象と違ったときの動作"""
+    """DataVersionが扱える形式より古いときの動作"""
 
     #: 警告コールバックを呼んで続行する
-    # 既定
+    #: 既定
     WARN = "warn"
 
-    #: ``UNSUPPORTED_DATA_VERSION`` の例外にする
+    #: ``UNSUPPORTED_DATA_VERSION``の例外にする
     ERROR = "error"
 
     #: 何もしない
@@ -71,20 +68,18 @@ class VersionMismatchAction(enum.Enum):
 
 class ChunkReadOptions:
     """チャンク読み込みのオプション
-
-    仕様: ``docs/spec/30-chunk-format.md`` 5章
     """
 
     def __init__(self,
                  on_version_mismatch: VersionMismatchAction = VersionMismatchAction.WARN,
                  on_warning: Optional[Callable[[str], None]] = None,
                  lenient_bit_storage: bool = False) -> None:
-        #: DataVersion が対象と違うときの動作
+        #: DataVersionが扱える形式より古いときの動作
         self.on_version_mismatch = on_version_mismatch
         #: 警告の通知先
-        # None なら何もしない
+        #: Noneなら何もしない
         self.on_warning = on_warning
-        #: data の長さが期待値と違うとき、長さからビット幅を逆算して読むか
+        #: dataの長さが期待値と違うとき、長さからビット幅を逆算して読むか
         self.lenient_bit_storage = lenient_bit_storage
 
 
@@ -92,11 +87,11 @@ class ChunkWriteOptions:
     """チャンク書き込みのオプション"""
 
     def __init__(self, allow_foreign_data_version: bool = False) -> None:
-        #: 対象バージョン以外の DataVersion を持つチャンクの書き戻しを許すか
+        #: 扱える形式より古いDataVersionを持つチャンクの書き戻しを許すか
         #:
-        #: 既定は False
-        # 古いワールドを黙って新形式で上書きし、
-        #: 利用者が気づかないうちに壊すことを防ぐため（``docs/adr/0003-version-policy.md``）
+        #: 既定はFalse
+        #: エラーを出さずに古いワールドを新形式で上書きし、
+        #: 利用者が気づかないうちに使えなくすることを防ぐため
         self.allow_foreign_data_version = allow_foreign_data_version
 
 
@@ -105,12 +100,10 @@ _DEFAULT_WRITE = ChunkWriteOptions()
 
 
 class ChunkSection:
-    """チャンクを Y 方向に 16 ブロックずつ区切った 16×16×16 の立方体
+    """チャンクをY方向に16ブロックずつ区切った16×16×16の立方体
 
-    ``BlockLight`` / ``SkyLight`` などの解釈していないキーは元の NBT に残り、
+    ``BlockLight`` / ``SkyLight``などの解釈していないキーは元のNBTに残り、
     書き戻しでそのまま出力される
-
-    仕様: ``docs/spec/30-chunk-format.md`` 2章
     """
 
     __slots__ = ("raw", "y", "block_states", "biomes")
@@ -133,11 +126,11 @@ class ChunkSection:
 
     @staticmethod
     def from_nbt(nbt: NbtCompound, options: ChunkReadOptions) -> "ChunkSection":
-        """NBT からセクションを読む"""
+        """NBTからセクションを読む"""
         section = ChunkSection(nbt, nbt.get_byte("Y"))
         block_states = nbt.opt_compound("block_states")
 
-        # 光源専用のセクションは block_states を持たない
+        # 光源専用のセクションはblock_statesを持たない
         if block_states is not None:
             section.block_states = PalettedContainer.from_nbt(
                 block_states, BLOCKS_PER_SECTION, 4, options.lenient_bit_storage)
@@ -152,7 +145,7 @@ class ChunkSection:
         return section
 
     def to_nbt(self) -> NbtCompound:
-        """NBT へ書き戻す
+        """NBTへ書き戻す
         解釈していないキーはそのまま残る
         """
         if self.block_states is not None:
@@ -176,7 +169,7 @@ class ChunkSection:
 
 
 class Chunk:
-    """チャンク 1 つ分"""
+    """チャンク1つ分"""
 
     __slots__ = ("raw", "_sections", "_modified")
 
@@ -203,13 +196,13 @@ class Chunk:
     @property
     def min_section_y(self) -> int:
         """最下段セクションのY位置
-        オーバーワールドは -4
+        オーバーワールドは-4
         """
         return self.raw.get_int("yPos")
 
     @property
     def status(self) -> str:
-        """生成段階（``minecraft:full`` など）"""
+        """生成段階（``minecraft:full``など）"""
         return self.raw.get_string("Status")
 
     @property
@@ -224,9 +217,9 @@ class Chunk:
         """このチャンクに変更が加わったか
 
         ブロックやバイオームを書き換えると立つ
-        :meth:`Dimension.flush` はこれが立っているチャンクだけを書き戻す
+        :meth:`Dimension.flush`はこれが立っているチャンクだけを書き戻す
 
-        ``raw`` を直接いじった場合はここが立たないので、自分で True にすること
+        ``raw``を直接いじった場合は立たないので、自分でTrueにすること
         """
         return self._modified
 
@@ -244,7 +237,7 @@ class Chunk:
 
     @staticmethod
     def from_nbt(nbt: NbtCompound, options: Optional[ChunkReadOptions] = None) -> "Chunk":
-        """NBT からチャンクを読む
+        """NBTからチャンクを読む
 
         :raises SpringNbtError: 必須のキーが無い、または構造が想定と違う場合
         """
@@ -260,7 +253,7 @@ class Chunk:
         if section_list is None:
             return chunk
 
-        # 並び順に依存しないよう、Y から索引を作る
+        # 並び順に依存しないよう、Yから索引を作る
         for entry in section_list:
             if not isinstance(entry, NbtCompound):
                 raise SpringNbtError.unexpected_tag_type(
@@ -272,7 +265,7 @@ class Chunk:
         return chunk
 
     def _check_data_version(self, options: ChunkReadOptions) -> None:
-        """DataVersion を検査し、オプションに従って警告またはエラーにする"""
+        """DataVersionを検査し、オプションに従って警告またはエラーにする"""
         version = self.data_version
 
         # 形式が同じであれば、新しいバージョンでもそのまま読める
@@ -291,10 +284,10 @@ class Chunk:
             options.on_warning(message)
 
     def to_nbt(self, options: Optional[ChunkWriteOptions] = None) -> NbtCompound:
-        """NBT へ書き戻す
-        変更したセクションだけを反映し、他のキーはそのまま残す
+        """NBTへ書き戻す
+        全セクションを書き戻し、他のキーはそのまま残す
 
-        :raises SpringNbtError: DataVersion が対象と違い、かつ書き戻しが許可されていない場合
+        :raises SpringNbtError: DataVersionが扱える形式より古く、かつ書き戻しが許可されていない場合
         """
         if options is None:
             effective = _DEFAULT_WRITE
@@ -303,7 +296,7 @@ class Chunk:
 
         version = self.data_version
 
-        # 形式の違う古いチャンクは、書き戻すと壊しかねない
+        # 形式の違う古いチャンクは、書き戻すと使えなくなりかねない
         if version < MIN_SUPPORTED_DATA_VERSION and not effective.allow_foreign_data_version:
             raise SpringNbtError(
                 ErrorCode.UNSUPPORTED_DATA_VERSION,
@@ -311,7 +304,7 @@ class Chunk:
                 "許可するなら ChunkWriteOptions(allow_foreign_data_version=True)"
                 % (version, MIN_SUPPORTED_DATA_VERSION))
 
-        # DataVersion は読んだ値のまま残す
+        # DataVersionは読んだ値のまま残す
         # 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
         if len(self._sections) == 0:
@@ -319,7 +312,7 @@ class Chunk:
 
         section_list = NbtList(TagType.COMPOUND)
 
-        # Y の昇順で書き出す
+        # Yの昇順で書き出す
         for section_y in self.section_ys:
             section_list.append(self._sections[section_y].to_nbt())
 
@@ -328,7 +321,7 @@ class Chunk:
 
     def section(self, section_y: int) -> Optional[ChunkSection]:
         """Y位置からセクションを得る
-        無ければ None
+        無ければNone
         """
         return self._sections.get(section_y)
 
@@ -339,7 +332,7 @@ class Chunk:
         :param y: 絶対Y座標
         :param z: チャンク内相対Z座標 (0..15)
         :return: ブロック
-        セクションが無い、または block_states を持たない場合は None
+        セクションが無い、またはblock_statesを持たない場合はNone
         """
         _check_local_coordinates(x, z)
         section = self.section(y >> 4)
@@ -358,19 +351,15 @@ class Chunk:
     def set_block(self, x: int, y: int, z: int, state: Union[BlockState, str]) -> None:
         """ブロックを設定する
 
-        ``minecraft:oak_stairs[facing=north]`` の形の文字列でも指定できる
+        ``minecraft:oak_stairs[facing=north]``の形の文字列でも指定できる
 
         置き換えによって不整合になる付随データ（``block_entities`` /
-        ``block_ticks`` / ``fluid_ticks`` のうち、その座標を指すもの）は
-        同時に取り除く
-        残すとブロックと中身が食い違い、
-        Minecraft 側で予期しない挙動になるため
+        ``block_ticks`` / ``fluid_ticks``のうち、その座標を指すもの）は同時に取り除く
+        残すとブロックと中身が食い違い、Minecraft側で予期しない挙動になるため
 
-        仕様: ``docs/spec/30-chunk-format.md`` 2.4章
-
-        :raises SpringNbtError: 対象のセクションが無い、または block_states を持たない場合
+        :raises SpringNbtError: 対象のセクションが無い、またはblock_statesを持たない場合
         """
-        # 文字列で渡されたら BlockState へ直してから進む
+        # 文字列で渡されたらBlockStateへ直してから進む
         if isinstance(state, str):
             state = BlockState.parse(state)
 
@@ -384,7 +373,7 @@ class Chunk:
                 "本ライブラリはセクションを新規生成しない" % (y, section_y))
 
         # 同じ状態を置き直すだけなら、付随データを触る理由がない
-        # プロパティの並び順に左右されないよう、NBT ではなく BlockState として比べる
+        # プロパティの並び順に左右されないよう、NBTではなくBlockStateとして比べる
         current = self.get_block(x, y, z)
 
         if current is not None and current == state:
@@ -397,13 +386,13 @@ class Chunk:
     def _remove_block_data(self, x: int, y: int, z: int) -> None:
         """その座標を指す付随データを取り除く
 
-        ``block_entities`` / ``block_ticks`` / ``fluid_ticks`` の要素は
-        いずれも ``x`` ``y`` ``z`` を**絶対座標**で持つ
+        ``block_entities`` / ``block_ticks`` / ``fluid_ticks``の要素は
+        いずれも``x`` ``y`` ``z``を**絶対座標**で持つ
         """
         absolute_x = (self.x * 16) + x
         absolute_z = (self.z * 16) + z
 
-        # 3 つのリストは形が同じなので、まとめて同じ処理をかける
+        # 3つのリストは形が同じなので、まとめて同じ処理をかける
         for key in _BLOCK_DATA_KEYS:
             values = self.raw.opt_list(key)
 
@@ -421,7 +410,7 @@ class Chunk:
 
     def get_biome(self, x: int, y: int, z: int) -> Optional[str]:
         """バイオームを取得する
-        4×4×4 の単位なので、座標は自動的に丸められる
+        4×4×4の単位なので、座標は自動的に丸められる
         """
         _check_local_coordinates(x, z)
         section = self.section(y >> 4)
@@ -439,7 +428,7 @@ class Chunk:
 
     def set_biome(self, x: int, y: int, z: int, biome: str) -> None:
         """バイオームを設定する
-        4×4×4 の単位
+        4×4×4の単位
         """
         _check_local_coordinates(x, z)
         section_y = y >> 4
@@ -453,17 +442,16 @@ class Chunk:
         self._modified = True
 
     def clear_heightmaps(self) -> None:
-        """``Heightmaps`` を削除し、Minecraft に再計算させる
+        """``Heightmaps``を削除し、Minecraftに再計算させる
 
         本ライブラリは高さマップを再計算しない
         ブロックを改変したら呼ぶこと
-        （``docs/adr/0004-defer-heightmap-recalc.md``）
         """
         self.raw.remove("Heightmaps")
         self._modified = True
 
     def invalidate_lighting(self) -> None:
-        """``isLightOn`` を 0 にし、光源の再計算を促す"""
+        """``isLightOn``を0にし、光源の再計算を促す"""
         self.raw.set_byte("isLightOn", 0)
         self._modified = True
 
@@ -476,20 +464,20 @@ class Chunk:
 def block_index(x: int, y: int, z: int) -> int:
     """セクション内のブロック添字
 
-    ``& 15`` により負のY座標でも正しく求まる
+    ``& 15``により負のY座標でも正しく求まる
     """
     return ((y & 15) * 256) + ((z & 15) * 16) + (x & 15)
 
 
 def biome_index(x: int, y: int, z: int) -> int:
     """セクション内のバイオーム添字
-    1 エントリが 4×4×4 ブロック
+    1エントリが4×4×4ブロック
     """
     return (((y & 15) // 4) * 16) + (((z & 15) // 4) * 4) + ((x & 15) // 4)
 
 
 def _check_local_coordinates(x: int, z: int) -> None:
-    # チャンク内相対座標は 0..15 でなければならない
+    # チャンク内相対座標は0..15でなければならない
     if x < 0 or x > 15 or z < 0 or z > 15:
         raise SpringNbtError.invalid_argument(
             "チャンク内相対座標が範囲外: (%d, %d)。X も Z も 0..15 であること" % (x, z))

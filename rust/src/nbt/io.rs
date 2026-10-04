@@ -1,6 +1,4 @@
-//! NBT のファイル・バイト列・ストリームからの読み書き
-//!
-//! 仕様: `docs/spec/10-nbt-binary.md` 3章〜6章
+//! NBTのファイル・バイト列・ストリームからの読み書き
 
 use std::fmt;
 use std::io::{Read, Write};
@@ -14,22 +12,18 @@ use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::mutf8;
 use crate::nbt::tag::{NbtCompound, NbtList, NbtString, NbtTag, TagType};
 
-/// NBT のルートタグの並び方
-///
-/// 仕様: `docs/spec/10-nbt-binary.md` 3章
+/// NBTのルートタグの並び方
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NbtFormat {
     /// ファイル形式
     /// ルートは「タグID + 名前長 + 名前 + ペイロード」の順に並ぶ
     Java,
-    /// ネットワーク形式 (1.20.2 以降)
+    /// ネットワーク形式 (1.20.2以降)
     /// ルートに名前が付かない
     Network,
 }
 
 /// 圧縮方式
-///
-/// 仕様: `docs/spec/10-nbt-binary.md` 4章
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Compression {
     /// 無圧縮
@@ -47,7 +41,7 @@ pub enum Compression {
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedTag {
     /// ルート名
-    /// `Java` 形式では通常空文字列だが、読んだ値をそのまま保持する
+    /// `Java`形式では通常空文字列だが、読んだ値をそのまま保持する
     pub name: String,
     /// ルートタグ
     pub tag: NbtCompound,
@@ -60,7 +54,7 @@ impl NamedTag {
     }
 }
 
-/// NBT 読み込みのオプション
+/// NBT読み込みのオプション
 #[derive(Debug, Clone, Copy)]
 pub struct NbtReadOptions {
     /// ルートタグの並び方
@@ -69,7 +63,7 @@ pub struct NbtReadOptions {
     /// 既定は自動判定
     pub compression: Compression,
     /// ネストの深さ上限
-    /// 既定は 512
+    /// 既定は512
     pub max_depth: i32,
     /// 展開後の総バイト数の上限
     /// 負値なら無制限
@@ -87,13 +81,13 @@ impl Default for NbtReadOptions {
     }
 }
 
-/// NBT 書き込みのオプション
+/// NBT書き込みのオプション
 #[derive(Debug, Clone, Copy)]
 pub struct NbtWriteOptions {
     /// ルートタグの並び方
     pub format: NbtFormat,
     /// 圧縮方式
-    /// 既定は GZip
+    /// 既定はGZip
     pub compression: Compression,
 }
 
@@ -117,9 +111,7 @@ impl NbtWriteOptions {
 /// 位置を指定した読み込みの結果
 ///
 /// 読んだタグと、その直後の位置を持つ
-/// 続けて読むときは `end` を次の開始位置として渡す
-///
-/// 仕様: `docs/spec/10-nbt-binary.md` 3.1章
+/// 続けて読むときは`end`を次の開始位置として渡す
 #[derive(Debug, Clone, PartialEq)]
 pub struct NbtReadResult {
     /// 読んだタグ
@@ -128,7 +120,7 @@ pub struct NbtReadResult {
     pub end: usize,
 }
 
-/// 展開済みのバイト列から NBT を読み出す
+/// 展開済みのバイト列からNBTを読み出す
 ///
 /// 入力全体をあらかじめメモリに持つ設計にしている
 /// 「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため
@@ -170,12 +162,12 @@ impl<'a> Reader<'a> {
         Ok(tag)
     }
 
-    /// ルートタグを 1 つ読む
+    /// ルートタグを1つ読む
     /// 末尾の余りは見ない
     fn read_root_tag(&mut self, format: NbtFormat) -> Result<NamedTag> {
         let tag_type = TagType::from_id(self.read_byte()?)?;
 
-        // Java版のファイル形式でもネットワーク形式でも、ルートは必ず TAG_Compound
+        // Java版のファイル形式でもネットワーク形式でも、ルートは必ずTAG_Compound
         if tag_type != TagType::Compound {
             return Err(Error::new(
                 ErrorCode::MalformedData,
@@ -207,7 +199,7 @@ impl<'a> Reader<'a> {
     }
 
     fn read_payload(&mut self, tag_type: TagType, depth: i32) -> Result<NbtTag> {
-        // 深さ上限は再帰する型に入る手前で検査する
+        // 深さ上限は型を問わず、ペイロードを読む前に検査する
         if depth > self.max_depth {
             return Err(Error::new(
                 ErrorCode::LimitExceeded,
@@ -243,7 +235,7 @@ impl<'a> Reader<'a> {
                 self.ensure_available(count as u64 * 4)?;
                 let mut values = Vec::with_capacity(count);
 
-                // 4 バイトずつビッグエンディアンで読む
+                // 4バイトずつビッグエンディアンで読む
                 for _ in 0..count {
                     values.push(self.read_unsigned(4)? as i32);
                 }
@@ -255,7 +247,7 @@ impl<'a> Reader<'a> {
                 self.ensure_available(count as u64 * 8)?;
                 let mut values = Vec::with_capacity(count);
 
-                // 8 バイトずつビッグエンディアンで読む
+                // 8バイトずつビッグエンディアンで読む
                 for _ in 0..count {
                     values.push(self.read_unsigned(8)? as i64);
                 }
@@ -272,7 +264,7 @@ impl<'a> Reader<'a> {
     fn read_compound_payload(&mut self, depth: i32) -> Result<NbtCompound> {
         let mut compound = NbtCompound::new();
 
-        // TAG_End が現れるまで名前付きタグを読み続ける
+        // TAG_Endが現れるまで名前付きタグを読み続ける
         loop {
             let tag_type = TagType::from_id(self.read_byte()?)?;
 
@@ -300,7 +292,7 @@ impl<'a> Reader<'a> {
         let count = self.read_length()?;
 
         if element_type == TagType::End {
-            // 要素型 End のリストは空でなければならない
+            // 要素型Endのリストは空でなければならない
             if count != 0 {
                 return Err(Error::new(
                     ErrorCode::MalformedData,
@@ -311,7 +303,7 @@ impl<'a> Reader<'a> {
             return Ok(NbtList::with_element_type(TagType::End));
         }
 
-        // 1 要素の最小バイト数から、宣言された個数が入力に収まるかを先に検査する
+        // 1要素の最小バイト数から、宣言された個数が入力に収まるかを先に検査する
         self.ensure_available(count as u64 * minimum_payload_size(element_type))?;
 
         let mut list = NbtList::with_element_type(element_type);
@@ -337,7 +329,7 @@ impl<'a> Reader<'a> {
     fn read_length(&mut self) -> Result<usize> {
         let length = self.read_unsigned(4)? as i32;
 
-        // 長さは i32 だが、負値は仕様上ありえない
+        // 長さはi32だが、負値は仕様上ありえない
         if length < 0 {
             return Err(Error::new(
                 ErrorCode::MalformedData,
@@ -394,13 +386,13 @@ fn minimum_payload_size(tag_type: TagType) -> u64 {
         TagType::Short => 2,
         TagType::Int | TagType::Float => 4,
         TagType::Long | TagType::Double => 8,
-        // 長さフィールドの 4 バイトは必ずある
+        // 長さフィールドの4バイトは必ずある
         TagType::ByteArray | TagType::IntArray | TagType::LongArray => 4,
-        // 長さフィールドの 2 バイトは必ずある
+        // 長さフィールドの2バイトは必ずある
         TagType::String => 2,
-        // 要素型 1 バイト + 個数 4 バイト
+        // 要素型1バイト + 個数4バイト
         TagType::List => 5,
-        // 終端の TAG_End 1 バイトは必ずある
+        // 終端のTAG_End 1バイトは必ずある
         TagType::Compound | TagType::End => 1,
     }
 }
@@ -409,10 +401,10 @@ fn minimum_payload_size(tag_type: TagType) -> u64 {
 // 書き込み
 // ---------------------------------------------------------------------------
 
-/// NBT を展開済みのバイト列へ書き出す
+/// NBTを展開済みのバイト列へ書き出す
 ///
 /// 出力は一意でなければならない（ラウンドトリップ検証が成立するため）
-/// Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す
+/// Compoundは挿入順のまま、浮動小数点はビットパターンのまま書き出す
 struct Writer {
     buffer: Vec<u8>,
 }
@@ -440,13 +432,13 @@ impl Writer {
             NbtTag::Short(value) => self.write_unsigned(*value as u16 as u64, 2),
             NbtTag::Int(value) => self.write_unsigned(*value as u32 as u64, 4),
             NbtTag::Long(value) => self.write_unsigned(*value as u64, 8),
-            // NaN や -0.0 を保つため、ビットパターンをそのまま書く
+            // NaNや-0.0を保つため、ビットパターンをそのまま書く
             NbtTag::Float(value) => self.write_unsigned(value.to_bits() as u64, 4),
             NbtTag::Double(value) => self.write_unsigned(value.to_bits(), 8),
             NbtTag::ByteArray(values) => {
                 self.write_unsigned(values.len() as u64, 4);
 
-                // 1 バイトずつそのまま書く
+                // 1バイトずつそのまま書く
                 for value in values {
                     self.buffer.push(*value as u8);
                 }
@@ -457,7 +449,7 @@ impl Writer {
             NbtTag::IntArray(values) => {
                 self.write_unsigned(values.len() as u64, 4);
 
-                // 4 バイトずつビッグエンディアンで書く
+                // 4バイトずつビッグエンディアンで書く
                 for value in values {
                     self.write_unsigned(*value as u32 as u64, 4);
                 }
@@ -465,7 +457,7 @@ impl Writer {
             NbtTag::LongArray(values) => {
                 self.write_unsigned(values.len() as u64, 4);
 
-                // 8 バイトずつビッグエンディアンで書く
+                // 8バイトずつビッグエンディアンで書く
                 for value in values {
                     self.write_unsigned(*value as u64, 8);
                 }
@@ -502,8 +494,8 @@ impl Writer {
     fn write_string(&mut self, value: &NbtString) -> Result<()> {
         let encoded = value.to_mutf8();
 
-        // 長さフィールドは u16
-        // 65535 を超えると書き出せない
+        // 長さフィールドはu16
+        // 65535を超えると書き出せない
         if encoded.len() > mutf8::MAX_BYTE_LENGTH {
             return Err(Error::new(
                 ErrorCode::InvalidArgument,
@@ -538,13 +530,13 @@ pub fn detect_compression(bytes: &[u8]) -> Result<Compression> {
         ));
     }
 
-    // GZip は必ず 1F 8B で始まる
+    // GZipは必ず1F 8Bで始まる
     if bytes.len() >= 2 && bytes[0] == 0x1F && bytes[1] == 0x8B {
         return Ok(Compression::Gzip);
     }
 
     if bytes.len() >= 2 {
-        // zlib ヘッダは「圧縮法が 8 (deflate)」かつ「先頭2バイトが 31 の倍数」
+        // zlibヘッダは「圧縮法が8 (deflate)」かつ「先頭2バイトが31の倍数」
         let is_deflate = (bytes[0] & 0x0F) == 0x08;
         let header = ((bytes[0] as u32) << 8) | bytes[1] as u32;
 
@@ -553,7 +545,7 @@ pub fn detect_compression(bytes: &[u8]) -> Result<Compression> {
         }
     }
 
-    // 無圧縮なら先頭は TAG_Compound のタグID
+    // 無圧縮なら先頭はTAG_CompoundのタグID
     if bytes[0] == TagType::Compound.id() {
         return Ok(Compression::None);
     }
@@ -650,19 +642,19 @@ fn compress(plain: Vec<u8>, method: Compression) -> Result<Vec<u8>> {
 }
 
 // ---------------------------------------------------------------------------
-// 公開 API
+// 公開API
 // ---------------------------------------------------------------------------
 
-/// バイト列から NBT を読む
+/// バイト列からNBTを読む
 pub fn read_bytes(bytes: &[u8], options: &NbtReadOptions) -> Result<NamedTag> {
     let plain = decompress(bytes, options)?;
     Reader::new(&plain, options.max_depth).read_root(options.format)
 }
 
-/// バイト列の指定した位置から NBT を 1 つ読む
+/// バイト列の指定した位置からNBTを1つ読む
 ///
-/// 複数の NBT が連なっているデータを、先頭から順に読み進めるために使う
-/// 戻り値の `end` が次の開始位置になる
+/// 複数のNBTが連なっているデータを、先頭から順に読み進めるために使う
+/// 戻り値の`end`が次の開始位置になる
 ///
 /// 位置は渡したバイト列そのものを指すので、圧縮されたデータは扱えない
 pub fn read_bytes_at(
@@ -685,16 +677,16 @@ pub fn read_bytes_at(
     Ok(NbtReadResult { tag, end: reader.position })
 }
 
-/// バイト列に連なっている NBT をすべて読む
+/// バイト列に連なっているNBTをすべて読む
 ///
 /// 入力を使い切るまで読み続ける
 /// 空のバイト列なら空の一覧を返す
 ///
-/// 圧縮は入力全体に 1 回かかっているものとして扱う
+/// 圧縮は入力全体に1回かかっているものとして扱う
 pub fn read_bytes_all(bytes: &[u8], options: &NbtReadOptions) -> Result<Vec<NamedTag>> {
     let mut tags: Vec<NamedTag> = Vec::new();
 
-    // 空の入力は「0 個」であってエラーではない
+    // 空の入力は「0個」であってエラーではない
     if bytes.is_empty() {
         return Ok(tags);
     }
@@ -721,7 +713,7 @@ fn require_plain_input(options: &NbtReadOptions) -> Result<()> {
     Ok(())
 }
 
-/// ファイルから NBT を読む
+/// ファイルからNBTを読む
 pub fn read_file(path: impl AsRef<Path>, options: &NbtReadOptions) -> Result<NamedTag> {
     let raw = std::fs::read(path.as_ref()).map_err(|error| {
         // 下位の入出力エラーは情報を失わないよう原因として保持する
@@ -735,7 +727,7 @@ pub fn read_file(path: impl AsRef<Path>, options: &NbtReadOptions) -> Result<Nam
     read_bytes(&raw, options)
 }
 
-/// リーダから NBT を読む
+/// リーダからNBTを読む
 /// 最後まで読み切る
 pub fn read_reader(source: &mut impl Read, options: &NbtReadOptions) -> Result<NamedTag> {
     let mut raw = Vec::new();
@@ -743,9 +735,9 @@ pub fn read_reader(source: &mut impl Read, options: &NbtReadOptions) -> Result<N
     read_bytes(&raw, options)
 }
 
-/// NBT をバイト列へ書き出す
+/// NBTをバイト列へ書き出す
 pub fn write_bytes(named: &NamedTag, options: &NbtWriteOptions) -> Result<Vec<u8>> {
-    // 書き込み時に Auto は決められない
+    // 書き込み時にAutoは決められない
     if options.compression == Compression::Auto {
         return Err(Error::new(
             ErrorCode::InvalidArgument,
@@ -757,7 +749,7 @@ pub fn write_bytes(named: &NamedTag, options: &NbtWriteOptions) -> Result<Vec<u8
     compress(plain, options.compression)
 }
 
-/// NBT をファイルへ書き出す
+/// NBTをファイルへ書き出す
 pub fn write_file(
     path: impl AsRef<Path>,
     named: &NamedTag,
@@ -774,7 +766,7 @@ pub fn write_file(
     })
 }
 
-/// NBT をライタへ書き出す
+/// NBTをライタへ書き出す
 pub fn write_writer(
     destination: &mut impl Write,
     named: &NamedTag,

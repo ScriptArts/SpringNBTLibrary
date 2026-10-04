@@ -1,12 +1,10 @@
 /**
  * チャンクとリージョンの座標
- *
- * 仕様: `docs/spec/20-anvil-region.md` 1章
  */
 
 /**
  * リージョンの座標
- * 1リージョンは 32×32 チャンクを担当する
+ * 1リージョンは32×32チャンクを担当する
  */
 export class RegionPos {
   constructor(
@@ -30,13 +28,13 @@ export class RegionPos {
   }
 
   /**
-   * `r.X.Z.mca` 形式のファイル名から座標を得る
-   * 解釈できなければ undefined
+   * `r.X.Z.mca`形式のファイル名から座標を得る
+   * 解釈できなければundefined
    */
   static fromFileName(fileName: string): RegionPos | undefined {
     const parts = fileName.split(".");
 
-    // "r" "<x>" "<z>" "mca" の 4 つに分かれるはず
+    // "r" "<x>" "<z>" "mca"の4つに分かれるはず
     if (parts.length !== 4 || parts[0] !== "r" || parts[3] !== "mca") {
       return undefined;
     }
@@ -49,7 +47,10 @@ export class RegionPos {
     return new RegionPos(Number.parseInt(parts[1], 10), Number.parseInt(parts[2], 10));
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `RegionPos(${this.x}, ${this.z})`;
   }
@@ -91,7 +92,10 @@ export class ChunkPos {
     return other.x === this.x && other.z === this.z;
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `ChunkPos(${this.x}, ${this.z})`;
   }
