@@ -276,7 +276,7 @@ public final class Conformance {
     }
 
     private static String versionLine() {
-        return "java spring-nbt-library 1.0.0 target_data_version="
+        return "java spring-nbt-library target_data_version="
                 + SpringNbt.TARGET_DATA_VERSION + "\n";
     }
 

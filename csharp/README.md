@@ -13,6 +13,7 @@ C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書か
 ## 導入
 
 [Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`SpringNBTLibrary.<版>.nupkg`を落とし、プロジェクト直下の`packages/`へ置きます。
+以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 `.csproj`の隣に`nuget.config`を作ってソースを教えたら、参照に足せます。
 
 ```xml
@@ -24,7 +25,7 @@ C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書か
 ```
 
 ```bash
-dotnet add package SpringNBTLibrary --version 1.0.0
+dotnet add package SpringNBTLibrary --version <版>
 ```
 
 dllを直接参照したいときは`SpringNBTLibrary-<版>-dotnet8.zip`のほうを使います。

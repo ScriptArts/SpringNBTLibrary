@@ -6,9 +6,10 @@ Node.js 20以上が必要です。ESM専用です。
 ## 導入
 
 [Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring-nbt-library-<版>.tgz`を落とします。
+以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ```bash
-npm install ./spring-nbt-library-1.0.0.tgz
+npm install ./spring-nbt-library-<版>.tgz
 ```
 
 これで`node_modules`へ入り、通常のパッケージと同じようにimportできます。
@@ -31,7 +32,7 @@ import { BlockState } from "spring-nbt-library/world";
 ```json
 {
   "dependencies": {
-    "spring-nbt-library": "file:spring-nbt-library-1.0.0.tgz"
+    "spring-nbt-library": "file:spring-nbt-library-<版>.tgz"
   }
 }
 ```

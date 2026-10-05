@@ -5,12 +5,13 @@ Java 21 (LTS)以上が必要です。
 ## 導入
 
 [Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring-nbt-library-<版>.jar`を落とします。
+以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 Gradleならjarを`libs/`へ置いて読み込みます。
 
 ```groovy
 dependencies {
-    implementation files("libs/spring-nbt-library-1.0.0.jar")
+    implementation files("libs/spring-nbt-library-<版>.jar")
 }
 ```
 
@@ -18,24 +19,24 @@ Mavenならローカルリポジトリへ入れてから依存に書きます。
 
 ```bash
 mvn install:install-file \
-  -Dfile=spring-nbt-library-1.0.0.jar \
+  -Dfile=spring-nbt-library-<版>.jar \
   -DgroupId=io.github.scriptarts \
   -DartifactId=spring-nbt-library \
-  -Dversion=1.0.0 -Dpackaging=jar
+  -Dversion=<版> -Dpackaging=jar
 ```
 
 ```xml
 <dependency>
   <groupId>io.github.scriptarts</groupId>
   <artifactId>spring-nbt-library</artifactId>
-  <version>1.0.0</version>
+  <version><版></version>
 </dependency>
 ```
 
 クラスパスへ直接置くこともできます。
 
 ```bash
-java -cp spring-nbt-library-1.0.0.jar:. YourApp
+java -cp spring-nbt-library-<版>.jar:. YourApp
 ```
 
 ## NBTファイルを読む

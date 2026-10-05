@@ -26,6 +26,10 @@ jobs:
       - name: ドキュメント内のリンク切れを調べる
         run: python3 spec/tools/check_links.py
 
+      # 版はリリースのタグで決まるので、パッケージ設定に具体的な版を書かない
+      - name: パッケージ設定の版が仮の版のままか調べる
+        run: python3 spec/tools/set_version.py --check
+
       # 「if / ループにコメントを入れる」は独自の規約なので、
       # 各言語の標準Linterには該当ルールが無い。自前で見るしかない
       - name: コメントと禁止記法の規約適合を調べる

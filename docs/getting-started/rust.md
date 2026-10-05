@@ -5,10 +5,11 @@ Rust 2021 edition、MSRV 1.75です。
 ## 導入
 
 Cargo.tomlにgit参照を書きます。
+以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ```toml
 [dependencies]
-spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v1.0.0" }
+spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v<版>" }
 ```
 
 Cargoが自分で取得します。
@@ -16,12 +17,12 @@ Cargoが自分で取得します。
 ネットワークに繋がらない環境なら、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)の`spring-nbt-library-<版>.crate`（拡張子が違うだけのtar.gz）を展開してパス参照します。
 
 ```bash
-tar xzf spring-nbt-library-1.0.0.crate
+tar xzf spring-nbt-library-<版>.crate
 ```
 
 ```toml
 [dependencies]
-spring-nbt-library = { path = "spring-nbt-library-1.0.0" }
+spring-nbt-library = { path = "spring-nbt-library-<版>" }
 ```
 
 ## 例外ではなく`Result`

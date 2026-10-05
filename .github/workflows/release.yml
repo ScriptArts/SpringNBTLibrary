@@ -44,17 +44,30 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # タグ名から版を取る。手動実行のときはCargo.tomlの版を使う
+      # 版はタグだけで決める。手動実行のときはCHANGELOGのいちばん新しい版を使う
       - name: 版を決める
         id: version
         run: |
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             version="${GITHUB_REF_NAME#v}"
           else
-            version=$(grep '^version' rust/Cargo.toml | head -1 | cut -d'"' -f2)
+            version=$(python3 spec/tools/set_version.py --changelog-latest)
           fi
           echo "value=${version}" >> "$GITHUB_OUTPUT"
           echo "組み立てる版: ${version}"
+
+      # リポジトリのパッケージ設定は0.0.0のままなので、組み立てる前に版を書き込む
+      - name: パッケージ設定へ版を書き込む
+        run: python3 spec/tools/set_version.py "${{ steps.version.outputs.value }}"
+
+      # CHANGELOGにその版の節が無ければここで落ちる
+      # 変更点を書き忘れたまま、テストや組み立てに時間を使わないよう先に確かめる
+      - name: リリース本文を組み立てる
+        run: |
+          python3 spec/tools/release_notes.py \
+            "${{ steps.version.outputs.value }}" --output release-body.md
+          echo "----- ここから本文 -----"
+          cat release-body.md
 
       # 正しく動かないものを配らないよう、公開前に必ず全部通す
       - name: 全言語のテスト
@@ -107,9 +120,10 @@ jobs:
           mkdir -p artifacts
           cp python/dist/*.whl python/dist/*.tar.gz artifacts/
 
+      # 版を書き込んだCargo.tomlは未コミットの変更になるので、--allow-dirtyで許す
       - name: Rust (crate)
         run: |
-          (cd rust && cargo package --no-verify)
+          (cd rust && cargo package --no-verify --allow-dirty)
           mkdir -p artifacts
           cp rust/target/package/spring-nbt-library-*.crate artifacts/
 
@@ -119,15 +133,6 @@ jobs:
           rm -rf artifacts/csharp
           (cd artifacts && sha256sum * > SHA256SUMS.txt)
           ls -la artifacts
-
-      # CHANGELOGからその版の節を取り出し、案内文と合わせて本文にする
-      # 節が無ければここで落ちるので、変更点を書き忘れたまま公開できない
-      - name: リリース本文を組み立てる
-        run: |
-          python3 spec/tools/release_notes.py \
-            "${{ steps.version.outputs.value }}" --output release-body.md
-          echo "----- ここから本文 -----"
-          cat release-body.md
 
       - name: Releases へ上げる
         if: github.ref_type == 'tag'

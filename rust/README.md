@@ -13,10 +13,11 @@ C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書か
 ## 導入
 
 Cargo.tomlにgit参照を書きます。
+以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ```toml
 [dependencies]
-spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v1.0.0" }
+spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v<版>" }
 ```
 
 ネットワークに繋がらない環境向けに、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)へ`.crate`も置いています。

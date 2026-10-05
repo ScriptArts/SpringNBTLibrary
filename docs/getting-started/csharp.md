@@ -9,6 +9,7 @@ C#は[基準実装](../adr/0002-idiomatic-naming.md)です。
 
 [Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)に2通り置いてあります。
 どちらでも中身は同じです。
+以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ### `.nupkg`を使う（おすすめ）
 
@@ -29,7 +30,7 @@ NuGetへは公開していないので、落としたファイルを置いたフ
 3. 参照に足します
 
    ```bash
-   dotnet add package SpringNBTLibrary --version 1.0.0
+   dotnet add package SpringNBTLibrary --version <版>
    ```
 
 ドキュメントの置き場所はNuGetが面倒を見るので、補完に説明が出ます。

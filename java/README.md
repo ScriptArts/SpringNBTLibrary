@@ -13,10 +13,11 @@ C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書か
 ## 導入
 
 [Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring-nbt-library-<版>.jar`を落として、クラスパスへ追加します。
+以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ```groovy
 dependencies {
-    implementation files("libs/spring-nbt-library-1.0.0.jar")
+    implementation files("libs/spring-nbt-library-<版>.jar")
 }
 ```
 

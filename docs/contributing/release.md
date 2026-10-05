@@ -57,7 +57,7 @@
    python3 spec/tools/build_testdata.py
    ```
 8. 全言語のテストと適合性検証を通す
-9. バージョン番号の`x`を上げる
+9. 次のリリースでは、タグの版の`x`を上げる（4章）
 
 ---
 
@@ -92,30 +92,25 @@ python3 spec/tools/scan_world.py "<ワールドのパス>"
 
 ---
 
-## 4. バージョン番号を上げる場所
+## 4. 版はタグで決まる
 
-| 言語 | ファイル |
-|---|---|
-| C# | `csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj` |
-| Java | `java/pom.xml` |
-| TypeScript | `typescript/package.json` |
-| Python | `python/pyproject.toml` |
-| Rust | `rust/Cargo.toml` |
+版を書くのは、リリースのタグ（`v1.2.3`）と`CHANGELOG.md`の節の見出し（`## [1.2.3]`）の2か所だけである。
+パッケージ設定などに版を書き写して回ることはしない。
 
-適合性検証ツールの`version`コマンドの出力にも版が直書きされている。
-言語間の比較には使わないが、表示がずれないよう合わせて上げる。
+- 各言語のパッケージ設定（csproj、pom.xml、package.json、pyproject.toml、Cargo.toml）とロックファイルの版は、常に仮の版`0.0.0`のままにしておく。
+  `release`ワークフローが、組み立てる直前にタグの版を[`spec/tools/set_version.py`](../../spec/tools/set_version.py)で書き込む。
+  `lint`ワークフローは、リポジトリ内で`0.0.0`から変わっていないかを調べる
+- 導入手順の例（言語別のREADMEと`docs/getting-started/`）は、具体的な版の代わりに`<版>`と書く
+- 適合性検証ツールの`version`コマンドは、ライブラリの版を出さない
 
-| 言語 | ファイル |
-|---|---|
-| C# | `csharp/tests/SpringNBTLibrary.Conformance/Program.cs` |
-| Java | `java/src/test/java/io/github/scriptarts/springnbt/conformance/Conformance.java` |
-| TypeScript | `typescript/src/conformance.ts` |
-| Python | `python/src/spring_nbt_library/conformance.py` |
-| Rust | `rust/examples/conformance.rs` |
+そのため、リリースで手を動かすのは次の2つだけになる。
 
-あわせて`CHANGELOG.md`に変更点を書く。
+1. `CHANGELOG.md`に`## [<版>]`の節を作り、変更点を書く
+2. その版のタグを打ってpushする（5章）
 
-**これはリリースの必須条件である。** リリースの本文はここから組み立てるので、節が無いとワークフローが落ちて公開まで進まない。
+**CHANGELOGの節はリリースの必須条件である。** リリースの本文はここから組み立てるので、節が無いとワークフローが落ちて公開まで進まない。
+
+gitのタグで参照したRustのクレートは、Cargo.tomlの版が`0.0.0`のまま見える。中身はそのタグのものである。
 
 ---
 
@@ -127,16 +122,18 @@ GitHub Releasesへビルド済みの成果物を置く。
 ### 5.1 タグを打つと自動で公開される
 
 ```bash
-git tag -a v1.0.0 -m "v1.0.0"
-git push origin v1.0.0
+git tag -a v<版> -m "v<版>"
+git push origin v<版>
 ```
 
 `v`で始まるタグをpushすると[`release`ワークフロー](../../.github/workflows/release.yml)が動き、次を行う。
 
-1. 全対応言語のテストと[適合性検証](../spec/90-conformance.md)を通す（落ちたら公開しない。正しく動かないものを配らないため）
-2. 言語ごとの成果物を組み立てる
-3. `SHA256SUMS.txt`を作る
-4. Releasesを作って成果物を添付する
+1. タグから版を取り、各言語のパッケージ設定へ書き込む
+2. `CHANGELOG.md`からリリース本文を組み立てる（その版の節が無ければここで止まる）
+3. 全対応言語のテストと[適合性検証](../spec/90-conformance.md)を通す（落ちたら公開しない。正しく動かないものを配らないため）
+4. 言語ごとの成果物を組み立てる
+5. `SHA256SUMS.txt`を作る
+6. Releasesを作って成果物を添付する
 
 ### 5.2 成果物
 
@@ -155,6 +152,7 @@ Rustはgit参照が主な使い方になる。Cargoはgitリポジトリを直�
 
 `release`ワークフローは手動でも起動できる。
 Actionsの画面から`Run workflow`を選ぶと、成果物の組み立てまでを行い、Releasesは作らずにartifactsとして残す。
+このときの版は、`CHANGELOG.md`のいちばん新しい節のものを使う。
 
 中身を確かめてからタグを打てる。
 
