@@ -3,11 +3,11 @@ using System.Globalization;
 namespace SpringNBTLibrary.World;
 
 /// <summary>
-/// ブロック座標の直方体な範囲
+/// ブロック座標の直方体の範囲
 /// </summary>
 /// <remarks>
 /// <para>両端を含む</para>
-/// <para><c>Of(0, 0, 0, 0, 0, 0)</c> は 1 ブロック</para>
+/// <para><c>Of(0, 0, 0, 0, 0, 0)</c>は1ブロック</para>
 /// <para>範囲内のブロックを順に処理したいときに使う</para>
 /// </remarks>
 public sealed class Cuboid : IEquatable<Cuboid>
@@ -32,31 +32,31 @@ public sealed class Cuboid : IEquatable<Cuboid>
     public static Cuboid Of(int x1, int y1, int z1, int x2, int y2, int z2) =>
         new Cuboid(new BlockPos(x1, y1, z1), new BlockPos(x2, y2, z2));
 
-    /// <summary>X の最小値</summary>
+    /// <summary>Xの最小値</summary>
     public int MinX { get; }
 
-    /// <summary>Y の最小値</summary>
+    /// <summary>Yの最小値</summary>
     public int MinY { get; }
 
-    /// <summary>Z の最小値</summary>
+    /// <summary>Zの最小値</summary>
     public int MinZ { get; }
 
-    /// <summary>X の最大値（含む）</summary>
+    /// <summary>Xの最大値（含む）</summary>
     public int MaxX { get; }
 
-    /// <summary>Y の最大値（含む）</summary>
+    /// <summary>Yの最大値（含む）</summary>
     public int MaxY { get; }
 
-    /// <summary>Z の最大値（含む）</summary>
+    /// <summary>Zの最大値（含む）</summary>
     public int MaxZ { get; }
 
-    /// <summary>X 方向の長さ</summary>
+    /// <summary>X方向の長さ</summary>
     public int SizeX => MaxX - MinX + 1;
 
-    /// <summary>Y 方向の長さ</summary>
+    /// <summary>Y方向の長さ</summary>
     public int SizeY => MaxY - MinY + 1;
 
-    /// <summary>Z 方向の長さ</summary>
+    /// <summary>Z方向の長さ</summary>
     public int SizeZ => MaxZ - MinZ + 1;
 
     /// <summary>含まれるブロックの個数</summary>
@@ -69,16 +69,16 @@ public sealed class Cuboid : IEquatable<Cuboid>
     /// <summary>
     /// 範囲内の座標を順に返す
     /// </summary>
-    /// <remarks>並びは Y、Z、X の順で、X がいちばん内側で動く</remarks>
+    /// <remarks>並びはY、Z、Xの順で、Xがいちばん内側で動く</remarks>
     public IEnumerable<BlockPos> Positions()
     {
-        // 内側から X が動くので、同じチャンクの並びを続けて触れる
+        // Xがいちばん内側で動くので、同じチャンクの並びを続けて扱える
         for (int y = MinY; y <= MaxY; y++)
         {
-            // Z を進めながら、その行の X を端から端まで返す
+            // Zを進めながら、その行のXを端から端まで返す
             for (int z = MinZ; z <= MaxZ; z++)
             {
-                // X はチャンク内で連続するので、まとめて触れる
+                // Xはチャンク内で連続するので、まとめて扱える
                 for (int x = MinX; x <= MaxX; x++)
                 {
                     yield return new BlockPos(x, y, z);

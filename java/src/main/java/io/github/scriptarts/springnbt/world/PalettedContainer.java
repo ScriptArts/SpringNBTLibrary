@@ -14,11 +14,9 @@ import java.util.Objects;
  * パレットとビットストレージの組
  * セクション内のブロック状態やバイオームを格納する
  *
- * <p>パレットの要素は<strong>生の {@link NbtTag} のまま</strong>持つ
- * こうすると、触っていないブロックについては Minecraft が書き出したときの
+ * <p>パレットの要素は<strong>生の{@link NbtTag}のまま</strong>持つ
+ * こうすると、触っていないブロックについてはMinecraftが書き出したときの
  * プロパティの並び順まで含めてそのまま書き戻せる
- *
- * <p>仕様: {@code docs/spec/31-paletted-container.md}
  */
 public final class PalettedContainer {
 
@@ -35,7 +33,7 @@ public final class PalettedContainer {
 
     /**
      * エントリ数
-     * ブロックなら 4096、バイオームなら 64
+     * ブロックなら4096、バイオームなら64
      *
      * @return エントリ数
      */
@@ -45,7 +43,7 @@ public final class PalettedContainer {
 
     /**
      * ビット幅の下限
-     * ブロックなら 4、バイオームなら 1
+     * ブロックなら4、バイオームなら1
      *
      * @return 下限
      */
@@ -65,7 +63,7 @@ public final class PalettedContainer {
 
     /**
      * 現在のビット幅
-     * パレットが 1 要素なら 0（記憶域を持たない）
+     * パレットが1要素なら0（記憶域を持たない）
      *
      * @return ビット幅
      */
@@ -93,14 +91,14 @@ public final class PalettedContainer {
     }
 
     /**
-     * NBT から読み込む
+     * NBTから読み込む
      *
-     * @param nbt                 コンテナの NBT
+     * @param nbt                 コンテナのNBT
      * @param entryCount          エントリ数
      * @param minBits             ビット幅の下限
-     * @param lenientBitStorage   data の長さが合わないとき、長さから逆算するか
+     * @param lenientBitStorage   dataの長さが合わないとき、長さから逆算するか
      * @return コンテナ
-     * @throws SpringNbtException パレットが空、data の長さが合わない、添字が範囲外のいずれか
+     * @throws SpringNbtException パレットが空、dataの長さが合わない、添字がパレット範囲外のいずれか
      */
     public static PalettedContainer fromNbt(
             NbtCompound nbt, int entryCount, int minBits, boolean lenientBitStorage) {
@@ -112,7 +110,7 @@ public final class PalettedContainer {
             throw SpringNbtException.malformed("palette が無いか空");
         }
 
-        // パレットの要素は生の NbtTag のまま持つ
+        // パレットの要素は生のNbtTagのまま持つ
         // 並び順まで元どおりに書き戻すため
         for (NbtTag entry : paletteTag) {
             result.palette.add(entry);
@@ -121,7 +119,7 @@ public final class PalettedContainer {
         long[] data = nbt.optLongArray("data");
 
         if (data == null) {
-            // パレットが 1 要素なら data は無くてよい
+            // パレットが1要素ならdataは無くてよい
             if (result.palette.size() != 1) {
                 throw SpringNbtException.malformed(
                         "palette が " + result.palette.size() + " 要素なのに data が無い");
@@ -134,7 +132,7 @@ public final class PalettedContainer {
         result.storage = BitStorage.fromLongs(data, bits, entryCount, lenientBitStorage);
 
         // 取り出した添字がパレットの範囲に収まっているか確かめる
-        // 黙って 0 番目で代替すると、壊れたデータをそうと分からない形で書き戻してしまう
+        // エラーを出さずに0番目で代替すると、おかしくなったデータをそうと分からない形で書き戻してしまう
         for (int index = 0; index < entryCount; index++) {
             int value = result.storage.get(index);
 
@@ -148,7 +146,7 @@ public final class PalettedContainer {
     }
 
     /**
-     * NBT へ変換する
+     * NBTへ変換する
      *
      * @return NBT
      */
@@ -161,8 +159,8 @@ public final class PalettedContainer {
             paletteTag.add(entry);
         }
 
-        // パレットが 1 要素なら data は書かない
-        // Minecraft と同じ振る舞い
+        // パレットが1要素ならdataは書かない
+        // Minecraftと同じ振る舞い
         if (storage != null && palette.size() > 1) {
             result.set("data", new NbtLongArray(storage.toLongs()));
         }
@@ -180,7 +178,7 @@ public final class PalettedContainer {
     public NbtTag get(int index) {
         checkIndex(index);
 
-        // 記憶域が無いということは、全エントリがパレットの 0 番目
+        // 記憶域が無いということは、全エントリがパレットの0番目
         if (storage == null) {
             return palette.get(0);
         }
@@ -201,7 +199,7 @@ public final class PalettedContainer {
 
         int paletteIndex = indexOfOrAdd(value);
 
-        // 記憶域が無く、書き込む値も 0 番目なら何もしなくてよい
+        // 記憶域が無く、書き込む値も0番目なら何もしなくてよい
         if (storage == null && paletteIndex == 0) {
             return;
         }
@@ -211,8 +209,8 @@ public final class PalettedContainer {
     }
 
     /**
-     * 全エントリを 1 つの値で埋める
-     * パレットもその 1 要素だけにする
+     * 全エントリを1つの値で埋める
+     * パレットもその1要素だけにする
      *
      * @param value 値
      */
@@ -226,7 +224,7 @@ public final class PalettedContainer {
     /**
      * どのエントリからも参照されていないパレット要素を取り除き、添字を振り直す
      *
-     * <p>大量の {@code set} を行う用途で遅くならないよう、明示的に呼んだときだけ実行する
+     * <p>大量の{@code set}を行う用途で遅くならないよう、明示的に呼んだときだけ実行する
      */
     public void compact() {
         if (storage == null) {
@@ -270,7 +268,7 @@ public final class PalettedContainer {
         palette.addAll(compacted);
 
         if (compacted.size() == 1) {
-            // 1 要素になったら記憶域を捨てる
+            // 1要素になったら記憶域を捨てる
             storage = null;
         } else {
             storage = rebuilt;
@@ -282,7 +280,7 @@ public final class PalettedContainer {
      * 無ければ末尾へ追加する
      */
     private int indexOfOrAdd(NbtTag value) {
-        // パレットは高々 4096 要素なので線形探索で足りる
+        // パレットは高々4096要素なので線形探索で足りる
         for (int index = 0; index < palette.size(); index++) {
             if (palette.get(index).equals(value)) {
                 return index;
@@ -298,7 +296,7 @@ public final class PalettedContainer {
         int required = Math.max(minBits, ceilLog2(palette.size()));
 
         if (storage == null) {
-            // これまで単一値だったので、全エントリが 0 番目のまま始まる
+            // これまで単一値だったので、全エントリが0番目のまま始まる
             storage = BitStorage.create(required, entryCount);
             return;
         }
@@ -319,8 +317,8 @@ public final class PalettedContainer {
     }
 
     /**
-     * {@code count} 個の値を表すのに必要な最小ビット数
-     * 1 なら 0
+     * {@code count}個の値を表すのに必要な最小ビット数
+     * 1なら0
      *
      * @param count 値の個数
      * @return ビット数
@@ -328,7 +326,7 @@ public final class PalettedContainer {
     public static int ceilLog2(int count) {
         int bits = 0;
 
-        // 1 を超える分だけシフトして数える
+        // 1を超える分だけシフトして数える
         while ((1 << bits) < count) {
             bits += 1;
         }

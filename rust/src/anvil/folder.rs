@@ -1,20 +1,15 @@
-//! リージョンファイルが並ぶディレクトリ 1 つ分
+//! リージョンファイルが並ぶディレクトリ1つ分
 //!
-//! `region/`、`entities/`、`poi/` のいずれかを表す
-//! 開いたリージョンファイルはキャッシュし、[`RegionFolder::close`] でまとめて閉じる
+//! `region/`、`entities/`、`poi/`のいずれかを表す
+//! 開いたリージョンファイルはキャッシュし、[`RegionFolder::close`]でまとめて閉じる
 //! チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい
 //!
-//! [`RegionFile`] はファイル全体をメモリへ載せるため、キャッシュには
-//! [`RegionFolder::max_cached_regions`] 件の上限がある
-//! 上限を超えると、
-//! 最も長く使われていないものから書き出して閉じる
+//! [`RegionFile`]はファイル全体をメモリへ載せるため、キャッシュには[`RegionFolder::max_cached_regions`]件の上限がある
+//! 上限を超えると、最も長く使われていないものから書き出して閉じる
 //! 大きなワールドを端から走査してもメモリを使い切らない
 //!
-//! このため [`RegionFolder::region`] が返した参照は、
-//! **別のリージョンへアクセスすると閉じられている場合がある**
+//! このため[`RegionFolder::region`]が返す参照は`&mut self`の借用に縛られ、別のリージョンへアクセスする前に手放す必要がある
 //! 参照を保持せず、必要なたびに取得すること
-//!
-//! 仕様: `docs/spec/20-anvil-region.md` 5章
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -26,12 +21,12 @@ use super::region::{ChunkPos, RegionFile, RegionFileMode, RegionPos};
 
 /// 同時に開いておくリージョンファイル数の既定の上限
 ///
-/// 1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる
-/// 実データでは数 MB から数十 MB 程度
-/// 8 件なら通常のワールドで数百 MB に収まる
+/// 1リージョンは最大255セクタ × 1024チャンク＝理論上1GiBになりうる
+/// 実データでは数MBから数十MB程度
+/// 8件なら通常のワールドで数百MBに収まる
 pub const DEFAULT_MAX_CACHED_REGIONS: usize = 8;
 
-/// リージョンフォルダ 1 つ分
+/// リージョンフォルダ1つ分
 pub struct RegionFolder {
     directory: PathBuf,
     mode: RegionFileMode,
@@ -117,11 +112,11 @@ impl RegionFolder {
 
         let mut found = Vec::new();
 
-        // r.X.Z.mca として解釈できるファイルだけを拾う
+        // r.X.Z.mcaとして解釈できるファイルだけを拾う
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
 
-            // r.X.Z.mca として解釈できるファイルだけを拾う
+            // r.X.Z.mcaとして解釈できるファイルだけを拾う
             if let Some(position) = RegionPos::from_file_name(&name) {
                 found.push(position);
             }
@@ -133,7 +128,7 @@ impl RegionFolder {
     }
 
     /// リージョンファイルを取得する
-    /// 読み取り専用で存在しなければ `None`
+    /// 読み取り専用で存在しなければ`None`
     pub fn region(&mut self, region_x: i32, region_z: i32) -> Result<Option<&mut RegionFile>> {
         self.ensure_open()?;
         let position = RegionPos::new(region_x, region_z);
@@ -141,7 +136,7 @@ impl RegionFolder {
         if !self.cache.contains_key(&position) {
             let path = self.directory.join(position.file_name());
 
-            // 読み取り専用では、存在しないリージョンは「チャンクが無い」として None を返す
+            // 読み取り専用では、存在しないリージョンは「チャンクが無い」としてNoneを返す
             if !path.exists() && self.mode == RegionFileMode::ReadOnly {
                 return Ok(None);
             }
@@ -160,7 +155,7 @@ impl RegionFolder {
 
     /// 使ったリージョンを、最近使った列の末尾へ移す
     fn touch(&mut self, position: RegionPos) {
-        // 同じ座標が列に残っていたら、先に取り除いてから末尾へ積む
+        // 既に列にあるなら、いったん外してから末尾へ積み直す
         if let Some(index) = self.recently_used.iter().position(|item| *item == position) {
             self.recently_used.remove(index);
         }
@@ -168,7 +163,7 @@ impl RegionFolder {
         self.recently_used.push_back(position);
     }
 
-    /// 新しく 1 件開けるよう、上限を下回るまで古いものを閉じる
+    /// 新しく1件開けるよう、上限を下回るまで古いものを閉じる
     fn evict_until_below_limit(&mut self) -> Result<()> {
         // 上限に達している間、いちばん長く使っていないものから閉じる
         while self.cache.len() >= self.max_cached_regions {
@@ -197,8 +192,8 @@ impl RegionFolder {
         }
     }
 
-    /// チャンクを NBT として読む
-    /// 存在しなければ `None`
+    /// チャンクをNBTとして読む
+    /// 存在しなければ`None`
     pub fn read_chunk(&mut self, chunk_x: i32, chunk_z: i32) -> Result<Option<NbtCompound>> {
         let position = ChunkPos::new(chunk_x, chunk_z).region();
 
@@ -208,7 +203,7 @@ impl RegionFolder {
         }
     }
 
-    /// チャンクを NBT として書き込む
+    /// チャンクをNBTとして書き込む
     pub fn write_chunk(
         &mut self,
         chunk_x: i32,
@@ -228,10 +223,10 @@ impl RegionFolder {
         }
     }
 
-    /// すでに組み立て済みの NBT をチャンクとして書き込む
+    /// すでに組み立て済みのNBTをチャンクとして書き込む
     ///
-    /// 既定の Zlib 圧縮を使う
-    /// World 層から呼ぶための入口
+    /// 既定のZlib圧縮を使う
+    /// World層から呼ぶためのメソッド
     pub fn write_chunk_nbt(
         &mut self,
         chunk_x: i32,
@@ -242,7 +237,7 @@ impl RegionFolder {
     }
 
     /// チャンクを削除する
-    /// 削除できたら `true`
+    /// 削除できたら`true`
     pub fn delete_chunk(&mut self, chunk_x: i32, chunk_z: i32) -> Result<bool> {
         let position = ChunkPos::new(chunk_x, chunk_z).region();
 

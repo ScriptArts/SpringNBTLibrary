@@ -5,11 +5,9 @@ namespace SpringNBTLibrary.Anvil;
 /// </summary>
 /// <remarks>
 /// <para>
-/// 本ライブラリが解釈できない圧縮方式（LZ4 未導入、カスタム方式）でも
-/// これなら取り出せる
+/// 本ライブラリが解釈できない圧縮方式（カスタム方式）のチャンクでも、これなら取り出せる
 /// バックアップや別ツールへの受け渡しに使う
 /// </para>
-/// <para>仕様: <c>docs/spec/20-anvil-region.md</c> 5章</para>
 /// </remarks>
 public sealed class RawChunk
 {
@@ -29,11 +27,11 @@ public sealed class RawChunk
     public byte[] Data { get; }
 
     /// <summary>
-    /// 外部ファイル <c>c.X.Z.mcc</c> に格納されていたか
+    /// 外部ファイル<c>c.X.Z.mcc</c>に格納されていたか
     /// </summary>
     /// <remarks>
     /// 書き込み時にこの値を指定する必要はない
-    /// サイズに応じて <see cref="RegionFile"/> が自動的に判断する
+    /// サイズに応じて<see cref="RegionFile"/>が自動的に判断する
     /// </remarks>
     public bool External { get; }
 

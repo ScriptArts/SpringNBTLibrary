@@ -1,15 +1,12 @@
 /**
- * World / Block レイヤ。
+ * World / Blockレイヤ
  *
- * 仕様: docs/spec/30-chunk-format.md / 31-paletted-container.md / 40-world-layout.md
- *
- * 他言語版と同じ検証項目を持つ。
- * 共通テストベクタによる言語間比較は spec/run-conformance.sh が担当し、
- * ここでは API の振る舞いを直接確かめる。
+ * 他言語版と同じ検証項目を持つ
+ * 共通テストベクタによる言語間比較はspec/run-conformance.shが担当し、ここではAPIの振る舞いを直接確かめる
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -35,30 +32,32 @@ import {
   NbtString,
   readFile,
   writeBytes,
+  writeFile,
 } from "../src/nbt/index.js";
+import { RegionFile, RegionFileMode } from "../src/anvil/index.js";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
 const VECTORS = join(REPO_ROOT, "spec", "testdata", "world");
 
-/** 共通テストベクタ（world/*.nbt）のパス。 */
+/** 共通テストベクタ（world/*.nbt）のパス */
 function vectorPath(name: string): string {
   return join(VECTORS, `${name}.nbt`);
 }
 
-/** テストベクタをチャンクとして読む。 */
+/** テストベクタをチャンクとして読む */
 function loadChunk(name: string, options?: ChunkReadOptions): Chunk {
   return Chunk.fromNbt(readFile(vectorPath(name)).tag, options);
 }
 
-/** ブロックのパレット要素を作る。 */
+/** ブロックのパレット要素を作る */
 function blockEntry(name: string): NbtCompound {
   const entry = new NbtCompound();
   entry.set("Name", new NbtString(name));
   return entry;
 }
 
-/** SpringNbtError が指定のコードで投げられることを確かめる。 */
+/** SpringNbtErrorが指定のコードで投げられることを確かめる */
 function assertErrorCode(code: ErrorCode, action: () => unknown): void {
   assert.throws(action, (error: unknown) => {
     assert.ok(error instanceof SpringNbtError);
@@ -127,7 +126,7 @@ test("BlockState: 壊れた文字列は INVALID_ARGUMENT", () => {
     "minecraft:oak_stairs[]extra",
   ];
 
-  // 壊し方ごとに同じエラーコードになることを確かめる
+  // 崩し方ごとに同じエラーコードになることを確かめる
   for (const text of broken) {
     assertErrorCode(ErrorCode.InvalidArgument, () => BlockState.parse(text));
   }
@@ -160,7 +159,8 @@ test("BitStorage: 書いた値をそのまま読み出せる", () => {
 test("BitStorage: long 境界を跨がずに詰める", () => {
   const storage = BitStorage.create(5, 4096);
 
-  // bits=5 なら 1 つの long に 12 個。12 個目は次の long の最下位から始まる
+  // bits=5なら1つのlongに12個
+  // 添字12は次のlongの最下位から始まる
   storage.set(11, 31);
   storage.set(12, 1);
   const longs = storage.toLongs();
@@ -192,7 +192,7 @@ test("BitStorage: ビット幅に対して長さが合わない配列は MALFORM
 });
 
 test("BitStorage: 寛容モードなら長さからビット幅を逆算する", () => {
-  // 4096 エントリを 342 long で表せるのは bits=5 のときだけ
+  // 4096エントリを342 longで表せるのはbits=5のときだけ
   const storage = BitStorage.fromLongs(new BigInt64Array(342), 4, 4096, true);
   assert.equal(storage.bitsPerEntry, 5);
 });
@@ -231,7 +231,7 @@ test("PalettedContainer: 単一値のコンテナは data を持たない", () =
 test("PalettedContainer: 値を足すとパレットとビット幅が広がる", () => {
   const container = PalettedContainer.filled(blockEntry("minecraft:air"), 4096, 4);
 
-  // パレットを 17 要素まで増やして bits=4 から 5 への拡張を起こす
+  // 17種のブロックを足してパレットを18要素にし、bits=4から5への拡張を起こす
   for (let index = 0; index < 17; index++) {
     container.set(index, blockEntry(`minecraft:block_${index}`));
   }
@@ -257,7 +257,7 @@ test("PalettedContainer: compact で未使用のパレット要素が消える",
 
   container.compact();
 
-  // 残るのは実際に使われている air と dirt の 2 つ
+  // 残るのは実際に使われているairとdirtの2つ
   assert.equal(container.palette.length, 2);
   assert.equal((container.get(0) as NbtCompound).getString("Name"), "minecraft:dirt");
 });
@@ -298,7 +298,8 @@ test("Chunk: ビット幅 5 のチャンクを端から端まで読める", () =
   const chunk = loadChunk("palette_17");
   const head = ["minecraft:air", "minecraft:stone"];
 
-  // ベクタの添字は (位置 * 11) % 17。パレット先頭 2 つだけ名前が違う
+  // ベクタの添字は (位置 * 11) % 17
+  // パレットの先頭2つだけ名前が違う
   for (let position = 0; position < 4096; position++) {
     const paletteIndex = (position * 11) % 17;
     const block = chunk.getBlock(position & 15, -64 + (position >> 8), (position >> 4) & 15);
@@ -347,7 +348,7 @@ test("Chunk: 変更したチャンクには印が付く", () => {
   chunk.setBlock(3, -60, 7, "minecraft:stone");
   assert.equal(chunk.isModified, true);
 
-  // 保存済みとして印を下ろせる
+  // 保存済みとして印を外せる
   chunk.isModified = false;
   assert.equal(chunk.isModified, false);
 
@@ -363,7 +364,7 @@ test("Chunk: バイオームは 4 ブロック単位で効く", () => {
   const chunk = loadChunk("palette_1");
   chunk.setBiome(0, -64, 0, "minecraft:desert");
 
-  // 同じ 4×4×4 の枠内はまとめて変わる
+  // 同じ4×4×4の枠内はまとめて変わる
   assert.equal(chunk.getBiome(3, -61, 3), "minecraft:desert");
   assert.equal(chunk.getBiome(4, -64, 0), "minecraft:plains");
 });
@@ -397,13 +398,13 @@ test("Chunk: ブロックを置き換えると同じ座標の付随データが�
   assert.equal(chunk.raw.getList("block_ticks").size, 2);
   assert.equal(chunk.raw.getList("fluid_ticks").size, 1);
 
-  // (0,-64,0) には chest と block_tick、(1,-64,1) には furnace と fluid_tick がある
+  // (0,-64,0)にはchestとblock_tick、(1,-64,1)にはfurnaceとfluid_tickがある
   chunk.setBlock(0, -64, 0, BlockState.parse("minecraft:stone"));
   chunk.setBlock(1, -64, 1, BlockState.parse("minecraft:stone"));
 
   const entities = chunk.raw.getList("block_entities");
 
-  // 触っていない (15,-50,15) の barrel だけが残る
+  // 触っていない(15,-50,15)のbarrelだけが残る
   assert.equal(entities.size, 1);
   assert.equal((entities.get(0) as NbtCompound).getString("id"), "minecraft:barrel");
 
@@ -427,8 +428,7 @@ test("Chunk: 同じブロックを置き直しても付随データは消えな�
 });
 
 test("Chunk: 別のチャンクの同じ相対座標は消さない", () => {
-  // 付随データは絶対座標で持つので、チャンク座標を取り違えると
-  // 無関係な要素を消してしまう
+  // 付随データは絶対座標で持つので、チャンク座標を間違えると無関係な要素を消してしまう
   const root = readFile(vectorPath("block_entities")).tag;
   root.set("xPos", new NbtInt(1));
   root.set("zPos", new NbtInt(1));
@@ -436,7 +436,8 @@ test("Chunk: 別のチャンクの同じ相対座標は消さない", () => {
   const chunk = Chunk.fromNbt(root);
   chunk.setBlock(0, -64, 0, BlockState.parse("minecraft:stone"));
 
-  // このチャンクの (0,-64,0) は絶対座標 (16,-64,16)。どれとも一致しない
+  // このチャンクの(0,-64,0)は絶対座標(16,-64,16)
+  // どれとも一致しない
   assert.equal(chunk.raw.getList("block_entities").size, 3);
 });
 
@@ -464,10 +465,10 @@ test("Chunk: チャンク内の相対座標が範囲外なら INVALID_ARGUMENT",
 });
 
 // ---------------------------------------------------------------------------
-// DataVersion の扱い
+// DataVersionの扱い
 // ---------------------------------------------------------------------------
 
-/** DataVersion だけを差し替えたチャンクを作る。 */
+/** DataVersionだけを差し替えたチャンクを作る */
 function foreignChunk(): NbtCompound {
   const root = readFile(vectorPath("palette_1")).tag;
   root.set("DataVersion", new NbtInt(3953));
@@ -514,11 +515,11 @@ test("DataVersion: 許可すれば古いチャンクも元のバージョンの�
     onVersionMismatch: VersionMismatchAction.Ignore,
   });
 
-  // DataVersion は読んだ値のまま残す
+  // DataVersionは読んだ値のまま残す
   assert.equal(chunk.toNbt({ allowForeignDataVersion: true }).getInt("DataVersion"), 3953);
 });
 
-/** 対象より新しい DataVersion を持つチャンクを作る。 */
+/** 対象より新しいDataVersionを持つチャンクを作る */
 function newerChunk(): NbtCompound {
   const root = readFile(vectorPath("palette_1")).tag;
   root.setInt("DataVersion", 5015);
@@ -528,7 +529,7 @@ function newerChunk(): NbtCompound {
 test("DataVersion: 新しいバージョンのチャンクは警告を出さない", () => {
   const warnings: string[] = [];
 
-  // 形式が同じであれば、新しいバージョンでも黙って読める
+  // 形式が同じであれば、新しいバージョンでも警告を出さずに読める
   const chunk = Chunk.fromNbt(newerChunk(), {
     onVersionMismatch: VersionMismatchAction.Warn,
     onWarning: (message) => warnings.push(message),
@@ -549,7 +550,7 @@ test("DataVersion: 新しいバージョンのチャンクはエラー設定で�
 test("DataVersion: 新しいバージョンのチャンクはそのまま書き戻せる", () => {
   const chunk = Chunk.fromNbt(newerChunk());
 
-  // 許可を出さなくても書き戻せて、DataVersion も変わらない
+  // 許可を出さなくても書き戻せて、DataVersionも変わらない
   assert.equal(chunk.toNbt().getInt("DataVersion"), 5015);
 });
 
@@ -572,6 +573,37 @@ test("MinecraftWorld: level.dat が無いディレクトリは IO", () => {
 
   try {
     assertErrorCode(ErrorCode.Io, () => MinecraftWorld.open(work));
+  } finally {
+    // テストごとに作った一時ディレクトリを片付ける
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test("MinecraftWorld: 次元経由で読んだチャンクの警告も通知先へ届く", () => {
+  const work = mkdtempSync(join(tmpdir(), "springnbt-world-"));
+
+  try {
+    const region = join(work, "dimensions", "minecraft", "overworld", "region");
+    mkdirSync(region, { recursive: true });
+
+    // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
+    const level = new NbtCompound();
+    level.set("Data", new NbtCompound());
+    writeFile(join(work, "level.dat"), new NamedTag("", level));
+
+    const file = RegionFile.open(join(region, "r.0.0.mca"), RegionFileMode.ReadWrite);
+    file.writeChunk(0, 0, foreignChunk());
+    file.close();
+
+    const warnings: string[] = [];
+    const world = MinecraftWorld.open(work, { chunkRead: { onWarning: (message) => warnings.push(message) } });
+    const overworld = world.dimension("minecraft:overworld");
+    assert.ok(overworld !== undefined);
+    assert.ok(overworld.chunk(0, 0) !== undefined);
+    world.close();
+
+    // ワールドを開くときに渡した通知先が、次元経由の読み込みでも呼ばれる
+    assert.equal(warnings.length, 1);
   } finally {
     // テストごとに作った一時ディレクトリを片付ける
     rmSync(work, { recursive: true, force: true });

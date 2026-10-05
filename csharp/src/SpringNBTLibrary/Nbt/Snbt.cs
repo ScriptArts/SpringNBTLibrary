@@ -4,20 +4,19 @@ using System.Text;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// SNBT (Stringified NBT) のパースと出力
+/// SNBT (Stringified NBT)のパースと出力
 /// </summary>
 /// <remarks>
 /// <para>
-/// 対応範囲は「バイナリ NBT へ損失なく写せる部分集合」
-/// 1.21.5 以降の異種リスト（<c>[1, "a"]</c>）は受理しない
+/// 対応範囲は「バイナリNBTへ損失なく写せる部分集合」
+/// 1.21.5以降の異種リスト（<c>[1, "a"]</c>）は受理しない
 /// </para>
-/// <para>仕様: <c>docs/spec/11-snbt.md</c> / <c>docs/adr/0006-snbt-scope.md</c></para>
 /// </remarks>
 public static class Snbt
 {
     private const string IndentUnit = "    ";
 
-    /// <summary>SNBT 文字列をタグへ変換する</summary>
+    /// <summary>SNBT文字列をタグへ変換する</summary>
     /// <exception cref="SpringNbtException">構文が不正な場合</exception>
     public static NbtTag Parse(string text)
     {
@@ -26,9 +25,9 @@ public static class Snbt
         return parser.ParseWhole();
     }
 
-    /// <summary>SNBT 文字列を Compound へ変換する</summary>
+    /// <summary>SNBT文字列をCompoundへ変換する</summary>
     /// <exception cref="SpringNbtException">
-    /// 構文が不正、またはルートが Compound でない場合
+    /// 構文が不正、またはルートがCompoundでない場合
     /// </exception>
     public static NbtCompound ParseCompound(string text)
     {
@@ -43,7 +42,7 @@ public static class Snbt
             $"ルートが compound でない: {tag.Type.AsString()}");
     }
 
-    /// <summary>タグを 1 行の SNBT へ変換する</summary>
+    /// <summary>タグを1行のSNBTへ変換する</summary>
     public static string Write(NbtTag tag)
     {
         ArgumentNullException.ThrowIfNull(tag);
@@ -52,8 +51,8 @@ public static class Snbt
         return builder.ToString();
     }
 
-    /// <summary>タグを整形した SNBT へ変換する
-    /// インデントは空白 4 個</summary>
+    /// <summary>タグを整形したSNBTへ変換する
+    /// インデントは空白4個</summary>
     public static string WritePretty(NbtTag tag)
     {
         ArgumentNullException.ThrowIfNull(tag);
@@ -64,7 +63,7 @@ public static class Snbt
 
     /// <summary>
     /// タグを書き出す
-    /// <paramref name="depth"/> が負なら 1 行、0 以上なら整形して出力する
+    /// <paramref name="depth"/>が負なら1行、0以上なら整形して出力する
     /// </summary>
     private static void WriteTag(StringBuilder builder, NbtTag tag, int depth)
     {
@@ -113,7 +112,7 @@ public static class Snbt
 
     private static void WriteCompound(StringBuilder builder, NbtCompound compound, int depth)
     {
-        // 空の compound は改行もインデントも入れず {} と書く
+        // 空のcompoundは改行もインデントも入れず{}と書く
         if (compound.Count == 0)
         {
             builder.Append("{}");
@@ -126,7 +125,7 @@ public static class Snbt
         // 挿入順のまま「キー: 値」を並べる
         foreach (KeyValuePair<string, NbtTag> entry in compound)
         {
-            // 2 つ目以降の前に区切りのカンマを置く
+            // 2つ目以降の前に区切りのカンマを置く
             if (!first)
             {
                 builder.Append(',');
@@ -152,7 +151,7 @@ public static class Snbt
 
     private static void WriteList(StringBuilder builder, NbtList list, int depth)
     {
-        // 空のリストは改行もインデントも入れず [] と書く
+        // 空のリストは改行もインデントも入れず[]と書く
         if (list.Count == 0)
         {
             builder.Append("[]");
@@ -165,7 +164,7 @@ public static class Snbt
         // 要素型は共通なので値だけを並べる
         foreach (NbtTag item in list)
         {
-            // 2 つ目以降の前に区切りのカンマを置く
+            // 2つ目以降の前に区切りのカンマを置く
             if (!first)
             {
                 builder.Append(',');
@@ -184,11 +183,11 @@ public static class Snbt
     {
         builder.Append("[B;");
 
-        // 型付き配列は 1 行に収める
+        // 型付き配列は1行に収める
         // 要素には接尾辞を付ける
         for (int i = 0; i < array.Value.Length; i++)
         {
-            // 2 つ目以降の前に区切りのカンマを置く
+            // 2つ目以降の前に区切りのカンマを置く
             if (i > 0)
             {
                 builder.Append(',');
@@ -204,10 +203,10 @@ public static class Snbt
     {
         builder.Append("[I;");
 
-        // IntArray の要素は接尾辞なし
+        // IntArrayの要素は接尾辞なし
         for (int i = 0; i < array.Value.Length; i++)
         {
-            // 2 つ目以降の前に区切りのカンマを置く
+            // 2つ目以降の前に区切りのカンマを置く
             if (i > 0)
             {
                 builder.Append(',');
@@ -223,10 +222,10 @@ public static class Snbt
     {
         builder.Append("[L;");
 
-        // LongArray の要素には L 接尾辞を付ける
+        // LongArrayの要素にはL接尾辞を付ける
         for (int i = 0; i < array.Value.Length; i++)
         {
-            // 2 つ目以降の前に区切りのカンマを置く
+            // 2つ目以降の前に区切りのカンマを置く
             if (i > 0)
             {
                 builder.Append(',');
@@ -238,7 +237,7 @@ public static class Snbt
         builder.Append(']');
     }
 
-    /// <summary>整形出力なら改行とインデントを、1 行出力なら何も入れない</summary>
+    /// <summary>整形出力なら改行とインデントを、1行出力なら何も入れない</summary>
     private static void AppendSeparator(StringBuilder builder, int depth)
     {
         if (depth < 0)
@@ -255,7 +254,7 @@ public static class Snbt
         }
     }
 
-    /// <summary>整形出力のときだけ深さを 1 段進める</summary>
+    /// <summary>整形出力のときだけ深さを1段進める</summary>
     private static int NextDepth(int depth)
     {
         if (depth < 0)
@@ -303,7 +302,7 @@ public static class Snbt
         StringBuilder builder = new StringBuilder(text.Length + 2);
         builder.Append('"');
 
-        // 1 文字ずつ見てエスケープが要るものだけ置き換える
+        // 1文字ずつ見てエスケープが要るものだけ置き換える
         for (int index = 0; index < text.Length; index++)
         {
             char c = text[index];
@@ -343,7 +342,7 @@ public static class Snbt
                     }
                     else if (c < 0x20 || c == 0x7F || char.IsSurrogate(c))
                     {
-                        // 制御文字と孤立サロゲートは \uXXXX で表す
+                        // 制御文字と孤立サロゲートは\uXXXXで表す
                         builder.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
                     }
                     else

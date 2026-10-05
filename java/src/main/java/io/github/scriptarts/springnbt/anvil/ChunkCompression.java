@@ -4,12 +4,10 @@ import io.github.scriptarts.springnbt.SpringNbtException;
 
 /**
  * リージョンファイル内でチャンクに使われる圧縮方式
- * {@link #id()} は仕様が定める圧縮方式IDと一致する
+ * {@link #id()}は仕様が定める圧縮方式IDと一致する
  *
- * <p>NBT 層の {@link io.github.scriptarts.springnbt.nbt.Compression} とは別物であることに注意
- * あちらはファイル全体の圧縮を表し、こちらはリージョン内の 1 チャンクに付く 1 バイトのIDを表す
- *
- * <p>仕様: {@code docs/spec/20-anvil-region.md} 3.1章
+ * <p>NBT層の{@link io.github.scriptarts.springnbt.nbt.Compression}とは違うものであることに注意
+ * あちらはファイル全体の圧縮を表し、こちらはリージョン内の1チャンクに付く1バイトのIDを表す
  */
 public enum ChunkCompression {
 
@@ -23,7 +21,7 @@ public enum ChunkCompression {
     /**
      * Zlib (RFC 1950)
      * ID=2
-     * Minecraft が実際に書き出す方式
+     * Minecraftが実際に書き出す方式
      */
     ZLIB(2, "zlib"),
 
@@ -34,9 +32,10 @@ public enum ChunkCompression {
     NONE(3, "none"),
 
     /**
-     * LZ4（ブロック形式）
+     * LZ4（独自ヘッダ付きのブロック連結）
      * ID=4
-     * 任意依存
+     * 読み込みのみ対応
+     * 展開は自前で行い、外部の依存は使わない
      */
     LZ4(4, "lz4"),
 
@@ -74,14 +73,14 @@ public enum ChunkCompression {
     }
 
     /**
-     * 圧縮方式IDから {@link ChunkCompression} を得る
+     * 圧縮方式IDから{@link ChunkCompression}を得る
      *
      * @param id 圧縮方式ID
      * @return 圧縮方式
      * @throws SpringNbtException 未知のIDの場合
      */
     public static ChunkCompression fromId(int id) {
-        // 仕様が定めるのは 1・2・3・4・127 の 5 種類だけ
+        // 仕様が定めるのは1・2・3・4・127の5種類だけ
         for (ChunkCompression candidate : values()) {
             if (candidate.id == id) {
                 return candidate;

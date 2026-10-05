@@ -30,15 +30,13 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 
 /**
- * Anvil のリージョンファイル ({@code r.X.Z.mca})
- * 32×32 チャンクを格納する
+ * Anvilのリージョンファイル ({@code r.X.Z.mca})
+ * 32×32チャンクを格納する
  *
  * <p>ファイル全体をメモリに読み込んで扱う
- * 実データのリージョンは数 MB 程度で、
- * この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
- * 開いて何も変えずに {@link #flush()} すると、バイト単位で元と同じファイルになる
- *
- * <p>仕様: {@code docs/spec/20-anvil-region.md}
+ * 実データのリージョンは数MB程度で、この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
+ * 開いて何も変えずに{@link #flush()}すると、バイト単位で元と同じファイルになる
+ * ただし空のファイルは、8KiBのヘッダだけのファイルになる
  */
 public final class RegionFile implements AutoCloseable {
 
@@ -51,7 +49,7 @@ public final class RegionFile implements AutoCloseable {
     /** 1リージョンに入るチャンク数 */
     private static final int CHUNK_COUNT = 1024;
 
-    /** 1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため） */
+    /** 1チャンクが確保できるセクタ数の上限（長さフィールドがu8のため） */
     private static final int MAX_SECTORS = 255;
 
     /**
@@ -111,7 +109,7 @@ public final class RegionFile implements AutoCloseable {
     /**
      * リージョンファイルを開く
      *
-     * @param path {@code r.X.Z.mca} という名前のファイル
+     * @param path {@code r.X.Z.mca}という名前のファイル
      * 座標はファイル名から読み取る
      * @param mode 読み取り専用か読み書きか
      * @return 開いたリージョン
@@ -157,7 +155,7 @@ public final class RegionFile implements AutoCloseable {
 
     /** ヘッダを解析し、ロケーションとタイムスタンプを取り込む */
     private void parseHeader() {
-        // 空ファイルは「チャンクが 1 つも無いリージョン」として受け入れる
+        // 空ファイルは「チャンクが1つも無いリージョン」として受け入れる
         if (data.length == 0) {
             data = new byte[HEADER_SECTORS * SECTOR_SIZE];
             return;
@@ -176,7 +174,7 @@ public final class RegionFile implements AutoCloseable {
         int totalSectors = data.length / SECTOR_SIZE;
         Map<Integer, Integer> sectorOwner = new HashMap<>();
 
-        // ロケーションテーブルの 1024 エントリを順に取り込む
+        // ロケーションテーブルの1024エントリを順に取り込む
         for (int index = 0; index < CHUNK_COUNT; index++) {
             long entry = readUnsigned(index * 4, 4);
             int offset = (int) (entry >>> 8);
@@ -203,7 +201,7 @@ public final class RegionFile implements AutoCloseable {
                         "チャンク " + index + " の割り当てがファイル外へはみ出している");
             }
 
-            // 同じセクタを 2 つのチャンクが指していたら、どちらかが壊れている
+            // 同じセクタを2つのチャンクが指していたら、どちらかがおかしくなっている
             for (int sector = offset; sector < offset + count; sector++) {
                 Integer owner = sectorOwner.put(sector, index);
 
@@ -248,7 +246,7 @@ public final class RegionFile implements AutoCloseable {
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
-     * @return 存在すれば true
+     * @return 存在すればtrue
      */
     public boolean hasChunk(int chunkX, int chunkZ) {
         ensureOpen();
@@ -264,7 +262,7 @@ public final class RegionFile implements AutoCloseable {
         ensureOpen();
         List<ChunkPos> result = new ArrayList<>();
 
-        // 添字の昇順に走査する（localZ が外、localX が内）
+        // 添字の昇順に走査する（localZが外、localXが内）
         for (int index = 0; index < CHUNK_COUNT; index++) {
             if (sectorCounts[index] == 0) {
                 continue;
@@ -279,8 +277,8 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクの最終更新時刻（Unix 秒）
-     * 存在しなければ 0
+     * チャンクの最終更新時刻（Unix秒）
+     * タイムスタンプテーブルの値をそのまま返すため、チャンクが無くても0とは限らない
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -311,7 +309,7 @@ public final class RegionFile implements AutoCloseable {
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
      * @return チャンク
-     * 存在しなければ null
+     * 存在しなければnull
      */
     public RawChunk readChunkRaw(int chunkX, int chunkZ) {
         ensureOpen();
@@ -339,7 +337,7 @@ public final class RegionFile implements AutoCloseable {
         ChunkCompression compression = ChunkCompression.fromId(schemeByte & 0x7F);
 
         if (external) {
-            // 最上位ビットが立っている場合、本体は c.X.Z.mcc にある
+            // 最上位ビットが立っている場合、本体はc.X.Z.mccにある
             return new RawChunk(compression, readExternalFile(chunkX, chunkZ), true);
         }
 
@@ -348,12 +346,12 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクを NBT として読む
+     * チャンクをNBTとして読む
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
      * @return チャンク
-     * 存在しなければ null
+     * 存在しなければnull
      */
     public NbtCompound readChunk(int chunkX, int chunkZ) {
         RawChunk raw = readChunkRaw(chunkX, chunkZ);
@@ -368,8 +366,8 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクを NBT として書き込む
-     * 圧縮方式は Zlib
+     * チャンクをNBTとして書き込む
+     * 圧縮方式はZlib
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -380,7 +378,7 @@ public final class RegionFile implements AutoCloseable {
     }
 
     /**
-     * チャンクを NBT として、圧縮方式を指定して書き込む
+     * チャンクをNBTとして、圧縮方式を指定して書き込む
      *
      * @param chunkX      絶対チャンクX座標
      * @param chunkZ      絶対チャンクZ座標
@@ -414,7 +412,7 @@ public final class RegionFile implements AutoCloseable {
         int schemeByte;
 
         if (useExternal) {
-            // 1MiB を超えるチャンクは外部ファイルへ退避し、リージョンには目印だけ残す
+            // 255セクタ（約1MiB）に収まらないチャンクは外部ファイルへ退避し、リージョンには目印だけ残す
             writeExternalFile(chunkX, chunkZ, raw.data());
             payload = new byte[0];
             schemeByte = raw.compression().id() | 0x80;
@@ -453,7 +451,7 @@ public final class RegionFile implements AutoCloseable {
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
-     * @return 削除できたら true
+     * @return 削除できたらtrue
      */
     public boolean deleteChunk(int chunkX, int chunkZ) {
         ensureOpen();
@@ -476,7 +474,7 @@ public final class RegionFile implements AutoCloseable {
     /**
      * 必要なセクタ数を確保し、開始セクタ番号を返す
      *
-     * <p>既存の割り当てがちょうど同じ大きさならその場を使い、
+     * <p>既存の割り当てがちょうど同じ大きさなら、その場所をそのまま使う
      * そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する
      */
     private int allocateSectors(int index, int needed) {
@@ -513,13 +511,13 @@ public final class RegionFile implements AutoCloseable {
 
     /**
      * セクタの使用状況を作る
-     * {@code ignoreIndex} のチャンクは空きとして扱う
+     * {@code ignoreIndex}のチャンクは空きとして扱う
      */
     private boolean[] buildSectorUsage(int ignoreIndex) {
         int totalSectors = data.length / SECTOR_SIZE;
         boolean[] used = new boolean[totalSectors];
 
-        // ヘッダの 2 セクタは常に使用中
+        // ヘッダの2セクタは常に使用中
         for (int sector = 0; sector < HEADER_SECTORS && sector < totalSectors; sector++) {
             used[sector] = true;
         }
@@ -618,6 +616,8 @@ public final class RegionFile implements AutoCloseable {
         }
 
         writeHeader();
+        // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        ensureDirectory();
 
         try {
             Files.write(path, data);
@@ -640,9 +640,9 @@ public final class RegionFile implements AutoCloseable {
         return data.clone();
     }
 
-    /** ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す */
+    /** ロケーションテーブルとタイムスタンプテーブルを先頭2セクタへ書き戻す */
     private void writeHeader() {
-        // 位置表とタイムスタンプ表を、添字順に組み立て直す
+        // ロケーションテーブルとタイムスタンプテーブルを、添字順に組み立て直す
         for (int index = 0; index < CHUNK_COUNT; index++) {
             long entry = ((long) offsets[index] << 8) | (long) sectorCounts[index];
             writeUnsigned(index * 4, entry, 4);
@@ -706,8 +706,23 @@ public final class RegionFile implements AutoCloseable {
         }
     }
 
+    /**
+     * ファイルを置くディレクトリが無ければ作る
+     *
+     * <p>読むだけの操作で空のディレクトリができないよう、書き出す直前にだけ呼ぶ
+     */
+    private void ensureDirectory() {
+        try {
+            Files.createDirectories(directory);
+        } catch (IOException error) {
+            throw new SpringNbtException(ErrorCode.IO, "ディレクトリを作れない: " + directory, error);
+        }
+    }
+
     private void writeExternalFile(int chunkX, int chunkZ, byte[] payload) {
         Path external = externalPath(chunkX, chunkZ);
+        // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        ensureDirectory();
 
         try {
             Files.write(external, payload);
@@ -760,7 +775,7 @@ final class ChunkCodec {
         }
 
         try (ByteArrayOutputStream destination = new ByteArrayOutputStream()) {
-            // ストリームを閉じてフッタを書かせてから toByteArray する必要がある
+            // ストリームを閉じてフッタを書かせてからtoByteArrayする必要がある
             try (OutputStream encoder = createEncoder(destination, compression)) {
                 encoder.write(plain);
             }

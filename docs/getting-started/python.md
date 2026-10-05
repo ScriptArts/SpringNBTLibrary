@@ -1,18 +1,18 @@
 # はじめに（Python）
 
-Python 3.10 以上が必要です。依存パッケージはありません。
+Python 3.10以上が必要です。依存パッケージはありません。
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `spring_nbt_library-<版>-py3-none-any.whl` を落とします。
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring_nbt_library-<版>-py3-none-any.whl`を落とします。
 
 ```bash
 pip install spring_nbt_library-1.0.0-py3-none-any.whl
 ```
 
-wheel なのでビルドは不要です。
+wheelなのでビルドは不要です。
 
-## NBT ファイルを読む
+## NBTファイルを読む
 
 ```python
 from spring_nbt_library.nbt import read_file
@@ -25,8 +25,8 @@ print(data.get_string("LevelName"))
 print(data.get_int("DataVersion"))
 ```
 
-型が違えば `UNEXPECTED_TAG_TYPE` の例外になります。
-キーが無いかもしれないときは `opt_*` を使います（無ければ `None`）。
+型が違えば`UNEXPECTED_TAG_TYPE`の例外になります。
+キーが無いかもしれないときは`opt_*`を使います（無ければ`None`）。
 
 ## 書く
 
@@ -43,10 +43,12 @@ write_file("out.nbt", NamedTag("", root),
            NbtWriteOptions(compression=Compression.GZIP))
 ```
 
-整数型の範囲は構築時に検査します。Python には整数の幅が無いので、
-型で守れないぶんを実行時に見ています。
+整数型の範囲は構築時に検査します。
+Pythonには整数の幅が無いので、型で守れないぶんを実行時に見ています。
 
 ```python
+from spring_nbt_library.nbt import NbtByte
+
 NbtByte(300)   # INVALID_ARGUMENT
 ```
 
@@ -67,7 +69,7 @@ with MinecraftWorld.open(world_path) as world:
 ## ブロックを書き換える
 
 ```python
-from spring_nbt_library.world import MinecraftWorld, WorldOpenOptions
+from spring_nbt_library.world import BlockState, MinecraftWorld, WorldOpenOptions
 
 with MinecraftWorld.open(world_path, WorldOpenOptions(writable=True)) as world:
     overworld = world.dimension("minecraft:overworld")
@@ -75,11 +77,10 @@ with MinecraftWorld.open(world_path, WorldOpenOptions(writable=True)) as world:
     overworld.flush()   # ここで初めてディスクへ書かれる
 ```
 
-> **Minecraft を終了してから実行すること。**
-> Python 版が `session.lock` を確認するのは POSIX 環境だけです
-> （Windows には `fcntl` がありません。[adr/0008](../adr/0008-session-lock.md)）。
+> **Minecraftを終了してから実行してください。**
+> Python版が`session.lock`を確認するのはPOSIX環境だけです（Windowsには`fcntl`がありません。[adr/0008](../adr/0008-session-lock.md)）。
 
-> ブロックを置き換えても Heightmaps と光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> ブロックを置き換えてもHeightmapsと光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
 
 ## 自分のワールドで検証する
 
@@ -94,6 +95,6 @@ python3 spec/tools/scan_world.py "<ワールドのパス>"
 
 ## 次に読むもの
 
-- [ガイド](../guide/01-nbt.md) — 目的別の使い方
-- [API 対応表](../api/overview.md) — 他言語版との対応
+- [ガイド](../guide/01-nbt.md): 目的別の使い方
+- [API対応表](../api/overview.md): 他言語版との対応
 - [エラーと安全上限](../guide/06-errors-and-limits.md)

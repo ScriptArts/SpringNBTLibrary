@@ -1,14 +1,13 @@
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// NBT のタグ型
+/// NBTのタグ型
 /// 値は仕様が定めるタグIDと一致する
 /// </summary>
-/// <remarks>仕様: <c>docs/spec/10-nbt-binary.md</c> 1章</remarks>
 public enum TagType : byte
 {
     /// <summary>TAG_End (0)
-    /// Compound の終端を表す</summary>
+    /// Compoundの終端を表す</summary>
     End = 0,
 
     /// <summary>TAG_Byte (1)</summary>
@@ -48,7 +47,7 @@ public enum TagType : byte
     LongArray = 12,
 }
 
-/// <summary><see cref="TagType"/> の拡張メソッド</summary>
+/// <summary><see cref="TagType"/>の拡張メソッド</summary>
 public static class TagTypeExtensions
 {
     /// <summary>
@@ -90,13 +89,13 @@ public static class TagTypeExtensions
     }
 
     /// <summary>
-    /// タグIDから <see cref="TagType"/> を得る
+    /// タグIDから<see cref="TagType"/>を得る
     /// 未知のIDなら例外を送出する
     /// </summary>
     /// <exception cref="SpringNbtException">未知のタグID（<see cref="ErrorCode.MalformedData"/>）</exception>
     public static TagType FromId(byte id)
     {
-        // 0..12 の範囲外はすべて不正なタグID
+        // 0..12の範囲外はすべて不正なタグID
         if (id > (byte)TagType.LongArray)
         {
             throw SpringNbtException.Malformed($"未知のタグID: {id}");

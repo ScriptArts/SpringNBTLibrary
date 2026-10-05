@@ -2,7 +2,7 @@ package io.github.scriptarts.springnbt.nbt;
 
 /**
  * TAG_Long
- * 64bit 符号付き整数
+ * 64bit符号付き整数
  */
 public final class NbtLong implements NbtTag {
 

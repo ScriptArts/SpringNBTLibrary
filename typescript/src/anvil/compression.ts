@@ -1,10 +1,8 @@
 /**
  * リージョンファイル内でチャンクに使われる圧縮方式
  *
- * NBT 層の `Compression` とは別物であることに注意
- * あちらはファイル全体の圧縮を表し、こちらはリージョン内の 1 チャンクに付く 1 バイトのIDを表す
- *
- * 仕様: `docs/spec/20-anvil-region.md` 3.1章
+ * NBT層の`Compression`とは違うものであることに注意
+ * あちらはファイル全体の圧縮を表し、こちらはリージョン内の1チャンクに付く1バイトのIDを表す
  */
 
 import { SpringNbtError } from "../errors.js";
@@ -21,14 +19,15 @@ export enum ChunkCompression {
   Gzip = 1,
   /**
    * Zlib (RFC 1950)
-   * Minecraft が実際に書き出す方式
+   * Minecraftが実際に書き出す方式
    */
   Zlib = 2,
   /** 無圧縮 */
   None = 3,
   /**
-   * LZ4（ブロック形式）
-   * 任意依存
+   * LZ4（独自ヘッダ付きのブロック連結）
+   * 読み込みのみ対応
+   * 展開は自前で行い、外部の依存は使わない
    */
   Lz4 = 4,
   /**
@@ -58,12 +57,12 @@ export function chunkCompressionAsString(compression: ChunkCompression): string 
 }
 
 /**
- * 圧縮方式IDから {@link ChunkCompression} を得る
+ * 圧縮方式IDから{@link ChunkCompression}を得る
  *
  * @throws {SpringNbtError} 未知のIDの場合
  */
 export function chunkCompressionFromId(id: number): ChunkCompression {
-  // 仕様が定めるのは 1・2・3・4・127 の 5 種類だけ
+  // 仕様が定めるのは1・2・3・4・127の5種類だけ
   if (LABELS.has(id as ChunkCompression)) {
     return id as ChunkCompression;
   }
@@ -79,7 +78,10 @@ export class RawChunk {
     readonly external: boolean = false,
   ) {}
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `RawChunk(${chunkCompressionAsString(this.compression)}, ` +
       `${this.data.length} バイト, external=${this.external})`;

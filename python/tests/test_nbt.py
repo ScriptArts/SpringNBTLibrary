@@ -1,8 +1,8 @@
-"""NBT レイヤの単体テスト。
+"""NBTレイヤの単体テスト
 
-C# 版 (csharp/tests/SpringNBTLibrary.Tests/) と同じ検証項目を持つ。
-共通テストベクタによる言語間比較は spec/run-conformance.sh が担当し、
-ここでは API の振る舞いを直接確かめる。
+C#版 (csharp/tests/SpringNBTLibrary.Tests/) と同じ検証項目を持つ
+共通テストベクタによる言語間比較はspec/run-conformance.shが担当し、
+ここではAPIの振る舞いを直接確かめる
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def uncompressed_write() -> NbtWriteOptions:
 
 
 def hello_world_bytes() -> bytes:
-    """仕様書どおりに組んだ最小の NBT。"""
+    """仕様書どおりに組んだ最小のNBT"""
     parts = []
 
     # ルート: TAG_Compound、名前 "hello world"
@@ -126,6 +126,14 @@ class TestNbtIo:
         assert len(named.tag) == 1
         assert named.tag.get_string("name") == "Bananrama"
 
+    def test_nan_bit_patterns_are_written_back_unchanged(self):
+        # ペイロード付き・負・シグナリングのNaNを、Float / Doubleの両方で持つCompound
+        original = bytes.fromhex(
+            "0a0000050001617fc0000105000162ffc00000050001637f800001060001647ff800000000000106000165fff8000000000000060001667ff000000000000100")
+        named = read_bytes(original, uncompressed_read())
+
+        assert write_bytes(named, uncompressed_write()) == original
+
     def test_writes_back_the_same_bytes(self):
         original = hello_world_bytes()
         named = read_bytes(original, uncompressed_read())
@@ -149,7 +157,7 @@ class TestNbtIo:
         encoded = write_bytes(NamedTag("", root), uncompressed_write())
         decoded = read_bytes(encoded, uncompressed_read()).tag
 
-        # -0.0 と +0.0 は == では区別できないので、ビットパターンで比較する
+        # -0.0と+0.0は == では区別できないので、ビットパターンで比較する
         assert struct.pack(">d", decoded.get_double("negative_zero")) == struct.pack(">d", -0.0)
         assert decoded.get_float("nan") != decoded.get_float("nan")
         assert decoded.get_double("infinity") == float("inf")
@@ -188,11 +196,20 @@ class TestNbtIo:
 
         assert info.value.code == ErrorCode.UNEXPECTED_TAG_TYPE
 
+    def test_list_rejects_out_of_range_position_without_fixing_element_type(self):
+        values = NbtList()
+
+        with pytest.raises(IndexError):
+            values[0] = NbtInt(1)
+
+        # 失敗した操作で要素型が確定していない
+        assert values.element_type == TagType.END
+
     def test_typed_getter_distinguishes_missing_key_from_wrong_type(self):
         root = NbtCompound()
         root.set("value", NbtString("text"))
 
-        # キーが無い場合は None
+        # キーが無い場合はNone
         assert root.opt_int("missing") is None
 
         # 型が違う場合はキーの有無に関わらず例外
@@ -204,6 +221,20 @@ class TestNbtIo:
             root.get_int("missing")
         assert missing.value.code == ErrorCode.INVALID_ARGUMENT
 
+    def test_broken_compressed_data_is_malformed_data(self):
+        named = read_bytes(hello_world_bytes(), uncompressed_read())
+        gzip_bytes = write_bytes(named, NbtWriteOptions(compression=Compression.GZIP))
+        truncated = gzip_bytes[:len(gzip_bytes) // 2]
+        broken_gzip = bytes.fromhex("1f8b0800000000000000ffffffffff")
+        broken_zlib = bytes.fromhex("789cffffffffffff")
+
+        # 途中で切れたGZip、中身の壊れたGZip、中身の壊れたZlibは、どれも仕様に反するデータとして扱う
+        for data in (truncated, broken_gzip, broken_zlib):
+            with pytest.raises(SpringNbtError) as info:
+                read_bytes(data)
+
+            assert info.value.code == ErrorCode.MALFORMED_DATA
+
     @pytest.mark.parametrize("method", [Compression.GZIP, Compression.ZLIB, Compression.NONE])
     def test_compression_is_detected_automatically(self, method):
         named = read_bytes(hello_world_bytes(), uncompressed_read())
@@ -211,7 +242,7 @@ class TestNbtIo:
 
         assert detect_compression(encoded) == method
 
-        # 既定の ReadOptions は AUTO なので、方式を指定しなくても読める
+        # 既定のReadOptionsはAUTOなので、方式を指定しなくても読める
         assert read_bytes(encoded).tag.get_string("name") == "Bananrama"
 
     def test_network_format_has_no_root_name(self):
@@ -222,7 +253,7 @@ class TestNbtIo:
             NamedTag("ignored", root),
             NbtWriteOptions(fmt=NbtFormat.NETWORK, compression=Compression.NONE))
 
-        # タグID + ペイロード のみで、名前長の 2 バイトが無い
+        # タグID + ペイロードのみで、名前長の2バイトが無い
         assert encoded[0] == 0x0A
         assert encoded[1] == 0x03
 
@@ -239,7 +270,7 @@ class TestNbtIo:
         assert info.value.code == ErrorCode.MALFORMED_DATA
 
     def test_huge_declared_length_is_rejected_before_allocating(self):
-        # ルート直下に「長さ 0x7FFFFFFF の ByteArray」を宣言するだけの入力
+        # ルート直下に「長さ0x7FFFFFFFのByteArray」を宣言するだけの入力
         data = (bytes([0x0A]) + bytes([0x00, 0x00])
                 + bytes([0x07]) + bytes([0x00, 0x01]) + b"a"
                 + bytes([0x7F, 0xFF, 0xFF, 0xFF]))
@@ -289,21 +320,23 @@ class TestNbtIo:
         (NbtLong, 9223372036854775808),
     ])
     def test_integer_range_is_checked_on_construction(self, factory, value):
-        # Python の int には幅が無いため、構築時に範囲を検査する
+        # Pythonのintには幅が無いため、構築時に範囲を検査する
         with pytest.raises(SpringNbtError) as info:
             factory(value)
 
         assert info.value.code == ErrorCode.INVALID_ARGUMENT
 
     def test_float_is_rounded_to_binary32_on_construction(self):
-        # 他言語と同じ値になるよう、構築時に binary32 へ丸める
+        # 他言語と同じ値になるよう、構築時にbinary32へ丸める
         value = NbtFloat(0.1).value
         assert struct.pack(">f", value) == struct.pack(">f", 0.1)
         assert value != 0.1
 
 
 def build_all_tags() -> NbtCompound:
-    """全13タグ型を含む Compound を作る。"""
+    """TAG_Endを除く12種のタグ型をすべて含むCompoundを作る
+    TAG_EndはCompoundの終端として書き出されるので、往復させれば13種すべてを読み書きする
+    """
     root = NbtCompound()
     root.set("byte", NbtByte(-128))
     root.set("short", NbtShort(32767))
@@ -330,10 +363,10 @@ def build_all_tags() -> NbtCompound:
 
 
 def build_nested_compound(depth: int) -> bytes:
-    """指定した深さまで Compound を入れ子にしたバイト列を作る。"""
+    """指定した深さまでCompoundを入れ子にしたバイト列を作る"""
     parts = [bytes([0x0A]), bytes([0x00, 0x00])]
 
-    # ルート + (depth - 1) 段の入れ子
+    # ルート + (depth - 1)段の入れ子
     for _ in range(depth - 1):
         parts.append(bytes([0x0A]))
         parts.append(bytes([0x00, 0x01]))
@@ -379,14 +412,16 @@ class TestSnbt:
         assert snbt.parse(source) == NbtInt(expected)
 
     def test_hex_suffix_rule_is_fixed(self):
-        # 仕様 11 の 2.1: 16進では b/d/f を数字として読む。幅接尾辞は s/l のみ
+        # 16進ではb/d/fを数字として読む
+        # 幅接尾辞はs/lのみ
         assert snbt.parse("0xFF") == NbtInt(255)
         assert snbt.parse("0xFFb") == NbtInt(4091)
         assert snbt.parse("0xFFl") == NbtLong(255)
         assert snbt.parse("0xFFs") == NbtShort(255)
 
     def test_zero_byte_literal_is_not_binary(self):
-        # 0b は「10進の 0 に Byte 接尾辞」。真偽値の false として広く使われる形
+        # 0bは「10進の0にByte接尾辞」
+        # 真偽値のfalseとして広く使われる形
         assert snbt.parse("0b") == NbtByte(0)
         assert snbt.parse("0b1") == NbtInt(1)
         assert snbt.parse("0b1001b") == NbtByte(9)
@@ -413,7 +448,7 @@ class TestSnbt:
         assert snbt.parse("[I; 1, 2]") == NbtIntArray([1, 2])
         assert snbt.parse("[L; 1L, 2L]") == NbtLongArray([1, 2])
 
-        # 接尾辞なしでも範囲内なら受理する（Minecraft 自身がそう書き出すため）
+        # 接尾辞なしでも範囲内なら受理する（Minecraft自身がそう書き出すため）
         assert snbt.parse("[B; 1, 2]") == NbtByteArray([1, 2])
 
     def test_typed_array_range_is_checked(self):
@@ -427,7 +462,7 @@ class TestSnbt:
         assert len(snbt.parse("[1,2,]")) == 2
 
     def test_heterogeneous_list_is_rejected(self):
-        # 異種リストはバイナリ NBT へ写せないため受理しない (adr/0006)
+        # 異種リストはバイナリNBTへ写せないため受理しない
         with pytest.raises(SpringNbtError) as info:
             snbt.parse('[1, "a"]')
 
@@ -439,6 +474,32 @@ class TestSnbt:
         assert snbt.parse('"\\u0048"') == NbtString("H")
         assert snbt.parse('"\\s"') == NbtString(" ")
         assert snbt.parse('"\\U0001F600"') == NbtString("\U0001F600")
+
+    def test_surrogate_escapes_follow_the_same_rules_everywhere(self):
+        lone = chr(0xD800)
+
+        # \Uでサロゲートの範囲を書くと、\uと同じく孤立サロゲートになる
+        assert snbt.parse('"\\U0000D800"') == NbtString(lone)
+        assert snbt.parse('"\\uD800"') == NbtString(lone)
+
+        # 対になったサロゲートは補助文字1文字と同じ
+        assert snbt.parse('"\\uD83D\\uDE00"') == NbtString(chr(0x1F600))
+        assert NbtString(chr(0xD83D) + chr(0xDE00)) == NbtString(chr(0x1F600))
+
+        # コードポイントの範囲外と、キーの孤立サロゲートは仕様に反する
+        for source in ('"\\U00110000"', '{"\\uD800":1}', '{"\\U0000D800":1}'):
+            with pytest.raises(SpringNbtError) as info:
+                snbt.parse(source)
+
+            assert info.value.code == ErrorCode.MALFORMED_DATA
+
+        # APIからも孤立サロゲートのキーは設定できない
+        compound = NbtCompound()
+
+        with pytest.raises(SpringNbtError) as info:
+            compound.set(lone, NbtInt(1))
+
+        assert info.value.code == ErrorCode.INVALID_ARGUMENT
 
     def test_named_character_escape_is_unsupported(self):
         with pytest.raises(SpringNbtError) as info:
@@ -499,10 +560,10 @@ class TestSnbt:
 
 
 class TestCanonicalDecimal:
-    """仕様: docs/spec/11-snbt.md 5.1章
+    """浮動小数点の正準10進表記
 
-    ここが言語ごとにずれると SNBT 出力の言語間一致が崩れるため、
-    期待値は仕様の記述から手で書き下している。
+    この表記が言語ごとにずれると、SNBT出力が言語間で一致しなくなるため、
+    期待値は仕様の記述から手で書き下している
     """
 
     @pytest.mark.parametrize("value,expected", [
@@ -545,6 +606,20 @@ class TestCanonicalDecimal:
         assert snbt.write(NbtDouble(float("-inf"))) == "-Infinityd"
         assert snbt.write(NbtFloat(float("nan"))) == "NaNf"
 
+    def test_float_out_of_range_becomes_signed_infinity(self):
+        # binary32の範囲を超える値は、符号付きの無限大になる
+        assert snbt.parse("1e39f") == NbtFloat(float("inf"))
+        assert snbt.parse("-1e39f") == NbtFloat(float("-inf"))
+        assert NbtFloat(1e39).value == float("inf")
+        assert NbtFloat(-(10 ** 400)).value == float("-inf")
+
+        # binary32の最大値へ丸まる値は無限大にしない
+        assert NbtFloat(3.4028235e38).value == struct.unpack(">f", bytes.fromhex("7f7fffff"))[0]
+
+        values = NbtFloat(0.0)
+        values.value = 1e39
+        assert values.value == float("inf")
+
     def test_every_formatted_value_parses_back_to_the_same_bits(self):
         doubles = [0.0, -0.0, 1.0, -1.0, 0.1, 1.0 / 3.0, 1e300, 1e-300, 4903.0]
 
@@ -564,9 +639,8 @@ class TestCanonicalDecimal:
 class TestTagEquality:
     """タグの等値比較と深い複製
 
-    仕様: docs/spec/10-nbt-binary.md 7.3
     規則は全言語で同じでなければならない
-    各言語の同名テストと突き合わせて読むこと
+    各言語の同名テストと見比べながら読むこと
     """
 
     def test_same_type_same_value_is_equal(self):
@@ -578,13 +652,13 @@ class TestTagEquality:
         assert NbtByteArray([1]) != NbtByteArray([1, 2])
 
     def test_different_tag_type_is_not_equal(self):
-        # 値が同じでもタグの型が違えば別物
+        # 値が同じでもタグの型が違えば等しくない
         assert NbtInt(1) != NbtShort(1)
         assert NbtInt(1) != 1
         assert NbtInt(1) is not None
 
     def test_floats_compare_by_bit_pattern(self):
-        # NaN 同士は等しく、+0.0 と -0.0 は等しくない
+        # NaN同士は等しく、+0.0と-0.0は等しくない
         assert NbtFloat(float("nan")) == NbtFloat(float("nan"))
         assert NbtDouble(float("nan")) == NbtDouble(float("nan"))
         assert NbtFloat(0.0) != NbtFloat(-0.0)
@@ -605,7 +679,7 @@ class TestTagEquality:
         reversed_list.append(NbtInt(1))
         assert left != reversed_list
 
-        # 空でも要素型が違えば別物
+        # 空でも要素型が違えば等しくない
         assert NbtList(TagType.INT) != NbtList(TagType.BYTE)
 
     def test_compound_compares_insertion_order(self):
@@ -618,7 +692,7 @@ class TestTagEquality:
         same.set("b", NbtInt(2))
         assert left == same
 
-        # 中身は同じでも挿入順が違えば別物
+        # 中身は同じでも挿入順が違えば等しくない
         reordered = NbtCompound()
         reordered.set("b", NbtInt(2))
         reordered.set("a", NbtInt(1))
@@ -639,9 +713,7 @@ class TestTagEquality:
 
 
 class TestConcatenatedNbt:
-    """連なった NBT の読み込み
-
-    仕様: docs/spec/10-nbt-binary.md 3.1章
+    """連なったNBTの読み込み
     """
 
     def test_reads_concatenated_nbt_one_by_one(self):
@@ -688,8 +760,6 @@ class TestConcatenatedNbt:
 
 class TestTypedSetters:
     """型付き設定子
-
-    仕様: docs/spec/10-nbt-binary.md 7.1章
     """
 
     def test_mirror_the_getters(self):
@@ -720,7 +790,7 @@ class TestTypedSetters:
         assert root.get_int_array("ia") == [1, -1]
         assert root.get_long_array("la") == [1, -1]
 
-        # 真偽値は TAG_Byte の 0 / 1 として入る
+        # 真偽値はTAG_Byteの0 / 1として入る
         assert root.get("t").type == TagType.BYTE
 
     def test_keep_the_insertion_order(self):

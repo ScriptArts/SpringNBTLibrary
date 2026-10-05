@@ -3,14 +3,13 @@ using System.Buffers.Binary;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// NBT を展開済みのバイト列へ書き出す
+/// NBTを展開済みのバイト列へ書き出す
 /// </summary>
 /// <remarks>
 /// <para>
 /// 出力は一意でなければならない（ラウンドトリップ検証が成立するため）
-/// Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す
+/// Compoundは挿入順のまま、浮動小数点はビットパターンのまま書き出す
 /// </para>
-/// <para>仕様: <c>docs/spec/10-nbt-binary.md</c> 5章</para>
 /// </remarks>
 internal sealed class NbtBinaryWriter
 {
@@ -48,7 +47,7 @@ internal sealed class NbtBinaryWriter
                 WriteInt64(value.Value);
                 break;
             case NbtFloat value:
-                // NaN や -0.0 を保つため、ビットパターンをそのまま書く
+                // NaNや-0.0を保つため、ビットパターンをそのまま書く
                 WriteInt32(BitConverter.SingleToInt32Bits(value.Value));
                 break;
             case NbtDouble value:
@@ -106,7 +105,7 @@ internal sealed class NbtBinaryWriter
     {
         WriteInt32(values.Length);
 
-        // 1 バイトずつそのまま書く
+        // 1バイトずつそのまま書く
         foreach (sbyte value in values)
         {
             buffer.Add((byte)value);
@@ -117,7 +116,7 @@ internal sealed class NbtBinaryWriter
     {
         WriteInt32(values.Length);
 
-        // 4 バイトずつビッグエンディアンで書く
+        // 4バイトずつビッグエンディアンで書く
         foreach (int value in values)
         {
             WriteInt32(value);
@@ -128,7 +127,7 @@ internal sealed class NbtBinaryWriter
     {
         WriteInt32(values.Length);
 
-        // 8 バイトずつビッグエンディアンで書く
+        // 8バイトずつビッグエンディアンで書く
         foreach (long value in values)
         {
             WriteInt64(value);
@@ -139,8 +138,8 @@ internal sealed class NbtBinaryWriter
     {
         byte[] encoded = Mutf8.Encode(text);
 
-        // 長さフィールドは u16
-        // NbtString 側でも検査しているが、キー名は素の string なのでここでも見る
+        // 長さフィールドはu16
+        // NbtString側でも検査しているが、キー名は素のstringなのでここでも見る
         if (encoded.Length > Mutf8.MaxByteLength)
         {
             throw SpringNbtException.InvalidArgument(
@@ -167,7 +166,7 @@ internal sealed class NbtBinaryWriter
         Span<byte> bytes = stackalloc byte[4];
         BinaryPrimitives.WriteInt32BigEndian(bytes, value);
 
-        // Span は AddRange に渡せないので 1 バイトずつ積む
+        // SpanはAddRangeに渡せないので1バイトずつ積む
         for (int i = 0; i < bytes.Length; i++)
         {
             buffer.Add(bytes[i]);
@@ -179,7 +178,7 @@ internal sealed class NbtBinaryWriter
         Span<byte> bytes = stackalloc byte[8];
         BinaryPrimitives.WriteInt64BigEndian(bytes, value);
 
-        // Span は AddRange に渡せないので 1 バイトずつ積む
+        // SpanはAddRangeに渡せないので1バイトずつ積む
         for (int i = 0; i < bytes.Length; i++)
         {
             buffer.Add(bytes[i]);

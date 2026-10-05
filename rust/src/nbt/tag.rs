@@ -1,6 +1,4 @@
-//! NBT のタグ型と値モデル
-//!
-//! 仕様: `docs/spec/10-nbt-binary.md` 1章・7章
+//! NBTのタグ型と値モデル
 
 use std::collections::HashMap;
 use std::fmt;
@@ -8,12 +6,12 @@ use std::fmt;
 use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::mutf8;
 
-/// NBT のタグ型
+/// NBTのタグ型
 /// 値は仕様が定めるタグIDと一致する
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TagType {
     /// TAG_End (0)
-    /// Compound の終端を表す
+    /// Compoundの終端を表す
     End,
     /// TAG_Byte (1)
     Byte,
@@ -80,7 +78,7 @@ impl TagType {
         }
     }
 
-    /// タグIDから [`TagType`] を得る
+    /// タグIDから[`TagType`]を得る
     /// 未知のIDならエラー
     pub fn from_id(id: u8) -> Result<TagType> {
         match id {
@@ -97,7 +95,7 @@ impl TagType {
             10 => Ok(TagType::Compound),
             11 => Ok(TagType::IntArray),
             12 => Ok(TagType::LongArray),
-            // 0..12 の範囲外はすべて不正なタグID
+            // 0..12の範囲外はすべて不正なタグID
             other => Err(Error::new(
                 ErrorCode::MalformedData,
                 format!("未知のタグID: {other}"),
@@ -106,18 +104,16 @@ impl TagType {
     }
 }
 
-/// TAG_String の値
+/// TAG_Stringの値
 ///
-/// Rust の [`String`] は UTF-8 の不変条件を持つため、
-/// 孤立サロゲートを含む文字列をそのまま保持できない
-/// 他の3言語（C# / Java / Python）は UTF-16 相当でそれを保持できてしまうので、
-/// ここだけ表現を分けて往復性を保っている
+/// Rustの[`String`]はUTF-8の不変条件を持つため、孤立サロゲートを含む文字列をそのまま保持できない
+/// 他の4言語（C# / Java / TypeScript / Python）はUTF-16相当でそれを保持できてしまうので、ここだけ表現を分けて往復性を保っている
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NbtString {
-    /// UTF-8 として表せる通常の文字列
+    /// UTF-8として表せる通常の文字列
     /// 実データはほぼすべてこちら
     Text(String),
-    /// UTF-8 に写せない UTF-16 コード単位の列（孤立サロゲートを含む場合）
+    /// UTF-8に写せないUTF-16コード単位の列（孤立サロゲートを含む場合）
     Surrogates(Vec<u16>),
 }
 
@@ -127,8 +123,8 @@ impl NbtString {
         NbtString::Text(text.into())
     }
 
-    /// UTF-16 コード単位の列から作る
-    /// UTF-8 に写せなければ [`NbtString::Surrogates`] になる
+    /// UTF-16コード単位の列から作る
+    /// UTF-8に写せなければ[`NbtString::Surrogates`]になる
     pub fn from_utf16(units: Vec<u16>) -> NbtString {
         match String::from_utf16(&units) {
             Ok(text) => NbtString::Text(text),
@@ -137,7 +133,7 @@ impl NbtString {
         }
     }
 
-    /// UTF-8 として表せる場合だけ文字列を返す
+    /// UTF-8として表せる場合だけ文字列を返す
     pub fn as_str(&self) -> Option<&str> {
         match self {
             NbtString::Text(text) => Some(text.as_str()),
@@ -145,7 +141,7 @@ impl NbtString {
         }
     }
 
-    /// UTF-16 コード単位の列を返す
+    /// UTF-16コード単位の列を返す
     pub fn to_utf16(&self) -> Vec<u16> {
         match self {
             NbtString::Text(text) => text.encode_utf16().collect(),
@@ -153,12 +149,12 @@ impl NbtString {
         }
     }
 
-    /// MUTF-8 バイト列を返す
+    /// MUTF-8バイト列を返す
     pub fn to_mutf8(&self) -> Vec<u8> {
         mutf8::encode_from_utf16(&self.to_utf16())
     }
 
-    /// MUTF-8 で符号化したときのバイト長
+    /// MUTF-8で符号化したときのバイト長
     pub fn mutf8_len(&self) -> usize {
         self.to_mutf8().len()
     }
@@ -176,9 +172,7 @@ impl From<String> for NbtString {
     }
 }
 
-/// NBT のタグ
-///
-/// 仕様: `docs/spec/10-nbt-binary.md` 1章
+/// NBTのタグ
 #[derive(Debug, Clone)]
 pub enum NbtTag {
     /// TAG_Byte
@@ -234,7 +228,7 @@ impl PartialEq for NbtTag {
             (NbtTag::Short(a), NbtTag::Short(b)) => a == b,
             (NbtTag::Int(a), NbtTag::Int(b)) => a == b,
             (NbtTag::Long(a), NbtTag::Long(b)) => a == b,
-            // NaN や -0.0 を区別するため、値ではなくビットパターンで比較する
+            // NaNや-0.0を区別するため、値ではなくビットパターンで比較する
             (NbtTag::Float(a), NbtTag::Float(b)) => a.to_bits() == b.to_bits(),
             (NbtTag::Double(a), NbtTag::Double(b)) => a.to_bits() == b.to_bits(),
             (NbtTag::ByteArray(a), NbtTag::ByteArray(b)) => a == b,
@@ -249,12 +243,11 @@ impl PartialEq for NbtTag {
 }
 
 /// TAG_List
-/// 要素型が 1 つに固定されたタグの列
+/// 要素型が1つに固定されたタグの列
 ///
-/// 空リストの要素型は [`TagType::End`]
+/// 空リストの要素型は[`TagType::End`]
 /// 最初の要素を追加した時点で型が確定する
-/// 全要素を削除しても確定済みの要素型は維持される
-/// （読み書きの往復で型が消えないようにするため）
+/// 読み書きの往復で型が消えないよう、全要素を削除しても確定済みの要素型は維持される
 #[derive(Debug, Clone, PartialEq)]
 pub struct NbtList {
     element_type: TagType,
@@ -274,7 +267,7 @@ impl NbtList {
     }
 
     /// 要素の型
-    /// 空で未確定なら [`TagType::End`]
+    /// 空で未確定なら[`TagType::End`]
     pub fn element_type(&self) -> TagType {
         self.element_type
     }
@@ -303,7 +296,13 @@ impl NbtList {
     }
 
     /// 位置を指定して挿入する
+    /// 位置が要素数を超えていればエラー
     pub fn insert(&mut self, index: usize, item: NbtTag) -> Result<()> {
+        // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+        if index > self.items.len() {
+            return Err(Error::invalid_argument(format!("位置が範囲外: {index}")));
+        }
+
         self.ensure_element_type(&item)?;
         self.items.insert(index, item);
         Ok(())
@@ -375,7 +374,7 @@ pub struct NbtCompound {
 }
 
 impl NbtCompound {
-    /// 空の Compound を作る
+    /// 空のCompoundを作る
     pub fn new() -> NbtCompound {
         NbtCompound { entries: Vec::new(), index: HashMap::new() }
     }
@@ -423,7 +422,7 @@ impl NbtCompound {
     }
 
     /// キーに対応するタグを返す
-    /// 存在しなければ `None`
+    /// 存在しなければ`None`
     pub fn opt(&self, key: &str) -> Option<&NbtTag> {
         match self.index.get(key) {
             Some(&position) => Some(&self.entries[position].1),
@@ -444,7 +443,7 @@ impl NbtCompound {
     }
 
     /// キーを削除する
-    /// 削除できたら `true`
+    /// 削除できたら`true`
     pub fn remove(&mut self, key: &str) -> bool {
         let position = match self.index.remove(key) {
             Some(position) => position,
@@ -487,8 +486,8 @@ impl<'a> IntoIterator for &'a NbtCompound {
 /// 型付き取得子
 ///
 /// 「キーが無い」と「型が違う」は区別する
-/// `opt_*` はキーが無ければ `None` を返し、`get_*` はエラーにする
-/// どちらも型が違えば必ず [`ErrorCode::UnexpectedTagType`] になる
+/// `opt_*`はキーが無ければ`None`を返し、`get_*`はエラーにする
+/// どちらも型が違えば必ず[`ErrorCode::UnexpectedTagType`]になる
 impl NbtCompound {
     fn wrong_type(key: &str, actual: TagType, expected: &str) -> Error {
         Error::new(
@@ -507,8 +506,8 @@ impl NbtCompound {
 
 /// スカラ型の取得子を生やすためのマクロ
 ///
-/// 6 種類ぶんを手で書くと差分が生まれやすいので、1 か所から展開する
-/// 参照を返す取得子は寿命の注釈が要るため、マクロにせず個別に書く
+/// 6種類ぶんを手で書くと差分が生まれやすいので、1か所から展開する
+/// 参照を返す取得子は、配列型を`ref_accessors`で展開し、String / List / Compoundは個別に書く
 macro_rules! scalar_accessors {
     ($opt:ident, $get:ident, $variant:ident, $ret:ty, $label:literal) => {
         impl NbtCompound {
@@ -541,8 +540,8 @@ scalar_accessors!(opt_double, get_double, Double, f64, "Double");
 
 /// スカラ型の設定子を生やすためのマクロ
 ///
-/// `set(key, NbtTag::Int(42))` と書かずに済むようにするための糖衣
-/// 取得子の `get_int` と対になる
+/// `set(key, NbtTag::Int(42))`と書かずに済むようにするための糖衣
+/// 取得子の`get_int`と対になる
 macro_rules! scalar_setters {
     ($set:ident, $variant:ident, $arg:ty, $label:literal) => {
         impl NbtCompound {
@@ -562,10 +561,10 @@ scalar_setters!(set_float, Float, f32, "Float");
 scalar_setters!(set_double, Double, f64, "Double");
 
 impl NbtCompound {
-    /// TAG_Byte として設定する
-    /// `true` は 1、`false` は 0
+    /// TAG_Byteとして設定する
+    /// `true`は1、`false`は0
     pub fn set_bool(&mut self, key: &str, value: bool) {
-        // NBT に真偽値の専用型は無いので TAG_Byte の 0 / 1 で表す
+        // NBTに真偽値の専用型は無いので、TAG_Byteの0 / 1で表す
         if value {
             self.set_byte(key, 1);
         } else {
@@ -573,22 +572,22 @@ impl NbtCompound {
         }
     }
 
-    /// TAG_String として設定する
+    /// TAG_Stringとして設定する
     pub fn set_string(&mut self, key: &str, value: &str) {
         self.set(key, NbtTag::String(NbtString::from(value)));
     }
 
-    /// TAG_Byte_Array として設定する
+    /// TAG_Byte_Arrayとして設定する
     pub fn set_byte_array(&mut self, key: &str, value: Vec<i8>) {
         self.set(key, NbtTag::ByteArray(value));
     }
 
-    /// TAG_Int_Array として設定する
+    /// TAG_Int_Arrayとして設定する
     pub fn set_int_array(&mut self, key: &str, value: Vec<i32>) {
         self.set(key, NbtTag::IntArray(value));
     }
 
-    /// TAG_Long_Array として設定する
+    /// TAG_Long_Arrayとして設定する
     pub fn set_long_array(&mut self, key: &str, value: Vec<i64>) {
         self.set(key, NbtTag::LongArray(value));
     }
@@ -623,8 +622,8 @@ ref_accessors!(opt_int_array, get_int_array, IntArray, [i32], "Int_Array", as_sl
 ref_accessors!(opt_long_array, get_long_array, LongArray, [i64], "Long_Array", as_slice);
 
 impl NbtCompound {
-    /// TAG_String を [`NbtString`] のまま取得する
-    /// キーが無ければ `None`
+    /// TAG_Stringを[`NbtString`]のまま取得する
+    /// キーが無ければ`None`
     pub fn opt_string_tag(&self, key: &str) -> Result<Option<&NbtString>> {
         match self.opt(key) {
             None => Ok(None),
@@ -633,7 +632,7 @@ impl NbtCompound {
         }
     }
 
-    /// TAG_String を [`NbtString`] のまま取得する
+    /// TAG_Stringを[`NbtString`]のまま取得する
     /// キーが無ければエラー
     pub fn get_string_tag(&self, key: &str) -> Result<&NbtString> {
         match self.opt_string_tag(key)? {
@@ -642,8 +641,8 @@ impl NbtCompound {
         }
     }
 
-    /// TAG_List を取得する
-    /// キーが無ければ `None`
+    /// TAG_Listを取得する
+    /// キーが無ければ`None`
     pub fn opt_list(&self, key: &str) -> Result<Option<&NbtList>> {
         match self.opt(key) {
             None => Ok(None),
@@ -652,7 +651,7 @@ impl NbtCompound {
         }
     }
 
-    /// TAG_List を取得する
+    /// TAG_Listを取得する
     /// キーが無ければエラー
     pub fn get_list(&self, key: &str) -> Result<&NbtList> {
         match self.opt_list(key)? {
@@ -661,8 +660,8 @@ impl NbtCompound {
         }
     }
 
-    /// TAG_Compound を取得する
-    /// キーが無ければ `None`
+    /// TAG_Compoundを取得する
+    /// キーが無ければ`None`
     pub fn opt_compound(&self, key: &str) -> Result<Option<&NbtCompound>> {
         match self.opt(key) {
             None => Ok(None),
@@ -671,7 +670,7 @@ impl NbtCompound {
         }
     }
 
-    /// TAG_Compound を取得する
+    /// TAG_Compoundを取得する
     /// キーが無ければエラー
     pub fn get_compound(&self, key: &str) -> Result<&NbtCompound> {
         match self.opt_compound(key)? {
@@ -682,12 +681,11 @@ impl NbtCompound {
 }
 
 impl NbtCompound {
-    /// TAG_String を UTF-8 文字列として取得する
-    /// キーが無ければ `None`
+    /// TAG_StringをUTF-8文字列として取得する
+    /// キーが無ければ`None`
     ///
     /// 孤立サロゲートを含む文字列はエラーになる
-    /// その場合は
-    /// [`NbtCompound::opt_string_tag`] で [`NbtString`] のまま取り出す
+    /// その場合は[`NbtCompound::opt_string_tag`]で[`NbtString`]のまま取り出す
     pub fn opt_string(&self, key: &str) -> Result<Option<&str>> {
         match self.opt_string_tag(key)? {
             None => Ok(None),
@@ -701,7 +699,7 @@ impl NbtCompound {
         }
     }
 
-    /// TAG_String を UTF-8 文字列として取得する
+    /// TAG_StringをUTF-8文字列として取得する
     /// キーが無ければエラー
     pub fn get_string(&self, key: &str) -> Result<&str> {
         match self.opt_string(key)? {
@@ -710,9 +708,9 @@ impl NbtCompound {
         }
     }
 
-    /// TAG_Byte を真偽値として取得する
-    /// 0 以外が `true`
-    /// キーが無ければ `None`
+    /// TAG_Byteを真偽値として取得する
+    /// 0以外が`true`
+    /// キーが無ければ`None`
     pub fn opt_bool(&self, key: &str) -> Result<Option<bool>> {
         match self.opt_byte(key)? {
             Some(value) => Ok(Some(value != 0)),
@@ -720,8 +718,8 @@ impl NbtCompound {
         }
     }
 
-    /// TAG_Byte を真偽値として取得する
-    /// 0 以外が `true`
+    /// TAG_Byteを真偽値として取得する
+    /// 0以外が`true`
     /// キーが無ければエラー
     pub fn get_bool(&self, key: &str) -> Result<bool> {
         Ok(self.get_byte(key)? != 0)
@@ -732,7 +730,7 @@ impl NbtCompound {
 // 人が読むための表現
 //
 // デバッグ用であり、中身の形式は仕様で決めていない
-// SNBT が要るなら `snbt::write` を使う
+// SNBTが要るなら`snbt::write`を使う
 // ---------------------------------------------------------------------------
 
 impl fmt::Display for NbtString {

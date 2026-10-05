@@ -3,11 +3,11 @@ using SpringNBTLibrary.Nbt;
 namespace SpringNBTLibrary.Tests;
 
 /// <summary>
-/// 浮動小数点の正準10進表記。仕様: docs/spec/11-snbt.md 5.1章
+/// 浮動小数点の正準10進表記
 /// </summary>
 /// <remarks>
-/// ここが言語ごとにずれると SNBT 出力の言語間一致が崩れるため、
-/// 期待値は仕様の記述から手で書き下している。
+/// この表記が言語ごとにずれると、SNBT出力が言語間で一致しなくなるため、
+/// 期待値は仕様の記述から手で書き下している
 /// </remarks>
 public class CanonicalDecimalTests
 {

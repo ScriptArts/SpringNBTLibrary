@@ -1,6 +1,6 @@
 name: release
 
-# タグを打つとビルドして GitHub Releases へ成果物を添付する。
+# タグを打つとビルドしてGitHub Releasesへ成果物を添付する。
 #
 # パッケージレジストリ（NuGet / Maven Central / npm / PyPI / crates.io）へは公開せず、
 # ここに置いたファイルを利用者が自分のプロジェクトへ組み込む形をとる。
@@ -10,7 +10,7 @@ on:
   # タグを打つ前に組み立てだけ試せるようにしておく
   workflow_dispatch:
 
-# gh release create で成果物を上げるために要る
+# gh release createで成果物を上げるために要る
 permissions:
   contents: write
 
@@ -44,7 +44,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # タグ名から版を取る。手動実行のときは Cargo.toml の版を使う
+      # タグ名から版を取る。手動実行のときはCargo.tomlの版を使う
       - name: 版を決める
         id: version
         run: |
@@ -56,7 +56,7 @@ jobs:
           echo "value=${version}" >> "$GITHUB_OUTPUT"
           echo "組み立てる版: ${version}"
 
-      # 壊れたものを配らないよう、公開前に必ず全部通す
+      # 正しく動かないものを配らないよう、公開前に必ず全部通す
       - name: 全言語のテスト
         run: |
           (cd csharp && dotnet test --configuration Release)
@@ -68,8 +68,8 @@ jobs:
       - name: 全言語の挙動が一致することの検証
         run: ./spec/run-conformance.sh
 
-      # dll を直接参照したい人向け。xml を隣に置かないと補完に説明が出ないので、
-      # LICENSE と合わせてひとまとめにする
+      # dllを直接参照したい人向け。xmlを隣に置かないと補完に説明が出ないので、
+      # LICENSEと合わせてひとまとめにする
       - name: C# (zip)
         run: |
           dotnet build csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj \
@@ -82,7 +82,7 @@ jobs:
           (cd artifacts/csharp && zip -q -r \
             "../SpringNBTLibrary-${{ steps.version.outputs.value }}-dotnet8.zip" .)
 
-      # NuGet へは公開しないが、落としたファイルをローカルのソースにできる
+      # NuGetへは公開しないが、落としたファイルをローカルのソースにできる
       - name: C# (nupkg)
         run: |
           dotnet pack csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj \
@@ -113,14 +113,14 @@ jobs:
           mkdir -p artifacts
           cp rust/target/package/spring-nbt-library-*.crate artifacts/
 
-      # 落としたファイルが壊れていないか、利用者が確かめられるようにする
+      # 落としたファイルが元のままか、利用者が確かめられるようにする
       - name: チェックサムを作る
         run: |
           rm -rf artifacts/csharp
           (cd artifacts && sha256sum * > SHA256SUMS.txt)
           ls -la artifacts
 
-      # CHANGELOG からその版の節を取り出し、案内文と合わせて本文にする
+      # CHANGELOGからその版の節を取り出し、案内文と合わせて本文にする
       # 節が無ければここで落ちるので、変更点を書き忘れたまま公開できない
       - name: リリース本文を組み立てる
         run: |

@@ -16,32 +16,27 @@ import java.util.LinkedList;
 import java.util.Objects;
 
 /**
- * リージョンファイルが並ぶディレクトリ 1 つ分
- * （{@code region/}、{@code entities/}、{@code poi/} のいずれか）
+ * リージョンファイルが並ぶディレクトリ1つ分
+ * （{@code region/}、{@code entities/}、{@code poi/}のいずれか）
  *
- * <p>開いたリージョンファイルはキャッシュし、{@link #close()} でまとめて閉じる
+ * <p>開いたリージョンファイルはキャッシュし、{@link #close()}でまとめて閉じる
  * チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい
  *
- * <p>{@link RegionFile} はファイル全体をメモリへ載せるため、キャッシュには
- * {@link #maxCachedRegions()} 件の上限がある
- * 上限を超えると、最も長く使われていない
- * ものから書き出して閉じる
+ * <p>{@link RegionFile}はファイル全体をメモリへ載せるため、キャッシュには{@link #maxCachedRegions()}件の上限がある
+ * 上限を超えると、最も長く使われていないものから書き出して閉じる
  * 大きなワールドを端から走査してもメモリを使い切らない
  *
- * <p>このため {@link #region(int, int)} が返した参照は、
- * <b>別のリージョンへアクセスすると閉じられている場合がある</b>
+ * <p>このため{@link #region(int, int)}が返した参照は、<b>別のリージョンへアクセスすると閉じられている場合がある</b>
  * 参照を保持せず、必要なたびに取得すること
- *
- * <p>仕様: {@code docs/spec/20-anvil-region.md} 5章
  */
 public final class RegionFolder implements AutoCloseable {
 
     /**
      * 同時に開いておくリージョンファイル数の既定の上限
      *
-     * <p>1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる
-     * 実データでは数 MB から数十 MB 程度
-     * 8 件なら通常のワールドで数百 MB に収まる
+     * <p>1リージョンは最大255セクタ × 1024チャンク＝理論上1GiBになりうる
+     * 実データでは数MBから数十MB程度
+     * 8件なら通常のワールドで数百MBに収まる
      */
     public static final int DEFAULT_MAX_CACHED_REGIONS = 8;
 
@@ -111,7 +106,7 @@ public final class RegionFolder implements AutoCloseable {
      * @param maxCachedRegions 同時に開いておくリージョンファイル数の上限
      * @return 開いたフォルダ
      * @throws SpringNbtException 読み取り専用でディレクトリが存在しない場合、
-     *                            または上限が 1 未満の場合
+     *                            または上限が1未満の場合
      */
     public static RegionFolder open(Path directory, RegionFileMode mode, int maxCachedRegions) {
         Objects.requireNonNull(directory, "directory");
@@ -153,7 +148,7 @@ public final class RegionFolder implements AutoCloseable {
         }
 
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory, "r.*.mca")) {
-            // r.X.Z.mca として解釈できるファイルだけを拾う
+            // r.X.Z.mcaとして解釈できるファイルだけを拾う
             for (Path path : stream) {
                 RegionPos position = RegionPos.fromFileName(path.getFileName().toString());
 
@@ -177,7 +172,7 @@ public final class RegionFolder implements AutoCloseable {
      * @param regionX リージョンX座標
      * @param regionZ リージョンZ座標
      * @return リージョン
-     * 読み取り専用で存在しなければ null
+     * 読み取り専用で存在しなければnull
      */
     public RegionFile region(int regionX, int regionZ) {
         ensureOpen();
@@ -191,7 +186,7 @@ public final class RegionFolder implements AutoCloseable {
 
         Path path = directory.resolve(position.fileName());
 
-        // 読み取り専用では、存在しないリージョンは「チャンクが無い」として null を返す
+        // 読み取り専用では、存在しないリージョンは「チャンクが無い」としてnullを返す
         if (!Files.exists(path) && mode == RegionFileMode.READ_ONLY) {
             return null;
         }
@@ -212,7 +207,7 @@ public final class RegionFolder implements AutoCloseable {
         recentlyUsed.addLast(position);
     }
 
-    /** 新しく 1 件開けるよう、上限を下回るまで古いものを閉じる */
+    /** 新しく1件開けるよう、上限を下回るまで古いものを閉じる */
     private void evictUntilBelowLimit() {
         // 上限に達している間、いちばん長く使っていないものから閉じる
         while (cache.size() >= maxCachedRegions && !recentlyUsed.isEmpty()) {
@@ -232,7 +227,7 @@ public final class RegionFolder implements AutoCloseable {
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
-     * @return 存在すれば true
+     * @return 存在すればtrue
      */
     public boolean hasChunk(int chunkX, int chunkZ) {
         RegionFile file = regionFor(chunkX, chunkZ);
@@ -245,12 +240,12 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * チャンクを NBT として読む
+     * チャンクをNBTとして読む
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
      * @return チャンク
-     * 存在しなければ null
+     * 存在しなければnull
      */
     public NbtCompound readChunk(int chunkX, int chunkZ) {
         RegionFile file = regionFor(chunkX, chunkZ);
@@ -263,7 +258,7 @@ public final class RegionFolder implements AutoCloseable {
     }
 
     /**
-     * チャンクを NBT として書き込む
+     * チャンクをNBTとして書き込む
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
@@ -285,7 +280,7 @@ public final class RegionFolder implements AutoCloseable {
      *
      * @param chunkX 絶対チャンクX座標
      * @param chunkZ 絶対チャンクZ座標
-     * @return 削除できたら true
+     * @return 削除できたらtrue
      */
     public boolean deleteChunk(int chunkX, int chunkZ) {
         RegionFile file = regionFor(chunkX, chunkZ);

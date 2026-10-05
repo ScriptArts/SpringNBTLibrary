@@ -3,15 +3,14 @@ using System.Buffers.Binary;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// 展開済みのバイト列から NBT を読み出す
+/// 展開済みのバイト列からNBTを読み出す
 /// </summary>
 /// <remarks>
 /// <para>
 /// 入力全体をあらかじめメモリに持つ設計にしている
 /// 「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため
-/// これがないと、長さ 0x7FFFFFFF を宣言しただけの数バイトの入力でメモリを枯渇させられる
+/// これがないと、長さ0x7FFFFFFFを宣言しただけの数バイトの入力でメモリを枯渇させられる
 /// </para>
-/// <para>仕様: <c>docs/spec/10-nbt-binary.md</c></para>
 /// </remarks>
 internal sealed class NbtBinaryReader
 {
@@ -54,14 +53,14 @@ internal sealed class NbtBinaryReader
         return tag;
     }
 
-    /// <summary>ルートタグを 1 つ読む
+    /// <summary>ルートタグを1つ読む
     /// 末尾の余りは見ない</summary>
     internal NamedTag ReadRootTag(NbtFormat format)
     {
         byte id = ReadByteRaw();
         TagType type = TagTypeExtensions.FromId(id);
 
-        // Java版のファイル形式でもネットワーク形式でも、ルートは必ず TAG_Compound
+        // Java版のファイル形式でもネットワーク形式でも、ルートは必ずTAG_Compound
         if (type != TagType.Compound)
         {
             throw SpringNbtException.Malformed(
@@ -87,7 +86,7 @@ internal sealed class NbtBinaryReader
     /// <summary>指定した型のペイロードを読む</summary>
     private NbtTag ReadPayload(TagType type, int depth)
     {
-        // 深さ上限は再帰する型に入る手前で検査する
+        // 深さ上限は型を問わず、ペイロードを読む前に検査する
         if (depth > maxDepth)
         {
             throw SpringNbtException.LimitExceeded($"ネストが深すぎる (上限 {maxDepth})");
@@ -126,12 +125,12 @@ internal sealed class NbtBinaryReader
         }
     }
 
-    /// <summary>TAG_Compound のペイロード（名前付きタグの並び + TAG_End）を読む</summary>
+    /// <summary>TAG_Compoundのペイロード（名前付きタグの並び + TAG_End）を読む</summary>
     private NbtCompound ReadCompoundPayload(int depth)
     {
         NbtCompound compound = new NbtCompound();
 
-        // TAG_End が現れるまで名前付きタグを読み続ける
+        // TAG_Endが現れるまで名前付きタグを読み続ける
         while (true)
         {
             byte id = ReadByteRaw();
@@ -148,7 +147,7 @@ internal sealed class NbtBinaryReader
         }
     }
 
-    /// <summary>TAG_List のペイロードを読む</summary>
+    /// <summary>TAG_Listのペイロードを読む</summary>
     private NbtList ReadListPayload(int depth)
     {
         byte elementId = ReadByteRaw();
@@ -157,7 +156,7 @@ internal sealed class NbtBinaryReader
 
         if (elementType == TagType.End)
         {
-            // 要素型 End のリストは空でなければならない
+            // 要素型Endのリストは空でなければならない
             if (count != 0)
             {
                 throw SpringNbtException.Malformed($"要素型 End のリストに {count} 個の要素が宣言されている");
@@ -166,7 +165,7 @@ internal sealed class NbtBinaryReader
             return new NbtList(TagType.End);
         }
 
-        // 1 要素の最小バイト数から、宣言された個数が入力に収まるかを先に検査する
+        // 1要素の最小バイト数から、宣言された個数が入力に収まるかを先に検査する
         EnsureAvailable((long)count * MinimumPayloadSize(elementType));
 
         NbtList list = new NbtList(elementType);
@@ -204,7 +203,7 @@ internal sealed class NbtBinaryReader
 
         int[] result = new int[count];
 
-        // 4 バイトずつビッグエンディアンで読む
+        // 4バイトずつビッグエンディアンで読む
         for (int i = 0; i < count; i++)
         {
             result[i] = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(position + (i * 4), 4));
@@ -221,7 +220,7 @@ internal sealed class NbtBinaryReader
 
         long[] result = new long[count];
 
-        // 8 バイトずつビッグエンディアンで読む
+        // 8バイトずつビッグエンディアンで読む
         for (int i = 0; i < count; i++)
         {
             result[i] = BinaryPrimitives.ReadInt64BigEndian(data.AsSpan(position + (i * 8), 8));
@@ -231,7 +230,7 @@ internal sealed class NbtBinaryReader
         return result;
     }
 
-    /// <summary>MUTF-8 の文字列（u16 の長さ + 本体）を読む</summary>
+    /// <summary>MUTF-8の文字列（u16の長さ + 本体）を読む</summary>
     private string ReadString()
     {
         int length = BinaryPrimitives.ReadUInt16BigEndian(Take(2));
@@ -248,7 +247,7 @@ internal sealed class NbtBinaryReader
     {
         int length = BinaryPrimitives.ReadInt32BigEndian(Take(4));
 
-        // 長さは i32 だが、負値は仕様上ありえない
+        // 長さはi32だが、負値は仕様上ありえない
         if (length < 0)
         {
             throw SpringNbtException.Malformed($"長さが負値: {length}");
@@ -289,11 +288,11 @@ internal sealed class NbtBinaryReader
     /// キーやルート名として使える文字列か検査する
     /// </summary>
     /// <remarks>
-    /// 値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）
-    /// Minecraft が書き出すキーは ASCII の識別子のみで、
+    /// 値と違い、キーには孤立サロゲートを許さない
+    /// Minecraftが書き出すキーはASCIIの識別子のみで、
     /// 孤立サロゲートが現れるのはデータ破損を意味する
     /// またキーを「ただの文字列」として扱えることが、
-    /// 4言語すべてでマップ型をそのまま使えるという実装上の利点につながる
+    /// 5言語すべてでマップ型をそのまま使えるという実装上の利点につながる
     /// </remarks>
     private static string RequireUtf8Representable(string text, string role)
     {
@@ -302,10 +301,10 @@ internal sealed class NbtBinaryReader
         {
             char c = text[index];
 
-            // 上位サロゲートは、対になる下位サロゲートとまとめて 1 文字を成す
+            // 上位サロゲートは、対になる下位サロゲートとまとめて1文字を成す
             if (char.IsHighSurrogate(c))
             {
-                // 対が揃っていれば 2 コード単位を消費する
+                // 対が揃っていれば2コード単位を消費する
                 // 揃わなければ孤立サロゲート
                 if (index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]))
                 {
@@ -346,16 +345,16 @@ internal sealed class NbtBinaryReader
             case TagType.ByteArray:
             case TagType.IntArray:
             case TagType.LongArray:
-                // 長さフィールドの 4 バイトは必ずある
+                // 長さフィールドの4バイトは必ずある
                 return 4;
             case TagType.String:
-                // 長さフィールドの 2 バイトは必ずある
+                // 長さフィールドの2バイトは必ずある
                 return 2;
             case TagType.List:
-                // 要素型 1 バイト + 個数 4 バイト
+                // 要素型1バイト + 個数4バイト
                 return 5;
             case TagType.Compound:
-                // 終端の TAG_End 1 バイトは必ずある
+                // 終端のTAG_End 1バイトは必ずある
                 return 1;
             default:
                 return 1;

@@ -3,16 +3,14 @@ package io.github.scriptarts.springnbt.nbt;
 import io.github.scriptarts.springnbt.SpringNbtException;
 
 /**
- * NBT のタグ型
- * {@link #id()} は仕様が定めるタグIDと一致する
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 1章
+ * NBTのタグ型
+ * {@link #id()}は仕様が定めるタグIDと一致する
  */
 public enum TagType {
 
     /**
      * TAG_End (0)
-     * Compound の終端を表す
+     * Compoundの終端を表す
      */
     END(0, "end"),
 
@@ -81,14 +79,14 @@ public enum TagType {
     }
 
     /**
-     * タグIDから {@link TagType} を得る
+     * タグIDから{@link TagType}を得る
      *
      * @param id タグID
      * @return タグ型
      * @throws SpringNbtException 未知のタグIDの場合
      */
     public static TagType fromId(int id) {
-        // 0..12 の範囲外はすべて不正なタグID
+        // 0..12の範囲外はすべて不正なタグID
         if (id < 0 || id >= BY_ID.length) {
             throw SpringNbtException.malformed("未知のタグID: " + id);
         }

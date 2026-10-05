@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# SpringNBTLibrary の開発用ツールチェーンへ PATH を通す。
+# SpringNBTLibraryの開発用ツールチェーンへPATHを通す。
 #   使い方:  source spec/tools/env.sh
 #
-# Homebrew の keg-only な formula（dotnet@8 / openjdk@21 / python@3.12）は
-# /opt/homebrew/bin へ symlink されないため、ここで明示的に前方に置く。
+# Homebrewのkeg-onlyなformula（dotnet@8 / openjdk@21 / python@3.12）は
+# /opt/homebrew/binへsymlinkされないため、ここで明示的に前方に置く。
 
 _brew_prefix="${HOMEBREW_PREFIX:-/opt/homebrew}"
 
@@ -14,7 +14,7 @@ for _p in \
     "${HOME}/.cargo/bin" \
     "${_brew_prefix}/opt/rustup/bin"
 do
-    # 既に PATH に含まれている場合は重複追加しない
+    # 既にPATHに含まれている場合は重複追加しない
     case ":${PATH}:" in
         *":${_p}:"*) ;;
         *) PATH="${_p}:${PATH}" ;;
@@ -22,7 +22,7 @@ do
 done
 export PATH
 
-# Maven が使う JDK を明示する（システム既定の JDK が無い環境でも動くように）
+# Mavenが使うJDKを明示する（システム既定のJDKが無い環境でも動くように）
 export JAVA_HOME="${_brew_prefix}/opt/openjdk@21"
 
 unset _brew_prefix _p

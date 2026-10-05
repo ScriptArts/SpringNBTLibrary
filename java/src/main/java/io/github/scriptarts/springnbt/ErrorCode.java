@@ -2,9 +2,7 @@ package io.github.scriptarts.springnbt;
 
 /**
  * エラーの分類
- * 4言語すべてで同一の集合を持つ
- *
- * <p>仕様: {@code docs/spec/00-conventions.md} 4章
+ * 全言語で同一の集合を持つ
  */
 public enum ErrorCode {
 
@@ -17,7 +15,7 @@ public enum ErrorCode {
     /** 期待した型と違うタグを取り出した */
     UNEXPECTED_TAG_TYPE,
 
-    /** 仕様上は妥当だが、このビルドでは扱えない */
+    /** 仕様上は妥当だが、このライブラリでは扱えない */
     UNSUPPORTED_FEATURE,
 
     /** 安全上限を超えた */
@@ -26,7 +24,7 @@ public enum ErrorCode {
     /** 呼び出し側の引数が不正 */
     INVALID_ARGUMENT,
 
-    /** 対象バージョン外のデータ */
+    /** 扱える形式より古いデータ */
     UNSUPPORTED_DATA_VERSION;
 
     /**

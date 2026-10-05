@@ -11,14 +11,13 @@ namespace SpringNBTLibrary.Nbt;
 /// 既存キーへの再設定は位置を維持したまま値だけを置き換える
 /// これにより読み込んだ順序が書き出しでも保たれ、ラウンドトリップが成立する
 /// </para>
-/// <para>仕様: <c>docs/spec/10-nbt-binary.md</c> 7.1章</para>
 /// </remarks>
 public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<string, NbtTag>>
 {
     private readonly List<KeyValuePair<string, NbtTag>> entries = new List<KeyValuePair<string, NbtTag>>();
     private readonly Dictionary<string, int> index = new Dictionary<string, int>(StringComparer.Ordinal);
 
-    /// <summary>空の Compound を作る</summary>
+    /// <summary>空のCompoundを作る</summary>
     public NbtCompound()
     {
     }
@@ -34,7 +33,7 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
     {
         get
         {
-            // 挿入順を保つため entries 側から取り出す
+            // 挿入順を保つため、entries側から取り出す
             foreach (KeyValuePair<string, NbtTag> entry in entries)
             {
                 yield return entry.Key;
@@ -78,7 +77,13 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(value);
 
-        // TAG_End は Compound の終端マーカーなので値として持てない
+        // 孤立サロゲートを含むキーは書き出すと読み戻せないので、ここで止める
+        if (Mutf8.HasLoneSurrogate(key))
+        {
+            throw SpringNbtException.InvalidArgument("キーに孤立サロゲートは使えない");
+        }
+
+        // TAG_EndはCompoundの終端マーカーなので値として持てない
         if (value.Type == TagType.End)
         {
             throw SpringNbtException.UnexpectedTagType("TAG_End は Compound の値にできない");
@@ -97,7 +102,7 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
     }
 
     /// <summary>キーを削除する
-    /// 削除できたら true</summary>
+    /// 削除できたらtrue</summary>
     public bool Remove(string key)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -127,7 +132,7 @@ public sealed partial class NbtCompound : NbtTag, IEnumerable<KeyValuePair<strin
     }
 
     /// <summary>キーに対応するタグを返す
-    /// 存在しなければ null</summary>
+    /// 存在しなければnull</summary>
     public NbtTag? Opt(string key)
     {
         ArgumentNullException.ThrowIfNull(key);

@@ -3,12 +3,11 @@ using System.IO.Compression;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// NBT のファイル・バイト列・ストリームからの読み書き
+/// NBTのファイル・バイト列・ストリームからの読み書き
 /// </summary>
-/// <remarks>仕様: <c>docs/spec/10-nbt-binary.md</c> 3章・4章</remarks>
 public static class NbtIo
 {
-    /// <summary>ファイルから NBT を読む</summary>
+    /// <summary>ファイルからNBTを読む</summary>
     /// <exception cref="SpringNbtException">読み込みに失敗した場合</exception>
     public static NamedTag ReadFile(string path, NbtReadOptions? options = null)
     {
@@ -32,7 +31,7 @@ public static class NbtIo
         return ReadBytes(raw, options);
     }
 
-    /// <summary>バイト列から NBT を読む</summary>
+    /// <summary>バイト列からNBTを読む</summary>
     /// <exception cref="SpringNbtException">読み込みに失敗した場合</exception>
     public static NamedTag ReadBytes(byte[] bytes, NbtReadOptions? options = null)
     {
@@ -54,11 +53,11 @@ public static class NbtIo
         return reader.ReadRoot(effective.Format);
     }
 
-    /// <summary>バイト列の指定した位置から NBT を 1 つ読む</summary>
+    /// <summary>バイト列の指定した位置からNBTを1つ読む</summary>
     /// <remarks>
     /// <para>
-    /// 複数の NBT が連なっているデータを、先頭から順に読み進めるために使う
-    /// 戻り値の <see cref="NbtReadResult.End"/> が次の開始位置になる
+    /// 複数のNBTが連なっているデータを、先頭から順に読み進めるために使う
+    /// 戻り値の<see cref="NbtReadResult.End"/>が次の開始位置になる
     /// </para>
     /// <para>
     /// 位置は渡したバイト列そのものを指すので、圧縮されたデータは扱えない
@@ -84,11 +83,11 @@ public static class NbtIo
         return new NbtReadResult(tag, reader.Position);
     }
 
-    /// <summary>バイト列に連なっている NBT をすべて読む</summary>
+    /// <summary>バイト列に連なっているNBTをすべて読む</summary>
     /// <remarks>
     /// <para>入力を使い切るまで読み続ける</para>
     /// <para>空のバイト列なら空の一覧を返す</para>
-    /// <para>圧縮は入力全体に 1 回かかっているものとして扱う</para>
+    /// <para>圧縮は入力全体に1回かかっているものとして扱う</para>
     /// </remarks>
     /// <exception cref="SpringNbtException">読み込みに失敗した場合</exception>
     public static IReadOnlyList<NamedTag> ReadBytesAll(byte[] bytes,
@@ -99,7 +98,7 @@ public static class NbtIo
         NbtReadOptions effective = EffectiveOptions(options);
         List<NamedTag> tags = new List<NamedTag>();
 
-        // 空の入力は「0 個」であってエラーではない
+        // 空の入力は「0個」であってエラーではない
         if (bytes.Length == 0)
         {
             return tags;
@@ -138,7 +137,7 @@ public static class NbtIo
         }
     }
 
-    /// <summary>ストリームから NBT を読む
+    /// <summary>ストリームからNBTを読む
     /// ストリームは最後まで読み切る</summary>
     /// <exception cref="SpringNbtException">読み込みに失敗した場合</exception>
     public static NamedTag ReadStream(Stream stream, NbtReadOptions? options = null)
@@ -158,7 +157,7 @@ public static class NbtIo
         return ReadBytes(memory.ToArray(), options);
     }
 
-    /// <summary>NBT をファイルへ書き出す</summary>
+    /// <summary>NBTをファイルへ書き出す</summary>
     /// <exception cref="SpringNbtException">書き込みに失敗した場合</exception>
     public static void WriteFile(string path, NamedTag tag, NbtWriteOptions? options = null)
     {
@@ -180,7 +179,7 @@ public static class NbtIo
         }
     }
 
-    /// <summary>NBT をバイト列へ書き出す</summary>
+    /// <summary>NBTをバイト列へ書き出す</summary>
     /// <exception cref="SpringNbtException">書き込みに失敗した場合</exception>
     public static byte[] WriteBytes(NamedTag tag, NbtWriteOptions? options = null)
     {
@@ -197,7 +196,7 @@ public static class NbtIo
             effective = options;
         }
 
-        // 書き込み時に Auto は決められない
+        // 書き込み時にAutoは決められない
         if (effective.Compression == Compression.Auto)
         {
             throw SpringNbtException.InvalidArgument("書き込みで Compression.Auto は指定できない");
@@ -208,7 +207,7 @@ public static class NbtIo
         return Compress(plain, effective.Compression);
     }
 
-    /// <summary>NBT をストリームへ書き出す</summary>
+    /// <summary>NBTをストリームへ書き出す</summary>
     /// <exception cref="SpringNbtException">書き込みに失敗した場合</exception>
     public static void WriteStream(Stream stream, NamedTag tag, NbtWriteOptions? options = null)
     {
@@ -241,7 +240,7 @@ public static class NbtIo
             throw SpringNbtException.Malformed("入力が空で圧縮方式を判定できない");
         }
 
-        // GZip は必ず 1F 8B で始まる
+        // GZipは必ず1F 8Bで始まる
         if (bytes.Length >= 2 && bytes[0] == 0x1F && bytes[1] == 0x8B)
         {
             return Compression.Gzip;
@@ -249,7 +248,7 @@ public static class NbtIo
 
         if (bytes.Length >= 2)
         {
-            // zlib ヘッダは「圧縮法が 8 (deflate)」かつ「先頭2バイトが 31 の倍数」
+            // zlibヘッダは「圧縮法が8 (deflate)」かつ「先頭2バイトが31の倍数」
             bool isDeflate = (bytes[0] & 0x0F) == 0x08;
             int header = (bytes[0] << 8) | bytes[1];
             if (isDeflate && header % 31 == 0)
@@ -258,7 +257,7 @@ public static class NbtIo
             }
         }
 
-        // 無圧縮なら先頭は TAG_Compound のタグID
+        // 無圧縮なら先頭はTAG_CompoundのタグID
         if (bytes[0] == (byte)TagType.Compound)
         {
             return Compression.None;
@@ -271,7 +270,7 @@ public static class NbtIo
     private static byte[] Decompress(byte[] bytes, NbtReadOptions options)
     {
         Compression method;
-        // Auto なら先頭バイトから圧縮方式を見分ける
+        // Autoなら先頭バイトから圧縮方式を見分ける
         if (options.Compression == Compression.Auto)
         {
             method = DetectCompression(bytes);
@@ -312,7 +311,7 @@ public static class NbtIo
 
         using MemoryStream destination = new MemoryStream();
 
-        // using ブロックを閉じてフッタを書かせてから ToArray する必要がある
+        // usingブロックを閉じてフッタを書かせてからToArrayする必要がある
         using (Stream encoder = CreateEncoder(destination, method))
         {
             encoder.Write(plain, 0, plain.Length);

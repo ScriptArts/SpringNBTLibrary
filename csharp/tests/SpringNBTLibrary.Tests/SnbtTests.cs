@@ -2,7 +2,9 @@ using SpringNBTLibrary.Nbt;
 
 namespace SpringNBTLibrary.Tests;
 
-/// <summary>SNBT のパースと出力。仕様: docs/spec/11-snbt.md</summary>
+/// <summary>
+/// SNBTのパースと出力
+/// </summary>
 public class SnbtTests
 {
     [Theory]
@@ -43,7 +45,8 @@ public class SnbtTests
     [Fact]
     public void HexSuffixRuleIsFixed()
     {
-        // 仕様 11 の 2.1: 16進では b/d/f を数字として読む。幅接尾辞は s/l のみ
+        // 16進ではb/d/fを数字として読む
+        // 幅接尾辞はs/lのみ
         Assert.Equal(new NbtInt(255), Snbt.Parse("0xFF"));
         Assert.Equal(new NbtInt(4091), Snbt.Parse("0xFFb"));
         Assert.Equal(new NbtLong(255), Snbt.Parse("0xFFl"));
@@ -53,11 +56,12 @@ public class SnbtTests
     [Fact]
     public void ZeroByteLiteralIsNotBinary()
     {
-        // 0b は「10進の 0 に Byte 接尾辞」。真偽値の false として広く使われる形
+        // 0bは「10進の0にByte接尾辞」
+        // 真偽値のfalseとして広く使われる形
         Assert.Equal(new NbtByte(0), Snbt.Parse("0b"));
         Assert.Equal(new NbtByte(1), Snbt.Parse("1b"));
 
-        // 2進数字が続く場合だけ 2 進リテラルになる
+        // 2進数字が続く場合だけ2進リテラルになる
         Assert.Equal(new NbtInt(1), Snbt.Parse("0b1"));
         Assert.Equal(new NbtByte(9), Snbt.Parse("0b1001b"));
     }
@@ -65,7 +69,7 @@ public class SnbtTests
     [Fact]
     public void UnsignedSuffixWrapsToSigned()
     {
-        // 255ub は符号なし 255 として読み、Byte へは -1 として格納される
+        // 255ubは符号なし255として読み、Byteへは-1として格納される
         Assert.Equal(new NbtByte(-1), Snbt.Parse("255ub"));
         Assert.Equal(new NbtShort(-1), Snbt.Parse("65535us"));
     }
@@ -80,7 +84,7 @@ public class SnbtTests
     [Fact]
     public void SuffixlessIntegerIsNotPromotedToLong()
     {
-        // Int の範囲を超える接尾辞なし整数は、暗黙に Long へ格上げせずエラーにする
+        // Intの範囲を超える接尾辞なし整数は、暗黙にLongへ格上げせずエラーにする
         SpringNbtException error = Assert.Throws<SpringNbtException>(() => Snbt.Parse("2147483648"));
         Assert.Equal(ErrorCode.MalformedData, error.Code);
 
@@ -107,13 +111,21 @@ public class SnbtTests
     }
 
     [Fact]
+    public void FloatOutOfRangeBecomesSignedInfinity()
+    {
+        // binary32の範囲を超える値は、符号付きの無限大になる
+        Assert.True(float.IsPositiveInfinity(Assert.IsType<NbtFloat>(Snbt.Parse("1e39f")).Value));
+        Assert.True(float.IsNegativeInfinity(Assert.IsType<NbtFloat>(Snbt.Parse("-1e39f")).Value));
+    }
+
+    [Fact]
     public void TypedArrays()
     {
         Assert.Equal(new NbtByteArray(new sbyte[] { 1, 2 }), Snbt.Parse("[B; 1b, 2b]"));
         Assert.Equal(new NbtIntArray(new[] { 1, 2 }), Snbt.Parse("[I; 1, 2]"));
         Assert.Equal(new NbtLongArray(new[] { 1L, 2L }), Snbt.Parse("[L; 1L, 2L]"));
 
-        // 接尾辞なしでも範囲内なら受理する（Minecraft 自身がそう書き出すため）
+        // 接尾辞なしでも範囲内なら受理する（Minecraft自身がそう書き出すため）
         Assert.Equal(new NbtByteArray(new sbyte[] { 1, 2 }), Snbt.Parse("[B; 1, 2]"));
     }
 
@@ -137,7 +149,7 @@ public class SnbtTests
     [Fact]
     public void HeterogeneousListIsRejected()
     {
-        // 異種リストはバイナリ NBT へ写せないため受理しない (adr/0006)
+        // 異種リストはバイナリNBTへ写せないため受理しない
         SpringNbtException error = Assert.Throws<SpringNbtException>(() => Snbt.Parse("[1, \"a\"]"));
         Assert.Equal(ErrorCode.MalformedData, error.Code);
     }
@@ -150,6 +162,32 @@ public class SnbtTests
         Assert.Equal("H", Assert.IsType<NbtString>(Snbt.Parse("\"\\u0048\"")).Value);
         Assert.Equal(" ", Assert.IsType<NbtString>(Snbt.Parse("\"\\s\"")).Value);
         Assert.Equal("\U0001F600", Assert.IsType<NbtString>(Snbt.Parse("\"\\U0001F600\"")).Value);
+    }
+
+    [Fact]
+    public void SurrogateEscapesFollowTheSameRulesEverywhere()
+    {
+        string lone = ((char)0xD800).ToString();
+
+        // \Uでサロゲートの範囲を書くと、\uと同じく孤立サロゲートになる
+        Assert.Equal(new NbtString(lone), Snbt.Parse("\"\\U0000D800\""));
+        Assert.Equal(new NbtString(lone), Snbt.Parse("\"\\uD800\""));
+
+        // 対になったサロゲートは補助文字1文字と同じ
+        Assert.Equal(new NbtString(char.ConvertFromUtf32(0x1F600)), Snbt.Parse("\"\\uD83D\\uDE00\""));
+
+        // コードポイントの範囲外と、キーの孤立サロゲートは仕様に反する
+        Assert.Equal(ErrorCode.MalformedData,
+            Assert.Throws<SpringNbtException>(() => Snbt.Parse("\"\\U00110000\"")).Code);
+        Assert.Equal(ErrorCode.MalformedData,
+            Assert.Throws<SpringNbtException>(() => Snbt.Parse("{\"\\uD800\":1}")).Code);
+        Assert.Equal(ErrorCode.MalformedData,
+            Assert.Throws<SpringNbtException>(() => Snbt.Parse("{\"\\U0000D800\":1}")).Code);
+
+        // APIからも孤立サロゲートのキーは設定できない
+        NbtCompound compound = new NbtCompound();
+        Assert.Equal(ErrorCode.InvalidArgument,
+            Assert.Throws<SpringNbtException>(() => compound.Set(lone, new NbtInt(1))).Code);
     }
 
     [Fact]
@@ -187,7 +225,7 @@ public class SnbtTests
     [Fact]
     public void SnbtToNbtToSnbtToNbtIsStable()
     {
-        // 仕様 11 の 5章: 保証するのは「SNBT -> NBT -> SNBT -> NBT」で NBT が一致すること
+        // 保証するのは「SNBT -> NBT -> SNBT -> NBT」でNBTが一致すること
         string source = "{ name : 'Bananrama' , list : [ 1L , 2L ] , nested : { flag : true } , "
             + "bytes : [B; 1b, -2b] , ratio : 0.5f }";
 
@@ -196,7 +234,7 @@ public class SnbtTests
 
         Assert.Equal(first, second);
 
-        // 整形出力からも同じ NBT が得られること
+        // 整形出力からも同じNBTが得られること
         NbtTag third = Snbt.Parse(Snbt.WritePretty(first));
         Assert.Equal(first, third);
     }

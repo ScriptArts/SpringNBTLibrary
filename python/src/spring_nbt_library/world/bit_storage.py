@@ -1,13 +1,11 @@
-"""添字を 64bit 整数の配列へ詰めた表現
-1.16 以降の**跨ぎなし**パッキング
+"""添字を64bit整数の配列へ詰めた表現
+1.16以降の**跨ぎなし**パッキング
 
-1 つの値に入りきらない分は、その値の残りビットを未使用のまま捨て、
+1つの値に入りきらない分は、その値の残りビットを未使用のまま捨て、
 次の値の最下位ビットから始める
 
-Python の整数は無限精度なので、i64 として扱う箇所では
-読み込み時に符号付きへ、書き込み時に符号なしへ明示的に変換する
-
-仕様: ``docs/spec/31-paletted-container.md`` 2章
+Pythonの整数は無限精度なので、i64として扱う箇所では
+値を取り出すときは符号なしへ、書き込むときは符号付きへ明示的に変換する
 """
 
 from __future__ import annotations
@@ -22,7 +20,7 @@ _MASK64 = 0xFFFFFFFFFFFFFFFF
 
 
 class BitStorage:
-    """packed な添字の並び"""
+    """packedな添字の並び"""
 
     __slots__ = ("_data", "bits_per_entry", "entry_count")
 
@@ -33,7 +31,7 @@ class BitStorage:
 
     @property
     def values_per_long(self) -> int:
-        """1 つの 64bit 値に入るエントリ数"""
+        """1つの64bit値に入るエントリ数"""
         return 64 // self.bits_per_entry
 
     @staticmethod
@@ -48,9 +46,10 @@ class BitStorage:
     @staticmethod
     def from_longs(data: List[int], bits_per_entry: int, entry_count: int,
                    lenient: bool = False) -> "BitStorage":
-        """既存の 64bit 配列から作る
+        """既存の64bit配列から作る
 
-        :param lenient: True なら配列長からビット幅を逆算して読む（第三者ツール由来の救済）
+        :param lenient: Trueなら、配列長が期待値と違う場合に配列長からビット幅を逆算して読む
+            第三者ツールが書いたデータの救済用
         :raises SpringNbtError: 配列長が期待値と一致しない場合
         """
         expected = BitStorage.long_count(bits_per_entry, entry_count)
@@ -74,7 +73,7 @@ class BitStorage:
 
     @staticmethod
     def long_count(bits_per_entry: int, entry_count: int) -> int:
-        """必要な 64bit 値の個数を求める"""
+        """必要な64bit値の個数を求める"""
         values_per_long = 64 // bits_per_entry
         return (entry_count + values_per_long - 1) // values_per_long
 
@@ -87,7 +86,7 @@ class BitStorage:
         bit_offset = (index % per_long) * self.bits_per_entry
         mask = (1 << self.bits_per_entry) - 1
 
-        # 符号付きのままシフトすると符号が伸びるので、符号なしへ直してから動かす
+        # 符号付きのままシフトすると上位ビットが伸びるので、符号なしへ直してから動かす
         return ((self._data[long_index] & _MASK64) >> bit_offset) & mask
 
     def set(self, index: int, value: int) -> None:
@@ -109,7 +108,7 @@ class BitStorage:
         self._data[long_index] = _to_signed(updated)
 
     def to_longs(self) -> List[int]:
-        """packed な配列を返す
+        """packedな配列を返す
         内部の配列をそのまま返す（コピーしない）
         """
         return self._data
@@ -131,7 +130,7 @@ class BitStorage:
 
 
 def _to_signed(value: int) -> int:
-    """符号なし 64bit を符号付きへ読み替える"""
+    """符号なし64bitを符号付きへ読み替える"""
     if value >= (1 << 63):
         return value - (1 << 64)
 

@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 """ドキュメント内のリンク切れを調べる。
 
-`docs/` は5系統に分かれていて相互に行き来する作りなので、
-ファイルを増やしたり動かしたりするとリンクが静かに死ぬ。
-読み手がそこで止まってしまうため、CI で検出する。
+`docs/`は6つのディレクトリに分かれていて相互に行き来する作りなので、
+ファイルを増やしたり動かしたりするとリンクが知らないうちに切れる。
+読み手がそこで止まってしまうため、CIで検出する。
 
-調べるもの:
+次のことを調べる。
 
 1. 相対リンクの指す先のファイルが実在するか
-2. `#見出し` の指す見出しがそのファイルに実在するか
+2. `#見出し`の指す見出しがそのファイルに実在するか
 
 外部リンク（http/https）は対象外。ネットワークに依存すると
-CI がその日の外部サイトの都合で落ちるようになるため。
+CIがその日の外部サイトの都合で落ちるようになるため。
 
 使い方:
     python3 spec/tools/check_links.py
-
-仕様: docs/adr/0009-static-api-extraction.md
 """
 
 from __future__ import annotations
@@ -28,10 +26,10 @@ import unicodedata
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-#: `[表示](リンク先)` の形。画像も同じ形なので一緒に拾う。
+#: `[表示](リンク先)`の形。画像も同じ形なので一緒に拾う。
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 
-#: Markdown の見出し。
+#: Markdownの見出し。
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*$")
 
 #: コードブロックの区切り。この中のリンクは例示なので対象外。
@@ -42,9 +40,9 @@ SKIPPED_PREFIXES = ("http://", "https://", "mailto:", "#")
 
 
 def slugify(text: str) -> str:
-    """見出しを GitHub のアンカー名へ写す。
+    """見出しをGitHubのアンカー名へ写す。
 
-    GitHub は見出しを小文字にし、記号を落とし、空白をハイフンに変える。
+    GitHubは見出しを小文字にし、記号を落とし、空白をハイフンに変える。
     日本語はそのまま残る。
     """
     # インラインのコード・強調・リンクの装飾を落とす
@@ -90,10 +88,10 @@ def collect_headings(path: str):
 
 
 def markdown_files():
-    """検査対象の Markdown を列挙する。"""
+    """検査対象のMarkdownを列挙する。"""
     found = []
 
-    # docs/ 配下は全部、言語ディレクトリは README だけを見る
+    # docs/配下は全部、言語ディレクトリはREADMEだけを見る
     for language in ("csharp", "java", "typescript", "python", "rust"):
         candidate = os.path.join(REPO_ROOT, language, "README.md")
 
@@ -111,7 +109,7 @@ def markdown_files():
             if filename.endswith(".md"):
                 found.append(os.path.join(dirpath, filename))
 
-    # リポジトリ直下の README なども対象にする（1 階層だけ）
+    # リポジトリ直下のREADMEなども対象にする（1階層だけ）
     for filename in os.listdir(REPO_ROOT):
         if filename.endswith(".md"):
             found.append(os.path.join(REPO_ROOT, filename))

@@ -10,10 +10,8 @@ import org.junit.jupiter.api.Test;
 /**
  * タグの等値比較と深い複製
  *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 7.3
- *
  * <p>規則は全言語で同じでなければならない
- * 各言語の同名テストと突き合わせて読むこと
+ * 各言語の同名テストと見比べながら読むこと
  */
 class TagEqualityTest {
 
@@ -31,7 +29,7 @@ class TagEqualityTest {
     @Test
     @DisplayName("型が違えば等しくない")
     void differentTagTypeIsNotEqual() {
-        // 値が同じでもタグの型が違えば別物
+        // 値が同じでもタグの型が違えば等しくない
         assertFalse(new NbtInt(1).equals(new NbtShort((short) 1)));
         assertFalse(new NbtInt(1).equals(null));
     }
@@ -39,7 +37,7 @@ class TagEqualityTest {
     @Test
     @DisplayName("浮動小数点はビットパターンで比べる")
     void floatsCompareByBitPattern() {
-        // NaN 同士は等しく、+0.0 と -0.0 は等しくない
+        // NaN同士は等しく、+0.0と-0.0は等しくない
         assertTrue(new NbtFloat(Float.NaN).equals(new NbtFloat(Float.NaN)));
         assertTrue(new NbtDouble(Double.NaN).equals(new NbtDouble(Double.NaN)));
         assertFalse(new NbtFloat(0.0f).equals(new NbtFloat(-0.0f)));
@@ -63,7 +61,7 @@ class TagEqualityTest {
         reversed.add(new NbtInt(1));
         assertFalse(left.equals(reversed));
 
-        // 空でも要素型が違えば別物
+        // 空でも要素型が違えば等しくない
         assertFalse(new NbtList(TagType.INT).equals(new NbtList(TagType.BYTE)));
     }
 
@@ -79,7 +77,7 @@ class TagEqualityTest {
         same.set("b", new NbtInt(2));
         assertTrue(left.equals(same));
 
-        // 中身は同じでも挿入順が違えば別物
+        // 中身は同じでも挿入順が違えば等しくない
         NbtCompound reordered = new NbtCompound();
         reordered.set("b", new NbtInt(2));
         reordered.set("a", new NbtInt(1));

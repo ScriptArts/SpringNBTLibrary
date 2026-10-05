@@ -3,21 +3,25 @@
 
 全言語で同じ書きぶりを保つための道具。人手のレビューでは必ず抜けが出る。
 
-検査するもの:
+次のものを検査する。
 
-1. **公開 API の doc コメント** — 型・公開メソッドの直前に、
-   その言語の doc 形式のコメントがあるか
+1. **公開APIのdocコメント**: 型・公開メソッドの直前に、
+   その言語のdoc形式のコメントがあるか
    （C# `/// <summary>` / Java・TypeScript `/** */` / Python docstring / Rust `///`）
-2. **条件分岐のコメント** — `if` の直前に説明のコメントがあるか
-3. **ループのコメント** — `for` / `foreach` / `while` の直前に説明のコメントがあるか
-4. **禁止記法** — 三項演算子、オプショナルチェーン、null 合体演算子
-5. **コメントの句点** — コメントに `。` を使わない
+2. **条件分岐のコメント**: `if`の直前かブロックの先頭に説明のコメントがあるか
+3. **ループのコメント**: `for` / `foreach` / `while`の直前かブロックの先頭に説明のコメントがあるか
+4. **禁止記法**: 三項演算子、オプショナルチェーン、null合体演算子
+5. **コメントの句点**: コメントに`。`を使わない
+6. **仕様書への参照**: コメントに仕様書やADRの参照先（`docs/spec/…`、「3章」など）を書かない。
+   章立てを変えるたびにコードのコメントが古くなるため
+7. **docコメントの整形**: 複数行のdocコメントを、本文を載せた`/**`の行で始めていないか
 
-ガード節（引数検証など、`throw` / `return` だけで終わる短い分岐）は
-2 の対象から外す。書いても「不正なら弾く」としか書けず、かえって読みにくいため。
+ガード節（引数検証など、`throw` / `return`だけで終わる短い分岐）は
+2の対象から外す。書いても「不正なら弾く」としか書けず、かえって読みにくいため。
+多重ループの内側は3の対象から外す。いちばん外側に書いた目的がそのまま当てはまるため。
 
 使い方:
-    python3 spec/tools/check_comments.py            # 違反があれば終了コード 1
+    python3 spec/tools/check_comments.py            # 違反があれば終了コード1
     python3 spec/tools/check_comments.py --summary  # 件数だけ出す
     python3 spec/tools/check_comments.py --language csharp
 
@@ -35,7 +39,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 
 LANGUAGE_ORDER = ["csharp", "java", "typescript", "python", "rust"]
 
-#: 言語ごとの、検査対象のソースと doc コメントの形。
+#: 言語ごとの、検査対象のソースとdocコメントの形。
 LANGUAGES = {
     "csharp": {
         "roots": ["csharp/src"],
@@ -73,17 +77,17 @@ LANGUAGES = {
 # 禁止記法
 # ---------------------------------------------------------------------------
 
-#: 三項演算子。`cond ? a : b`。C# の nullable(`int?`) や
-#: TypeScript の省略可能引数(`x?: T`) と紛れないよう、`?` の前後に空白を要求する。
+#: 三項演算子。`cond ? a : b`。C#のnullable(`int?`)や
+#: TypeScriptの省略可能引数(`x?: T`)と紛れないよう、`?`の前後に空白を要求する。
 TERNARY = re.compile(r"[^?\s]\s+\?\s+[^?:]+?\s+:\s")
 
 #: オプショナルチェーン。`foo?.bar`
 OPTIONAL_CHAIN = re.compile(r"[A-Za-z0-9_\)\]]\?\.")
 
-#: null 合体演算子。`a ?? b` / `a ??= b`
+#: null合体演算子。`a ?? b` / `a ??= b`
 NULL_COALESCE = re.compile(r"\?\?=?")
 
-#: Python の条件式。三項演算子に相当する
+#: Pythonの条件式。三項演算子に相当する
 PY_CONDITIONAL = re.compile(r"\S\s+if\s+.+\s+else\s+\S")
 
 BANNED = [
@@ -97,7 +101,7 @@ BANNED = [
 # 構文の検出
 # ---------------------------------------------------------------------------
 
-#: 条件分岐の始まり。`else if` / `elif` は先頭の if に付いていればよいので除く。
+#: 条件分岐の始まり。`else if` / `elif`は先頭のifに付いていればよいので除く。
 BRANCH = {
     "csharp": re.compile(r"^\s*if\s*\("),
     "java": re.compile(r"^\s*if\s*\("),
@@ -115,7 +119,7 @@ LOOP = {
     "rust": re.compile(r"^\s*(for\s+|while\s+|loop\s*\{)"),
 }
 
-#: 公開メソッド・関数の宣言。doc コメントを要求する。
+#: 公開メソッド・関数の宣言。docコメントを要求する。
 PUBLIC_MEMBER = {
     "csharp": re.compile(
         r"^\s{4}public\s+(?!class|interface|enum|struct|record)"
@@ -125,7 +129,7 @@ PUBLIC_MEMBER = {
         r"^\s{4}public\s+(?!class|interface|enum|record)"
         r"(?:static\s+|final\s+|abstract\s+|synchronized\s+)*"
         r"[A-Za-z0-9_<>,\[\]\?\. ]+\s+[A-Za-z0-9_]+\s*\("),
-    # 宣言は `{` で終わる。`foo(...);` のような呼び出しと区別する
+    # 宣言は`{`で終わる。`foo(...);`のような呼び出しと区別する
     "typescript": re.compile(
         r"^  (?!private|#|constructor|if|for|while|switch|return|throw|else|do|try|catch)"
         r"(?:static\s+|get\s+|set\s+)?[A-Za-z0-9_]+\s*[\(<].*\{\s*$"),
@@ -142,9 +146,12 @@ PUBLIC_TYPE = {
     "rust": re.compile(r"^pub\s+(?:struct|enum|trait)\s"),
 }
 
-#: 本文を載せたまま閉じていない doc コメントの開始行。
-#: 複数行の doc コメントは本文の無い `/**` で始める決まりなので、
-#: この形は整形が壊れた跡とみなす。
+#: コメントに書かない、仕様書・ADRへの参照。
+SPEC_REFERENCE = re.compile(r"docs/(spec|adr)/|adr/[0-9]{4}|[0-9]章|仕様[0-9]+の")
+
+#: 本文を載せたまま閉じていないdocコメントの開始行。
+#: 複数行のdocコメントは本文の無い`/**`で始める決まりなので、
+#: この形は整形が崩れた跡とみなす。
 BROKEN_DOC = re.compile(r"^\s*/\*\*\s*\S")
 
 #: ガード節とみなす本体。これだけで終わる分岐にはコメントを求めない。
@@ -153,7 +160,7 @@ GUARD_BODY = re.compile(
 
 
 class Finding:
-    """1 件の指摘。"""
+    """1件の指摘。"""
 
     def __init__(self, language: str, path: str, line: int, kind: str, text: str) -> None:
         self.language = language
@@ -167,7 +174,7 @@ class Finding:
 
 
 def is_comment(line: str, language: str) -> bool:
-    """その行がコメント（doc 形式を含む）か。"""
+    """その行がコメント（doc形式を含む）か。"""
     stripped = line.strip()
     spec = LANGUAGES[language]
 
@@ -177,7 +184,7 @@ def is_comment(line: str, language: str) -> bool:
     if stripped.startswith(spec["line_comment"]):
         return True
 
-    # doc コメントの途中の行（Java / TypeScript の ` * ...`）も含める
+    # docコメントの途中の行（Java / TypeScriptの` * ...`）も含める
     for prefix in spec["doc_prefixes"]:
         if stripped.startswith(prefix):
             return True
@@ -186,9 +193,9 @@ def is_comment(line: str, language: str) -> bool:
 
 
 def has_doc_before(lines, index: int, language: str) -> bool:
-    """宣言行の直前に doc 形式のコメントがあるか。
+    """宣言行の直前にdoc形式のコメントがあるか。
 
-    属性やアノテーション（`[Fact]` / `@Override` など）は読み飛ばす。
+    属性やアノテーション（`[Fact]` / `@Override`など）は読み飛ばす。
     """
     spec = LANGUAGES[language]
     position = index - 1
@@ -215,18 +222,18 @@ def has_doc_before(lines, index: int, language: str) -> bool:
         if stripped.startswith(prefix):
             return True
 
-    # Java / TypeScript は doc コメントの終わりが `*/`
+    # Java / TypeScriptはdocコメントの終わりが`*/`
     return stripped == "*/"
 
 
 def has_python_docstring(lines, index: int) -> bool:
-    """Python の宣言の次行以降に docstring があるか。
+    """Pythonの宣言の次行以降にdocstringがあるか。
 
     引数リストが複数行に渡ることがあるので、宣言が閉じる行まで読み飛ばす。
     """
     position = index
 
-    # 宣言が `:` で終わるまで進める（複数行のシグネチャに対応）
+    # 宣言が`:`で終わるまで進める（複数行のシグネチャに対応）
     while position < len(lines) and not lines[position].rstrip().endswith(":"):
         position += 1
 
@@ -259,7 +266,7 @@ def has_comment_before(lines, index: int, language: str) -> bool:
             position -= 1
             continue
 
-        # Python は docstring がその前の説明にあたる
+        # Pythonはdocstringがその前の説明にあたる
         if language == "python" and '"""' in stripped:
             return True
 
@@ -271,7 +278,7 @@ def has_comment_before(lines, index: int, language: str) -> bool:
 def has_comment_inside(lines, index: int, language: str) -> bool:
     """ブロックの中の先頭にコメントがあるか。
 
-    `if (...) {` の次の行から書き始める書き方も、
+    `if (...) {`の次の行から書き始める書き方も、
     「この分岐で何をするか」を説明しているので認める。
     """
     position = index + 1
@@ -300,7 +307,7 @@ def has_explanation(lines, index: int, language: str) -> bool:
 def is_nested_loop(lines, index: int, language: str) -> bool:
     """直前の行もループの開始か。
 
-    多重ループは 1 つの処理単位なので、いちばん外側に目的が書いてあれば足りる。
+    多重ループは1つの処理単位なので、いちばん外側に目的が書いてあれば足りる。
     内側にも同じ説明を重ねると、かえって読みにくくなる。
     """
     position = index - 1
@@ -318,7 +325,7 @@ def is_nested_loop(lines, index: int, language: str) -> bool:
 
 
 def is_guard(lines, index: int, language: str) -> bool:
-    """引数検証などのガード節か。本体が 1 文で、抜けるだけのもの。"""
+    """引数検証などのガード節か。本体が1文で、抜けるだけのもの。"""
     # 同じ行に本体がある場合（`if (x) return;`）
     tail = lines[index].split(")", 1)
 
@@ -326,7 +333,7 @@ def is_guard(lines, index: int, language: str) -> bool:
         if len(tail[1].strip()) > 0:
             return True
 
-    # 次の 1〜2 行が抜けるだけなら、ガード節とみなす
+    # 次の1〜2行が抜けるだけなら、ガード節とみなす
     for offset in (1, 2):
         if index + offset >= len(lines):
             break
@@ -342,9 +349,9 @@ def is_guard(lines, index: int, language: str) -> bool:
 
 
 def is_inherited(lines, index: int) -> bool:
-    """継承元の doc を引き継ぐ宣言か。
+    """継承元のdocを引き継ぐ宣言か。
 
-    `@Override` や `<inheritdoc/>` が付いていれば、同じ説明を重ねて書く必要はない。
+    `@Override`や`<inheritdoc/>`が付いていれば、同じ説明を重ねて書く必要はない。
     """
     position = index - 1
 
@@ -387,8 +394,23 @@ def source_files(language: str):
     return found
 
 
+def check_comment_text(language: str, path: str, number: int, line: str):
+    """コメント1行の本文が規約に沿っているかを見て、指摘の一覧を返す。"""
+    findings = []
+
+    # コメントに句点は使わない。文が続くなら行を分ける
+    if "。" in line:
+        findings.append(Finding(language, path, number, "コメントに句点がある", line))
+
+    # 仕様書の章立ては変わるので、参照先をコメントに書かない
+    if SPEC_REFERENCE.search(line):
+        findings.append(Finding(language, path, number, "コメントに仕様書の参照がある", line))
+
+    return findings
+
+
 def check_language(language: str):
-    """1 言語分を検査して、指摘の一覧を返す。"""
+    """1言語分を検査して、指摘の一覧を返す。"""
     findings = []
 
     for path in source_files(language):
@@ -404,36 +426,33 @@ def check_language(language: str):
             number = index + 1
             stripped = line.strip()
 
-            # Python の docstring も句点を使わない
-            if language == "python" and in_docstring and "。" in line:
-                findings.append(Finding(language, relative, number,
-                                        "コメントに句点がある", line))
+            # Pythonのdocstringも、コメントと同じ規則で本文を見る
+            if language == "python" and in_docstring:
+                findings.extend(check_comment_text(language, relative, number, line))
 
             if language == "python":
-                # 三重引用符の数が奇数なら、docstring の出入りが切り替わる
+                # 三重引用符の数が奇数なら、docstringの出入りが切り替わる
                 if stripped.count('"""') % 2 == 1:
                     in_docstring = not in_docstring
 
-            # 閉じ忘れた doc コメントは、この行だけで判別できる
+            # 閉じ忘れたdocコメントは、この行だけで判別できる
             if BROKEN_DOC.match(line) and not stripped.endswith("*/"):
                 findings.append(Finding(language, relative, number,
                                         "doc コメントの整形が壊れている", line))
 
-            # ブロックコメントの中は検査しない
+            # ブロックコメントは本文だけを見て、構文の検査はしない
             if stripped.startswith("/*"):
+                findings.extend(check_comment_text(language, relative, number, line))
                 in_block_comment = "*/" not in stripped
                 continue
 
             if in_block_comment:
+                findings.extend(check_comment_text(language, relative, number, line))
                 in_block_comment = "*/" not in stripped
                 continue
 
             if is_comment(line, language):
-                # コメントに句点は使わない。文が続くなら行を分ける
-                if "。" in line:
-                    findings.append(Finding(language, relative, number,
-                                            "コメントに句点がある", line))
-
+                findings.extend(check_comment_text(language, relative, number, line))
                 continue
 
             # 1. 禁止記法
@@ -441,7 +460,7 @@ def check_language(language: str):
                 if language in languages and pattern.search(line):
                     findings.append(Finding(language, relative, number, "禁止記法: " + label, line))
 
-            # 2. 公開型の doc コメント
+            # 2. 公開型のdocコメント
             if PUBLIC_TYPE[language].match(line):
                 if language == "python":
                     documented = has_python_docstring(lines, index)
@@ -453,9 +472,9 @@ def check_language(language: str):
 
                 continue
 
-            # 3. 公開メソッドの doc コメント
+            # 3. 公開メソッドのdocコメント
             if PUBLIC_MEMBER[language].match(line):
-                # 継承元の doc を引き継ぐものは、重ねて書かなくてよい
+                # 継承元のdocを引き継ぐものは、重ねて書かなくてよい
                 if is_inherited(lines, index):
                     continue
 
@@ -471,7 +490,7 @@ def check_language(language: str):
 
             # 4. 条件分岐のコメント（ガード節と定型句は除く）
             if BRANCH[language].match(line):
-                # スクリプトの入口を示す定型句。説明することがない
+                # スクリプトの起点を示す定型句。説明することがない
                 if stripped.startswith("if __name__ =="):
                     continue
 
@@ -482,7 +501,7 @@ def check_language(language: str):
 
             # 5. ループのコメント
             if LOOP[language].match(line):
-                # 多重ループの内側は、外側に付けた説明が 効いている
+                # 多重ループの内側には、外側に付けた説明が当てはまる
                 if is_nested_loop(lines, index, language):
                     continue
 

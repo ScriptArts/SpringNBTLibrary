@@ -8,14 +8,11 @@ import java.util.Objects;
 
 /**
  * TAG_List
- * 要素型が 1 つに固定されたタグの列
+ * 要素型が1つに固定されたタグの列
  *
- * <p>空リストの要素型は {@link TagType#END}
+ * <p>空リストの要素型は{@link TagType#END}
  * 最初の要素を追加した時点で型が確定する
- * 全要素を削除しても確定済みの要素型は維持される
- * （読み書きの往復で型が消えないようにするため）
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 7.2章
+ * 読み書きの往復で型が消えないよう、全要素を削除しても確定済みの要素型は維持される
  */
 public final class NbtList implements NbtTag, Iterable<NbtTag> {
 
@@ -41,7 +38,7 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
 
     /**
      * 要素の型
-     * 空で未確定なら {@link TagType#END}
+     * 空で未確定なら{@link TagType#END}
      *
      * @return 要素型
      */
@@ -76,6 +73,8 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
      * @throws SpringNbtException 要素型と一致しない場合
      */
     public void set(int index, NbtTag item) {
+        // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+        Objects.checkIndex(index, items.size());
         ensureElementType(item);
         items.set(index, item);
     }
@@ -99,6 +98,11 @@ public final class NbtList implements NbtTag, Iterable<NbtTag> {
      * @throws SpringNbtException 要素型と一致しない場合
      */
     public void insert(int index, NbtTag item) {
+        // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+        if (index < 0 || index > items.size()) {
+            throw new IndexOutOfBoundsException("位置が範囲外: " + index);
+        }
+
         ensureElementType(item);
         items.add(index, item);
     }

@@ -1,20 +1,19 @@
 # はじめに（Rust）
 
-Rust 2021 edition、MSRV 1.75 です。
+Rust 2021 edition、MSRV 1.75です。
 
 ## 導入
 
-Cargo.toml に git 参照を書きます。
+Cargo.tomlにgit参照を書きます。
 
 ```toml
 [dependencies]
 spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", tag = "v1.0.0" }
 ```
 
-Cargo が自分で取得します。
+Cargoが自分で取得します。
 
-ネットワークに繋がらない環境なら、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) の
-`spring-nbt-library-<版>.crate`（拡張子が違うだけの tar.gz）を展開してパス参照します。
+ネットワークに繋がらない環境なら、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)の`spring-nbt-library-<版>.crate`（拡張子が違うだけのtar.gz）を展開してパス参照します。
 
 ```bash
 tar xzf spring-nbt-library-1.0.0.crate
@@ -25,16 +24,16 @@ tar xzf spring-nbt-library-1.0.0.crate
 spring-nbt-library = { path = "spring-nbt-library-1.0.0" }
 ```
 
-## 例外ではなく `Result`
+## 例外ではなく`Result`
 
-Rust 版だけは例外ではなく `Result<T, Error>` を返します。
-`ErrorCode` の集合は他言語と完全に一致します（[adr/0005](../adr/0005-unified-error-model.md)）。
+Rust版だけは例外ではなく`Result<T, Error>`を返します。
+`ErrorCode`の集合は他言語と完全に一致します（[adr/0005](../adr/0005-unified-error-model.md)）。
 
 ```rust
 use spring_nbt_library::error::{ErrorCode, Result};
 ```
 
-## NBT ファイルを読む
+## NBTファイルを読む
 
 ```rust
 use spring_nbt_library::nbt::{read_file, NbtReadOptions};
@@ -47,8 +46,8 @@ println!("{}", data.get_string("LevelName")?);
 println!("{}", data.get_int("DataVersion")?);
 ```
 
-型が違えば `ErrorCode::UnexpectedTagType` が返ります。
-キーが無いかもしれないときは `opt_*` を使います（無ければ `Ok(None)`）。
+型が違えば`ErrorCode::UnexpectedTagType`が返ります。
+キーが無いかもしれないときは`opt_*`を使います（無ければ`Ok(None)`）。
 
 ## 書く
 
@@ -64,15 +63,15 @@ let options = NbtWriteOptions { compression: Compression::Gzip, ..Default::defau
 write_file("out.nbt", &NamedTag::new("", root), &options)?;
 ```
 
-## 文字列は 2 形態
+## 文字列は2形態
 
-Rust の `String` は UTF-8 に限られるので、NBT に現れうる孤立サロゲートを保持できません。
-そこで `NbtString` を列挙にしています（[spec/10 2.3](../spec/10-nbt-binary.md#23-各言語での保持方法)）。
+Rustの`String`はUTF-8に限られるので、NBTに現れうる孤立サロゲートを保持できません。
+そこで`NbtString`を列挙にしています（[spec/10 2.3](../spec/10-nbt-binary.md#23-各言語での保持方法)）。
 
 ```rust
 pub enum NbtString {
     Text(String),          // 通常の文字列。実データはほぼすべてこちら
-    Surrogates(Vec<u16>),  // UTF-8 に写せない UTF-16 コード単位の列
+    Surrogates(Vec<u16>),  // UTF-8に写せないUTF-16コード単位の列
 }
 ```
 
@@ -96,6 +95,8 @@ world.close()?;
 ## ブロックを書き換える
 
 ```rust
+use spring_nbt_library::world::{BlockState, MinecraftWorld, WorldOpenOptions};
+
 let options = WorldOpenOptions { writable: true, ..Default::default() };
 let mut world = MinecraftWorld::open(world_path, options)?;
 
@@ -108,22 +109,19 @@ if let Some(overworld) = world.dimension("minecraft:overworld")? {
 world.close()?;
 ```
 
-> **Minecraft を終了してから実行すること。**
-> Rust 版は `std` にファイルロックが無いため
-> `session.lock` は確認しません（[adr/0008](../adr/0008-session-lock.md)）。
-> 起動していないことは呼び出し側で担保してください。
+> **Minecraftを終了してから実行してください。**
+> Rust版は`std`にファイルロックが無いため、`session.lock`は確認しません（[adr/0008](../adr/0008-session-lock.md)）。
+> 起動していないことは呼び出し側で保証してください。
 
-> ブロックを置き換えても Heightmaps と光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> ブロックを置き換えてもHeightmapsと光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
 
 ## スタックの深さに注意
 
-NBT のネストは既定で深さ 512 まで許します。
-debug ビルドでは 1 段あたり約 8 KB 使うので、
-深いデータを扱うなら大きめのスタックを持つスレッドで走らせてください
-（[spec/00 5.1](../spec/00-conventions.md#51-深さ上限と実行スタック)）。
+NBTのネストは既定で深さ512まで許します。
+debugビルドでは1段あたり約8 KB使うので、深いデータを扱うなら大きめのスタックを持つスレッドで走らせてください（[spec/00 5.1](../spec/00-conventions.md#51-深さ上限と実行スタック)）。
 
 ## 次に読むもの
 
-- [ガイド](../guide/01-nbt.md) — 目的別の使い方
-- [API 対応表](../api/overview.md) — 他言語版との対応
+- [ガイド](../guide/01-nbt.md): 目的別の使い方
+- [API対応表](../api/overview.md): 他言語版との対応
 - [エラーと安全上限](../guide/06-errors-and-limits.md)

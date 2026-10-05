@@ -7,9 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * SNBT (Stringified NBT) のパーサ
- *
- * <p>仕様: {@code docs/spec/11-snbt.md}
+ * SNBT (Stringified NBT)のパーサ
  */
 final class SnbtParser {
 
@@ -24,7 +22,7 @@ final class SnbtParser {
     }
 
     /**
-     * 入力全体を 1 つの値として読む
+     * 入力全体を1つの値として読む
      * 末尾に余りがあれば例外
      */
     NbtTag parseWhole() {
@@ -68,13 +66,13 @@ final class SnbtParser {
         NbtCompound compound = new NbtCompound();
         skipWhitespace();
 
-        // 空の Compound
+        // 空のCompound
         if (peek() == '}') {
             position += 1;
             return compound;
         }
 
-        // 要素を 1 つずつ読む
+        // 要素を1つずつ読む
         while (true) {
             skipWhitespace();
 
@@ -106,7 +104,7 @@ final class SnbtParser {
     private NbtTag parseListOrArray() {
         expect('[');
 
-        // "[B;" のような型付き配列かどうかを先に判定する
+        // "[B;"のような型付き配列かどうかを先に判定する
         if (position + 1 < text.length() && text.charAt(position + 1) == ';') {
             char marker = text.charAt(position);
 
@@ -129,7 +127,7 @@ final class SnbtParser {
             return list;
         }
 
-        // 要素を 1 つずつ読む
+        // 要素を1つずつ読む
         while (true) {
             skipWhitespace();
 
@@ -141,7 +139,7 @@ final class SnbtParser {
 
             NbtTag value = parseValue();
 
-            // 異種リストはバイナリ NBT へ写せないため受理しない (adr/0006)
+            // 異種リストはバイナリNBTへ写せないため受理しない
             if (list.elementType() != TagType.END && list.elementType() != value.type()) {
                 throw malformed("リストに異なる型が混在している: "
                         + list.elementType().asString() + " と " + value.type().asString());
@@ -200,7 +198,7 @@ final class SnbtParser {
         if (marker == 'B') {
             byte[] result = new byte[values.size()];
 
-            // 各要素が Byte の範囲に収まるか確認しながら詰める
+            // 各要素がByteの範囲に収まるか確認しながら詰める
             for (int i = 0; i < values.size(); i++) {
                 long value = values.get(i);
 
@@ -217,7 +215,7 @@ final class SnbtParser {
         if (marker == 'I') {
             int[] result = new int[values.size()];
 
-            // 各要素が Int の範囲に収まるか確認しながら詰める
+            // 各要素がIntの範囲に収まるか確認しながら詰める
             for (int i = 0; i < values.size(); i++) {
                 long value = values.get(i);
 
@@ -258,8 +256,16 @@ final class SnbtParser {
     private String parseKey() {
         char c = peek();
 
+        // 引用符で始まるキーは、エスケープを解いて読む
         if (c == '"' || c == '\'') {
-            return parseQuotedString();
+            String quoted = parseQuotedString();
+
+            // バイナリの読み込みと同じく、キーには孤立サロゲートを許さない
+            if (Mutf8.hasLoneSurrogate(quoted)) {
+                throw malformed("Compound のキーが UTF-8 に写せない（孤立サロゲートを含む）");
+            }
+
+            return quoted;
         }
 
         String bare = readBareToken();
@@ -332,7 +338,7 @@ final class SnbtParser {
 
         long value = 0;
 
-        // 指定桁数ぶん 16進数字を読む
+        // 指定桁数ぶん16進数字を読む
         for (int i = 0; i < count; i++) {
             char c = text.charAt(position + i);
             int digit = hexDigitValue(c);
@@ -349,7 +355,7 @@ final class SnbtParser {
     }
 
     private void appendCodePoint(StringBuilder builder, long codePoint) {
-        // Unicode のコードポイント範囲を外れていないか確認する
+        // Unicodeのコードポイント範囲を外れていないか確認する
         if (codePoint < 0 || codePoint > 0x10FFFF) {
             throw malformed(String.format("コードポイントが範囲外: U+%X", codePoint));
         }
@@ -357,7 +363,7 @@ final class SnbtParser {
         builder.appendCodePoint((int) codePoint);
     }
 
-    /** Unicode 文字名によるエスケープ {@code \N{...}} を読む */
+    /** Unicode文字名によるエスケープ{@code \N{...}}を読む */
     private void appendNamedCharacter(StringBuilder builder) {
         expect('{');
         int start = position;
@@ -374,7 +380,7 @@ final class SnbtParser {
         String name = text.substring(start, position);
         position += 1;
 
-        // 実装間で Unicode 文字名の表が揃わないため対応しない（C# / Rust には表が無い）
+        // 実装間でUnicode文字名の表が揃わないため対応しない（C# / TypeScript / Rustには表が無い）
         throw new SpringNbtException(
                 ErrorCode.UNSUPPORTED_FEATURE,
                 "文字名によるエスケープには対応していない: \\N{" + name + "}");
@@ -387,7 +393,7 @@ final class SnbtParser {
             throw malformed("値が来るべき位置に解釈できない文字がある: '" + peekOrNul() + "'");
         }
 
-        // bool(...) / uuid(...) の関数呼び出し
+        // bool(...) / uuid(...)の関数呼び出し
         skipWhitespace();
         if (peekOrNul() == '(' && (token.equals("bool") || token.equals("uuid"))) {
             return parseFunction(token);
@@ -417,7 +423,7 @@ final class SnbtParser {
         expect(')');
 
         if (name.equals("bool")) {
-            // 0 以外を真とする
+            // 0以外を真とする
             if (toIntegral(argument) != 0) {
                 return new NbtByte((byte) 1);
             }
@@ -440,7 +446,7 @@ final class SnbtParser {
             throw malformed("UUID として解釈できない: " + stringTag.value());
         }
 
-        // UUID を上位から 32bit ずつ 4 要素の IntArray へ写す
+        // UUIDを上位から32bitずつ4要素のIntArrayへ写す
         long high = parsed.getMostSignificantBits();
         long low = parsed.getLeastSignificantBits();
 
@@ -451,7 +457,7 @@ final class SnbtParser {
 
     /**
      * 数値トークンを解釈する
-     * 数値として読めなければ null を返す（文字列として扱われる）
+     * 数値として読めなければnullを返す（文字列として扱われる）
      */
     private NbtTag tryParseNumber(String token) {
         boolean negative = false;
@@ -475,7 +481,7 @@ final class SnbtParser {
         boolean isHex = isHexBody(body);
 
         // 幅接尾辞を末尾から剥がす
-        // 16進では b/d/f が数字と紛れるため s/l だけを認める
+        // 16進ではb/d/fが数字と紛れるためs/lだけを認める
         char last = body.charAt(body.length() - 1);
         boolean suffixAllowed;
 
@@ -485,13 +491,13 @@ final class SnbtParser {
             suffixAllowed = WIDTH_SUFFIXES.indexOf(last) >= 0;
         }
 
-        // 末尾 1 文字が型の印なら切り離す
-        // 1 文字だけの token は数字そのもの
+        // 末尾1文字が型の印なら切り離す
+        // 符号を除いた本体が1文字だけなら、接尾辞とみなさず剥がさない
         if (suffixAllowed && body.length() >= 2) {
             widthSuffix = Character.toLowerCase(last);
             body = body.substring(0, body.length() - 1);
 
-            // 符号接尾辞 u / s は幅接尾辞の手前に置かれる
+            // 符号接尾辞u / sは幅接尾辞の手前に置かれる
             if (body.length() >= 2) {
                 char signChar = body.charAt(body.length() - 1);
 
@@ -550,13 +556,13 @@ final class SnbtParser {
     }
 
     private static boolean isBinaryBody(String body) {
-        // 0b / 0B で始まり、続きがある場合だけ 2 進リテラルとみなす
+        // 0b / 0Bで始まり、続きがある場合だけ2進リテラルとみなす
         if (!(body.length() > 2 && body.charAt(0) == '0'
                 && (body.charAt(1) == 'b' || body.charAt(1) == 'B'))) {
             return false;
         }
 
-        // 2進リテラルの本体は 0 と 1 だけ
+        // 2進リテラルの本体は0と1だけ
         for (int index = 2; index < body.length(); index++) {
             char c = body.charAt(index);
 
@@ -581,7 +587,7 @@ final class SnbtParser {
             return new NbtFloat((float) signed);
         }
 
-        // 接尾辞なしの小数は Double
+        // 接尾辞なしの小数はDouble
         if (widthSuffix == '\0' || widthSuffix == 'd') {
             return new NbtDouble(signed);
         }
@@ -639,8 +645,8 @@ final class SnbtParser {
             case 'l' -> new NbtLong(value);
             case 'f' -> new NbtFloat((float) value);
             case 'd' -> new NbtDouble(value);
-            // 接尾辞なしの整数は Int
-            // 暗黙に Long へ格上げしない
+            // 接尾辞なしの整数はInt
+            // 暗黙にLongへ格上げしない
             default -> new NbtInt(
                     (int) checkRange(value, Integer.MIN_VALUE, Integer.MAX_VALUE, "int"));
         };
@@ -657,7 +663,7 @@ final class SnbtParser {
 
     private long toSigned(long magnitude, boolean negative) {
         if (negative) {
-            // Long.MIN_VALUE の絶対値は long に収まらないため個別に扱う
+            // Long.MIN_VALUEの絶対値はlongに収まらないため個別に扱う
             if (magnitude == Long.MIN_VALUE) {
                 return Long.MIN_VALUE;
             }
@@ -755,7 +761,7 @@ final class SnbtParser {
 
     /**
      * 末尾でも例外にしない先読み
-     * 入力が尽きていれば NUL を返す
+     * 入力が尽きていればNULを返す
      */
     private char peekOrNul() {
         if (position >= text.length()) {

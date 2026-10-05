@@ -3,34 +3,30 @@ using SpringNBTLibrary.Nbt;
 namespace SpringNBTLibrary.Anvil;
 
 /// <summary>
-/// リージョンファイルが並ぶディレクトリ 1 つ分（<c>region/</c>、<c>entities/</c>、<c>poi/</c> のいずれか）
+/// リージョンファイルが並ぶディレクトリ1つ分（<c>region/</c>、<c>entities/</c>、<c>poi/</c>のいずれか）
 /// </summary>
 /// <remarks>
 /// <para>
-/// 開いたリージョンファイルはキャッシュし、<see cref="Close"/> でまとめて閉じる
+/// 開いたリージョンファイルはキャッシュし、<see cref="Close"/>でまとめて閉じる
 /// チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい
 /// </para>
 /// <para>
-/// <see cref="RegionFile"/> はファイル全体をメモリへ載せるため、キャッシュには
-/// <see cref="MaxCachedRegions"/> 件の上限がある
-/// 上限を超えると、最も長く使われていない
-/// ものから書き出して閉じる
+/// <see cref="RegionFile"/>はファイル全体をメモリへ載せるため、キャッシュには<see cref="MaxCachedRegions"/>件の上限がある
+/// 上限を超えると、最も長く使われていないものから書き出して閉じる
 /// 大きなワールドを端から走査してもメモリを使い切らない
 /// </para>
 /// <para>
-/// このため <see cref="Region(int, int)"/> が返した参照は、
-/// **別のリージョンへアクセスすると閉じられている場合がある**
+/// このため<see cref="Region(int, int)"/>が返した参照は、**別のリージョンへアクセスすると閉じられている場合がある**
 /// 参照を保持せず、必要なたびに取得すること
 /// </para>
-/// <para>仕様: <c>docs/spec/20-anvil-region.md</c> 5章</para>
 /// </remarks>
 public sealed class RegionFolder : IDisposable
 {
     /// <summary>同時に開いておくリージョンファイル数の既定の上限</summary>
     /// <remarks>
-    /// 1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる
-    /// 実データでは数 MB から数十 MB 程度
-    /// 8 件なら通常のワールドで数百 MB に収まる
+    /// 1リージョンは最大255セクタ × 1024チャンク＝理論上1GiBになりうる
+    /// 実データでは数MBから数十MB程度
+    /// 8件なら通常のワールドで数百MBに収まる
     /// </remarks>
     public const int DefaultMaxCachedRegions = 8;
 
@@ -66,13 +62,14 @@ public sealed class RegionFolder : IDisposable
     /// リージョンフォルダを開く
     /// </summary>
     /// <exception cref="SpringNbtException">
-    /// 読み取り専用でディレクトリが存在しない場合（<see cref="ErrorCode.Io"/>）
+    /// 読み取り専用でディレクトリが存在しない場合（<see cref="ErrorCode.Io"/>）、
+    /// または上限が1未満の場合（<see cref="ErrorCode.InvalidArgument"/>）
     /// </exception>
     /// <param name="directory">リージョンファイルが並ぶディレクトリ</param>
     /// <param name="mode">読み取り専用か、読み書きか</param>
     /// <param name="maxCachedRegions">
     /// 同時に開いておくリージョンファイル数の上限
-    /// 既定は <see cref="DefaultMaxCachedRegions"/>
+    /// 既定は<see cref="DefaultMaxCachedRegions"/>
     /// </param>
     public static RegionFolder Open(
         string directory,
@@ -101,7 +98,7 @@ public sealed class RegionFolder : IDisposable
     {
         EnsureOpen();
 
-        // フォルダがまだ無いなら、リージョンは 1 つも無い
+        // フォルダがまだ無いなら、リージョンは1つも無い
         if (!System.IO.Directory.Exists(Directory))
         {
             yield break;
@@ -109,12 +106,12 @@ public sealed class RegionFolder : IDisposable
 
         List<RegionPos> found = new List<RegionPos>();
 
-        // r.X.Z.mca として解釈できるファイルだけを拾う
+        // r.X.Z.mcaとして解釈できるファイルだけを拾う
         foreach (string path in System.IO.Directory.EnumerateFiles(Directory, "r.*.mca"))
         {
             RegionPos? position = RegionPos.FromFileName(Path.GetFileName(path));
 
-            // r.X.Z.mca として解釈できるファイルだけを拾う
+            // r.X.Z.mcaとして解釈できるファイルだけを拾う
             if (position is not null)
             {
                 found.Add(position.Value);
@@ -134,7 +131,7 @@ public sealed class RegionFolder : IDisposable
             return left.X.CompareTo(right.X);
         });
 
-        // 座標順に並べたものを、1 件ずつ返す
+        // 座標順に並べたものを、1件ずつ返す
         foreach (RegionPos position in found)
         {
             yield return position;
@@ -143,7 +140,7 @@ public sealed class RegionFolder : IDisposable
 
     /// <summary>
     /// リージョンファイルを取得する
-    /// 読み取り専用で存在しなければ null
+    /// 読み取り専用で存在しなければnull
     /// </summary>
     public RegionFile? Region(int regionX, int regionZ)
     {
@@ -159,7 +156,7 @@ public sealed class RegionFolder : IDisposable
 
         string path = Path.Combine(Directory, position.FileName);
 
-        // 読み取り専用では、存在しないリージョンは「チャンクが無い」として null を返す
+        // 読み取り専用では、存在しないリージョンは「チャンクが無い」としてnullを返す
         if (!File.Exists(path) && mode == RegionFileMode.ReadOnly)
         {
             return null;
@@ -189,7 +186,7 @@ public sealed class RegionFolder : IDisposable
         recentlyUsedNodes[position] = recentlyUsed.AddLast(position);
     }
 
-    /// <summary>新しく 1 件開けるよう、上限を下回るまで古いものを閉じる</summary>
+    /// <summary>新しく1件開けるよう、上限を下回るまで古いものを閉じる</summary>
     private void EvictUntilBelowLimit()
     {
         // 上限に達している間、いちばん長く使っていないものから閉じる
@@ -223,8 +220,8 @@ public sealed class RegionFolder : IDisposable
         return file.HasChunk(chunkX, chunkZ);
     }
 
-    /// <summary>チャンクを NBT として読む
-    /// 存在しなければ null</summary>
+    /// <summary>チャンクをNBTとして読む
+    /// 存在しなければnull</summary>
     public NbtCompound? ReadChunk(int chunkX, int chunkZ)
     {
         RegionPos region = new ChunkPos(chunkX, chunkZ).Region;
@@ -238,7 +235,7 @@ public sealed class RegionFolder : IDisposable
         return file.ReadChunk(chunkX, chunkZ);
     }
 
-    /// <summary>チャンクを NBT として書き込む</summary>
+    /// <summary>チャンクをNBTとして書き込む</summary>
     public void WriteChunk(int chunkX, int chunkZ, NbtCompound tag)
     {
         RegionPos region = new ChunkPos(chunkX, chunkZ).Region;
@@ -254,7 +251,7 @@ public sealed class RegionFolder : IDisposable
     }
 
     /// <summary>チャンクを削除する
-    /// 削除できたら true</summary>
+    /// 削除できたらtrue</summary>
     public bool DeleteChunk(int chunkX, int chunkZ)
     {
         RegionPos region = new ChunkPos(chunkX, chunkZ).Region;
@@ -281,7 +278,7 @@ public sealed class RegionFolder : IDisposable
                 continue;
             }
 
-            // リージョンごとに、その中のチャンク座標を順に返す
+            // そのリージョンにあるチャンクの座標を順に返す
             foreach (ChunkPos chunk in file.ChunkPositions())
             {
                 yield return chunk;

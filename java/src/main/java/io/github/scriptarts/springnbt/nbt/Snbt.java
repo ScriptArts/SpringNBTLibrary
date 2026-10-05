@@ -5,12 +5,10 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * SNBT (Stringified NBT) のパースと出力
+ * SNBT (Stringified NBT)のパースと出力
  *
- * <p>対応範囲は「バイナリ NBT へ損失なく写せる部分集合」
- * 1.21.5 以降の異種リスト（{@code [1, "a"]}）は受理しない
- *
- * <p>仕様: {@code docs/spec/11-snbt.md} / {@code docs/adr/0006-snbt-scope.md}
+ * <p>対応範囲は「バイナリNBTへ損失なく写せる部分集合」
+ * 1.21.5以降の異種リスト（{@code [1, "a"]}）は受理しない
  */
 public final class Snbt {
 
@@ -21,9 +19,9 @@ public final class Snbt {
     }
 
     /**
-     * SNBT 文字列をタグへ変換する
+     * SNBT文字列をタグへ変換する
      *
-     * @param text SNBT 文字列
+     * @param text SNBT文字列
      * @return タグ
      * @throws SpringNbtException 構文が不正な場合
      */
@@ -33,11 +31,11 @@ public final class Snbt {
     }
 
     /**
-     * SNBT 文字列を Compound へ変換する
+     * SNBT文字列をCompoundへ変換する
      *
-     * @param text SNBT 文字列
+     * @param text SNBT文字列
      * @return Compound
-     * @throws SpringNbtException 構文が不正、またはルートが Compound でない場合
+     * @throws SpringNbtException 構文が不正、またはルートがCompoundでない場合
      */
     public static NbtCompound parseCompound(String text) {
         NbtTag tag = parse(text);
@@ -50,10 +48,10 @@ public final class Snbt {
     }
 
     /**
-     * タグを 1 行の SNBT へ変換する
+     * タグを1行のSNBTへ変換する
      *
      * @param tag タグ
-     * @return SNBT 文字列
+     * @return SNBT文字列
      */
     public static String write(NbtTag tag) {
         Objects.requireNonNull(tag, "tag");
@@ -63,11 +61,11 @@ public final class Snbt {
     }
 
     /**
-     * タグを整形した SNBT へ変換する
-     * インデントは空白 4 個
+     * タグを整形したSNBTへ変換する
+     * インデントは空白4個
      *
      * @param tag タグ
-     * @return SNBT 文字列
+     * @return SNBT文字列
      */
     public static String writePretty(NbtTag tag) {
         Objects.requireNonNull(tag, "tag");
@@ -78,7 +76,7 @@ public final class Snbt {
 
     /**
      * タグを書き出す
-     * {@code depth} が負なら 1 行、0 以上なら整形して出力する
+     * {@code depth}が負なら1行、0以上なら整形して出力する
      */
     private static void writeTag(StringBuilder builder, NbtTag tag, int depth) {
         switch (tag) {
@@ -98,7 +96,7 @@ public final class Snbt {
     }
 
     private static void writeCompound(StringBuilder builder, NbtCompound compound, int depth) {
-        // 空の compound は改行もインデントも入れず {} と書く
+        // 空のcompoundは改行もインデントも入れず{}と書く
         if (compound.size() == 0) {
             builder.append("{}");
             return;
@@ -131,7 +129,7 @@ public final class Snbt {
     }
 
     private static void writeList(StringBuilder builder, NbtList list, int depth) {
-        // 空のリストは改行もインデントも入れず [] と書く
+        // 空のリストは改行もインデントも入れず[]と書く
         if (list.size() == 0) {
             builder.append("[]");
             return;
@@ -158,7 +156,7 @@ public final class Snbt {
     private static void writeByteArray(StringBuilder builder, byte[] values) {
         builder.append("[B;");
 
-        // 型付き配列は 1 行に収める
+        // 型付き配列は1行に収める
         // 要素には接尾辞を付ける
         for (int index = 0; index < values.length; index++) {
             if (index > 0) {
@@ -174,7 +172,7 @@ public final class Snbt {
     private static void writeIntArray(StringBuilder builder, int[] values) {
         builder.append("[I;");
 
-        // IntArray の要素は接尾辞なし
+        // IntArrayの要素は接尾辞なし
         for (int index = 0; index < values.length; index++) {
             if (index > 0) {
                 builder.append(',');
@@ -189,7 +187,7 @@ public final class Snbt {
     private static void writeLongArray(StringBuilder builder, long[] values) {
         builder.append("[L;");
 
-        // LongArray の要素には L 接尾辞を付ける
+        // LongArrayの要素にはL接尾辞を付ける
         for (int index = 0; index < values.length; index++) {
             if (index > 0) {
                 builder.append(',');
@@ -201,7 +199,7 @@ public final class Snbt {
         builder.append(']');
     }
 
-    /** 整形出力なら改行とインデントを、1 行出力なら何も入れない */
+    /** 整形出力なら改行とインデントを、1行出力なら何も入れない */
     private static void appendSeparator(StringBuilder builder, int depth) {
         if (depth < 0) {
             return;
@@ -215,7 +213,7 @@ public final class Snbt {
         }
     }
 
-    /** 整形出力のときだけ深さを 1 段進める */
+    /** 整形出力のときだけ深さを1段進める */
     private static int nextDepth(int depth) {
         if (depth < 0) {
             return -1;
@@ -256,7 +254,7 @@ public final class Snbt {
         StringBuilder builder = new StringBuilder(text.length() + 2);
         builder.append('"');
 
-        // 1 文字ずつ見てエスケープが要るものだけ置き換える
+        // 1文字ずつ見てエスケープが要るものだけ置き換える
         for (int index = 0; index < text.length(); index++) {
             char c = text.charAt(index);
 
@@ -278,7 +276,7 @@ public final class Snbt {
                         builder.append(text.charAt(index + 1));
                         index += 1;
                     } else if (c < 0x20 || c == 0x7F || Character.isSurrogate(c)) {
-                        // 制御文字と孤立サロゲートは \\uXXXX で表す
+                        // 制御文字と孤立サロゲートは\\uXXXXで表す
                         builder.append(String.format("\\u%04x", (int) c));
                     } else {
                         builder.append(c);

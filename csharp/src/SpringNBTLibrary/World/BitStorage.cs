@@ -1,15 +1,14 @@
 namespace SpringNBTLibrary.World;
 
 /// <summary>
-/// 添字を 64bit 整数の配列へ詰めた表現
-/// 1.16 以降の**跨ぎなし**パッキング
+/// 添字を64bit整数の配列へ詰めた表現
+/// 1.16以降の**跨ぎなし**パッキング
 /// </summary>
 /// <remarks>
 /// <para>
-/// 1 つの <c>i64</c> に入りきらない分は、その <c>i64</c> の残りビットを未使用のまま捨て、
-/// 次の <c>i64</c> の最下位ビットから始める
+/// 1つの<c>i64</c>に入りきらない分は、その<c>i64</c>の残りビットを未使用のまま捨て、
+/// 次の<c>i64</c>の最下位ビットから始める
 /// </para>
-/// <para>仕様: <c>docs/spec/31-paletted-container.md</c> 2章</para>
 /// </remarks>
 public sealed class BitStorage
 {
@@ -22,14 +21,14 @@ public sealed class BitStorage
         EntryCount = entryCount;
     }
 
-    /// <summary>1 エントリあたりのビット数</summary>
+    /// <summary>1エントリあたりのビット数</summary>
     public int BitsPerEntry { get; }
 
     /// <summary>エントリ数
-    /// ブロックなら 4096、バイオームなら 64</summary>
+    /// ブロックなら4096、バイオームなら64</summary>
     public int EntryCount { get; }
 
-    /// <summary>1 つの <c>i64</c> に入るエントリ数</summary>
+    /// <summary>1つの<c>i64</c>に入るエントリ数</summary>
     public int ValuesPerLong => 64 / BitsPerEntry;
 
     /// <summary>すべてゼロで初期化した記憶域を作る</summary>
@@ -44,13 +43,13 @@ public sealed class BitStorage
     }
 
     /// <summary>
-    /// 既存の <c>i64</c> 配列から作る
+    /// 既存の<c>i64</c>配列から作る
     /// </summary>
-    /// <param name="data">packed な配列</param>
+    /// <param name="data">packedな配列</param>
     /// <param name="bitsPerEntry">パレット長から求めたビット幅</param>
     /// <param name="entryCount">エントリ数</param>
     /// <param name="lenient">
-    /// true なら、配列長が期待値と違う場合に配列長からビット幅を逆算して読む
+    /// trueなら、配列長が期待値と違う場合に配列長からビット幅を逆算して読む
     /// 第三者ツールが書いたデータの救済用
     /// </param>
     /// <exception cref="SpringNbtException">
@@ -86,7 +85,7 @@ public sealed class BitStorage
             $"data の長さ {data.Length} long に合うビット幅が無い（エントリ数 {entryCount}）");
     }
 
-    /// <summary>必要な <c>i64</c> の個数を求める</summary>
+    /// <summary>必要な<c>i64</c>の個数を求める</summary>
     public static int LongCount(int bitsPerEntry, int entryCount)
     {
         int valuesPerLong = 64 / bitsPerEntry;
@@ -106,7 +105,7 @@ public sealed class BitStorage
         int bitOffset = (index % valuesPerLong) * BitsPerEntry;
         long mask = (1L << BitsPerEntry) - 1;
 
-        // 符号付きの算術シフトだと上位ビットが伸びるので、いったん ulong にして論理シフトする
+        // 符号付きの算術シフトだと上位ビットが伸びるので、いったんulongにして論理シフトする
         return (int)(((ulong)data[longIndex] >> bitOffset) & (ulong)mask);
     }
 
@@ -134,7 +133,7 @@ public sealed class BitStorage
         data[longIndex] = (data[longIndex] & ~mask) | ((long)value << bitOffset & mask);
     }
 
-    /// <summary>packed な配列を返す
+    /// <summary>packedな配列を返す
     /// 内部の配列をそのまま返す（コピーしない）</summary>
     public long[] ToLongs() => data;
 

@@ -4,8 +4,6 @@ import java.util.function.Consumer;
 
 /**
  * チャンク読み込みのオプション
- *
- * <p>仕様: {@code docs/spec/30-chunk-format.md} 5章
  */
 public final class ChunkReadOptions {
 
@@ -23,7 +21,7 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * DataVersion が扱える形式より古いときの動作
+     * DataVersionが扱える形式より古いときの動作
      *
      * @return 動作
      */
@@ -32,7 +30,7 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * DataVersion が扱える形式より古いときの動作を設定する
+     * DataVersionが扱える形式より古いときの動作を設定する
      *
      * @param value 動作
      * @return このオブジェクト
@@ -44,7 +42,7 @@ public final class ChunkReadOptions {
 
     /**
      * 警告の通知先
-     * null なら何もしない
+     * nullなら何もしない
      *
      * @return 通知先
      */
@@ -64,18 +62,18 @@ public final class ChunkReadOptions {
     }
 
     /**
-     * data の長さが期待値と違うとき、長さからビット幅を逆算して読むか
+     * dataの長さが期待値と違うとき、長さからビット幅を逆算して読むか
      *
-     * @return 逆算するなら true
+     * @return 逆算するならtrue
      */
     public boolean lenientBitStorage() {
         return lenientBitStorage;
     }
 
     /**
-     * data の長さから逆算するかを設定する
+     * dataの長さから逆算するかを設定する
      *
-     * @param value 逆算するなら true
+     * @param value 逆算するならtrue
      * @return このオブジェクト
      */
     public ChunkReadOptions setLenientBitStorage(boolean value) {

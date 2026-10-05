@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * TAG_Int_Array
- * 32bit 符号付き整数の配列
+ * 32bit符号付き整数の配列
  */
 public final class NbtIntArray implements NbtTag {
 
@@ -13,7 +13,7 @@ public final class NbtIntArray implements NbtTag {
 
     /**
      * 配列を指定して作る
-     * 渡した配列をそのまま保持する（コピーしない）
+     * 渡した配列をコピーせずにそのまま保持する
      *
      * @param value 配列
      */

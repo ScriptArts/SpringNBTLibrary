@@ -1,20 +1,19 @@
-# SpringNBTLibrary（C# 版）
+# SpringNBTLibrary（C#版）
 
-Minecraft Java版 26.1 以降のワールド・NBTファイルを読み書きするライブラリです。
-.NET 8 / C# 12 以上で動きます。
+Minecraft Java版26.1以降のワールド・NBTファイルを読み書きするライブラリです。
+.NET 8 / C# 12以上で動きます。
 
-いまのワールド形式は 26.1 で入ったものです。
+いまのワールド形式は26.1で入ったものです。
 それ以降のバージョンなら、形式が変わらない限りそのまま扱えます。
 
-C# / Java / TypeScript / Python / Rust 版があり、どれも同じ仕様書から作っています。
+C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書から作っています。
 同じ入力からは同じ結果が出ます（[対応言語の一覧](../README.md#対応言語)）。
-揃っているかは[適合性テスト](../docs/spec/90-conformance.md)で毎回確かめています。
+結果が揃っているかは[適合性テスト](../docs/spec/90-conformance.md)で毎回確かめています。
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から
-`SpringNBTLibrary.<版>.nupkg` を落とし、プロジェクト直下の `packages/` へ置きます。
-`.csproj` の隣に `nuget.config` を作ってソースを教えたら、参照に足せます。
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`SpringNBTLibrary.<版>.nupkg`を落とし、プロジェクト直下の`packages/`へ置きます。
+`.csproj`の隣に`nuget.config`を作ってソースを教えたら、参照に足せます。
 
 ```xml
 <configuration>
@@ -28,17 +27,17 @@ C# / Java / TypeScript / Python / Rust 版があり、どれも同じ仕様書�
 dotnet add package SpringNBTLibrary --version 1.0.0
 ```
 
-dll を直接参照したいときは `SpringNBTLibrary-<版>-dotnet8.zip` のほうを使います。
-同梱の `.xml` を dll と同じ場所に置くと、IDE の補完に説明が出ます。
+dllを直接参照したいときは`SpringNBTLibrary-<版>-dotnet8.zip`のほうを使います。
+同梱の`.xml`をdllと同じ場所に置くと、IDEの補完に説明が出ます。
 
 ## 使い方
 
-- [はじめに（C#）](../docs/getting-started/csharp.md) — まずここから
-- [ガイド](../docs/guide/01-nbt.md) — 目的別の使い方
-- [API 対応表](../docs/api/overview.md) — 他言語版との対応
-- [機能一覧](../docs/features.md) — 何ができて何ができないか
+- [はじめに（C#）](../docs/getting-started/csharp.md): まずここから
+- [ガイド](../docs/guide/01-nbt.md): 目的別の使い方
+- [API対応表](../docs/api/overview.md): 他言語版との対応
+- [機能一覧](../docs/features.md): 何ができて何ができないか
 
-説明は [`docs/`](../docs/README.md) にまとめてあります。
+説明は[`docs/`](../docs/README.md)にまとめてあります。
 
 ## ライセンス
 

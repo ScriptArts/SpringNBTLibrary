@@ -19,9 +19,7 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 
 /**
- * NBT のファイル・バイト列・ストリームからの読み書き
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 3章・4章
+ * NBTのファイル・バイト列・ストリームからの読み書き
  */
 public final class NbtIo {
 
@@ -30,11 +28,11 @@ public final class NbtIo {
     }
 
     /**
-     * ファイルから NBT を読む
+     * ファイルからNBTを読む
      *
      * @param path    ファイルパス
      * @param options 読み込みオプション
-     * null なら既定値
+     * nullなら既定値
      * @return 読み込んだルート
      * @throws SpringNbtException 読み込みに失敗した場合
      */
@@ -53,11 +51,11 @@ public final class NbtIo {
     }
 
     /**
-     * バイト列から NBT を読む
+     * バイト列からNBTを読む
      *
      * @param bytes   バイト列
      * @param options 読み込みオプション
-     * null なら既定値
+     * nullなら既定値
      * @return 読み込んだルート
      * @throws SpringNbtException 読み込みに失敗した場合
      */
@@ -76,16 +74,17 @@ public final class NbtIo {
     }
 
     /**
-     * バイト列の指定した位置から NBT を 1 つ読む
+     * バイト列の指定した位置からNBTを1つ読む
      *
-     * <p>複数の NBT が連なっているデータを、先頭から順に読み進めるために使う
-     * 戻り値の {@code end} が次の開始位置になる
+     * <p>複数のNBTが連なっているデータを、先頭から順に読み進めるために使う
+     * 戻り値の{@code end}が次の開始位置になる
      *
      * <p>位置は渡したバイト列そのものを指すので、圧縮されたデータは扱えない
      *
      * @param bytes 入力
      * @param offset 読み始める位置
-     * @param options オプション。null なら既定
+     * @param options オプション
+     * nullなら既定
      * @return 読んだタグと、その直後の位置
      * @throws SpringNbtException 読み込みに失敗した場合
      */
@@ -106,15 +105,16 @@ public final class NbtIo {
     }
 
     /**
-     * バイト列に連なっている NBT をすべて読む
+     * バイト列に連なっているNBTをすべて読む
      *
      * <p>入力を使い切るまで読み続ける
      * 空のバイト列なら空の一覧を返す
      *
-     * <p>圧縮は入力全体に 1 回かかっているものとして扱う
+     * <p>圧縮は入力全体に1回かかっているものとして扱う
      *
      * @param bytes 入力
-     * @param options オプション。null なら既定
+     * @param options オプション
+     * nullなら既定
      * @return 読んだタグの一覧
      * @throws SpringNbtException 読み込みに失敗した場合
      */
@@ -124,7 +124,7 @@ public final class NbtIo {
         NbtReadOptions effective = effectiveOptions(options);
         List<NamedTag> tags = new ArrayList<>();
 
-        // 空の入力は「0 個」であってエラーではない
+        // 空の入力は「0個」であってエラーではない
         if (bytes.length == 0) {
             return tags;
         }
@@ -160,12 +160,12 @@ public final class NbtIo {
     }
 
     /**
-     * ストリームから NBT を読む
+     * ストリームからNBTを読む
      * ストリームは最後まで読み切る
      *
      * @param stream  入力ストリーム
      * @param options 読み込みオプション
-     * null なら既定値
+     * nullなら既定値
      * @return 読み込んだルート
      * @throws SpringNbtException 読み込みに失敗した場合
      */
@@ -180,12 +180,12 @@ public final class NbtIo {
     }
 
     /**
-     * NBT をファイルへ書き出す
+     * NBTをファイルへ書き出す
      *
      * @param path    ファイルパス
      * @param tag     書き出すルート
      * @param options 書き込みオプション
-     * null なら既定値
+     * nullなら既定値
      * @throws SpringNbtException 書き込みに失敗した場合
      */
     public static void writeFile(Path path, NamedTag tag, NbtWriteOptions options) {
@@ -201,11 +201,11 @@ public final class NbtIo {
     }
 
     /**
-     * NBT をバイト列へ書き出す
+     * NBTをバイト列へ書き出す
      *
      * @param tag     書き出すルート
      * @param options 書き込みオプション
-     * null なら既定値
+     * nullなら既定値
      * @return バイト列
      * @throws SpringNbtException 書き込みに失敗した場合
      */
@@ -219,7 +219,7 @@ public final class NbtIo {
             effective = options;
         }
 
-        // 書き込み時に AUTO は決められない
+        // 書き込み時にAUTOは決められない
         if (effective.compression() == Compression.AUTO) {
             throw SpringNbtException.invalidArgument("書き込みで Compression.AUTO は指定できない");
         }
@@ -229,12 +229,12 @@ public final class NbtIo {
     }
 
     /**
-     * NBT をストリームへ書き出す
+     * NBTをストリームへ書き出す
      *
      * @param stream  出力ストリーム
      * @param tag     書き出すルート
      * @param options 書き込みオプション
-     * null なら既定値
+     * nullなら既定値
      * @throws SpringNbtException 書き込みに失敗した場合
      */
     public static void writeStream(OutputStream stream, NamedTag tag, NbtWriteOptions options) {
@@ -263,13 +263,13 @@ public final class NbtIo {
             throw SpringNbtException.malformed("入力が空で圧縮方式を判定できない");
         }
 
-        // GZip は必ず 1F 8B で始まる
+        // GZipは必ず1F 8Bで始まる
         if (bytes.length >= 2 && (bytes[0] & 0xFF) == 0x1F && (bytes[1] & 0xFF) == 0x8B) {
             return Compression.GZIP;
         }
 
         if (bytes.length >= 2) {
-            // zlib ヘッダは「圧縮法が 8 (deflate)」かつ「先頭2バイトが 31 の倍数」
+            // zlibヘッダは「圧縮法が8 (deflate)」かつ「先頭2バイトが31の倍数」
             boolean isDeflate = (bytes[0] & 0x0F) == 0x08;
             int header = ((bytes[0] & 0xFF) << 8) | (bytes[1] & 0xFF);
 
@@ -278,7 +278,7 @@ public final class NbtIo {
             }
         }
 
-        // 無圧縮なら先頭は TAG_Compound のタグID
+        // 無圧縮なら先頭はTAG_CompoundのタグID
         if ((bytes[0] & 0xFF) == TagType.COMPOUND.id()) {
             return Compression.NONE;
         }
@@ -290,7 +290,7 @@ public final class NbtIo {
     /** 指定された方式で展開する */
     private static byte[] decompress(byte[] bytes, NbtReadOptions options) {
         Compression method;
-        // AUTO なら先頭バイトから圧縮方式を見分ける
+        // AUTOなら先頭バイトから圧縮方式を見分ける
         if (options.compression() == Compression.AUTO) {
             method = detectCompression(bytes);
         } else {
@@ -318,7 +318,7 @@ public final class NbtIo {
         }
 
         try (ByteArrayOutputStream destination = new ByteArrayOutputStream()) {
-            // ストリームを閉じてフッタを書かせてから toByteArray する必要がある
+            // ストリームを閉じてフッタを書かせてからtoByteArrayする必要がある
             try (OutputStream encoder = createEncoder(destination, method)) {
                 encoder.write(plain);
             }

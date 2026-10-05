@@ -1,12 +1,12 @@
 # はじめに（Java）
 
-Java 21 (LTS) 以上が必要です。
+Java 21 (LTS)以上が必要です。
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases) から `spring-nbt-library-<版>.jar` を落とします。
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring-nbt-library-<版>.jar`を落とします。
 
-Gradle なら jar を `libs/` へ置いて読み込みます。
+Gradleならjarを`libs/`へ置いて読み込みます。
 
 ```groovy
 dependencies {
@@ -14,7 +14,7 @@ dependencies {
 }
 ```
 
-Maven ならローカルリポジトリへ入れてから依存に書きます。
+Mavenならローカルリポジトリへ入れてから依存に書きます。
 
 ```bash
 mvn install:install-file \
@@ -38,7 +38,7 @@ mvn install:install-file \
 java -cp spring-nbt-library-1.0.0.jar:. YourApp
 ```
 
-## NBT ファイルを読む
+## NBTファイルを読む
 
 ```java
 import io.github.scriptarts.springnbt.nbt.*;
@@ -46,16 +46,16 @@ import java.nio.file.Path;
 
 // 圧縮方式（Gzip / Zlib / 無圧縮）は自動で判定される
 NamedTag named = NbtIo.readFile(Path.of("level.dat"), null);
-NbtCompound data = ((NbtCompound) named.tag()).getCompound("Data");
+NbtCompound data = named.tag().getCompound("Data");
 
 System.out.println(data.getString("LevelName"));
 System.out.println(data.getInt("DataVersion"));
 ```
 
-型が違えば `UNEXPECTED_TAG_TYPE` の例外になります。
-キーが無いかもしれないときは `opt*` を使います（無ければ `null`）。
+型が違えば`UNEXPECTED_TAG_TYPE`の例外になります。
+キーが無いかもしれないときは`opt*`を使います（無ければ`null`）。
 
-本ライブラリの例外 `SpringNbtException` は**非検査例外**です。
+本ライブラリの例外`SpringNbtException`は**非検査例外**です。
 シグネチャを他言語版と揃えるため、検査例外は使いません（[adr/0005](../adr/0005-unified-error-model.md)）。
 
 ## 書く
@@ -99,15 +99,15 @@ try (MinecraftWorld world = MinecraftWorld.open(worldPath, options)) {
 }
 ```
 
-> **Minecraft を終了してから実行すること。**
-> 起動中のワールドへ書き込むとデータが壊れます。
-> Java 版は `session.lock` を確認して防いでいます（[adr/0008](../adr/0008-session-lock.md)）。
+> **Minecraftを終了してから実行してください。**
+> 起動中のワールドへ書き込むとデータがおかしくなります。
+> Java版は`session.lock`を確認して防いでいます（[adr/0008](../adr/0008-session-lock.md)）。
 
-> ブロックを置き換えても Heightmaps と光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
-> `Chunk.clearHeightmaps()` / `invalidateLighting()` でゲーム側に再計算させてください。
+> ブロックを置き換えてもHeightmapsと光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> `Chunk.clearHeightmaps()` / `invalidateLighting()`でゲーム側に再計算させてください。
 
 ## 次に読むもの
 
-- [ガイド](../guide/01-nbt.md) — 目的別の使い方
-- [API 対応表](../api/overview.md) — 他言語版との対応
+- [ガイド](../guide/01-nbt.md): 目的別の使い方
+- [API対応表](../api/overview.md): 他言語版との対応
 - [エラーと安全上限](../guide/06-errors-and-limits.md)

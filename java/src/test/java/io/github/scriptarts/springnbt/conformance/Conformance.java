@@ -22,12 +22,11 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * 適合性検証ツール。4言語すべてが同じインターフェースで同じ出力を出す。
+ * 適合性検証ツール
+ * 全言語が同じインターフェースで同じ出力を出す
  *
- * <p>{@code spec/run-conformance.sh} がこのツールを4言語ぶん起動し、
- * 出力を相互に diff することで「4言語が同一に振る舞う」ことを機械的に確かめる。
- *
- * <p>仕様: {@code docs/spec/90-conformance.md} 2.3章
+ * <p>{@code spec/run-conformance.sh}がこのツールを全言語ぶん起動し、
+ * 出力を相互にdiffすることで「全言語が同一に振る舞う」ことを機械的に確かめる
  */
 public final class Conformance {
 
@@ -36,7 +35,7 @@ public final class Conformance {
     }
 
     /**
-     * エントリポイント。
+     * エントリポイント
      *
      * @param args コマンドライン引数
      */
@@ -70,7 +69,7 @@ public final class Conformance {
                 }
             };
         } catch (SpringNbtException error) {
-            // 4言語で同じ ErrorCode を出すことが検証対象なので、コードを機械可読な形で出す
+            // 言語間で同じErrorCodeを出すことが検証対象なので、コードを機械可読な形で出す
             System.err.print("ERROR " + error.code().asString() + " " + error.getMessage() + "\n");
             return 1;
         } catch (IOException error) {
@@ -79,7 +78,7 @@ public final class Conformance {
         }
     }
 
-    /** 入力を読み、正規化JSON を書き出す。 */
+    /** 入力を読み、正規化JSONを書き出す */
     private static int runDecode(String[] args) throws IOException {
         if (args.length < 3) {
             System.err.println(usage());
@@ -93,7 +92,10 @@ public final class Conformance {
         return 0;
     }
 
-    /** 入力を読み、無圧縮で書き直す。ラウンドトリップ検証に使う。 */
+    /**
+     * 入力を読み、無圧縮で書き直す
+     * ラウンドトリップ検証に使う
+     */
     private static int runEncode(String[] args) throws IOException {
         if (args.length < 3) {
             System.err.println(usage());
@@ -110,7 +112,7 @@ public final class Conformance {
         return 0;
     }
 
-    /** 入力を読み、1行の SNBT を書き出す。 */
+    /** 入力を読み、1行のSNBTを書き出す */
     private static int runSnbt(String[] args) throws IOException {
         if (args.length < 3) {
             System.err.println(usage());
@@ -124,7 +126,7 @@ public final class Conformance {
         return 0;
     }
 
-    /** 連なった NBT を、位置を追いながら一覧として書き出す。 */
+    /** 連なったNBTを、位置を追いながら一覧として書き出す */
     private static int runNbtList(String[] args) throws IOException {
         if (args.length < 3) {
             System.err.println(usage());
@@ -158,7 +160,7 @@ public final class Conformance {
         return 0;
     }
 
-    /** リージョンの中身を一覧として書き出す。 */
+    /** リージョンの中身を一覧として書き出す */
     private static int runRegionList(String[] args) throws IOException {
         if (args.length < 3) {
             System.err.println(usage());
@@ -172,7 +174,7 @@ public final class Conformance {
         return 0;
     }
 
-    /** リージョンを読み直し、無圧縮で詰め直して書き出す。 */
+    /** リージョンを読み直し、無圧縮で詰め直して書き出す */
     private static int runRegionRewrite(String[] args) throws IOException {
         if (args.length < 3) {
             System.err.println(usage());
@@ -186,7 +188,7 @@ public final class Conformance {
         return 0;
     }
 
-    /** チャンクの全ブロック・全バイオームを走査して集計を書き出す。 */
+    /** チャンクの全ブロック・全バイオームを走査して集計を書き出す */
     private static int runChunkReport(String[] args) throws IOException {
         if (args.length < 3) {
             System.err.println(usage());
@@ -197,7 +199,7 @@ public final class Conformance {
         return 0;
     }
 
-    /** 決まった手順でチャンクを編集し、無圧縮で書き出す。 */
+    /** 決まった手順でチャンクを編集し、無圧縮で書き出す */
     private static int runChunkEdit(String[] args) throws IOException {
         if (args.length < 3) {
             System.err.println(usage());
@@ -213,19 +215,19 @@ public final class Conformance {
         return 0;
     }
 
-    /** チャンク NBT のファイルを読む。 */
+    /** チャンクNBTのファイルを読む */
     private static Chunk readChunkFile(String path) {
         NamedTag named = NbtIo.readFile(Path.of(path), null);
 
-        // 検証では DataVersion の違いを警告にせず、そのまま読む
+        // 検証では、DataVersionが扱える形式より古くても警告にせずそのまま読む
         ChunkReadOptions options = ChunkReadOptions.defaults()
                 .setOnVersionMismatch(VersionMismatchAction.IGNORE);
         return Chunk.fromNbt(named.tag(), options);
     }
 
-    /** {@code --format network} が指定されていればネットワーク形式として読む。 */
+    /** {@code --format network}が指定されていればネットワーク形式として読む */
     private static NbtFormat parseFormat(String[] args) {
-        // 3 番目以降の引数からオプションを探す
+        // 3番目以降の引数からオプションを探す
         for (int index = 3; index < args.length - 1; index++) {
             if (args[index].equals("--format") && args[index + 1].equals("network")) {
                 return NbtFormat.NETWORK;
@@ -236,20 +238,20 @@ public final class Conformance {
     }
 
     /**
-     * 改行を変換せず、BOM も付けずに UTF-8 で書く。
+     * 改行を変換せず、BOMも付けずにUTF-8で書く
      *
-     * <p>孤立サロゲートを含みうるが、標準の UTF-8 エンコーダは置換文字にしてしまうため、
-     * 自前で符号化する。
+     * <p>孤立サロゲートを含みうるが、標準のUTF-8エンコーダは置換文字にしてしまうため、
+     * 自前で符号化する
      */
     private static void writeTextFile(String path, String content) throws IOException {
         Files.write(Path.of(path), encodeUtf8KeepingSurrogates(content));
     }
 
-    /** 孤立サロゲートを WTF-8（3バイト形式）として保持したまま UTF-8 へ符号化する。 */
+    /** 孤立サロゲートをWTF-8（3バイト形式）として保持したままUTF-8へ符号化する */
     private static byte[] encodeUtf8KeepingSurrogates(String text) {
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
 
-        // コード単位を順に見て、正しいサロゲートペアだけ 1 文字として符号化する
+        // コード単位を順に見て、正しいサロゲートペアだけ1文字として符号化する
         for (int index = 0; index < text.length(); index++) {
             char unit = text.charAt(index);
 
@@ -261,7 +263,7 @@ public final class Conformance {
                         .getBytes(StandardCharsets.UTF_8));
                 index += 1;
             } else if (Character.isSurrogate(unit)) {
-                // 孤立サロゲートは 3 バイト形式でそのまま書く
+                // 孤立サロゲートは3バイト形式でそのまま書く
                 out.write(0xE0 | ((unit >> 12) & 0x0F));
                 out.write(0x80 | ((unit >> 6) & 0x3F));
                 out.write(0x80 | (unit & 0x3F));

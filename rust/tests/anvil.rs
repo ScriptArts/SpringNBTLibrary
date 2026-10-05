@@ -1,21 +1,20 @@
-//! Anvil リージョンファイルの読み書き。
+//! Anvilリージョンファイルの読み書き
 //!
-//! 仕様: `docs/spec/20-anvil-region.md`
-//!
-//! 他言語版と同じ検証項目を持つ。
-//! 共通テストベクタによる言語間比較は `spec/run-conformance.sh` が担当し、
-//! ここでは API の振る舞いを直接確かめる。
+//! 他言語版と同じ検証項目を持つ
+//! 共通テストベクタによる言語間比較は`spec/run-conformance.sh`が担当し、
+//! ここではAPIの振る舞いを直接確かめる
 
 use std::path::{Path, PathBuf};
 
 use spring_nbt_library::anvil::{
-    ChunkCompression, ChunkPos, RegionFile, RegionFileMode, RegionFolder, RegionPos, SECTOR_SIZE,
+    ChunkCompression, ChunkPos, RawChunk, RegionFile, RegionFileMode, RegionFolder, RegionPos,
+    SECTOR_SIZE,
 };
 use spring_nbt_library::error::ErrorCode;
 use spring_nbt_library::nbt::tag::{NbtCompound, NbtString, NbtTag};
 use spring_nbt_library::TARGET_DATA_VERSION;
 
-/// 共通テストベクタのディレクトリ。
+/// 共通テストベクタのディレクトリ
 fn vector_dir(name: &str) -> PathBuf {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -29,7 +28,8 @@ fn vector_dir(name: &str) -> PathBuf {
     path
 }
 
-/// テストごとの一時ディレクトリ。破棄時に自動で片付ける。
+/// テストごとの一時ディレクトリ
+/// 破棄時に自動で片付ける
 struct WorkDir {
     path: PathBuf,
 }
@@ -49,7 +49,7 @@ impl WorkDir {
         self.path.join(name)
     }
 
-    /// ベクタを一時ディレクトリへ複製し、書き込みテストで原本を汚さないようにする。
+    /// ベクタを一時ディレクトリへ複製し、書き込みテストで原本を汚さないようにする
     fn copy_vector(&self, name: &str) -> PathBuf {
         let source = vector_dir(name);
         let destination = self.path.join(name);
@@ -80,12 +80,14 @@ fn sample_chunk(x: i32, z: i32) -> NbtCompound {
     chunk
 }
 
-/// 圧縮しても縮まないバイト列を作る。サイズの制御が効くようにするため。
+/// 圧縮しても縮まないバイト列を作る
+/// サイズを狙いどおりに制御できるようにするため
 fn incompressible(length: usize) -> Vec<i8> {
     let mut result = Vec::with_capacity(length);
     let mut state: u32 = 0x12345678;
 
-    // 線形合同法で疑似乱数を作る。テストの再現性を保つため固定の種を使う
+    // 線形合同法で疑似乱数を作る
+    // テストの再現性を保つため、固定の種を使う
     for _ in 0..length {
         state = state.wrapping_mul(1664525).wrapping_add(1013904223);
         result.push((state >> 24) as u8 as i8);
@@ -200,7 +202,7 @@ fn reads_lz4_chunks() {
     let region =
         RegionFile::open(vector_dir("lz4").join("r.0.0.mca"), RegionFileMode::ReadOnly).unwrap();
 
-    // 1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
+    // 1ブロック / 2ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ
     for x in 0..4 {
         assert_eq!(
             region.read_chunk_raw(x, 0).unwrap().unwrap().compression,
@@ -232,12 +234,26 @@ fn rejects_lz4_block_with_broken_magic() {
 }
 
 #[test]
+fn truncated_gzip_chunk_is_malformed_data() {
+    let work = WorkDir::new("gziptruncated");
+    let path = work.copy_vector("lz4").join("r.0.0.mca");
+    let mut region = RegionFile::open(&path, RegionFileMode::ReadWrite).unwrap();
+
+    // GZipのヘッダだけで本体が無い、途中で切れたチャンク
+    let truncated = vec![0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff];
+    region.write_chunk_raw(0, 0, &RawChunk::new(ChunkCompression::Gzip, truncated)).unwrap();
+
+    let error = region.read_chunk(0, 0).unwrap_err();
+    assert_eq!(error.code(), ErrorCode::MalformedData);
+}
+
+#[test]
 fn writing_lz4_is_rejected() {
     let work = WorkDir::new("lz4write");
     let path = work.copy_vector("lz4").join("r.0.0.mca");
     let mut region = RegionFile::open(&path, RegionFileMode::ReadWrite).unwrap();
 
-    // LZ4 は読み込みのみ対応なので、圧縮して書き出すことはできない
+    // LZ4は読み込みのみ対応なので、圧縮して書き出すことはできない
     let chunk = region.read_chunk(0, 0).unwrap().unwrap();
     let error = region
         .write_chunk(0, 0, &chunk, ChunkCompression::Lz4)
@@ -252,7 +268,8 @@ fn untouched_lz4_chunks_keep_their_compression() {
     let before = std::fs::read(&path).unwrap();
 
     {
-        // 触らずに閉じるだけ。生バイトを素通しするので LZ4 のまま残る
+        // 触らずに閉じるだけ
+        // 生バイトに手を加えないので、LZ4のまま残る
         let mut region = RegionFile::open(&path, RegionFileMode::ReadWrite).unwrap();
         region.close().unwrap();
     }
@@ -287,7 +304,7 @@ fn broken_headers_are_rejected() {
     ];
 
     for vector in vectors {
-        // RegionFile は Debug を実装していないため、unwrap_err ではなく match で受ける
+        // RegionFileはDebugを実装していないため、unwrap_errではなくmatchで受ける
         match RegionFile::open(vector_dir(vector).join("r.0.0.mca"), RegionFileMode::ReadOnly) {
             Ok(_) => panic!("{vector}: エラーになるはずが成功した"),
             Err(error) => assert_eq!(error.code(), ErrorCode::MalformedData, "{vector}"),
@@ -300,7 +317,7 @@ fn chunk_outside_the_region_is_rejected() {
     let region =
         RegionFile::open(vector_dir("empty").join("r.0.0.mca"), RegionFileMode::ReadOnly).unwrap();
 
-    // r.0.0 が担当するのは 0..31 の範囲だけ
+    // r.0.0が担当するのは0..31の範囲だけ
     assert_eq!(
         region.has_chunk(32, 0).unwrap_err().code(),
         ErrorCode::InvalidArgument
@@ -324,7 +341,7 @@ fn read_only_region_rejects_writes() {
 
 #[test]
 fn opening_and_flushing_without_changes_keeps_bytes_identical() {
-    // 触っていないチャンクの配置を保つことが、既存ワールドを壊さない前提になる
+    // 触っていないチャンクの配置を保つことが、既存ワールドをおかしくしないための前提になる
     let work = WorkDir::new("noop");
     let path = work.copy_vector("fragmented").join("r.0.0.mca");
     let original = std::fs::read(&path).unwrap();
@@ -392,7 +409,7 @@ fn growing_chunk_is_relocated_without_breaking_others() {
     let work = WorkDir::new("grow");
     let path = work.copy_vector("fragmented").join("r.0.0.mca");
 
-    // 5 セクタぶんになる大きなチャンクを作る
+    // 5セクタぶんになる大きなチャンクを作る
     let mut big = sample_chunk(0, 0);
     big.set("filler", NbtTag::ByteArray(incompressible(5 * SECTOR_SIZE)));
 
@@ -405,7 +422,7 @@ fn growing_chunk_is_relocated_without_breaking_others() {
 
     let reopened = RegionFile::open(&path, RegionFileMode::ReadOnly).unwrap();
 
-    // 動かした結果、他の 2 チャンクが壊れていないこと
+    // 動かした結果、他の2チャンクがおかしくなっていないこと
     assert_eq!(reopened.chunk_positions().unwrap().len(), 3);
     assert_eq!(
         reopened.read_chunk(5, 3).unwrap().unwrap().get_int("xPos").unwrap(),
@@ -508,7 +525,7 @@ fn huge_chunk_goes_to_external_file_and_comes_back() {
     let work = WorkDir::new("mcc");
     let path = work.join("r.0.0.mca");
 
-    // 1MiB を超えるよう、圧縮の効かないデータを詰める
+    // 1MiBを超えるよう、圧縮しても縮まないデータを詰める
     let mut huge = sample_chunk(1, 2);
     huge.set("filler", NbtTag::ByteArray(incompressible(1200 * 1024)));
 
@@ -577,6 +594,34 @@ fn timestamp_can_be_set_explicitly() {
 // ---------------------------------------------------------------------------
 
 #[test]
+fn read_write_folder_creates_missing_directory_only_when_writing() {
+    let work = WorkDir::new("missingfolder");
+    let missing = work.join("missing").join("region");
+
+    // 読むだけなら、無いディレクトリは作らない
+    {
+        let mut folder = RegionFolder::open(&missing, RegionFileMode::ReadWrite).unwrap();
+        assert!(folder.read_chunk(0, 0).unwrap().is_none());
+        folder.close().unwrap();
+    }
+
+    assert!(!missing.exists());
+
+    // 書き出すときに作る
+    {
+        let mut folder = RegionFolder::open(&missing, RegionFileMode::ReadWrite).unwrap();
+        folder
+            .write_chunk(0, 0, &sample_chunk(0, 0), ChunkCompression::Zlib)
+            .unwrap();
+        folder.close().unwrap();
+    }
+
+    let mut reopened = RegionFolder::open(&missing, RegionFileMode::ReadOnly).unwrap();
+    let chunk = reopened.read_chunk(0, 0).unwrap().unwrap();
+    assert_eq!(chunk.get_int("xPos").unwrap(), 0);
+}
+
+#[test]
 fn folder_resolves_chunks_across_regions() {
     let work = WorkDir::new("folder");
 
@@ -595,7 +640,7 @@ fn folder_resolves_chunks_across_regions() {
         folder.close().unwrap();
     }
 
-    // 3 つの異なるリージョンへ振り分けられる
+    // 3つの異なるリージョンへ振り分けられる
     for name in ["r.0.0.mca", "r.-1.-1.mca", "r.1.1.mca"] {
         assert!(work.join(name).exists(), "{name} が作られていない");
     }
@@ -620,7 +665,8 @@ fn folder_resolves_chunks_across_regions() {
 fn キャッシュ上限を超えると古いリージョンから閉じる() {
     let work = WorkDir::new("lru");
 
-    // 上限 2 で 4 リージョンへ書く。古いものは閉じられるが内容は失われない
+    // 上限2で4リージョンへ書く
+    // 古いものは閉じられるが、内容は失われない
     {
         let mut folder =
             RegionFolder::open_with_limit(&work.path, RegionFileMode::ReadWrite, 2).unwrap();

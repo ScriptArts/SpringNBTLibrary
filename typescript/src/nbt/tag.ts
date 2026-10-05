@@ -1,20 +1,18 @@
 /**
- * NBT のタグ型と値モデル
- *
- * 仕様: `docs/spec/10-nbt-binary.md` 1章・7章
+ * NBTのタグ型と値モデル
  */
 
 import { SpringNbtError } from "../errors.js";
 import * as mutf8 from "./mutf8.js";
 
 /**
- * NBT のタグ型
+ * NBTのタグ型
  * 値は仕様が定めるタグIDと一致する
  */
 export enum TagType {
   /**
    * TAG_End (0)
-   * Compound の終端を表す
+   * Compoundの終端を表す
    */
   End = 0,
   /** TAG_Byte (1) */
@@ -65,12 +63,12 @@ export function tagTypeAsString(type: TagType): string {
 }
 
 /**
- * タグIDから {@link TagType} を得る
+ * タグIDから{@link TagType}を得る
  *
  * @throws {SpringNbtError} 未知のタグIDの場合
  */
 export function tagTypeFromId(id: number): TagType {
-  // 0..12 の範囲外はすべて不正なタグID
+  // 0..12の範囲外はすべて不正なタグID
   if (id < 0 || id > TagType.LongArray) {
     throw SpringNbtError.malformed(`未知のタグID: ${id}`);
   }
@@ -79,10 +77,10 @@ export function tagTypeFromId(id: number): TagType {
 }
 
 /**
- * Number 型で保持する整数の範囲を検査する
+ * Number型で保持する整数の範囲を検査する
  *
- * JavaScript の number は倍精度なので、i32 までは正確に扱えるが幅の情報を持たない
- * 構築時に検査しておかないと、書き出しで黙って切り詰められる
+ * JavaScriptのnumberは倍精度なので、i32までは正確に扱えるが幅の情報を持たない
+ * 構築時に検査しておかないと、書き出しで知らないうちに切り詰められる
  */
 function checkRange(value: number, minimum: number, maximum: number, typeName: string): number {
   if (!Number.isInteger(value)) {
@@ -102,8 +100,8 @@ function checkRange(value: number, minimum: number, maximum: number, typeName: s
 const BIT_VIEW = new DataView(new ArrayBuffer(8));
 
 /**
- * binary32 のビットパターンを取り出す
- * NaN や -0.0 を値ではなくビットで区別するために使う
+ * binary32のビットパターンを取り出す
+ * NaNや-0.0を値ではなくビットで区別するために使う
  */
 function floatBits(value: number): number {
   BIT_VIEW.setFloat32(0, value);
@@ -111,8 +109,8 @@ function floatBits(value: number): number {
 }
 
 /**
- * binary64 のビットパターンを取り出す
- * NaN や -0.0 を値ではなくビットで区別するために使う
+ * binary64のビットパターンを取り出す
+ * NaNや-0.0を値ではなくビットで区別するために使う
  */
 function doubleBits(value: number): bigint {
   BIT_VIEW.setFloat64(0, value);
@@ -128,7 +126,7 @@ function arrayEquals(
     return false;
   }
 
-  // 同じ位置の要素同士を突き合わせる
+  // 同じ位置の要素同士を比較する
   for (let index = 0; index < left.length; index++) {
     if (left[index] !== right[index]) {
       return false;
@@ -140,7 +138,7 @@ function arrayEquals(
 
 /**
  * TAG_Byte
- * 8bit 符号付き整数
+ * 8bit符号付き整数
  */
 export class NbtByte {
   readonly type = TagType.Byte as const;
@@ -157,7 +155,7 @@ export class NbtByte {
 
   /**
    * 値を差し替える
-   * 範囲外なら INVALID_ARGUMENT
+   * 範囲外ならINVALID_ARGUMENT
    */
   set value(newValue: number) {
     this.#value = checkRange(newValue, -128, 127, "byte");
@@ -168,7 +166,10 @@ export class NbtByte {
     return new NbtByte(this.#value);
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `${this.#value}b`;
   }
@@ -181,7 +182,7 @@ export class NbtByte {
 
 /**
  * TAG_Short
- * 16bit 符号付き整数
+ * 16bit符号付き整数
  */
 export class NbtShort {
   readonly type = TagType.Short as const;
@@ -198,7 +199,7 @@ export class NbtShort {
 
   /**
    * 値を差し替える
-   * 範囲外なら INVALID_ARGUMENT
+   * 範囲外ならINVALID_ARGUMENT
    */
   set value(newValue: number) {
     this.#value = checkRange(newValue, -32768, 32767, "short");
@@ -209,7 +210,10 @@ export class NbtShort {
     return new NbtShort(this.#value);
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `${this.#value}s`;
   }
@@ -222,7 +226,7 @@ export class NbtShort {
 
 /**
  * TAG_Int
- * 32bit 符号付き整数
+ * 32bit符号付き整数
  */
 export class NbtInt {
   readonly type = TagType.Int as const;
@@ -239,7 +243,7 @@ export class NbtInt {
 
   /**
    * 値を差し替える
-   * 範囲外なら INVALID_ARGUMENT
+   * 範囲外ならINVALID_ARGUMENT
    */
   set value(newValue: number) {
     this.#value = checkRange(newValue, -2147483648, 2147483647, "int");
@@ -250,7 +254,10 @@ export class NbtInt {
     return new NbtInt(this.#value);
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `${this.#value}`;
   }
@@ -266,11 +273,11 @@ const LONG_MAX = 9223372036854775807n;
 
 /**
  * TAG_Long
- * 64bit 符号付き整数
+ * 64bit符号付き整数
  *
- * 値は `bigint` で保持する
- * JavaScript の `number` は倍精度なので、
- * 2^53 を超える整数を正確に表せず、そのまま使うとワールドのシード値などが壊れる
+ * 値は`bigint`で保持する
+ * JavaScriptの`number`は倍精度なので、2^53を超える整数を正確に表せない
+ * そのまま使うとワールドのシード値などがおかしくなる
  */
 export class NbtLong {
   readonly type = TagType.Long as const;
@@ -287,7 +294,7 @@ export class NbtLong {
 
   /**
    * 値を差し替える
-   * 範囲外なら INVALID_ARGUMENT
+   * 範囲外ならINVALID_ARGUMENT
    */
   set value(newValue: bigint) {
     this.#value = NbtLong.#check(newValue);
@@ -298,7 +305,10 @@ export class NbtLong {
     return new NbtLong(this.#value);
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `${this.#value}L`;
   }
@@ -322,6 +332,15 @@ export class NbtLong {
 }
 
 /**
+ * 読み込んだときのbinary32のビットパターン
+ *
+ * numberはbinary64なので、シグナリングNaNはbinary32との変換で静かなNaNへ変わってしまう
+ * 読んだビットをここに覚えておき、値を変えていなければそのまま書き戻す
+ * 値を差し替えたタグは表から外す
+ */
+const readFloatBits = new WeakMap<NbtFloat, number>();
+
+/**
  * TAG_Float
  * IEEE 754 binary32
  */
@@ -330,7 +349,7 @@ export class NbtFloat {
   #value: number;
 
   constructor(value: number) {
-    // 他言語と同じ値になるよう、構築時に binary32 へ丸める
+    // 他言語と同じ値になるよう、構築時にbinary32へ丸める
     this.#value = Math.fround(value);
   }
 
@@ -341,30 +360,102 @@ export class NbtFloat {
 
   /**
    * 値を差し替える
-   * 範囲外なら INVALID_ARGUMENT
+   * 構築時と同じくbinary32へ丸める
    */
   set value(newValue: number) {
     this.#value = Math.fround(newValue);
+
+    // 値を変えたら、読み込んだときのビットパターンはもう使わない
+    readFloatBits.delete(this);
   }
 
   /** このタグの深いコピーを作る */
   copy(): NbtFloat {
-    return new NbtFloat(this.#value);
+    const result = new NbtFloat(this.#value);
+    const bits = readFloatBits.get(this);
+
+    // 読み込んだビットパターンを持っていれば、複製にも引き継ぐ
+    if (bits !== undefined) {
+      readFloatBits.set(result, bits);
+    }
+
+    return result;
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `${this.#value}f`;
   }
 
   /**
    * 同じ型で同じ値か
-   * NaN や -0.0 を区別するため、値ではなくビットパターンで比べる
+   * NaNや-0.0を区別するため、値ではなくビットパターンで比べる
    */
   equals(other: unknown): boolean {
-    return other instanceof NbtFloat && floatBits(other.value) === floatBits(this.#value);
+    return other instanceof NbtFloat && float32BitsOf(other) === float32BitsOf(this);
   }
 }
+
+/**
+ * binary32のビットパターンからタグを作る
+ * 読み込んだビットを覚えておき、書き戻すときにそのまま使う（ライブラリ内部用）
+ */
+function float32FromBits(bits: number): NbtFloat {
+  BIT_VIEW.setInt32(0, bits);
+  const tag = new NbtFloat(BIT_VIEW.getFloat32(0));
+  readFloatBits.set(tag, bits | 0);
+  return tag;
+}
+
+/**
+ * タグのbinary32のビットパターンを返す
+ * 読み込んだときのビットを覚えていればそれを、無ければ値から求める（ライブラリ内部用）
+ */
+function float32BitsOf(tag: NbtFloat): number {
+  const bits = readFloatBits.get(tag);
+
+  // 読み込んだままのタグは、読んだときのビットを使う
+  if (bits !== undefined) {
+    return bits;
+  }
+
+  return floatBits(tag.value);
+}
+
+/**
+ * 対になっていないサロゲートを含むか（ライブラリ内部用）
+ *
+ * 正しいサロゲートペアは1文字として数え、孤立したものだけを探す
+ * Compoundのキーには孤立サロゲートを許さないので、その検査に使う
+ */
+function hasLoneSurrogate(text: string): boolean {
+  // コード単位を1つずつ見て、サロゲート対をまとめる
+  for (let index = 0; index < text.length; index++) {
+    const unit = text.charCodeAt(index);
+
+    // 上位サロゲートは、対になる下位サロゲートとまとめて1文字を成す
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = text.charCodeAt(index + 1);
+
+      // 対が揃っていなければ孤立サロゲート
+      if (!(next >= 0xdc00 && next <= 0xdfff)) {
+        return true;
+      }
+
+      index += 1;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      // 上位サロゲートを伴わない下位サロゲートは孤立している
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export { float32BitsOf, float32FromBits, hasLoneSurrogate };
 
 /**
  * TAG_Double
@@ -380,14 +471,17 @@ export class NbtDouble {
     return new NbtDouble(this.value);
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `${this.value}d`;
   }
 
   /**
    * 同じ型で同じ値か
-   * NaN や -0.0 を区別するため、値ではなくビットパターンで比べる
+   * NaNや-0.0を区別するため、値ではなくビットパターンで比べる
    */
   equals(other: unknown): boolean {
     return other instanceof NbtDouble && doubleBits(other.value) === doubleBits(this.value);
@@ -396,7 +490,7 @@ export class NbtDouble {
 
 /**
  * TAG_String
- * MUTF-8 で符号化される文字列
+ * MUTF-8で符号化される文字列
  */
 export class NbtString {
   readonly type = TagType.String as const;
@@ -413,7 +507,7 @@ export class NbtString {
 
   /**
    * 値を差し替える
-   * 範囲外なら INVALID_ARGUMENT
+   * MUTF-8で65535バイトを超えるとINVALID_ARGUMENT
    */
   set value(newValue: string) {
     this.#value = NbtString.#check(newValue);
@@ -424,7 +518,10 @@ export class NbtString {
     return new NbtString(this.#value);
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return this.#value;
   }
@@ -437,8 +534,8 @@ export class NbtString {
   static #check(value: string): string {
     const length = mutf8.byteLength(value);
 
-    // 長さフィールドは u16
-    // 65535 を超えると書き出せない
+    // 長さフィールドはu16
+    // 65535を超えると書き出せない
     if (length > mutf8.MAX_BYTE_LENGTH) {
       throw SpringNbtError.invalidArgument(
         `文字列が長すぎる: MUTF-8 で ${length} バイト (上限 ${mutf8.MAX_BYTE_LENGTH})`,
@@ -451,7 +548,7 @@ export class NbtString {
 
 /**
  * TAG_Byte_Array
- * 8bit 符号付き整数の配列
+ * 8bit符号付き整数の配列
  */
 export class NbtByteArray {
   readonly type = TagType.ByteArray as const;
@@ -463,7 +560,10 @@ export class NbtByteArray {
     return new NbtByteArray(this.value.slice());
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `[B; ${this.value.length} 要素]`;
   }
@@ -476,7 +576,7 @@ export class NbtByteArray {
 
 /**
  * TAG_Int_Array
- * 32bit 符号付き整数の配列
+ * 32bit符号付き整数の配列
  */
 export class NbtIntArray {
   readonly type = TagType.IntArray as const;
@@ -488,7 +588,10 @@ export class NbtIntArray {
     return new NbtIntArray(this.value.slice());
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `[I; ${this.value.length} 要素]`;
   }
@@ -501,7 +604,7 @@ export class NbtIntArray {
 
 /**
  * TAG_Long_Array
- * 64bit 符号付き整数の配列
+ * 64bit符号付き整数の配列
  */
 export class NbtLongArray {
   readonly type = TagType.LongArray as const;
@@ -513,7 +616,10 @@ export class NbtLongArray {
     return new NbtLongArray(this.value.slice());
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `[L; ${this.value.length} 要素]`;
   }
@@ -526,12 +632,11 @@ export class NbtLongArray {
 
 /**
  * TAG_List
- * 要素型が 1 つに固定されたタグの列
+ * 要素型が1つに固定されたタグの列
  *
- * 空リストの要素型は {@link TagType.End}
+ * 空リストの要素型は{@link TagType.End}
  * 最初の要素を追加した時点で型が確定する
- * 全要素を削除しても確定済みの要素型は維持される
- * （読み書きの往復で型が消えないようにするため）
+ * 読み書きの往復で型が消えないよう、全要素を削除しても確定済みの要素型は維持される
  */
 export class NbtList {
   readonly type = TagType.List as const;
@@ -541,9 +646,9 @@ export class NbtList {
   constructor(elementType: TagType = TagType.End, elements?: Iterable<NbtTag>) {
     this.#elementType = elementType;
 
-    // 与えられた要素は 1 つずつ型検査しながら追加する
+    // 与えられた要素は1つずつ型検査しながら追加する
     if (elements !== undefined) {
-      // add を通すことで、要素型の検査も一緒にかかる
+      // addを通すことで、要素型の検査も一緒にかかる
       for (const element of elements) {
         this.add(element);
       }
@@ -552,7 +657,7 @@ export class NbtList {
 
   /**
    * 要素の型
-   * 空で未確定なら {@link TagType.End}
+   * 空で未確定なら{@link TagType.End}
    */
   get elementType(): TagType {
     return this.#elementType;
@@ -563,13 +668,24 @@ export class NbtList {
     return this.#items.length;
   }
 
-  /** 位置を指定して取り出す */
+  /**
+   * 位置を指定して取り出す
+   *
+   * @throws RangeError 位置が範囲外の場合
+   */
   get(index: number): NbtTag {
+    this.#checkIndex(index, this.#items.length - 1);
     return this.#items[index];
   }
 
-  /** 位置を指定して置き換える */
+  /**
+   * 位置を指定して置き換える
+   *
+   * @throws RangeError 位置が範囲外の場合
+   */
   set(index: number, item: NbtTag): void {
+    // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+    this.#checkIndex(index, this.#items.length - 1);
     this.#ensureElementType(item);
     this.#items[index] = item;
   }
@@ -580,15 +696,34 @@ export class NbtList {
     this.#items.push(item);
   }
 
-  /** 位置を指定して挿入する */
+  /**
+   * 位置を指定して挿入する
+   *
+   * @throws RangeError 位置が範囲外の場合
+   */
   insert(index: number, item: NbtTag): void {
+    // 要素型を確定させる前に位置を確かめ、失敗したときに状態を変えない
+    this.#checkIndex(index, this.#items.length);
     this.#ensureElementType(item);
     this.#items.splice(index, 0, item);
   }
 
-  /** 位置を指定して削除する */
+  /**
+   * 位置を指定して削除する
+   *
+   * @throws RangeError 位置が範囲外の場合
+   */
   removeAt(index: number): void {
+    this.#checkIndex(index, this.#items.length - 1);
     this.#items.splice(index, 1);
+  }
+
+  /** 位置が0以上`max`以下の整数であることを確かめる */
+  #checkIndex(index: number, max: number): void {
+    // 配列の範囲外へ書くと穴が空くので、他言語と同じく例外にする
+    if (!Number.isInteger(index) || index < 0 || index > max) {
+      throw new RangeError(`位置が範囲外: ${index}`);
+    }
   }
 
   /**
@@ -611,7 +746,10 @@ export class NbtList {
     return result;
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `[${tagTypeAsString(this.#elementType)}; ${this.#items.length} 要素]`;
   }
@@ -662,7 +800,7 @@ export class NbtList {
  * 挿入順を保持する、名前付きタグのマップ
  *
  * 既存キーへの再設定は位置を維持したまま値だけを置き換える
- * （`Map` の既定の振る舞い）
+ * （`Map`の既定の振る舞い）
  */
 export class NbtCompound {
   readonly type = TagType.Compound as const;
@@ -693,50 +831,55 @@ export class NbtCompound {
    * 既存キーなら位置を維持して値だけ置き換える
    */
   set(key: string, value: NbtTag): void {
+    // 孤立サロゲートを含むキーは書き出すと読み戻せないので、ここで止める
+    if (hasLoneSurrogate(key)) {
+      throw SpringNbtError.invalidArgument("キーに孤立サロゲートは使えない");
+    }
+
     this.#entries.set(key, value);
   }
 
   // -- 型付き設定子 -------------------------------------------------------
   //
-  // set(key, new NbtInt(42)) と書かずに済むようにするための糖衣
-  // 取得子の getInt と対になる
+  // set(key, new NbtInt(42))と書かずに済むようにするための糖衣
+  // 取得子のgetIntと対になる
 
-  /** TAG_Byte として設定する */
+  /** TAG_Byteとして設定する */
   setByte(key: string, value: number): void {
     this.set(key, new NbtByte(value));
   }
 
-  /** TAG_Short として設定する */
+  /** TAG_Shortとして設定する */
   setShort(key: string, value: number): void {
     this.set(key, new NbtShort(value));
   }
 
-  /** TAG_Int として設定する */
+  /** TAG_Intとして設定する */
   setInt(key: string, value: number): void {
     this.set(key, new NbtInt(value));
   }
 
-  /** TAG_Long として設定する */
+  /** TAG_Longとして設定する */
   setLong(key: string, value: bigint): void {
     this.set(key, new NbtLong(value));
   }
 
-  /** TAG_Float として設定する */
+  /** TAG_Floatとして設定する */
   setFloat(key: string, value: number): void {
     this.set(key, new NbtFloat(value));
   }
 
-  /** TAG_Double として設定する */
+  /** TAG_Doubleとして設定する */
   setDouble(key: string, value: number): void {
     this.set(key, new NbtDouble(value));
   }
 
   /**
-   * TAG_Byte として設定する
-   * true は 1、false は 0
+   * TAG_Byteとして設定する
+   * trueは1、falseは0
    */
   setBool(key: string, value: boolean): void {
-    // NBT に真偽値の専用型は無いので TAG_Byte の 0 / 1 で表す
+    // NBTに真偽値の専用型は無いので、TAG_Byteの0 / 1で表す
     if (value) {
       this.setByte(key, 1);
     } else {
@@ -745,31 +888,31 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_String として設定する
-   * MUTF-8 で 65535 バイトを超えると INVALID_ARGUMENT
+   * TAG_Stringとして設定する
+   * MUTF-8で65535バイトを超えるとINVALID_ARGUMENT
    */
   setString(key: string, value: string): void {
     this.set(key, new NbtString(value));
   }
 
-  /** TAG_Byte_Array として設定する */
+  /** TAG_Byte_Arrayとして設定する */
   setByteArray(key: string, value: Int8Array): void {
     this.set(key, new NbtByteArray(value));
   }
 
-  /** TAG_Int_Array として設定する */
+  /** TAG_Int_Arrayとして設定する */
   setIntArray(key: string, value: Int32Array): void {
     this.set(key, new NbtIntArray(value));
   }
 
-  /** TAG_Long_Array として設定する */
+  /** TAG_Long_Arrayとして設定する */
   setLongArray(key: string, value: BigInt64Array): void {
     this.set(key, new NbtLongArray(value));
   }
 
   /**
    * キーに対応するタグを返す
-   * 存在しなければ undefined
+   * 存在しなければundefined
    */
   opt(key: string): NbtTag | undefined {
     return this.#entries.get(key);
@@ -791,7 +934,7 @@ export class NbtCompound {
 
   /**
    * キーを削除する
-   * 削除できたら true
+   * 削除できたらtrue
    */
   remove(key: string): boolean {
     return this.#entries.delete(key);
@@ -814,7 +957,10 @@ export class NbtCompound {
     return result;
   }
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `{${this.#entries.size} 要素}`;
   }
@@ -830,7 +976,7 @@ export class NbtCompound {
 
     const right = other.entries();
 
-    // 挿入順にキーと値を突き合わせる
+    // キーと値を挿入順に比較する
     for (const [key, value] of this.#entries) {
       const pair = right.next();
 
@@ -849,19 +995,19 @@ export class NbtCompound {
   // -- 型付き取得子 -------------------------------------------------------
   //
   // 「キーが無い」と「型が違う」は区別する
-  // opt* はキーが無ければ undefined を返し、get* は例外を送出する
-  // どちらも型が違えば必ず UNEXPECTED_TAG_TYPE の例外になる
+  // opt*はキーが無ければundefinedを返し、get*は例外を送出する
+  // どちらも型が違えば必ずUNEXPECTED_TAG_TYPEの例外になる
 
   /**
-   * TAG_Byte を取得する
-   * キーが無ければ undefined
+   * TAG_Byteを取得する
+   * キーが無ければundefined
    */
   optByte(key: string): number | undefined {
     return this.#optScalar(key, TagType.Byte) as number | undefined;
   }
 
   /**
-   * TAG_Byte を取得する
+   * TAG_Byteを取得する
    * キーが無ければ例外
    */
   getByte(key: string): number {
@@ -869,15 +1015,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Short を取得する
-   * キーが無ければ undefined
+   * TAG_Shortを取得する
+   * キーが無ければundefined
    */
   optShort(key: string): number | undefined {
     return this.#optScalar(key, TagType.Short) as number | undefined;
   }
 
   /**
-   * TAG_Short を取得する
+   * TAG_Shortを取得する
    * キーが無ければ例外
    */
   getShort(key: string): number {
@@ -885,15 +1031,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Int を取得する
-   * キーが無ければ undefined
+   * TAG_Intを取得する
+   * キーが無ければundefined
    */
   optInt(key: string): number | undefined {
     return this.#optScalar(key, TagType.Int) as number | undefined;
   }
 
   /**
-   * TAG_Int を取得する
+   * TAG_Intを取得する
    * キーが無ければ例外
    */
   getInt(key: string): number {
@@ -901,15 +1047,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Long を取得する
-   * キーが無ければ undefined
+   * TAG_Longを取得する
+   * キーが無ければundefined
    */
   optLong(key: string): bigint | undefined {
     return this.#optScalar(key, TagType.Long) as bigint | undefined;
   }
 
   /**
-   * TAG_Long を取得する
+   * TAG_Longを取得する
    * キーが無ければ例外
    */
   getLong(key: string): bigint {
@@ -917,15 +1063,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Float を取得する
-   * キーが無ければ undefined
+   * TAG_Floatを取得する
+   * キーが無ければundefined
    */
   optFloat(key: string): number | undefined {
     return this.#optScalar(key, TagType.Float) as number | undefined;
   }
 
   /**
-   * TAG_Float を取得する
+   * TAG_Floatを取得する
    * キーが無ければ例外
    */
   getFloat(key: string): number {
@@ -933,15 +1079,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Double を取得する
-   * キーが無ければ undefined
+   * TAG_Doubleを取得する
+   * キーが無ければundefined
    */
   optDouble(key: string): number | undefined {
     return this.#optScalar(key, TagType.Double) as number | undefined;
   }
 
   /**
-   * TAG_Double を取得する
+   * TAG_Doubleを取得する
    * キーが無ければ例外
    */
   getDouble(key: string): number {
@@ -949,9 +1095,9 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Byte を真偽値として取得する
-   * 0 以外が true
-   * キーが無ければ undefined
+   * TAG_Byteを真偽値として取得する
+   * 0以外がtrue
+   * キーが無ければundefined
    */
   optBool(key: string): boolean | undefined {
     const raw = this.optByte(key);
@@ -964,8 +1110,8 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Byte を真偽値として取得する
-   * 0 以外が true
+   * TAG_Byteを真偽値として取得する
+   * 0以外がtrue
    * キーが無ければ例外
    */
   getBool(key: string): boolean {
@@ -973,15 +1119,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_String を取得する
-   * キーが無ければ undefined
+   * TAG_Stringを取得する
+   * キーが無ければundefined
    */
   optString(key: string): string | undefined {
     return this.#optScalar(key, TagType.String) as string | undefined;
   }
 
   /**
-   * TAG_String を取得する
+   * TAG_Stringを取得する
    * キーが無ければ例外
    */
   getString(key: string): string {
@@ -989,15 +1135,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Byte_Array を取得する
-   * キーが無ければ undefined
+   * TAG_Byte_Arrayを取得する
+   * キーが無ければundefined
    */
   optByteArray(key: string): Int8Array | undefined {
     return this.#optScalar(key, TagType.ByteArray) as Int8Array | undefined;
   }
 
   /**
-   * TAG_Byte_Array を取得する
+   * TAG_Byte_Arrayを取得する
    * キーが無ければ例外
    */
   getByteArray(key: string): Int8Array {
@@ -1005,15 +1151,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Int_Array を取得する
-   * キーが無ければ undefined
+   * TAG_Int_Arrayを取得する
+   * キーが無ければundefined
    */
   optIntArray(key: string): Int32Array | undefined {
     return this.#optScalar(key, TagType.IntArray) as Int32Array | undefined;
   }
 
   /**
-   * TAG_Int_Array を取得する
+   * TAG_Int_Arrayを取得する
    * キーが無ければ例外
    */
   getIntArray(key: string): Int32Array {
@@ -1021,15 +1167,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Long_Array を取得する
-   * キーが無ければ undefined
+   * TAG_Long_Arrayを取得する
+   * キーが無ければundefined
    */
   optLongArray(key: string): BigInt64Array | undefined {
     return this.#optScalar(key, TagType.LongArray) as BigInt64Array | undefined;
   }
 
   /**
-   * TAG_Long_Array を取得する
+   * TAG_Long_Arrayを取得する
    * キーが無ければ例外
    */
   getLongArray(key: string): BigInt64Array {
@@ -1037,15 +1183,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_List を取得する
-   * キーが無ければ undefined
+   * TAG_Listを取得する
+   * キーが無ければundefined
    */
   optList(key: string): NbtList | undefined {
     return this.#castTag(key, TagType.List) as NbtList | undefined;
   }
 
   /**
-   * TAG_List を取得する
+   * TAG_Listを取得する
    * キーが無ければ例外
    */
   getList(key: string): NbtList {
@@ -1053,15 +1199,15 @@ export class NbtCompound {
   }
 
   /**
-   * TAG_Compound を取得する
-   * キーが無ければ undefined
+   * TAG_Compoundを取得する
+   * キーが無ければundefined
    */
   optCompound(key: string): NbtCompound | undefined {
     return this.#castTag(key, TagType.Compound) as NbtCompound | undefined;
   }
 
   /**
-   * TAG_Compound を取得する
+   * TAG_Compoundを取得する
    * キーが無ければ例外
    */
   getCompound(key: string): NbtCompound {
@@ -1070,7 +1216,7 @@ export class NbtCompound {
 
   /**
    * キーに対応するタグを目的の型として取り出す
-   * キーが無ければ undefined、型が違えば例外
+   * キーが無ければundefined、型が違えば例外
    */
   #castTag(key: string, expected: TagType): NbtTag | undefined {
     const tag = this.#entries.get(key);
@@ -1110,10 +1256,8 @@ export class NbtCompound {
 }
 
 /**
- * NBT のタグ
- * 判別可能な合併型なので、`switch (tag.type)` で網羅的に分岐できる
- *
- * 仕様: `docs/spec/10-nbt-binary.md` 1章
+ * NBTのタグ
+ * 判別可能な合併型なので、`switch (tag.type)`で網羅的に分岐できる
  */
 export type NbtTag =
   | NbtByte

@@ -4,12 +4,10 @@ import io.github.scriptarts.springnbt.nbt.NbtCompound;
 import java.util.Objects;
 
 /**
- * チャンクを Y 方向に 16 ブロックずつ区切った 16×16×16 の立方体
+ * チャンクをY方向に16ブロックずつ区切った16×16×16の立方体
  *
- * <p>{@code BlockLight} / {@code SkyLight} などの解釈していないキーは元の NBT に残り、
+ * <p>{@code BlockLight} / {@code SkyLight}などの解釈していないキーは元のNBTに残り、
  * 書き戻しでそのまま出力される
- *
- * <p>仕様: {@code docs/spec/30-chunk-format.md} 2章
  */
 public final class ChunkSection {
 
@@ -26,7 +24,7 @@ public final class ChunkSection {
 
     /**
      * セクションのY位置
-     * オーバーワールドは -5..20
+     * オーバーワールドは-5..20
      *
      * @return Y位置
      */
@@ -36,7 +34,7 @@ public final class ChunkSection {
 
     /**
      * ブロック状態
-     * 持たないセクション（光源専用）では null
+     * 持たないセクション（光源専用）ではnull
      *
      * @return ブロック状態
      */
@@ -46,7 +44,7 @@ public final class ChunkSection {
 
     /**
      * バイオーム
-     * 持たないセクションでは null
+     * 持たないセクションではnull
      *
      * @return バイオーム
      */
@@ -57,7 +55,7 @@ public final class ChunkSection {
     /**
      * ブロック状態を持つか
      *
-     * @return 持つなら true
+     * @return 持つならtrue
      */
     public boolean hasBlockStates() {
         return blockStates != null;
@@ -66,14 +64,14 @@ public final class ChunkSection {
     /**
      * バイオームを持つか
      *
-     * @return 持つなら true
+     * @return 持つならtrue
      */
     public boolean hasBiomes() {
         return biomes != null;
     }
 
     /**
-     * 元の NBT
+     * 元のNBT
      * 解釈していないキーもここに残っている
      *
      * @return NBT
@@ -83,9 +81,9 @@ public final class ChunkSection {
     }
 
     /**
-     * NBT からセクションを読む
+     * NBTからセクションを読む
      *
-     * @param nbt     セクションの NBT
+     * @param nbt     セクションのNBT
      * @param options 読み込みオプション
      * @return セクション
      */
@@ -94,7 +92,7 @@ public final class ChunkSection {
         ChunkSection section = new ChunkSection(nbt, nbt.getByte("Y"));
         NbtCompound blockStatesTag = nbt.optCompound("block_states");
 
-        // 光源専用のセクションは block_states を持たない
+        // 光源専用のセクションはblock_statesを持たない
         if (blockStatesTag != null) {
             section.blockStates = PalettedContainer.fromNbt(
                     blockStatesTag, Chunk.BLOCKS_PER_SECTION, 4, options.lenientBitStorage());
@@ -111,7 +109,7 @@ public final class ChunkSection {
     }
 
     /**
-     * NBT へ書き戻す
+     * NBTへ書き戻す
      * 解釈していないキーはそのまま残る
      *
      * @return NBT

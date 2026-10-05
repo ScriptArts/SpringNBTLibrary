@@ -1,18 +1,25 @@
 /**
- * Minecraft Java版のセーブデータ 1 つ分と、その中の次元
+ * Minecraft Java版のセーブデータ1つ分と、その中の次元
  *
- * 26.x では構成が大きく変わっており、標準の3次元も
- * `dimensions/<名前空間>/<パス>/` の下に並ぶ
- *
- * 仕様: `docs/spec/40-world-layout.md`
+ * 26.xでは構成が大きく変わっており、標準の3次元も`dimensions/<名前空間>/<パス>/`の下に並ぶ
  */
 
-import { copyFileSync, existsSync, readdirSync, renameSync, statSync } from "node:fs";
+import {
+  closeSync,
+  copyFileSync,
+  existsSync,
+  fsyncSync,
+  openSync,
+  readdirSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, join } from "node:path";
 
 import { ChunkPos, RegionFileMode, RegionFolder } from "../anvil/index.js";
 import { ErrorCode, SpringNbtError } from "../errors.js";
-import { NamedTag, NbtCompound, readFile, writeFile } from "../nbt/index.js";
+import { NamedTag, NbtCompound, readFile, writeBytes } from "../nbt/index.js";
 import { Chunk, ChunkReadOptions, ChunkWriteOptions } from "./chunk.js";
 import { BlockState } from "./blockState.js";
 
@@ -24,15 +31,13 @@ export interface WorldOpenOptions {
    */
   writable?: boolean;
   /**
-   * `session.lock` の確認を飛ばすか
+   * `session.lock`の確認を飛ばすか
    *
-   * TypeScript 版はこの確認を行わない
-   * Node には移植性のある
-   * ファイルロックの手段が無いため（`docs/adr/0008-session-lock.md`）
-   * 他言語版との API を揃えるためにフィールドだけ用意してある
+   * Nodeには移植性のあるファイルロックの手段が無いため、TypeScript版はこの確認を行わない
+   * 他言語版とAPIを揃えるためにフィールドだけ用意してある
    *
-   * Minecraft が起動中のワールドへ書き込むとデータが壊れるので、
-   * 起動していないことは呼び出し側で担保すること
+   * Minecraftが起動中のワールドへ書き込むとデータがおかしくなるので、
+   * 起動していないことは呼び出し側で確かめること
    */
   ignoreSessionLock?: boolean;
   /** チャンク読み込みのオプション */
@@ -42,10 +47,9 @@ export interface WorldOpenOptions {
 }
 
 /**
- * `level.dat` の内容
+ * `level.dat`の内容
  *
- * 26.x では大幅に軽量化されており、ゲームルールやワールド生成設定は
- * `data/minecraft/` 配下の個別ファイルへ分離されている
+ * 26.xでは大幅に軽量化されており、ゲームルールやワールド生成設定は`data/minecraft/`配下の個別ファイルへ分離されている
  */
 export class LevelData {
   readonly raw: NbtCompound;
@@ -81,7 +85,7 @@ export class LevelData {
     return this.data.getInt("GameType");
   }
 
-  /** スポーン地点の `[x, y, z]` */
+  /** スポーン地点の`[x, y, z]` */
   get spawnPos(): Int32Array {
     return this.data.getCompound("spawn").getIntArray("pos");
   }
@@ -91,7 +95,7 @@ export class LevelData {
     return this.data.getCompound("spawn").getString("dimension");
   }
 
-  /** 難易度（`normal` など） */
+  /** 難易度（`normal`など） */
   get difficulty(): string {
     return this.data.getCompound("difficulty_settings").getString("difficulty");
   }
@@ -101,23 +105,22 @@ export class LevelData {
     return this.data.getCompound("difficulty_settings").getBool("hardcore");
   }
 
-  /** バージョン名（`26.2` など） */
+  /** バージョン名（`26.2`など） */
   get versionName(): string {
     return this.data.getCompound("Version").getString("Name");
   }
 
-  /** 書き出し用の `NamedTag` を作る */
+  /** 書き出し用の`NamedTag`を作る */
   toNamedTag(): NamedTag {
     return new NamedTag(this.#rootName, this.raw);
   }
 }
 
 /**
- * ワールド内の次元 1 つ分
- * `region/` `entities/` `poi/` をまとめて扱う
+ * ワールド内の次元1つ分
+ * `region/` `entities/` `poi/`をまとめて扱う
  *
- * ブロックの取得・設定は**絶対ワールド座標**で行い、
- * リージョン・チャンク・セクションの解決は内部で済ませる
+ * ブロックの取得・設定は**絶対ワールド座標**で行い、リージョン・チャンク・セクションの解決は内部で済ませる
  */
 export class Dimension {
   /** オーバーワールドの次元ID */
@@ -151,7 +154,7 @@ export class Dimension {
 
   /**
    * 地形のリージョンフォルダ
-   * 無ければ undefined
+   * 無ければundefined
    */
   get regionFolder(): RegionFolder | undefined {
     this.#regions = this.#folder(this.#regions, "region");
@@ -160,7 +163,7 @@ export class Dimension {
 
   /**
    * エンティティのリージョンフォルダ
-   * 無ければ undefined
+   * 無ければundefined
    */
   get entityFolder(): RegionFolder | undefined {
     this.#entities = this.#folder(this.#entities, "entities");
@@ -168,8 +171,8 @@ export class Dimension {
   }
 
   /**
-   * POI のリージョンフォルダ
-   * 無ければ undefined
+   * POIのリージョンフォルダ
+   * 無ければundefined
    */
   get poiFolder(): RegionFolder | undefined {
     this.#poi = this.#folder(this.#poi, "poi");
@@ -177,8 +180,10 @@ export class Dimension {
   }
 
   /**
-   * `data/minecraft/<name>.dat` を読む
-   * 存在しなければ undefined
+   * `data/minecraft/<name>.dat`を読む
+   * 存在しなければundefined
+   *
+   * 次元ごとの`world_border` / `raids` / `chunk_tickets`などが入る
    */
   dataFile(name: string): NbtCompound | undefined {
     this.#ensureOpen();
@@ -205,7 +210,7 @@ export class Dimension {
 
   /**
    * チャンクを読む
-   * 読み込んだチャンクはキャッシュされる
+   * 読み込んだチャンクはキャッシュされ、次回は同じインスタンスが返る
    */
   chunk(chunkX: number, chunkZ: number): Chunk | undefined {
     this.#ensureOpen();
@@ -249,7 +254,7 @@ export class Dimension {
 
   /**
    * 絶対座標でブロックを取得する
-   * チャンクが無ければ undefined
+   * チャンクが無ければundefined
    */
   getBlock(x: number, y: number, z: number): BlockState | undefined {
     const chunk = this.chunk(x >> 4, z >> 4);
@@ -264,10 +269,10 @@ export class Dimension {
   /**
    * 絶対座標でブロックを設定する
    *
-   * `minecraft:oak_stairs[facing=north]` の形の文字列でも指定できる
+   * `minecraft:oak_stairs[facing=north]`の形の文字列でも指定できる
    *
-   * 変更したチャンクには印が付き、`flush()` でまとめて書き戻される
-   * 本ライブラリはチャンクを新規生成しないので、存在しない座標はエラーになる
+   * 変更したチャンクには印が付き、`flush()`でまとめて書き戻される
+   * 本ライブラリはチャンクを新規生成しないので、チャンクが存在しない座標はエラーになる
    */
   setBlock(x: number, y: number, z: number, state: BlockState | string): void {
     this.#ensureWritable();
@@ -286,7 +291,7 @@ export class Dimension {
 
   /**
    * 絶対座標でバイオームを取得する
-   * 4×4×4 の単位
+   * 4×4×4の単位
    */
   getBiome(x: number, y: number, z: number): string | undefined {
     const chunk = this.chunk(x >> 4, z >> 4);
@@ -300,7 +305,7 @@ export class Dimension {
 
   /**
    * 絶対座標でバイオームを設定する
-   * 4×4×4 の単位
+   * 4×4×4の単位
    */
   setBiome(x: number, y: number, z: number, biome: string): void {
     this.#ensureWritable();
@@ -373,7 +378,7 @@ export class Dimension {
 
   /**
    * フォルダを遅延して開く
-   * 存在しなければ undefined のまま
+   * 存在しなければundefinedのまま
    */
   #folder(slot: RegionFolder | undefined, name: string): RegionFolder | undefined {
     this.#ensureOpen();
@@ -412,9 +417,9 @@ export class Dimension {
 }
 
 /**
- * Minecraft Java版のセーブデータ 1 つ分
+ * Minecraft Java版のセーブデータ1つ分
  *
- * 26.x では標準の3次元も `dimensions/<名前空間>/<パス>/` の下に並ぶ
+ * 26.xでは構成が大きく変わっており、標準の3次元も`dimensions/<名前空間>/<パス>/`の下に並ぶ
  */
 export class MinecraftWorld {
   readonly #dimensions = new Map<string, Dimension>();
@@ -441,7 +446,7 @@ export class MinecraftWorld {
       throw new SpringNbtError(ErrorCode.Io, `level.dat が無い: ${levelPath}`);
     }
 
-    // 書き込むなら、Minecraft が起動中でないことを先に確かめる
+    // 書き込むなら、Minecraftが起動中でないことを先に確かめる
     if (options.writable === true && options.ignoreSessionLock !== true) {
       checkSessionLock(directory);
     }
@@ -450,11 +455,10 @@ export class MinecraftWorld {
   }
 
   /**
-   * `data/minecraft/<name>.dat` を読む
-   * 存在しなければ undefined
+   * `data/minecraft/<name>.dat`を読む
+   * 存在しなければundefined
    *
-   * 26.x では `game_rules` / `weather` / `world_gen_settings` などが
-   * この形で `level.dat` から分離されている
+   * 26.xでは`game_rules` / `weather` / `world_gen_settings`などがこの形で`level.dat`から分離されている
    */
   dataFile(name: string): NbtCompound | undefined {
     this.#ensureOpen();
@@ -478,7 +482,7 @@ export class MinecraftWorld {
 
     const found: string[] = [];
 
-    // dimensions/<名前空間>/<パス>/ の 2 段を辿る
+    // dimensions/<名前空間>/<パス>/の2段を辿る
     for (const namespaceName of readdirSync(root)) {
       const namespaceDir = join(root, namespaceName);
 
@@ -486,7 +490,7 @@ export class MinecraftWorld {
         continue;
       }
 
-      // 2 段目が次元のパス
+      // 2段目が次元のパス
       for (const pathName of readdirSync(namespaceDir)) {
         // ディレクトリだけを次元として数える
         if (statSync(join(namespaceDir, pathName)).isDirectory()) {
@@ -502,7 +506,7 @@ export class MinecraftWorld {
 
   /**
    * 次元を得る
-   * ディレクトリが無ければ undefined
+   * ディレクトリが無ければundefined
    */
   dimension(dimensionId: string): Dimension | undefined {
     this.#ensureOpen();
@@ -541,9 +545,9 @@ export class MinecraftWorld {
 
     const found: string[] = [];
 
-    // <uuid>.dat の名前部分が UUID にあたる
+    // <uuid>.datの名前部分がUUIDにあたる
     for (const name of readdirSync(path)) {
-      // .dat 以外のファイルは対象外
+      // .dat以外のファイルは対象外
       if (name.endsWith(".dat")) {
         found.push(basename(name, ".dat"));
       }
@@ -555,7 +559,7 @@ export class MinecraftWorld {
 
   /**
    * プレイヤーデータを読む
-   * 存在しなければ undefined
+   * 存在しなければundefined
    */
   player(uuid: string): NbtCompound | undefined {
     this.#ensureOpen();
@@ -569,10 +573,10 @@ export class MinecraftWorld {
   }
 
   /**
-   * `level.dat` を書き戻す
+   * `level.dat`を書き戻す
    *
-   * 壊れるとワールド全体が開けなくなるため、
-   * 一時ファイルへ書いてから `level.dat_old` へ退避し、最後に置き換える
+   * `level.dat`がおかしくなるとワールド全体が開けなくなるため、
+   * 一時ファイルへ書いて内容をディスクへ確実に書き出してから、既存の`level.dat`を`level.dat_old`へ退避し、最後に置き換える
    */
   saveLevel(): void {
     this.#ensureOpen();
@@ -585,14 +589,28 @@ export class MinecraftWorld {
     const temporary = `${path}.tmp`;
     const backup = `${path}_old`;
 
-    writeFile(temporary, this.level.toNamedTag());
+    const encoded = writeBytes(this.level.toNamedTag());
 
-    // 既存の level.dat は、置き換える前に level.dat_old へ退避する
-    if (existsSync(path)) {
-      copyFileSync(path, backup);
+    try {
+      // 一時ファイルへ書き、置き換える前に内容をディスクへ確実に書き出す
+      const descriptor = openSync(temporary, "w");
+
+      try {
+        writeFileSync(descriptor, encoded);
+        fsyncSync(descriptor);
+      } finally {
+        closeSync(descriptor);
+      }
+
+      // 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
+      if (existsSync(path)) {
+        copyFileSync(path, backup);
+      }
+
+      renameSync(temporary, path);
+    } catch (error) {
+      throw new SpringNbtError(ErrorCode.Io, `level.dat を書けない: ${path}`, { cause: error });
     }
-
-    renameSync(temporary, path);
   }
 
   /** 開いている次元をすべて閉じる */
@@ -618,23 +636,19 @@ export class MinecraftWorld {
 }
 
 /**
- * `session.lock` を確認する（TypeScript 版では何もしない）
+ * `session.lock`を確認する（TypeScript版では何もしない）
  *
- * Minecraft は起動中このファイルのロックを保持し続けるので、本来は
- * 「ロックを取れるか」で判定する
- * しかし Node には移植性のある
- * ファイルロックの手段が無く、ファイルの存在自体は起動していなくても残るため、
+ * Minecraftは起動中このファイルのロックを保持し続けるので、本来は「ロックを取れるか」で判定する
+ * しかしNodeには移植性のあるファイルロックの手段が無く、ファイルの存在自体は起動していなくても残るため、
  * 存在確認だけでは何も判定できない
  *
- * 誤った判定を返すよりは何もしないほうが安全なので、素通しする
- *
- * 仕様: docs/spec/40-world-layout.md 3章 / docs/adr/0008-session-lock.md
+ * 誤った判定を返すよりは何もしないほうが安全なので、確認せずに進める
  */
 function checkSessionLock(directory: string): void {
   void directory;
 }
 
-/** 名前空間が省略されていたら `minecraft:` を補う */
+/** 名前空間が省略されていたら`minecraft:`を補う */
 function normalizeDimensionId(dimensionId: string): string {
   if (dimensionId.includes(":")) {
     return dimensionId;

@@ -1,6 +1,4 @@
 //! ブロックの絶対座標と、その範囲
-//!
-//! 仕様: `docs/spec/30-chunk-format.md` 5章
 
 use std::fmt;
 
@@ -51,25 +49,25 @@ impl fmt::Display for BlockPos {
     }
 }
 
-/// ブロック座標の直方体な範囲
+/// ブロック座標の直方体の範囲
 ///
 /// 両端を含む
-/// `Cuboid::of(0, 0, 0, 0, 0, 0)` は 1 ブロック
+/// `Cuboid::of(0, 0, 0, 0, 0, 0)`は1ブロック
 ///
 /// 範囲内のブロックを順に処理したいときに使う
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Cuboid {
-    /// X の最小値
+    /// Xの最小値
     pub min_x: i32,
-    /// Y の最小値
+    /// Yの最小値
     pub min_y: i32,
-    /// Z の最小値
+    /// Zの最小値
     pub min_z: i32,
-    /// X の最大値（含む）
+    /// Xの最大値（含む）
     pub max_x: i32,
-    /// Y の最大値（含む）
+    /// Yの最大値（含む）
     pub max_y: i32,
-    /// Z の最大値（含む）
+    /// Zの最大値（含む）
     pub max_z: i32,
 }
 
@@ -93,17 +91,17 @@ impl Cuboid {
         Cuboid::new(BlockPos::new(x1, y1, z1), BlockPos::new(x2, y2, z2))
     }
 
-    /// X 方向の長さ
+    /// X方向の長さ
     pub fn size_x(&self) -> i32 {
         self.max_x - self.min_x + 1
     }
 
-    /// Y 方向の長さ
+    /// Y方向の長さ
     pub fn size_y(&self) -> i32 {
         self.max_y - self.min_y + 1
     }
 
-    /// Z 方向の長さ
+    /// Z方向の長さ
     pub fn size_z(&self) -> i32 {
         self.max_z - self.min_z + 1
     }
@@ -124,9 +122,9 @@ impl Cuboid {
     }
 
     /// 範囲内の座標を順に返す
-    /// 並びは Y、Z、X の順で、X がいちばん内側で動く
+    /// 並びはY、Z、Xの順で、Xがいちばん内側で動く
     pub fn positions(&self) -> impl Iterator<Item = BlockPos> + '_ {
-        // 内側から X が動くので、同じチャンクの並びを続けて触れる
+        // Xがいちばん内側で動くので、同じチャンクの並びを続けて扱える
         (self.min_y..=self.max_y).flat_map(move |y| {
             (self.min_z..=self.max_z)
                 .flat_map(move |z| (self.min_x..=self.max_x).map(move |x| BlockPos::new(x, y, z)))

@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 """共通テストベクタを生成する。
 
-仕様: docs/spec/90-conformance.md 4章
-
-重要な設計方針:
-    このスクリプトは **ライブラリ本体を一切使わない**。
-    仕様書の記述だけを根拠に、独立した最小の NBT ライタを内蔵してバイト列を組み立てる。
-    ライブラリでベクタを作ると、ライブラリのバグをそのまま期待値にしてしまうため。
+重要な設計方針として、このスクリプトは**ライブラリ本体を一切使わない**。
+仕様書の記述だけを根拠に、独立した最小のNBTライタを内蔵してバイト列を組み立てる。
+ライブラリでベクタを作ると、ライブラリのバグをそのまま期待値にしてしまうため。
 
 使い方:
     python3 spec/tools/build_testdata.py
@@ -21,7 +18,7 @@ import struct
 import zlib
 
 # ---------------------------------------------------------------------------
-# 独立した最小の NBT ライタ（仕様書の記述だけを根拠に実装する）
+# 独立した最小のNBTライタ（仕様書の記述だけを根拠に実装する）
 # ---------------------------------------------------------------------------
 
 TAG_END = 0
@@ -40,14 +37,14 @@ TAG_LONG_ARRAY = 12
 
 
 def mutf8_encode(text: str) -> bytes:
-    """文字列を MUTF-8 へ符号化する。
+    """文字列をMUTF-8へ符号化する。
 
-    標準 UTF-8 との違いは U+0000 が C0 80 になることと、
-    補助文字がサロゲートペアへ分解されて 3 バイト × 2 になること。
+    標準UTF-8との違いは、U+0000がC0 80になることと、
+    補助文字がサロゲートペアへ分解されて3バイト × 2になること。
     """
     out = bytearray()
 
-    # Python の str はコードポイント単位なので、まず UTF-16 コード単位へ落とす
+    # Pythonのstrはコードポイント単位なので、まずUTF-16コード単位へ落とす
     units = []
     for ch in text:
         code = ord(ch)
@@ -59,7 +56,7 @@ def mutf8_encode(text: str) -> bytes:
         else:
             units.append(code)
 
-    # コード単位ごとに 1〜3 バイトへ展開する
+    # コード単位ごとに1〜3バイトへ展開する
     for unit in units:
         if 0x0001 <= unit <= 0x007F:
             out.append(unit)
@@ -75,7 +72,7 @@ def mutf8_encode(text: str) -> bytes:
 
 
 def write_string(text: str) -> bytes:
-    """u16 のバイト長を前置した MUTF-8 文字列。"""
+    """u16のバイト長を前置したMUTF-8文字列。"""
     encoded = mutf8_encode(text)
     if len(encoded) > 65535:
         raise ValueError("文字列が長すぎる: %d バイト" % len(encoded))
@@ -83,7 +80,7 @@ def write_string(text: str) -> bytes:
 
 
 class Tag:
-    """タグID とペイロードの組。"""
+    """タグIDとペイロードの組。"""
 
     def __init__(self, tag_id: int, payload: bytes) -> None:
         self.tag_id = tag_id
@@ -111,7 +108,7 @@ def t_float(value: float) -> Tag:
 
 
 def t_float_bits(bits: int) -> Tag:
-    """ビットパターンを直接指定する。NaN の表現を固定したい場合に使う。"""
+    """ビットパターンを直接指定する。NaNの表現を固定したい場合に使う。"""
     return Tag(TAG_FLOAT, struct.pack(">I", bits))
 
 
@@ -135,7 +132,7 @@ def t_string(text: str) -> Tag:
 
 
 def t_string_raw(raw: bytes) -> Tag:
-    """MUTF-8 のバイト列を直接指定する。孤立サロゲートを書くために使う。"""
+    """MUTF-8のバイト列を直接指定する。孤立サロゲートを書くために使う。"""
     return Tag(TAG_STRING, struct.pack(">H", len(raw)) + raw)
 
 
@@ -147,7 +144,7 @@ def t_list(element_id: int, elements: list) -> Tag:
 
 
 def t_compound(entries: list) -> Tag:
-    """entries は (名前, Tag) の並び。挿入順がそのまま出力順になる。"""
+    """entriesは (名前, Tag) の並び。挿入順がそのまま出力順になる。"""
     payload = b""
     for name, tag in entries:
         payload += struct.pack(">B", tag.tag_id)
@@ -194,9 +191,9 @@ VECTORS = []
 def write_if_changed(path, data):
     """内容が変わるときだけ書き出す。
 
-    Gzip / Zlib の出力バイト列は zlib の実装とバージョンで変わる。
+    Gzip / Zlibの出力バイト列はzlibの実装とバージョンで変わる。
     毎回書き出すと、同じ内容なのに環境ごとに差分が出てしまい、
-    「テストベクタが生成器から再現できる」ことを CI で確かめられなくなる。
+    「テストベクタが生成器から再現できる」ことをCIで確かめられなくなる。
 
     そこで**展開後の中身が同じなら書き換えない**。
     圧縮方式そのものを変えたときはバイト列も中身も変わるので、ちゃんと更新される。
@@ -219,7 +216,7 @@ def write_if_changed(path, data):
 
 
 def same_after_decompression(existing, data):
-    """2 つのバイト列が、展開すると同じ内容になるか。
+    """2つのバイト列が、展開すると同じ内容になるか。
 
     どちらかが展開できない形式なら「違う」とみなす。
     """
@@ -254,11 +251,11 @@ def region_contents(data):
     """リージョンファイルを、圧縮に依存しない「論理的な中身」へ均す。
 
     位置表・タイムスタンプ表と、各チャンクの (圧縮方式ID, 展開後のバイト列) を並べる。
-    圧縮結果そのものは zlib の実装で変わるため、比較には使わない。
+    圧縮結果そのものはzlibの実装で変わるため、比較には使わない。
     """
     parts = [data[:2 * SECTOR]]
 
-    # 位置表の 1024 エントリを順に見て、存在するチャンクを取り出す
+    # 位置表の1024エントリを順に見て、存在するチャンクを取り出す
     for index in range(1024):
         offset, sectors = struct.unpack_from(">I", data, index * 4)[0] >> 8, data[index * 4 + 3]
 
@@ -292,7 +289,7 @@ def region_contents(data):
 
 
 def add_concat_vector(vector_id, filename, data, description):
-    """連なった NBT のベクタを 1 件登録する。
+    """連なったNBTのベクタを1件登録する。
 
     期待値ファイルは持たず、言語間で出力が一致することだけを見る。
     """
@@ -311,7 +308,7 @@ def add_concat_vector(vector_id, filename, data, description):
 
 def add_vector(vector_id, filename, data, description,
                fmt="java", compression="none", roundtrip=True, expect_error=None):
-    """ベクタを 1 件登録し、ファイルへ書き出す。"""
+    """ベクタを1件登録し、ファイルへ書き出す。"""
     write_if_changed(os.path.join(TESTDATA, filename), data)
 
     entry = {
@@ -335,12 +332,15 @@ def add_vector(vector_id, filename, data, description,
 
 
 def hello_world_tag():
-    """最小の NBT。ルート名 "hello world" の Compound に文字列がひとつ。"""
+    """最小のNBT。ルート名"hello world"のCompoundに文字列がひとつ。"""
     return t_compound([("name", t_string("Bananrama"))])
 
 
 def all_tags_tag():
-    """全13タグを1つずつ含む Compound。"""
+    """TAG_Endを除く12種のタグ型をすべて含むCompound。
+
+    TAG_EndはCompoundの終端として書き出されるので、バイト列には13種すべてが現れる。
+    """
     return t_compound([
         ("byte", t_byte(-128)),
         ("short", t_short(32767)),
@@ -361,7 +361,7 @@ def all_tags_tag():
 
 
 def nested_compound(depth: int) -> Tag:
-    """指定した深さまで Compound を入れ子にする。ルートを含めた段数を depth とする。"""
+    """指定した深さまでCompoundを入れ子にする。ルートを含めた段数をdepthとする。"""
     tag = t_compound([])
 
     # 内側から外側へ包んでいく
@@ -383,7 +383,7 @@ def build_all():
     add_vector(
         "nbt/all_tags", "nbt/all_tags.nbt",
         to_java_file("", all_tags),
-        "全13タグを1つずつ含む")
+        "全13タグを含む。TAG_EndはCompoundの終端として現れる")
 
     add_vector(
         "nbt/nested_deep", "nbt/nested_deep.nbt",
@@ -456,7 +456,7 @@ def build_all():
         to_java_file("", t_compound([("value", t_string("a" * 65535))])),
         "MUTF-8 で 65535 バイトちょうどの文字列。長さフィールドの上限")
 
-    # 同じ内容を3種の圧縮で用意し、自動判定が効くことを確かめる
+    # 同じ内容を3種の圧縮で用意し、自動判定が働くことを確かめる
     plain = to_java_file("hello world", hello)
     add_vector(
         "nbt/uncompressed", "nbt/uncompressed.nbt", plain,
@@ -505,7 +505,7 @@ def build_all():
         "nbt/trailing_bytes", "nbt/trailing_bytes.nbt", trailing,
         "ルートの後に余分なバイトがある", expect_error="MALFORMED_DATA")
 
-    # キーに孤立サロゲートを置いたベクタ。値と違いキーでは許さない（仕様 10 の 2.2章）
+    # キーに孤立サロゲートを置いたベクタ。値と違いキーでは許さない
     lone_key = (struct.pack(">B", TAG_COMPOUND) + write_string("")
                 + struct.pack(">B", TAG_INT)
                 + struct.pack(">H", 3) + bytes([0xED, 0xA0, 0xBD])
@@ -524,7 +524,7 @@ def build_all():
 
 
 # ---------------------------------------------------------------------------
-# Anvil リージョンファイル
+# Anvilリージョンファイル
 # ---------------------------------------------------------------------------
 
 SECTOR = 4096
@@ -538,7 +538,7 @@ class RegionBuilder:
     """
 
     def __init__(self):
-        # ヘッダ 2 セクタぶんをゼロで確保する
+        # ヘッダ2セクタぶんをゼロで確保する
         self.sectors = [bytearray(SECTOR), bytearray(SECTOR)]
         self.locations = [(0, 0)] * 1024
         self.timestamps = [0] * 1024
@@ -548,7 +548,7 @@ class RegionBuilder:
 
     def add_chunk(self, local_x, local_z, payload, compression=2,
                   timestamp=1700000000, external=False, at_sector=None):
-        """チャンクを 1 つ置く。at_sector を指定すると配置先を固定できる。"""
+        """チャンクを1つ置く。at_sectorを指定すると配置先を固定できる。"""
         if external:
             body = b""
             scheme = compression | 0x80
@@ -601,22 +601,21 @@ class RegionBuilder:
 # LZ4（圧縮方式ID 4）の符号化
 #
 # 展開側はライブラリが実装するので、ここには符号化だけを置く。
-# 仕様: docs/spec/20-anvil-region.md 3.1.1 / 3.1.2
 # ---------------------------------------------------------------------------
 
-#: LZ4 ブロックのマッチはここから始まる長さ以上でなければならない。
+#: LZ4ブロックのマッチは、この長さ以上でなければならない。
 LZ4_MIN_MATCH = 4
 
-#: ブロックの末尾 5 バイトは必ずリテラルにする。
+#: ブロックの末尾5バイトは必ずリテラルにする。
 LZ4_LAST_LITERALS = 5
 
-#: 最後のマッチは末尾から 12 バイト以内で始めない。
+#: 最後のマッチは末尾から12バイト以内で始めない。
 LZ4_MATCH_LIMIT = 12
 
 
 def lz4_write_length(out, value):
-    """長さの追加ぶんを、255 が続く形式で書く。"""
-    # 255 を書けるだけ書き、最後に 255 未満のバイトで終える
+    """長さの追加ぶんを、255が続く形式で書く。"""
+    # 255を書けるだけ書き、最後に255未満のバイトで終える
     while value >= 255:
         out.append(255)
         value -= 255
@@ -625,11 +624,11 @@ def lz4_write_length(out, value):
 
 
 def lz4_emit(out, literals, offset, match_length):
-    """シーケンスを 1 つ書く。offset が None なら最後のシーケンス。"""
+    """シーケンスを1つ書く。offsetがNoneなら最後のシーケンス。"""
     token = (min(len(literals), 15) << 4) | min(match_length - LZ4_MIN_MATCH, 15)
     out.append(token)
 
-    # リテラル長が 15 以上なら追加バイトが続く
+    # リテラル長が15以上なら追加バイトが続く
     if len(literals) >= 15:
         lz4_write_length(out, len(literals) - 15)
 
@@ -641,13 +640,13 @@ def lz4_emit(out, literals, offset, match_length):
 
     out += struct.pack("<H", offset)
 
-    # マッチ長が 19 以上なら追加バイトが続く
+    # マッチ長が19以上なら追加バイトが続く
     if match_length - LZ4_MIN_MATCH >= 15:
         lz4_write_length(out, match_length - LZ4_MIN_MATCH - 15)
 
 
 def lz4_compress_block(data):
-    """LZ4 ブロック形式へ符号化する。
+    """LZ4ブロック形式へ符号化する。
 
     圧縮率は求めない。展開側の検証に必要な形（リテラル・マッチ・
     重なりのあるマッチ・長さの追加バイト）が出れば十分。
@@ -658,13 +657,13 @@ def lz4_compress_block(data):
     position = 0
     limit = len(data) - LZ4_MATCH_LIMIT
 
-    # 4 バイト一致する直前の位置を探しながら進む
+    # 4バイト一致する直前の位置を探しながら進む
     while position < limit:
         key = bytes(data[position:position + LZ4_MIN_MATCH])
         candidate = table.get(key)
         table[key] = position
 
-        # 参照できる範囲に候補が無ければ 1 バイト進む
+        # 参照できる範囲に候補が無ければ1バイト進む
         if candidate is None or position - candidate > 65535:
             position += 1
             continue
@@ -686,7 +685,7 @@ def lz4_compress_block(data):
 
 
 def lz4_block(payload, compressed=True):
-    """LZ4Block 形式のブロックを 1 つ作る。"""
+    """LZ4Block形式のブロックを1つ作る。"""
     if compressed:
         body = lz4_compress_block(payload)
         token = 0x26
@@ -694,7 +693,7 @@ def lz4_block(payload, compressed=True):
         body = payload
         token = 0x16
 
-    # チェックサムは検証対象外なので 0 を入れる
+    # チェックサムは検証対象外なので0を入れる
     header = (b"LZ4Block" + bytes([token])
               + struct.pack("<i", len(body))
               + struct.pack("<i", len(payload))
@@ -703,8 +702,8 @@ def lz4_block(payload, compressed=True):
 
 
 def lz4_chunk(payload, split=None, compressed=True):
-    """チャンクのペイロードを LZ4Block の連結へ包む。"""
-    # split を指定すると、その位置で 2 ブロックに分ける
+    """チャンクのペイロードをLZ4Blockの連結へ包む。"""
+    # splitを指定すると、その位置で2ブロックに分ける
     if split is None:
         return lz4_block(payload, compressed)
 
@@ -712,7 +711,7 @@ def lz4_chunk(payload, split=None, compressed=True):
 
 
 def sample_chunk(x, z, extra=None):
-    """チャンクらしい形の NBT を作る。実データの構造を最小限まねる。"""
+    """チャンクらしい形のNBTを作る。実データの構造を最小限まねる。"""
     entries = [
         ("DataVersion", t_int(4903)),
         ("xPos", t_int(x)),
@@ -738,41 +737,41 @@ def sample_chunk(x, z, extra=None):
 
 
 def build_concat():
-    """連なった NBT のテストベクタを組み立てる。"""
+    """連なったNBTのテストベクタを組み立てる。"""
     hello = to_java_file("hello world", hello_world_tag())
 
-    # 同じ NBT が 3 つ並んでいるだけのもの
+    # 同じNBTが3つ並んでいるだけのもの
     add_concat_vector(
         "concat/three_tags", "concat/three_tags.nbt", hello * 3,
         "同じ NBT が 3 つ連なっている")
 
-    # 大きさの違う NBT が混ざっているもの
+    # 大きさの違うNBTが混ざっているもの
     mixed = hello + to_java_file("all", all_tags_tag()) + hello
     add_concat_vector(
         "concat/mixed", "concat/mixed.nbt", mixed,
         "大きさの違う NBT が 3 つ連なっている")
 
-    # 1 つだけでも同じ入口で読める
+    # 1つだけでも同じ方法で読める
     add_concat_vector(
         "concat/single", "concat/single.nbt", hello,
         "NBT が 1 つだけ")
 
 
 def build_anvil():
-    """Anvil のテストベクタを組み立てる。"""
+    """Anvilのテストベクタを組み立てる。"""
     # 空のリージョン（ヘッダだけ）
     add_vector(
         "anvil/empty", "anvil/empty/r.0.0.mca", RegionBuilder().build(),
         "全エントリ 0 のリージョン。ヘッダ 2 セクタのみ")
 
-    # チャンク 1 つ
+    # チャンク1つ
     builder = RegionBuilder()
     builder.add_chunk(0, 0, zlib.compress(sample_chunk(0, 0), 6))
     add_vector(
         "anvil/single_chunk", "anvil/single_chunk/r.0.0.mca", builder.build(),
         "チャンクが 1 つだけ")
 
-    # 隙間のある配置。読み書きしても他のチャンクを壊さないこと
+    # 隙間のある配置。読み書きしても他のチャンクがおかしくならないこと
     builder = RegionBuilder()
     builder.add_chunk(0, 0, zlib.compress(sample_chunk(0, 0), 6), at_sector=2)
     builder.add_chunk(5, 3, zlib.compress(sample_chunk(5, 3), 6), at_sector=6)
@@ -781,7 +780,7 @@ def build_anvil():
         "anvil/fragmented", "anvil/fragmented/r.0.0.mca", builder.build(),
         "セクタ 3〜5 と 7〜8 が空いた断片化した配置")
 
-    # 圧縮方式 1 / 2 / 3 の混在
+    # 圧縮方式1 / 2 / 3の混在
     builder = RegionBuilder()
     builder.add_chunk(0, 0, gzip.compress(sample_chunk(0, 0), mtime=0), compression=1)
     builder.add_chunk(1, 0, zlib.compress(sample_chunk(1, 0), 6), compression=2)
@@ -790,24 +789,24 @@ def build_anvil():
         "anvil/mixed_compression", "anvil/mixed_compression/r.0.0.mca", builder.build(),
         "圧縮方式ID 1 (GZip) / 2 (Zlib) / 3 (無圧縮) が混在")
 
-    # 圧縮方式 4 (LZ4)
+    # 圧縮方式4 (LZ4)
     #
-    # 1 ブロック / 2 ブロック連結 / 無圧縮ブロックの 3 通りを並べる。
-    # 繰り返しの多い NBT なので、重なりのあるマッチも含まれる
+    # 1ブロック / 2ブロック連結 / 無圧縮ブロックの3通りを並べる。
+    # 繰り返しの多いNBTなので、重なりのあるマッチも含まれる
     builder = RegionBuilder()
     builder.add_chunk(0, 0, lz4_chunk(sample_chunk(0, 0)), compression=4)
     builder.add_chunk(1, 0, lz4_chunk(sample_chunk(1, 0), split=40), compression=4)
     builder.add_chunk(2, 0, lz4_chunk(sample_chunk(2, 0), compressed=False), compression=4)
 
     # 同じバイトが延々と続くチャンク
-    # 重なりのあるマッチ（オフセット 1）と、長さの追加バイトを必ず含ませる
+    # 重なりのあるマッチ（オフセット1）と、長さの追加バイトを必ず含ませる
     repetitive = sample_chunk(3, 0, extra=("filler", t_string("A" * 4000)))
     builder.add_chunk(3, 0, lz4_chunk(repetitive), compression=4)
     add_vector(
         "anvil/lz4", "anvil/lz4/r.0.0.mca", builder.build(),
         "圧縮方式ID 4 (LZ4)。1 ブロック / 2 ブロック連結 / 無圧縮ブロック / 重なりのあるマッチ")
 
-    # 異常系: LZ4Block のマジックが違う
+    # 異常系: LZ4Blockのマジックが違う
     builder = RegionBuilder()
     broken = bytearray(lz4_chunk(sample_chunk(0, 0)))
     broken[0] = ord("X")
@@ -825,7 +824,7 @@ def build_anvil():
         "anvil/external_mcc", "anvil/external_mcc/r.0.0.mca", builder.build(),
         "チャンクが c.0.0.mcc へ退避されている（圧縮方式IDに 0x80 が立つ）")
 
-    # .mcc 本体も同じディレクトリへ置く
+    # .mcc本体も同じディレクトリへ置く
     mcc_path = os.path.join(TESTDATA, "anvil", "external_mcc", "c.0.0.mcc")
     with open(mcc_path, "wb") as handle:
         handle.write(external_payload)
@@ -839,7 +838,7 @@ def build_anvil():
         "オフセットがヘッダ領域 (セクタ 1) を指している",
         expect_error="MALFORMED_DATA")
 
-    # 異常系: 2 チャンクが同じセクタを指す
+    # 異常系: 2チャンクが同じセクタを指す
     builder = RegionBuilder()
     builder.add_chunk(0, 0, zlib.compress(sample_chunk(0, 0), 6), at_sector=2)
     builder.set_location(1, 0, 2, 1)
@@ -872,10 +871,10 @@ def build_anvil():
 
 
 def ceil_log2(count):
-    """count 個の値を表すのに必要な最小ビット数。count == 1 なら 0。"""
+    """count個の値を表すのに必要な最小ビット数。count == 1なら0。"""
     bits = 0
 
-    # 1 を超える分だけシフトして数える
+    # 1を超える分だけシフトして数える
     while (1 << bits) < count:
         bits += 1
 
@@ -883,7 +882,7 @@ def ceil_log2(count):
 
 
 def pack_indices(indices, bits):
-    """添字の並びを、跨ぎなしで 64bit 整数の配列へ詰める。
+    """添字の並びを、跨ぎなしで64bit整数の配列へ詰める。
 
     ライブラリの実装を検証する側なので、ここでも仕様書の記述だけを根拠に組む。
     """
@@ -891,13 +890,13 @@ def pack_indices(indices, bits):
     long_count = (len(indices) + values_per_long - 1) // values_per_long
     longs = [0] * long_count
 
-    # 1 つの i64 に入りきらない分は捨てて、次の i64 の最下位ビットから始める
+    # 1つのi64に入りきらない分は捨てて、次のi64の最下位ビットから始める
     for position, value in enumerate(indices):
         long_index = position // values_per_long
         bit_offset = (position % values_per_long) * bits
         longs[long_index] |= (value & ((1 << bits) - 1)) << bit_offset
 
-    # 符号付き 64bit として書き出す
+    # 符号付き64bitとして書き出す
     return [value - (1 << 64) if value >= (1 << 63) else value for value in longs]
 
 
@@ -914,10 +913,9 @@ def block_palette_entry(name, properties=None):
 
 
 def paletted_container(palette_entries, indices, min_bits):
-    """パレット付きコンテナを組み立てる。パレットが 1 要素なら data を書かない。
+    """パレット付きコンテナを組み立てる。パレットが1要素ならdataを書かない。
 
-    キーは実データと同じく `data` -> `palette` の順に置く
-    （docs/spec/31-paletted-container.md 4.1章）。
+    キーは実データと同じく`data` -> `palette`の順に置く。
     """
     entries = []
 
@@ -930,7 +928,7 @@ def paletted_container(palette_entries, indices, min_bits):
 
 
 def make_section(y, block_palette, block_indices, biome_palette, biome_indices):
-    """セクションを 1 つ組み立てる。"""
+    """セクションを1つ組み立てる。"""
     return t_compound([
         ("Y", t_byte(y)),
         ("block_states", paletted_container(block_palette, block_indices, 4)),
@@ -939,7 +937,7 @@ def make_section(y, block_palette, block_indices, biome_palette, biome_indices):
 
 
 def block_entity(entity_id, x, y, z):
-    """ブロックエンティティ 1 件。座標は絶対座標で持つ（実データと同じ）。"""
+    """ブロックエンティティ1件。座標は絶対座標で持つ（実データと同じ）。"""
     return t_compound([
         ("id", t_string(entity_id)),
         ("x", t_int(x)),
@@ -949,7 +947,7 @@ def block_entity(entity_id, x, y, z):
 
 
 def block_tick(block_id, x, y, z):
-    """ブロックのティック予約 1 件。実データのキー名をなぞる。"""
+    """ブロックのティック予約1件。実データのキー名をなぞる。"""
     return t_compound([
         ("i", t_string(block_id)),
         ("p", t_int(0)),
@@ -962,7 +960,7 @@ def block_tick(block_id, x, y, z):
 
 def make_chunk(x, z, sections, status="minecraft:full",
                block_entities=None, block_ticks=None, fluid_ticks=None):
-    """チャンクの NBT を組み立てる。実データの構造をなぞる。"""
+    """チャンクのNBTを組み立てる。実データの構造をなぞる。"""
     entries = [
         ("DataVersion", t_int(4903)),
         ("xPos", t_int(x)),
@@ -977,7 +975,8 @@ def make_chunk(x, z, sections, status="minecraft:full",
         ])),
     ]
 
-    # 付随データは、空なら要素型 End の空リストになる（実データと同じ）
+    # block_entitiesは、空なら要素型Endの空リストになる（実データと同じ）
+    # block_ticksとfluid_ticksは、空ならキーごと書かない
     for key, values in (("block_entities", block_entities),
                         ("block_ticks", block_ticks),
                         ("fluid_ticks", fluid_ticks)):
@@ -997,14 +996,14 @@ PLAINS = t_string("minecraft:plains")
 
 
 def build_world():
-    """World / Block のテストベクタを組み立てる。"""
-    # パレット 1 要素。data を持たない
+    """World / Blockのテストベクタを組み立てる。"""
+    # パレット1要素。dataを持たない
     add_vector(
         "world/palette_1", "world/palette_1.nbt",
         make_chunk(0, 0, [make_section(-4, [AIR], [0] * 4096, [PLAINS], [0] * 64)]),
         "パレット 1 要素のセクション（data 無し）")
 
-    # パレット 5 要素 -> bits=4、端数なし（256 long）
+    # パレット5要素 -> bits=4、端数なし（256 long）
     palette5 = [
         AIR, STONE,
         block_palette_entry("minecraft:dirt"),
@@ -1017,7 +1016,7 @@ def build_world():
         make_chunk(0, 0, [make_section(-4, palette5, indices5, [PLAINS], [0] * 64)]),
         "パレット 5 要素 -> bits=4、data は 256 long（端数なし）")
 
-    # パレット 17 要素 -> bits=5、最後の long に端数（342 long）
+    # パレット17要素 -> bits=5、最後のlongに端数（342 long）
     palette17 = [AIR, STONE] + [
         block_palette_entry("minecraft:stone", [("variant", "v%d" % index)])
         for index in range(15)
@@ -1028,7 +1027,7 @@ def build_world():
         make_chunk(0, 0, [make_section(-4, palette17, indices17, [PLAINS], [0] * 64)]),
         "パレット 17 要素 -> bits=5、data は 342 long（最後に端数）")
 
-    # 複数セクション + バイオーム 2 種（bits=1）
+    # 複数セクション + バイオーム2種（bits=1）
     biome_palette = [PLAINS, t_string("minecraft:desert")]
     biome_indices = [(position // 8) % 2 for position in range(64)]
     add_vector(
@@ -1040,7 +1039,7 @@ def build_world():
         ]),
         "セクション 3 個。バイオームも 2 種（bits=1）")
 
-    # 未使用パレット要素を含む。compact() で減るはず
+    # 未使用パレット要素を含む。compact()で減るはず
     palette_unused = [AIR, STONE,
                       block_palette_entry("minecraft:dirt"),
                       block_palette_entry("minecraft:sand")]
@@ -1053,14 +1052,14 @@ def build_world():
 
     # ブロックに紐づく付随データを持つチャンク。
     # ブロックを置き換えたとき、同じ座標の要素が取り除かれるかを見る。
-    # チャンク (0,0) なので、絶対座標は x,z がそのまま。y は min_section_y*16 = -64 から
+    # チャンク (0,0) なので、絶対座標はx,zがそのまま。yはmin_section_y*16 = -64から
     add_vector(
         "world/block_entities", "world/block_entities.nbt",
         make_chunk(
             0, 0,
             [make_section(-4, palette5, indices5, [PLAINS], [0] * 64)],
             block_entities=[
-                # chunk_edit が置き換える座標にあるもの（消えるはず）
+                # chunk_editが置き換える座標にあるもの（消えるはず）
                 block_entity("minecraft:chest", 0, -64, 0),
                 block_entity("minecraft:furnace", 1, -64, 1),
                 # 触らない座標にあるもの（残るはず）
@@ -1104,7 +1103,7 @@ def build_world():
         "添字がパレットの範囲外を指している",
         expect_error="MALFORMED_DATA")
 
-    # 異常系: data の長さがビット幅と合わない
+    # 異常系: dataの長さがビット幅と合わない
     wrong_length = t_compound([
         ("data", t_long_array([0] * 100)),
         ("palette", t_list(TAG_COMPOUND, [AIR, STONE, block_palette_entry("minecraft:dirt")])),
@@ -1127,7 +1126,7 @@ def build_world():
         expect_error="MALFORMED_DATA")
 
 def write_manifest():
-    """ベクタ一覧を manifest.json へ書き出す。"""
+    """ベクタ一覧をmanifest.jsonへ書き出す。"""
     manifest = {
         "comment": "spec/tools/build_testdata.py が生成する。手で編集しないこと",
         "vectors": VECTORS,
@@ -1141,8 +1140,8 @@ def write_manifest():
 def write_handwritten_expectations():
     """手書きの期待値。生成器そのものを検証するための起点になる。
 
-    ここだけは 90-conformance.md と 00-conventions.md の記述を見ながら手で書く。
-    他の期待値は検証済みの実装から生成するため、この 1 件が信頼の基点になる。
+    ここだけは90-conformance.mdと00-conventions.mdの記述を見ながら手で書く。
+    他の期待値は検証済みの実装から生成するため、この1件が信頼の基点になる。
     """
     expected = (
         '{"format":"java","root_name":"hello world","root":'

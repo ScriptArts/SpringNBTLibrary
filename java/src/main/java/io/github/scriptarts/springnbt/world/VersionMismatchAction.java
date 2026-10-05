@@ -1,6 +1,6 @@
 package io.github.scriptarts.springnbt.world;
 
-/** DataVersion が対象と違ったときの動作 */
+/** DataVersionが扱える形式より古いときの動作 */
 public enum VersionMismatchAction {
 
     /**
@@ -9,7 +9,7 @@ public enum VersionMismatchAction {
      */
     WARN,
 
-    /** {@link io.github.scriptarts.springnbt.ErrorCode#UNSUPPORTED_DATA_VERSION} の例外にする */
+    /** {@link io.github.scriptarts.springnbt.ErrorCode#UNSUPPORTED_DATA_VERSION}の例外にする */
     ERROR,
 
     /** 何もしない */

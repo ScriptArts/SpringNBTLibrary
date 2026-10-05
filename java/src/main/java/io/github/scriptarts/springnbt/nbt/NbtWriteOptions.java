@@ -1,9 +1,7 @@
 package io.github.scriptarts.springnbt.nbt;
 
 /**
- * NBT 書き込みのオプション
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 6章
+ * NBT書き込みのオプション
  */
 public final class NbtWriteOptions {
 
@@ -50,7 +48,7 @@ public final class NbtWriteOptions {
 
     /**
      * 圧縮方式
-     * 既定は {@link Compression#GZIP}
+     * 既定は{@link Compression#GZIP}
      *
      * @return 圧縮方式
      */

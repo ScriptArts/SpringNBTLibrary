@@ -2,10 +2,8 @@
  * 適合性検証ツール
  * 全言語が同じインターフェースで同じ出力を出す
  *
- * `spec/run-conformance.sh` がこのツールを言語ぶん起動し、
- * 出力を相互に diff することで「全言語が同一に振る舞う」ことを機械的に確かめる
- *
- * 仕様: `docs/spec/90-conformance.md` 2.3章
+ * `spec/run-conformance.sh`がこのツールを全言語ぶん起動し、
+ * 出力を相互にdiffすることで「全言語が同一に振る舞う」ことを機械的に確かめる
  */
 
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -39,7 +37,7 @@ import {
 } from "./nbt/index.js";
 import { NbtCompound as NbtCompoundClass } from "./nbt/index.js";
 
-/** 連なった NBT を、位置を追いながら一覧として書き出す。 */
+/** 連なったNBTを、位置を追いながら一覧として書き出す */
 function nbtList(raw: Buffer, format: NbtFormat): string {
   const bytes = new Uint8Array(raw);
   const options = { format, compression: Compression.None };
@@ -76,11 +74,10 @@ const USAGE = `使い方:
 // ---------------------------------------------------------------------------
 // 正規化JSON
 //
-// 浮動小数点をビットパターンで、64bit 整数を10進文字列で表すのが要
-// 10進表記の丸めや JSON 数値の精度は処理系ごとに差が出るため、
+// 浮動小数点をビットパターンで、64bit整数を10進文字列で表すのが要
+// 10進表記の丸めやJSON数値の精度は処理系ごとに差が出るため、
 // そのまま出すと言語間で出力が一致しない
 //
-// 仕様: docs/spec/00-conventions.md 6章
 // ---------------------------------------------------------------------------
 
 const JSON_ESCAPES = new Map<number, string>([
@@ -94,16 +91,16 @@ const JSON_ESCAPES = new Map<number, string>([
 ]);
 
 /**
- * JSON 文字列を書き出す
- * 非 ASCII は必ず `\uXXXX` へ逃がす
+ * JSON文字列を書き出す
+ * 非ASCIIは必ず`\uXXXX`へエスケープする
  *
- * エスケープの単位は UTF-16 コード単位
+ * エスケープの単位はUTF-16コード単位
  * 言語ごとに既定のエスケープ方針が違うため、ここで一律に固定しないと出力が一致しない
  */
 function jsonString(text: string): string {
   let result = '"';
 
-  // コード単位ごとに、JSON として安全な形へ直す
+  // コード単位ごとに、JSONとして安全な形へ直す
   for (let index = 0; index < text.length; index++) {
     const unit = text.charCodeAt(index);
     const escaped = JSON_ESCAPES.get(unit);
@@ -113,7 +110,7 @@ function jsonString(text: string): string {
       continue;
     }
 
-    // ASCII の印字可能文字だけ生で出し、それ以外は \uXXXX にする
+    // ASCIIの印字可能文字だけ生で出し、それ以外は\uXXXXにする
     if (unit >= 0x20 && unit <= 0x7e) {
       result += text[index];
     } else {
@@ -139,7 +136,7 @@ function doubleBitsHex(value: number): string {
 function toHex(bytes: Uint8Array): string {
   let result = "";
 
-  // 1 バイトずつ 16 進 2 桁へ直す
+  // 1バイトずつ16進2桁へ直す
   for (const value of bytes) {
     result += value.toString(16).padStart(2, "0");
   }
@@ -150,7 +147,7 @@ function toHex(bytes: Uint8Array): string {
 function jsonTag(tag: NbtTag): string {
   let result = `{"type":${jsonString(tagTypeAsString(tag.type))}`;
 
-  // list だけは value の前に element_type が入る（仕様が定めるキー順）
+  // listだけはvalueの前にelement_typeが入る（仕様が定めるキー順）
   if (tag.type === TagType.List) {
     result += `,"element_type":${jsonString(tagTypeAsString((tag as NbtList).elementType))}`;
   }
@@ -164,7 +161,7 @@ function jsonTag(tag: NbtTag): string {
       result += `${tag.value}`;
       break;
     case TagType.Long:
-      // 64bit 整数は JSON 数値だと処理系によって精度が落ちるため10進文字列で表す
+      // 64bit整数はJSON数値だと処理系によって精度が落ちるため10進文字列で表す
       result += jsonString(`${tag.value}`);
       break;
     case TagType.Float:
@@ -176,8 +173,8 @@ function jsonTag(tag: NbtTag): string {
     case TagType.String:
       result += jsonString(tag.value);
 
-      // MUTF-8 のバイト列も併記する
-      // 孤立サロゲートなど UTF-8 に写せない値を厳密に比較するため
+      // MUTF-8のバイト列も併記する
+      // 孤立サロゲートなどUTF-8に写せない値を厳密に比較するため
       result += `,"mutf8":${jsonString(toHex(mutf8.encode(tag.value)))}`;
       break;
     case TagType.ByteArray:
@@ -185,7 +182,7 @@ function jsonTag(tag: NbtTag): string {
       result += `[${Array.from(tag.value).join(",")}]`;
       break;
     case TagType.LongArray: {
-      // 64bit 整数は10進文字列の配列で表す
+      // 64bit整数は10進文字列の配列で表す
       const items: string[] = [];
 
       // 配列の各要素を文字列として並べる
@@ -208,10 +205,10 @@ function jsonTag(tag: NbtTag): string {
       break;
     }
     case TagType.Compound: {
-      // JSON オブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
+      // JSONオブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
       const items: string[] = [];
 
-      // compound はキーと値の組の配列として写す
+      // compoundはキーと値の組の配列として写す
       // 挿入順を保つため
       for (const [key, value] of (tag as NbtCompound).entries()) {
         items.push(`[${jsonString(key)},${jsonTag(value)}]`);
@@ -228,7 +225,7 @@ function jsonTag(tag: NbtTag): string {
 }
 
 /**
- * ルートを含む全体を JSON 文字列へ変換する
+ * ルートを含む全体をJSON文字列へ変換する
  * 末尾に改行を1つ付ける
  */
 function normalizedJson(named: NamedTag, format: NbtFormat): string {
@@ -243,14 +240,13 @@ function normalizedJson(named: NamedTag, format: NbtFormat): string {
 // ---------------------------------------------------------------------------
 // リージョンファイル
 //
-// 仕様: docs/spec/90-conformance.md 2.3章
 // ---------------------------------------------------------------------------
 
 /**
- * 存在するチャンクを 1 行 1 チャンクで書き出す
+ * 存在するチャンクを1行1チャンクで書き出す
  * 並びはロケーションテーブルの添字順
  *
- * 各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 キー数」
+ * 各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 ルート直下キー数」
  */
 function regionList(region: RegionFile): string {
   const lines: string[] = [`region ${region.regionX} ${region.regionZ}`];
@@ -289,7 +285,7 @@ function regionList(region: RegionFile): string {
 /**
  * 全チャンクを読み直し、無圧縮で新しいリージョンへ詰め直して書き出す
  *
- * 無圧縮にするのは、zlib の出力が処理系ごとに違い、
+ * 無圧縮にするのは、zlibの出力が処理系ごとに違い、
  * 圧縮したままでは言語間でバイトが一致しないため
  */
 function regionRewrite(source: RegionFile, outputPath: string): void {
@@ -318,16 +314,15 @@ function regionRewrite(source: RegionFile, outputPath: string): void {
 
 
 // ---------------------------------------------------------------------------
-// チャンク（World レイヤ）
+// チャンク（Worldレイヤ）
 //
-// 仕様: docs/spec/90-conformance.md 2.3章
 // ---------------------------------------------------------------------------
 
 /**
  * チャンクの全ブロック・全バイオームを走査して集計する
  *
  * パレットとビットストレージを端から端まで通すので、
- * ビット詰めの実装が 1 か所でもずれれば集計値が変わる
+ * ビット詰めの実装が1か所でもずれれば集計値が変わる
  */
 function chunkDescribe(chunk: Chunk): string {
   const lines: string[] = [
@@ -358,7 +353,7 @@ function chunkDescribe(chunk: Chunk): string {
       `section ${sectionY} ${blockPalette} ${blockBits} ${biomePalette} ${biomeBits}`,
     );
 
-    // 全ブロックを 1 つずつ読んで、状態の文字列表現ごとに数える
+    // 全ブロックを1つずつ読んで、状態の文字列表現ごとに数える
     for (let y = 0; y < 16; y++) {
       for (let z = 0; z < 16; z++) {
         for (let x = 0; x < 16; x++) {
@@ -374,7 +369,7 @@ function chunkDescribe(chunk: Chunk): string {
       }
     }
 
-    // バイオームは 4×4×4 単位なので、4 ブロックおきに見る
+    // バイオームは4×4×4単位なので、4ブロックおきに見る
     for (let y = 0; y < 16; y += 4) {
       for (let z = 0; z < 16; z += 4) {
         for (let x = 0; x < 16; x += 4) {
@@ -418,7 +413,8 @@ function chunkEdit(chunk: Chunk): void {
     chunk.setBlock(index % 16, baseY + Math.floor(index / 16), index % 16, state);
   }
 
-  // プロパティ付きのブロックを、名前は同じで状態違いで置く
+  // プロパティ付きのブロックを置く
+  // 1つ目と2つ目はプロパティの並び順だけが違う同じ状態、3つ目は名前空間を省いて書いた別の状態
   chunk.setBlock(1, baseY + 2, 1, BlockState.parse("minecraft:oak_stairs[facing=north,half=top]"));
   chunk.setBlock(2, baseY + 2, 2, BlockState.parse("minecraft:oak_stairs[half=top,facing=north]"));
   chunk.setBlock(3, baseY + 2, 3, BlockState.parse("oak_stairs[facing=south]"));
@@ -430,14 +426,14 @@ function chunkEdit(chunk: Chunk): void {
   // 使われなくなったパレット要素を掃除する
   chunk.compact();
 
-  // 高さマップと光源は再計算しないので、無効化して Minecraft に任せる
+  // 高さマップと光源は再計算しないので、無効化してMinecraftに任せる
   chunk.clearHeightmaps();
   chunk.invalidateLighting();
 }
 
 /**
  * 集計表から現在の件数を取り出す
- * まだ無ければ 0
+ * まだ無ければ0
  */
 function countOf(counts: Map<string, number>, key: string): number {
   const current = counts.get(key);
@@ -449,9 +445,9 @@ function countOf(counts: Map<string, number>, key: string): number {
   return current;
 }
 
-/** チャンク NBT のファイルを読む */
+/** チャンクNBTのファイルを読む */
 function readChunkFile(path: string): Chunk {
-  // 検証では DataVersion の違いを警告にせず、そのまま読む
+  // 検証では、DataVersionが扱える形式より古くても警告にせずそのまま読む
   return Chunk.fromNbt(readFile(path).tag, {
     onVersionMismatch: VersionMismatchAction.Ignore,
   });
@@ -461,9 +457,9 @@ function readChunkFile(path: string): Chunk {
 // コマンド
 // ---------------------------------------------------------------------------
 
-/** `--format network` が指定されていればネットワーク形式として読む */
+/** `--format network`が指定されていればネットワーク形式として読む */
 function parseFormat(args: string[]): NbtFormat {
-  // 3 番目以降の引数からオプションを探す
+  // 3番目以降の引数からオプションを探す
   for (let index = 3; index < args.length - 1; index++) {
     if (args[index] === "--format" && args[index + 1] === "network") {
       return NbtFormat.Network;
@@ -474,15 +470,15 @@ function parseFormat(args: string[]): NbtFormat {
 }
 
 /**
- * 改行を変換せず、BOM も付けずに UTF-8 で書く
+ * 改行を変換せず、BOMも付けずにUTF-8で書く
  *
- * 孤立サロゲートを含みうるが、標準の UTF-8 エンコーダは置換文字にしてしまうため、
+ * 孤立サロゲートを含みうるが、標準のUTF-8エンコーダは置換文字にしてしまうため、
  * 自前で符号化する（WTF-8）
  */
 function writeTextFile(path: string, content: string): void {
   const bytes: number[] = [];
 
-  // コード単位を順に見て、正しいサロゲートペアだけ 1 文字として符号化する
+  // コード単位を順に見て、正しいサロゲートペアだけ1文字として符号化する
   for (let index = 0; index < content.length; index++) {
     const unit = content.charCodeAt(index);
 
@@ -506,7 +502,7 @@ function writeTextFile(path: string, content: string): void {
       bytes.push(0xc0 | (unit >> 6));
       bytes.push(0x80 | (unit & 0x3f));
     } else {
-      // 孤立サロゲートもこの経路で 3 バイト形式のまま書く
+      // 孤立サロゲートもこの経路で3バイト形式のまま書く
       bytes.push(0xe0 | (unit >> 12));
       bytes.push(0x80 | ((unit >> 6) & 0x3f));
       bytes.push(0x80 | (unit & 0x3f));
@@ -596,7 +592,7 @@ function main(argv: string[]): number {
     }
   } catch (error) {
     if (error instanceof SpringNbtError) {
-      // 言語間で同じ ErrorCode を出すことが検証対象なので、コードを機械可読な形で出す
+      // 言語間で同じErrorCodeを出すことが検証対象なので、コードを機械可読な形で出す
       process.stderr.write(`ERROR ${error.code} ${error.message}\n`);
       return 1;
     }

@@ -1,22 +1,21 @@
 /**
- * SpringNBTLibrary — Minecraft Java版の NBT / Anvil ワールドデータを読み書きするライブラリ
+ * SpringNBTLibraryは、Minecraft Java版のNBT / Anvilワールドデータを読み書きするライブラリ
  *
- * 仕様は `docs/spec/` を唯一の正とする
- * 対象は 26.1 で導入されたワールド形式 (DataVersion 4786 以降)
+ * 対象は26.1で導入されたワールド形式 (DataVersion 4786以降)
  */
 
 /**
- * このライブラリが扱えるワールド形式の下限となる DataVersion (26.1)
+ * このライブラリが扱えるワールド形式の下限となるDataVersion (26.1)
  *
- * 26.1 で次元とプレイヤーデータの置き場が変わり、いまの形式になった
+ * 26.1で次元とプレイヤーデータの置き場が変わり、いまの形式になった
  * これ以降のバージョンは、形式が同じであればそのまま読み書きできる
  *
- * これより古いワールドは構成そのものが違うので、
- * 読み込み時に UNSUPPORTED_DATA_VERSION の対象になる
+ * これより古いワールドは構成そのものが違う
+ * そうしたチャンクは、読み込み時は既定で警告を出し、書き戻しは既定でUNSUPPORTED_DATA_VERSIONにする
  */
 export const MIN_SUPPORTED_DATA_VERSION = 4786;
 
-/** 動作を確かめた Minecraft Java版の DataVersion (26.2) */
+/** 動作を確かめたMinecraft Java版のDataVersion (26.2) */
 export const TARGET_DATA_VERSION = 4903;
 
 export { ErrorCode, SpringNbtError, errorCodeAsString } from "./errors.js";
@@ -28,7 +27,7 @@ export * as anvil from "./anvil/index.js";
 export * as world from "./world/index.js";
 
 // よく使う型はトップレベルからも直接取れるようにする
-// 3 つのレイヤで名前が衝突しないことは check_docs_sync が保証する
+// 3つのレイヤで名前が衝突しないことはcheck_docs_syncが保証する
 export * from "./nbt/index.js";
 export * from "./anvil/index.js";
 export * from "./world/index.js";

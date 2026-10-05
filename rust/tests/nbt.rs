@@ -1,8 +1,8 @@
-//! NBT レイヤの統合テスト。
+//! NBTレイヤの統合テスト
 //!
-//! 他言語版と同じ検証項目を持つ。
-//! 共通テストベクタによる言語間比較は `spec/run-conformance.sh` が担当し、
-//! ここでは API の振る舞いを直接確かめる。
+//! 他言語版と同じ検証項目を持つ
+//! 共通テストベクタによる言語間比較は`spec/run-conformance.sh`が担当し、
+//! ここではAPIの振る舞いを直接確かめる
 
 use spring_nbt_library::error::ErrorCode;
 use spring_nbt_library::nbt::snbt;
@@ -21,7 +21,7 @@ fn uncompressed_write() -> NbtWriteOptions {
     NbtWriteOptions::uncompressed()
 }
 
-/// 仕様書どおりに組んだ最小の NBT。
+/// 仕様書どおりに組んだ最小のNBT
 fn hello_world_bytes() -> Vec<u8> {
     let mut bytes: Vec<u8> = Vec::new();
 
@@ -43,7 +43,8 @@ fn hello_world_bytes() -> Vec<u8> {
     bytes
 }
 
-/// 全13タグ型を含む Compound を作る。
+/// TAG_Endを除く12種のタグ型をすべて含むCompoundを作る
+/// TAG_EndはCompoundの終端として書き出されるので、往復させれば13種すべてを読み書きする
 fn build_all_tags() -> NbtCompound {
     let mut root = NbtCompound::new();
     root.set("byte", NbtTag::Byte(-128));
@@ -70,11 +71,11 @@ fn build_all_tags() -> NbtCompound {
     root
 }
 
-/// 指定した深さまで Compound を入れ子にしたバイト列を作る。
+/// 指定した深さまでCompoundを入れ子にしたバイト列を作る
 fn build_nested_compound(depth: usize) -> Vec<u8> {
     let mut bytes: Vec<u8> = vec![0x0A, 0x00, 0x00];
 
-    // ルート + (depth - 1) 段の入れ子
+    // ルート + (depth - 1)段の入れ子
     for _ in 0..depth - 1 {
         bytes.extend_from_slice(&[0x0A, 0x00, 0x01, b'c']);
     }
@@ -96,16 +97,16 @@ fn mutf8_roundtrips_and_rejects_invalid_input() {
     // ASCII
     assert_eq!(mutf8::encode("Bananrama"), b"Bananrama");
 
-    // U+0000 は C0 80 の 2 バイトになる
+    // U+0000はC0 80の2バイトになる
     assert_eq!(mutf8::encode("a\u{0000}b"), vec![0x61, 0xC0, 0x80, 0x62]);
 
-    // 補助文字は CESU-8 になる
+    // 補助文字はCESU-8になる
     assert_eq!(
         mutf8::encode("\u{1F600}"),
         vec![0xED, 0xA0, 0xBD, 0xED, 0xB8, 0x80]
     );
 
-    // 素の 0x00 / 冗長符号化 / 4バイト形式 / 途中で切れた入力 のすべてを拒否する
+    // 素の0x00、冗長符号化、4バイト形式、途中で切れた入力のすべてを拒否する
     let invalid: Vec<Vec<u8>> = vec![
         vec![0x00],
         vec![0xC1, 0x81],
@@ -121,13 +122,13 @@ fn mutf8_roundtrips_and_rejects_invalid_input() {
 
 #[test]
 fn lone_surrogate_is_kept_in_a_separate_representation() {
-    // Rust の String は UTF-8 に限られるため、専用の表現へ退避する
+    // RustのStringはUTF-8に限られるため、専用の表現へ退避する
     let value = NbtString::from_utf16(vec![0xD83D]);
     assert!(matches!(value, NbtString::Surrogates(_)));
     assert_eq!(value.as_str(), None);
     assert_eq!(value.to_mutf8(), vec![0xED, 0xA0, 0xBD]);
 
-    // 通常の文字列は Text になる
+    // 通常の文字列はTextになる
     let text = NbtString::from_utf16("あ".encode_utf16().collect());
     assert_eq!(text.as_str(), Some("あ"));
 }
@@ -143,6 +144,17 @@ fn reads_hand_built_hello_world() {
     assert_eq!(named.name, "hello world");
     assert_eq!(named.tag.len(), 1);
     assert_eq!(named.tag.get_string("name").unwrap(), "Bananrama");
+}
+
+#[test]
+fn nan_bit_patterns_are_written_back_unchanged() {
+    // ペイロード付き・負・シグナリングのNaNを、Float / Doubleの両方で持つCompound
+    let original: Vec<u8> = vec![
+        0x0a, 0x00, 0x00, 0x05, 0x00, 0x01, 0x61, 0x7f, 0xc0, 0x00, 0x01, 0x05, 0x00, 0x01, 0x62, 0xff, 0xc0, 0x00, 0x00, 0x05, 0x00, 0x01, 0x63, 0x7f, 0x80, 0x00, 0x01, 0x06, 0x00, 0x01, 0x64, 0x7f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x06, 0x00, 0x01, 0x65, 0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x66, 0x7f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+    ];
+    let named = read_bytes(&original, &uncompressed_read()).unwrap();
+
+    assert_eq!(write_bytes(&named, &uncompressed_write()).unwrap(), original);
 }
 
 #[test]
@@ -175,7 +187,7 @@ fn float_specials_keep_their_bit_pattern() {
     let encoded = write_bytes(&NamedTag::new("", root), &uncompressed_write()).unwrap();
     let decoded = read_bytes(&encoded, &uncompressed_read()).unwrap().tag;
 
-    // -0.0 と +0.0 は == では区別できないので、ビットパターンで比較する
+    // -0.0と+0.0は == では区別できないので、ビットパターンで比較する
     assert_eq!(
         decoded.get_double("negative_zero").unwrap().to_bits(),
         (-0.0f64).to_bits()
@@ -240,6 +252,18 @@ fn list_rejects_mixed_types() {
 }
 
 #[test]
+fn list_rejects_out_of_range_position_without_fixing_element_type() {
+    let mut list = NbtList::new();
+
+    let error = list.insert(1, NbtTag::Int(1)).unwrap_err();
+    assert_eq!(error.code(), ErrorCode::InvalidArgument);
+    assert!(list.get(0).is_none());
+
+    // 失敗した操作で要素型が確定していない
+    assert_eq!(list.element_type(), TagType::End);
+}
+
+#[test]
 fn list_keeps_element_type_after_clear() {
     let mut list = NbtList::new();
     list.push(NbtTag::Int(1)).unwrap();
@@ -255,7 +279,7 @@ fn typed_getter_distinguishes_missing_key_from_wrong_type() {
     let mut root = NbtCompound::new();
     root.set("value", NbtTag::String(NbtString::new("text")));
 
-    // キーが無い場合は None
+    // キーが無い場合はNone
     assert_eq!(root.opt_int("missing").unwrap(), None);
 
     // 型が違う場合はキーの有無に関わらずエラー
@@ -270,10 +294,28 @@ fn typed_getter_distinguishes_missing_key_from_wrong_type() {
 }
 
 #[test]
+fn broken_compressed_data_is_malformed_data() {
+    let named = read_bytes(&hello_world_bytes(), &uncompressed_read()).unwrap();
+    let options = NbtWriteOptions { format: NbtFormat::Java, compression: Compression::Gzip };
+    let gzip = write_bytes(&named, &options).unwrap();
+    let truncated = gzip[..gzip.len() / 2].to_vec();
+    let broken_gzip: Vec<u8> = vec![
+        0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff,
+    ];
+    let broken_zlib: Vec<u8> = vec![0x78, 0x9c, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+
+    // 途中で切れたGZip、中身の壊れたGZip、中身の壊れたZlibは、どれも仕様に反するデータとして扱う
+    for data in [truncated, broken_gzip, broken_zlib] {
+        let error = read_bytes(&data, &NbtReadOptions::default()).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::MalformedData);
+    }
+}
+
+#[test]
 fn compression_is_detected_automatically() {
     let named = read_bytes(&hello_world_bytes(), &uncompressed_read()).unwrap();
 
-    // 3 種の方式それぞれで、書き出した結果を方式指定なしで読み戻せること
+    // 3種の方式それぞれで、書き出した結果を方式指定なしで読み戻せること
     for method in [Compression::Gzip, Compression::Zlib, Compression::None] {
         let options = NbtWriteOptions { format: NbtFormat::Java, compression: method };
         let encoded = write_bytes(&named, &options).unwrap();
@@ -294,7 +336,7 @@ fn network_format_has_no_root_name() {
         NbtWriteOptions { format: NbtFormat::Network, compression: Compression::None };
     let encoded = write_bytes(&NamedTag::new("ignored", root), &write_options).unwrap();
 
-    // タグID + ペイロード のみで、名前長の 2 バイトが無い
+    // タグID + ペイロードのみで、名前長の2バイトが無い
     assert_eq!(encoded[0], 0x0A);
     assert_eq!(encoded[1], 0x03);
 
@@ -328,7 +370,7 @@ fn malformed_inputs_are_rejected() {
         ErrorCode::MalformedData
     );
 
-    // 長さ 0x7FFFFFFF を宣言するだけの入力（確保前に弾く）
+    // 長さ0x7FFFFFFFを宣言するだけの入力（確保前に弾く）
     let huge = vec![0x0A, 0x00, 0x00, 0x07, 0x00, 0x01, b'a', 0x7F, 0xFF, 0xFF, 0xFF];
     assert_eq!(
         read_bytes(&huge, &uncompressed_read()).unwrap_err().code(),
@@ -354,10 +396,10 @@ fn malformed_inputs_are_rejected() {
 
 #[test]
 fn excessive_nesting_is_rejected() {
-    // 読み込みは再帰で行うため、深いネストはスタックを使う。
-    // debug ビルドはフレームが太く、テストスレッド既定の 2 MiB では 512 段に届かない。
-    // 実運用の release ビルドでは 2 MiB でも 2000 段を超えて扱えるが、
-    // ここでは測定対象を「深さ上限の判定」に絞るため十分なスタックを与える。
+    // 読み込みは再帰で行うため、深いネストはスタックを使う
+    // debugビルドはフレームが大きく、テストスレッド既定の2 MiBでは512段に届かない
+    // 実運用のreleaseビルドでは2 MiBでも2000段を超えて扱えるが、
+    // ここでは測定対象を「深さ上限の判定」に絞るため、十分なスタックを与える
     let handle = std::thread::Builder::new()
         .stack_size(32 * 1024 * 1024)
         .spawn(|| {
@@ -419,7 +461,8 @@ fn suffix_decides_type() {
 
 #[test]
 fn hex_suffix_rule_is_fixed() {
-    // 仕様 11 の 2.1: 16進では b/d/f を数字として読む。幅接尾辞は s/l のみ
+    // 16進ではb/d/fを数字として読む
+    // 幅接尾辞はs/lのみ
     assert_eq!(snbt::parse("0xFF").unwrap(), NbtTag::Int(255));
     assert_eq!(snbt::parse("0xFFb").unwrap(), NbtTag::Int(4091));
     assert_eq!(snbt::parse("0xFFl").unwrap(), NbtTag::Long(255));
@@ -428,7 +471,8 @@ fn hex_suffix_rule_is_fixed() {
 
 #[test]
 fn zero_byte_literal_is_not_binary() {
-    // 0b は「10進の 0 に Byte 接尾辞」。真偽値の false として広く使われる形
+    // 0bは「10進の0にByte接尾辞」
+    // 真偽値のfalseとして広く使われる形
     assert_eq!(snbt::parse("0b").unwrap(), NbtTag::Byte(0));
     assert_eq!(snbt::parse("0b1").unwrap(), NbtTag::Int(1));
     assert_eq!(snbt::parse("0b1001b").unwrap(), NbtTag::Byte(9));
@@ -468,7 +512,7 @@ fn typed_arrays() {
     assert_eq!(snbt::parse("[I; 1, 2]").unwrap(), NbtTag::IntArray(vec![1, 2]));
     assert_eq!(snbt::parse("[L; 1L, 2L]").unwrap(), NbtTag::LongArray(vec![1, 2]));
 
-    // 接尾辞なしでも範囲内なら受理する（Minecraft 自身がそう書き出すため）
+    // 接尾辞なしでも範囲内なら受理する（Minecraft自身がそう書き出すため）
     assert_eq!(snbt::parse("[B; 1, 2]").unwrap(), NbtTag::ByteArray(vec![1, 2]));
     assert_eq!(
         snbt::parse("[B; 200]").unwrap_err().code(),
@@ -485,7 +529,7 @@ fn trailing_commas_and_heterogeneous_lists() {
         other => panic!("リストではない: {other:?}"),
     }
 
-    // 異種リストはバイナリ NBT へ写せないため受理しない (adr/0006)
+    // 異種リストはバイナリNBTへ写せないため受理しない
     assert_eq!(
         snbt::parse("[1, \"a\"]").unwrap_err().code(),
         ErrorCode::MalformedData
@@ -521,6 +565,27 @@ fn escape_sequences() {
 }
 
 #[test]
+fn surrogate_escapes_follow_the_same_rules_everywhere() {
+    let lone = NbtTag::String(NbtString::from_utf16(vec![0xD800]));
+
+    // \Uでサロゲートの範囲を書くと、\uと同じく孤立サロゲートになる
+    assert_eq!(snbt::parse("\"\\U0000D800\"").unwrap(), lone);
+    assert_eq!(snbt::parse("\"\\uD800\"").unwrap(), lone);
+
+    // 対になったサロゲートは補助文字1文字と同じ
+    assert_eq!(
+        snbt::parse("\"\\uD83D\\uDE00\"").unwrap(),
+        NbtTag::String(NbtString::new("\u{1F600}"))
+    );
+
+    // コードポイントの範囲外と、キーの孤立サロゲートは仕様に反する
+    // Rustのキーは`String`なので、APIから孤立サロゲートのキーを設定することはそもそもできない
+    for source in ["\"\\U00110000\"", "{\"\\uD800\":1}", "{\"\\U0000D800\":1}"] {
+        assert_eq!(snbt::parse(source).unwrap_err().code(), ErrorCode::MalformedData, "{source}");
+    }
+}
+
+#[test]
 fn functions() {
     assert_eq!(snbt::parse("bool(5)").unwrap(), NbtTag::Byte(1));
     assert_eq!(snbt::parse("bool(0)").unwrap(), NbtTag::Byte(0));
@@ -537,7 +602,7 @@ fn functions() {
 
 #[test]
 fn snbt_to_nbt_to_snbt_to_nbt_is_stable() {
-    // 仕様 11 の 5章: 保証するのは「SNBT -> NBT -> SNBT -> NBT」で NBT が一致すること
+    // 保証するのは「SNBT -> NBT -> SNBT -> NBT」でNBTが一致すること
     let source = "{ name : 'Bananrama' , list : [ 1L , 2L ] , nested : { flag : true } , \
                   bytes : [B; 1b, -2b] , ratio : 0.5f }";
 
@@ -642,6 +707,13 @@ fn special_values() {
 }
 
 #[test]
+fn float_out_of_range_becomes_signed_infinity() {
+    // binary32の範囲を超える値は、符号付きの無限大になる
+    assert_eq!(snbt::parse("1e39f").unwrap(), NbtTag::Float(f32::INFINITY));
+    assert_eq!(snbt::parse("-1e39f").unwrap(), NbtTag::Float(f32::NEG_INFINITY));
+}
+
+#[test]
 fn every_formatted_value_parses_back_to_the_same_bits() {
     let doubles: Vec<f64> = vec![
         0.0,
@@ -694,9 +766,8 @@ fn every_formatted_value_parses_back_to_the_same_bits() {
 // ---------------------------------------------------------------------------
 // タグの等値比較と深い複製
 //
-// 仕様: docs/spec/10-nbt-binary.md 7.3
 // 規則は全言語で同じでなければならない
-// 各言語の同名テストと突き合わせて読むこと
+// 各言語の同名テストと見比べながら読むこと
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -714,13 +785,13 @@ fn same_type_same_value_is_equal() {
 
 #[test]
 fn different_tag_type_is_not_equal() {
-    // 値が同じでもタグの型が違えば別物
+    // 値が同じでもタグの型が違えば等しくない
     assert_ne!(NbtTag::Int(1), NbtTag::Short(1));
 }
 
 #[test]
 fn floats_compare_by_bit_pattern() {
-    // NaN 同士は等しく、+0.0 と -0.0 は等しくない
+    // NaN同士は等しく、+0.0と-0.0は等しくない
     assert_eq!(NbtTag::Float(f32::NAN), NbtTag::Float(f32::NAN));
     assert_eq!(NbtTag::Double(f64::NAN), NbtTag::Double(f64::NAN));
     assert_ne!(NbtTag::Float(0.0), NbtTag::Float(-0.0));
@@ -743,7 +814,7 @@ fn list_compares_element_type_and_order() {
     reversed.push(NbtTag::Int(1)).unwrap();
     assert_ne!(left, reversed);
 
-    // 空でも要素型が違えば別物
+    // 空でも要素型が違えば等しくない
     assert_ne!(
         NbtList::with_element_type(TagType::Int),
         NbtList::with_element_type(TagType::Byte)
@@ -761,7 +832,7 @@ fn compound_compares_insertion_order() {
     same.set("b", NbtTag::Int(2));
     assert_eq!(left, same);
 
-    // 中身は同じでも挿入順が違えば別物
+    // 中身は同じでも挿入順が違えば等しくない
     let mut reordered = NbtCompound::new();
     reordered.set("b", NbtTag::Int(2));
     reordered.set("a", NbtTag::Int(1));
@@ -787,16 +858,15 @@ fn clone_is_deep() {
 }
 
 // ---------------------------------------------------------------------------
-// 連なった NBT の読み込み
+// 連なったNBTの読み込み
 //
-// 仕様: docs/spec/10-nbt-binary.md 3.1章
 // ---------------------------------------------------------------------------
 
 #[test]
 fn reads_concatenated_nbt_one_by_one() {
     let mut joined: Vec<u8> = Vec::new();
 
-    // 同じ NBT を 3 つ続けて並べる
+    // 同じNBTを3つ続けて並べる
     for _ in 0..3 {
         joined.extend_from_slice(&hello_world_bytes());
     }
@@ -850,7 +920,6 @@ fn rejects_compression_when_reading_at_offset() {
 // ---------------------------------------------------------------------------
 // 型付き設定子
 //
-// 仕様: docs/spec/10-nbt-binary.md 7.1章
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -882,7 +951,7 @@ fn typed_setters_mirror_the_getters() {
     assert_eq!(root.get_int_array("ia").unwrap(), &[1, -1]);
     assert_eq!(root.get_long_array("la").unwrap(), &[1, -1]);
 
-    // 真偽値は TAG_Byte の 0 / 1 として入る
+    // 真偽値はTAG_Byteの0 / 1として入る
     assert_eq!(root.get("t").unwrap().tag_type(), TagType::Byte);
 }
 

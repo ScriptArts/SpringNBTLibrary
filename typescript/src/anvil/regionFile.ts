@@ -1,16 +1,14 @@
 /**
- * Anvil のリージョンファイル (`r.X.Z.mca`)
- * 32×32 チャンクを格納する
+ * Anvilのリージョンファイル (`r.X.Z.mca`)
+ * 32×32チャンクを格納する
  *
  * ファイル全体をメモリに読み込んで扱う
- * 実データのリージョンは数 MB 程度で、
- * この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
- * 開いて何も変えずに `flush()` すると、バイト単位で元と同じファイルになる
- *
- * 仕様: `docs/spec/20-anvil-region.md`
+ * 実データのリージョンは数MB程度で、この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
+ * 開いて何も変えずに`flush()`すると、バイト単位で元と同じファイルになる
+ * ただし空のファイルは、8KiBのヘッダだけのファイルになる
  */
 
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { deflateSync, gunzipSync, gzipSync, inflateSync, constants as zlibConstants } from "node:zlib";
 
@@ -40,7 +38,7 @@ const HEADER_SECTORS = 2;
 /** 1リージョンに入るチャンク数 */
 const CHUNK_COUNT = 1024;
 
-/** 1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため） */
+/** 1チャンクが確保できるセクタ数の上限（長さフィールドがu8のため） */
 const MAX_SECTORS = 255;
 
 /**
@@ -53,7 +51,7 @@ const MAX_INLINE_PAYLOAD = MAX_SECTORS * SECTOR_SIZE - 5;
 export enum RegionFileMode {
   /**
    * 読み取り専用
-   * 書き込み系の操作はエラーになる
+   * 書き込み系の操作はエラーになる（`flush`は何もしない）
    */
   ReadOnly = "read_only",
   /**
@@ -64,11 +62,11 @@ export enum RegionFileMode {
 }
 
 /**
- * Anvil のリージョンファイル (`r.X.Z.mca`)
- * 32×32 チャンクを格納する
+ * Anvilのリージョンファイル (`r.X.Z.mca`)
+ * 32×32チャンクを格納する
  *
- * ファイル全体をメモリに読み込んで扱うので、開いて何も変えずに `flush()` すると
- * バイト単位で元と同じファイルになる
+ * ファイル全体をメモリに読み込んで扱うので、開いて何も変えずに`flush()`すると、バイト単位で元と同じファイルになる
+ * ただし空のファイルは、8KiBのヘッダだけのファイルになる
  */
 export class RegionFile {
   readonly #path: string;
@@ -101,7 +99,7 @@ export class RegionFile {
   /**
    * リージョンファイルを開く
    *
-   * @param path `r.X.Z.mca` という名前のファイル
+   * @param path `r.X.Z.mca`という名前のファイル
    * 座標はファイル名から読み取る
    * @param mode 読み取り専用か読み書きか
    */
@@ -135,7 +133,7 @@ export class RegionFile {
 
   /** ヘッダを解析し、ロケーションとタイムスタンプを取り込む */
   #parseHeader(): void {
-    // 空ファイルは「チャンクが 1 つも無いリージョン」として受け入れる
+    // 空ファイルは「チャンクが1つも無いリージョン」として受け入れる
     if (this.#data.length === 0) {
       this.#data = new Uint8Array(HEADER_SECTORS * SECTOR_SIZE);
       return;
@@ -156,7 +154,7 @@ export class RegionFile {
     const totalSectors = this.#data.length / SECTOR_SIZE;
     const sectorOwner = new Map<number, number>();
 
-    // ロケーションテーブルの 1024 エントリを順に取り込む
+    // ロケーションテーブルの1024エントリを順に取り込む
     for (let index = 0; index < CHUNK_COUNT; index++) {
       const entry = this.#readUnsigned(index * 4, 4);
       const offset = Math.floor(entry / 256);
@@ -184,7 +182,7 @@ export class RegionFile {
         throw SpringNbtError.malformed(`チャンク ${index} の割り当てがファイル外へはみ出している`);
       }
 
-      // 同じセクタを 2 つのチャンクが指していたら、どちらかが壊れている
+      // 同じセクタを2つのチャンクが指していたら、どちらかがおかしくなっている
       for (let sector = offset; sector < offset + count; sector++) {
         const owner = sectorOwner.get(sector);
 
@@ -239,7 +237,7 @@ export class RegionFile {
     this.#ensureOpen();
     const result: ChunkPos[] = [];
 
-    // 添字の昇順に走査する（localZ が外、localX が内）
+    // 添字の昇順に走査する（localZが外、localXが内）
     for (let index = 0; index < CHUNK_COUNT; index++) {
       if (this.#sectorCounts[index] === 0) {
         continue;
@@ -254,8 +252,8 @@ export class RegionFile {
   }
 
   /**
-   * チャンクの最終更新時刻（Unix 秒）
-   * 存在しなければ 0
+   * チャンクの最終更新時刻（Unix秒）
+   * タイムスタンプテーブルの値をそのまま返すため、チャンクが無くても0とは限らない
    */
   timestamp(chunkX: number, chunkZ: number): number {
     this.#ensureOpen();
@@ -272,7 +270,7 @@ export class RegionFile {
 
   /**
    * チャンクを圧縮されたまま取り出す
-   * 存在しなければ undefined
+   * 存在しなければundefined
    */
   readChunkRaw(chunkX: number, chunkZ: number): RawChunk | undefined {
     this.#ensureOpen();
@@ -302,7 +300,7 @@ export class RegionFile {
     const compression = chunkCompressionFromId(schemeByte & 0x7f);
 
     if (external) {
-      // 最上位ビットが立っている場合、本体は c.X.Z.mcc にある
+      // 最上位ビットが立っている場合、本体はc.X.Z.mccにある
       return new RawChunk(compression, this.#readExternalFile(chunkX, chunkZ), true);
     }
 
@@ -310,8 +308,8 @@ export class RegionFile {
   }
 
   /**
-   * チャンクを NBT として読む
-   * 存在しなければ undefined
+   * チャンクをNBTとして読む
+   * 存在しなければundefined
    */
   readChunk(chunkX: number, chunkZ: number): NbtCompound | undefined {
     const raw = this.readChunkRaw(chunkX, chunkZ);
@@ -323,7 +321,7 @@ export class RegionFile {
     return readBytes(decompressChunk(raw), { compression: Compression.None }).tag;
   }
 
-  /** チャンクを NBT として書き込む */
+  /** チャンクをNBTとして書き込む */
   writeChunk(
     chunkX: number,
     chunkZ: number,
@@ -346,7 +344,7 @@ export class RegionFile {
     let schemeByte: number;
 
     if (useExternal) {
-      // 1MiB を超えるチャンクは外部ファイルへ退避し、リージョンには目印だけ残す
+      // 255セクタ（約1MiB）に収まらないチャンクは外部ファイルへ退避し、リージョンには目印だけ残す
       this.#writeExternalFile(chunkX, chunkZ, raw.data);
       payload = new Uint8Array(0);
       schemeByte = raw.compression | 0x80;
@@ -382,7 +380,7 @@ export class RegionFile {
 
   /**
    * チャンクを削除する
-   * 削除できたら true
+   * 削除できたらtrue
    */
   deleteChunk(chunkX: number, chunkZ: number): boolean {
     this.#ensureOpen();
@@ -405,7 +403,7 @@ export class RegionFile {
   /**
    * 必要なセクタ数を確保し、開始セクタ番号を返す
    *
-   * 既存の割り当てがちょうど同じ大きさならその場を使い、
+   * 既存の割り当てがちょうど同じ大きさなら、その場所をそのまま使う
    * そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する
    */
   #allocateSectors(index: number, needed: number): number {
@@ -442,13 +440,13 @@ export class RegionFile {
 
   /**
    * セクタの使用状況を作る
-   * `ignoreIndex` のチャンクは空きとして扱う
+   * `ignoreIndex`のチャンクは空きとして扱う
    */
   #buildSectorUsage(ignoreIndex: number): boolean[] {
     const totalSectors = this.#data.length / SECTOR_SIZE;
     const used = new Array<boolean>(totalSectors).fill(false);
 
-    // ヘッダの 2 セクタは常に使用中
+    // ヘッダの2セクタは常に使用中
     for (let sector = 0; sector < HEADER_SECTORS && sector < totalSectors; sector++) {
       used[sector] = true;
     }
@@ -543,6 +541,8 @@ export class RegionFile {
     }
 
     this.#writeHeader();
+    // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+    this.#ensureDirectory();
 
     try {
       writeFileSync(this.#path, this.#data);
@@ -563,9 +563,9 @@ export class RegionFile {
     return this.#data.slice();
   }
 
-  /** ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す */
+  /** ロケーションテーブルとタイムスタンプテーブルを先頭2セクタへ書き戻す */
   #writeHeader(): void {
-    // 位置表とタイムスタンプ表を、添字順に組み立て直す
+    // ロケーションテーブルとタイムスタンプテーブルを、添字順に組み立て直す
     for (let index = 0; index < CHUNK_COUNT; index++) {
       this.#writeUnsigned(index * 4, this.#offsets[index] * 256 + this.#sectorCounts[index], 4);
       this.#writeUnsigned(SECTOR_SIZE + index * 4, this.#timestamps[index] >>> 0, 4);
@@ -642,8 +642,22 @@ export class RegionFile {
     }
   }
 
+  /**
+   * ファイルを置くディレクトリが無ければ作る
+   * 読むだけの操作で空のディレクトリができないよう、書き出す直前にだけ呼ぶ
+   */
+  #ensureDirectory(): void {
+    try {
+      mkdirSync(this.#directory, { recursive: true });
+    } catch (error) {
+      throw new SpringNbtError(ErrorCode.Io, `ディレクトリを作れない: ${this.#directory}`, { cause: error });
+    }
+  }
+
   #writeExternalFile(chunkX: number, chunkZ: number, payload: Uint8Array): void {
     const external = this.#externalPath(chunkX, chunkZ);
+    // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+    this.#ensureDirectory();
 
     try {
       writeFileSync(external, payload);

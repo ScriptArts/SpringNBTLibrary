@@ -1,19 +1,19 @@
-# API 対応表：NBT
+# API対応表：NBT
 
-NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋なコーデック。
+NBTのタグ型・読み書き・SNBT。バージョンに依存しない純粋なコーデック。
 
-- 使い方は [ガイド 01](../guide/01-nbt.md) / [ガイド 02](../guide/02-snbt.md)
-- バイトレベルの仕様は [spec/10](../spec/10-nbt-binary.md) / [spec/11](../spec/11-snbt.md)
-- 命名の変換規則は [概要](overview.md#2-変換規則)
+- 使い方は[ガイド01](../guide/01-nbt.md) / [ガイド02](../guide/02-snbt.md)
+- バイトレベルの仕様は[spec/10](../spec/10-nbt-binary.md) / [spec/11](../spec/11-snbt.md)
+- 命名の変換規則は[概要](overview.md#2-変換規則)
 
 「—」はその言語に対応するものが無いことを示す。
-理由は [概要 4章](overview.md#4-言語ごとに揃わないところ) にまとめてある。
+理由は[概要4章](overview.md#4-言語ごとに揃わないところ)にまとめてある。
 
 <!-- generated:start -->
 
 | 論理名 | C# | Java | TypeScript | Python | Rust | 概要 |
 |---|---|---|---|---|---|---|
-| **TagType** | `TagType` | `TagType` | `TagType` | `TagType` | `TagType` | NBT のタグ型 |
+| **TagType** | `TagType` | `TagType` | `TagType` | `TagType` | `TagType` | NBTのタグ型 |
 | `as_string` | `AsString()` | `asString()` | `tagTypeAsString()` | `as_string()` | `as_str()` | 適合性テストで言語間比較に使う識別子を返す |
 | `byte` | `Byte` | `BYTE` | `Byte` | `BYTE` | `Byte` | TAG_Byte (1) |
 | `byte_array` | `ByteArray` | `BYTE_ARRAY` | `ByteArray` | `BYTE_ARRAY` | `ByteArray` | TAG_Byte_Array (7) |
@@ -23,7 +23,7 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `end` | `End` | `END` | `End` | `END` | `End` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `float` | `Float` | `FLOAT` | `Float` | `FLOAT` | `Float` | TAG_Float (5) |
-| `from_id` | `FromId()` | `fromId()` | `tagTypeFromId()` | `from_id()` | `from_id()` | タグIDから TagType を得る |
+| `from_id` | `FromId()` | `fromId()` | `tagTypeFromId()` | `from_id()` | `from_id()` | タグIDからTagTypeを得る |
 | `id` | `Id` | `id()` | `id` | `id()` | `id()` |  |
 | `int` | `Int` | `INT` | `Int` | `INT` | `Int` | TAG_Int (3) |
 | `int_array` | `IntArray` | `INT_ARRAY` | `IntArray` | `INT_ARRAY` | `IntArray` | TAG_Int_Array (11) |
@@ -32,7 +32,7 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `long_array` | `LongArray` | `LONG_ARRAY` | `LongArray` | `LONG_ARRAY` | `LongArray` | TAG_Long_Array (12) |
 | `short` | `Short` | `SHORT` | `Short` | `SHORT` | `Short` | TAG_Short (2) |
 | `string` | `String` | `STRING` | `String` | `STRING` | `String` | TAG_String (8) |
-| **NbtTag** | `NbtTag` | `NbtTag` | — | `NbtTag` | `NbtTag` | NBT のタグ |
+| **NbtTag** | `NbtTag` | `NbtTag` | — | `NbtTag` | `NbtTag` | NBTのタグ |
 | `byte` | `Byte` | `BYTE` | `Byte` | `BYTE` | `Byte` |  |
 | `byte_array` | `ByteArray` | `BYTE_ARRAY` | `ByteArray` | `BYTE_ARRAY` | `ByteArray` |  |
 | `compound` | `Compound` | `COMPOUND` | `Compound` | `COMPOUND` | `Compound` |  |
@@ -163,17 +163,17 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `opt_string_tag` | — | — | — | — | `opt_string_tag()` |  |
 | `remove` | `Remove()` | `remove()` | `remove()` | `remove()` | `remove()` |  |
 | `set` | `Set()` | `set()` | `set()` | `set()` | `set()` | 値を設定する |
-| `set_bool` | `SetBool()` | `setBool()` | `setBool()` | `set_bool()` | `set_bool()` | TAG_Byte として設定する |
-| `set_byte` | `SetByte()` | `setByte()` | `setByte()` | `set_byte()` | `set_byte()` | TAG_Byte として設定する |
-| `set_byte_array` | `SetByteArray()` | `setByteArray()` | `setByteArray()` | `set_byte_array()` | `set_byte_array()` | TAG_Byte_Array として設定する |
-| `set_double` | `SetDouble()` | `setDouble()` | `setDouble()` | `set_double()` | `set_double()` | TAG_Double として設定する |
-| `set_float` | `SetFloat()` | `setFloat()` | `setFloat()` | `set_float()` | `set_float()` | TAG_Float として設定する |
-| `set_int` | `SetInt()` | `setInt()` | `setInt()` | `set_int()` | `set_int()` | TAG_Int として設定する |
-| `set_int_array` | `SetIntArray()` | `setIntArray()` | `setIntArray()` | `set_int_array()` | `set_int_array()` | TAG_Int_Array として設定する |
-| `set_long` | `SetLong()` | `setLong()` | `setLong()` | `set_long()` | `set_long()` | TAG_Long として設定する |
-| `set_long_array` | `SetLongArray()` | `setLongArray()` | `setLongArray()` | `set_long_array()` | `set_long_array()` | TAG_Long_Array として設定する |
-| `set_short` | `SetShort()` | `setShort()` | `setShort()` | `set_short()` | `set_short()` | TAG_Short として設定する |
-| `set_string` | `SetString()` | `setString()` | `setString()` | `set_string()` | `set_string()` | TAG_String として設定する |
+| `set_bool` | `SetBool()` | `setBool()` | `setBool()` | `set_bool()` | `set_bool()` | TAG_Byteとして設定する |
+| `set_byte` | `SetByte()` | `setByte()` | `setByte()` | `set_byte()` | `set_byte()` | TAG_Byteとして設定する |
+| `set_byte_array` | `SetByteArray()` | `setByteArray()` | `setByteArray()` | `set_byte_array()` | `set_byte_array()` | TAG_Byte_Arrayとして設定する |
+| `set_double` | `SetDouble()` | `setDouble()` | `setDouble()` | `set_double()` | `set_double()` | TAG_Doubleとして設定する |
+| `set_float` | `SetFloat()` | `setFloat()` | `setFloat()` | `set_float()` | `set_float()` | TAG_Floatとして設定する |
+| `set_int` | `SetInt()` | `setInt()` | `setInt()` | `set_int()` | `set_int()` | TAG_Intとして設定する |
+| `set_int_array` | `SetIntArray()` | `setIntArray()` | `setIntArray()` | `set_int_array()` | `set_int_array()` | TAG_Int_Arrayとして設定する |
+| `set_long` | `SetLong()` | `setLong()` | `setLong()` | `set_long()` | `set_long()` | TAG_Longとして設定する |
+| `set_long_array` | `SetLongArray()` | `setLongArray()` | `setLongArray()` | `set_long_array()` | `set_long_array()` | TAG_Long_Arrayとして設定する |
+| `set_short` | `SetShort()` | `setShort()` | `setShort()` | `set_short()` | `set_short()` | TAG_Shortとして設定する |
+| `set_string` | `SetString()` | `setString()` | `setString()` | `set_string()` | `set_string()` | TAG_Stringとして設定する |
 | `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
 | `type` | `Type` | `type()` | `type` | `type` | `tag_type()` |  |
 | **NamedTag** | `NamedTag` | `NamedTag` | `NamedTag` | `NamedTag` | `NamedTag` | ルート名とルートタグの組 |
@@ -189,12 +189,12 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `gzip` | `Gzip` | `GZIP` | `Gzip` | `GZIP` | `Gzip` | GZip (RFC 1952) |
 | `none` | `None` | `NONE` | `None` | `NONE` | `None` | 無圧縮 |
 | `zlib` | `Zlib` | `ZLIB` | `Zlib` | `ZLIB` | `Zlib` | Zlib (RFC 1950) |
-| **NbtFormat** | `NbtFormat` | `NbtFormat` | `NbtFormat` | `NbtFormat` | `NbtFormat` | NBT のルートタグの並び方 |
+| **NbtFormat** | `NbtFormat` | `NbtFormat` | `NbtFormat` | `NbtFormat` | `NbtFormat` | NBTのルートタグの並び方 |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `java` | `Java` | `JAVA` | `Java` | `JAVA` | `Java` | ファイル形式 |
-| `network` | `Network` | `NETWORK` | `Network` | `NETWORK` | `Network` | ネットワーク形式 (1.20.2 以降) |
-| **NbtReadOptions** | `NbtReadOptions` | `NbtReadOptions` | `NbtReadOptions` | `NbtReadOptions` | `NbtReadOptions` | NBT 読み込みのオプション |
+| `network` | `Network` | `NETWORK` | `Network` | `NETWORK` | `Network` | ネットワーク形式 (1.20.2以降) |
+| **NbtReadOptions** | `NbtReadOptions` | `NbtReadOptions` | `NbtReadOptions` | `NbtReadOptions` | `NbtReadOptions` | NBT読み込みのオプション |
 | `compression` | `Compression` | `compression()` | `compression` | `compression` | `compression` |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `default_max_depth` | — | `DEFAULT_MAX_DEPTH` | — | — | — |  |
@@ -207,7 +207,7 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `tag` | `Tag` | `tag()` | `tag` | `tag` | `tag` | 読んだタグ |
 | `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` |  |
-| **NbtWriteOptions** | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | NBT 書き込みのオプション |
+| **NbtWriteOptions** | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | `NbtWriteOptions` | NBT書き込みのオプション |
 | `compression` | `Compression` | `compression()` | `compression` | `compression` | `compression` |  |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `format` | `Format` | `format()` | `format` | `format` | `format` |  |
@@ -217,15 +217,15 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `biomes_per_section` | `BiomesPerSection` | `BIOMES_PER_SECTION` | `BIOMES_PER_SECTION` | `BIOMES_PER_SECTION` | `BIOMES_PER_SECTION` |  |
 | `block_index` | `BlockIndex()` | `blockIndex()` | `blockIndex()` | `block_index()` | `block_index()` |  |
 | `blocks_per_section` | `BlocksPerSection` | `BLOCKS_PER_SECTION` | `BLOCKS_PER_SECTION` | `BLOCKS_PER_SECTION` | `BLOCKS_PER_SECTION` |  |
-| `byte_length` | `ByteLength()` | `byteLength()` | `byteLength()` | `byte_length()` | `byte_length()` | 文字列を MUTF-8 で符号化したときのバイト長を求める |
+| `byte_length` | `ByteLength()` | `byteLength()` | `byteLength()` | `byte_length()` | `byte_length()` | 文字列をMUTF-8で符号化したときのバイト長を求める |
 | `ceil_log2` | `CeilLog2()` | `ceilLog2()` | `ceilLog2()` | `ceil_log2()` | `ceil_log2()` |  |
-| `decode` | `Decode()` | `decode()` | `decode()` | `decode()` | `decode()` | MUTF-8 バイト列を文字列へ復号する |
+| `decode` | `Decode()` | `decode()` | `decode()` | `decode()` | `decode()` | MUTF-8バイト列を文字列へ復号する |
 | `decode_to_utf16` | — | — | — | — | `decode_to_utf16()` |  |
 | `decompress` | — | — | — | — | `decompress()` |  |
 | `decompress_lz4` | — | — | `decompressLz4()` | `decompress_lz4()` | — |  |
 | `default_max_cached_regions` | `DefaultMaxCachedRegions` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` | `DEFAULT_MAX_CACHED_REGIONS` |  |
 | `detect_compression` | `DetectCompression()` | `detectCompression()` | `detectCompression()` | `detect_compression()` | `detect_compression()` | 先頭バイトから圧縮方式を判定する |
-| `encode` | `Encode()` | `encode()` | `encode()` | `encode()` | `encode()` | 文字列を MUTF-8 バイト列へ符号化する |
+| `encode` | `Encode()` | `encode()` | `encode()` | `encode()` | `encode()` | 文字列をMUTF-8バイト列へ符号化する |
 | `encode_from_utf16` | — | — | — | — | `encode_from_utf16()` |  |
 | `from_double` | — | — | `fromDouble()` | `from_double()` | — |  |
 | `from_f32` | — | — | — | — | `from_f32()` |  |
@@ -234,28 +234,27 @@ NBT のタグ型・読み書き・SNBT。バージョンに依存しない純粋
 | `header_length` | — | — | — | `HEADER_LENGTH` | — |  |
 | `is_bare_char` | — | — | — | `is_bare_char()` | — |  |
 | `magic` | — | — | — | `MAGIC` | — |  |
-| `max_byte_length` | `MaxByteLength` | `MAX_BYTE_LENGTH` | `MAX_BYTE_LENGTH` | `MAX_BYTE_LENGTH` | `MAX_BYTE_LENGTH` | MUTF-8 の文字列が取りうる最大バイト長（長さフィールドが u16 のため） |
+| `max_byte_length` | `MaxByteLength` | `MAX_BYTE_LENGTH` | `MAX_BYTE_LENGTH` | `MAX_BYTE_LENGTH` | `MAX_BYTE_LENGTH` | MUTF-8の文字列が取りうる最大バイト長（長さフィールドがu16のため） |
 | `method_compressed` | — | — | — | `METHOD_COMPRESSED` | — |  |
 | `method_stored` | — | — | — | `METHOD_STORED` | — |  |
 | `min_match` | — | — | — | `MIN_MATCH` | — |  |
-| `min_supported_data_version` | `MinSupportedDataVersion` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | このライブラリが扱えるワールド形式の下限となる DataVersion (26.1) |
-| `parse` | `Parse()` | `parse()` | `parse()` | `parse()` | `parse()` | SNBT 文字列をタグへ変換する |
-| `parse_compound` | `ParseCompound()` | `parseCompound()` | `parseCompound()` | `parse_compound()` | `parse_compound()` | SNBT 文字列を Compound へ変換する |
-| `read_bytes` | `ReadBytes()` | `readBytes()` | `readBytes()` | `read_bytes()` | `read_bytes()` | バイト列から NBT を読む |
-| `read_bytes_all` | `ReadBytesAll()` | `readBytesAll()` | `readBytesAll()` | `read_bytes_all()` | `read_bytes_all()` | バイト列に連なっている NBT をすべて読む |
-| `read_bytes_at` | `ReadBytesAt()` | `readBytesAt()` | `readBytesAt()` | `read_bytes_at()` | `read_bytes_at()` | バイト列の指定した位置から NBT を 1 つ読む |
-| `read_file` | `ReadFile()` | `readFile()` | `readFile()` | `read_file()` | `read_file()` | ファイルから NBT を読む |
+| `min_supported_data_version` | `MinSupportedDataVersion` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | このライブラリが扱えるワールド形式の下限となるDataVersion (26.1) |
+| `parse` | `Parse()` | `parse()` | `parse()` | `parse()` | `parse()` | SNBT文字列をタグへ変換する |
+| `parse_compound` | `ParseCompound()` | `parseCompound()` | `parseCompound()` | `parse_compound()` | `parse_compound()` | SNBT文字列をCompoundへ変換する |
+| `read_bytes` | `ReadBytes()` | `readBytes()` | `readBytes()` | `read_bytes()` | `read_bytes()` | バイト列からNBTを読む |
+| `read_bytes_all` | `ReadBytesAll()` | `readBytesAll()` | `readBytesAll()` | `read_bytes_all()` | `read_bytes_all()` | バイト列に連なっているNBTをすべて読む |
+| `read_bytes_at` | `ReadBytesAt()` | `readBytesAt()` | `readBytesAt()` | `read_bytes_at()` | `read_bytes_at()` | バイト列の指定した位置からNBTを1つ読む |
+| `read_file` | `ReadFile()` | `readFile()` | `readFile()` | `read_file()` | `read_file()` | ファイルからNBTを読む |
 | `read_stream` | `ReadStream()` | `readStream()` | — | `read_stream()` | `read_reader()` |  |
 | `sector_size` | `SectorSize` | `SECTOR_SIZE` | `SECTOR_SIZE` | `SECTOR_SIZE` | `SECTOR_SIZE` |  |
-| `target_data_version` | `TargetDataVersion` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | 動作を確かめた Minecraft Java版の DataVersion (26.2) |
+| `target_data_version` | `TargetDataVersion` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | 動作を確かめたMinecraft Java版のDataVersion (26.2) |
 | `utf16_to_string` | — | — | — | — | `utf16_to_string()` |  |
-| `write` | `Write()` | `write()` | `write()` | `write()` | `write()` | タグを 1 行の SNBT へ変換する |
-| `write_bytes` | `WriteBytes()` | `writeBytes()` | `writeBytes()` | `write_bytes()` | `write_bytes()` | NBT をバイト列へ書き出す |
-| `write_file` | `WriteFile()` | `writeFile()` | `writeFile()` | `write_file()` | `write_file()` | NBT をファイルへ書き出す |
+| `write` | `Write()` | `write()` | `write()` | `write()` | `write()` | タグを1行のSNBTへ変換する |
+| `write_bytes` | `WriteBytes()` | `writeBytes()` | `writeBytes()` | `write_bytes()` | `write_bytes()` | NBTをバイト列へ書き出す |
+| `write_file` | `WriteFile()` | `writeFile()` | `writeFile()` | `write_file()` | `write_file()` | NBTをファイルへ書き出す |
 | `write_pretty` | `WritePretty()` | `writePretty()` | `writePretty()` | `write_pretty()` | `write_pretty()` |  |
-| `write_stream` | `WriteStream()` | `writeStream()` | — | `write_stream()` | `write_writer()` | NBT をストリームへ書き出す |
+| `write_stream` | `WriteStream()` | `writeStream()` | — | `write_stream()` | `write_writer()` | NBTをストリームへ書き出す |
 
 <!-- generated:end -->
 
-この表は実装から生成している。手で直さず、
-`python3 spec/tools/check_docs_sync.py --write` で更新すること。
+この表は実装から生成している。手で直さず、`python3 spec/tools/check_docs_sync.py --write`で更新すること。

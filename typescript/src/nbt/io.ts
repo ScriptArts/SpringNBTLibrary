@@ -1,7 +1,5 @@
 /**
- * NBT のファイル・バイト列からの読み書き
- *
- * 仕様: `docs/spec/10-nbt-binary.md` 3章〜6章
+ * NBTのファイル・バイト列からの読み書き
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -20,7 +18,6 @@ import {
   NbtByteArray,
   NbtCompound,
   NbtDouble,
-  NbtFloat,
   NbtInt,
   NbtIntArray,
   NbtList,
@@ -30,11 +27,13 @@ import {
   NbtString,
   NbtTag,
   TagType,
+  float32BitsOf,
+  float32FromBits,
   tagTypeAsString,
   tagTypeFromId,
 } from "./tag.js";
 
-/** NBT のルートタグの並び方 */
+/** NBTのルートタグの並び方 */
 export enum NbtFormat {
   /**
    * ファイル形式
@@ -42,7 +41,7 @@ export enum NbtFormat {
    */
   Java = "java",
   /**
-   * ネットワーク形式 (1.20.2 以降)
+   * ネットワーク形式 (1.20.2以降)
    * ルートに名前が付かない
    */
   Network = "network",
@@ -70,47 +69,50 @@ export class NamedTag {
     readonly tag: NbtCompound,
   ) {}
 
-  /** 人が読むための表現。中身の形式は決めていない */
+  /**
+   * 人が読むための表現
+   * 中身の形式は決めていない
+   */
   toString(): string {
     return `NamedTag("${this.name}", ${this.tag})`;
   }
 }
 
-/** NBT 読み込みのオプション */
+/** NBT読み込みのオプション */
 export interface NbtReadOptions {
   /**
    * ルートタグの並び方
-   * 既定は {@link NbtFormat.Java}
+   * 既定は{@link NbtFormat.Java}
    */
   format?: NbtFormat;
   /**
    * 圧縮方式
-   * 既定は {@link Compression.Auto}
+   * 既定は{@link Compression.Auto}
    */
   compression?: Compression;
   /**
    * ネストの深さ上限
-   * 既定は 512
+   * 既定は512
    */
   maxDepth?: number;
   /**
    * 展開後の総バイト数の上限
    * 負値なら無制限
-   * 既定は -1
+   * 既定は-1
    */
   maxDecompressedSize?: number;
 }
 
-/** NBT 書き込みのオプション */
+/** NBT書き込みのオプション */
 export interface NbtWriteOptions {
   /**
    * ルートタグの並び方
-   * 既定は {@link NbtFormat.Java}
+   * 既定は{@link NbtFormat.Java}
    */
   format?: NbtFormat;
   /**
    * 圧縮方式
-   * 既定は {@link Compression.Gzip}
+   * 既定は{@link Compression.Gzip}
    */
   compression?: Compression;
 }
@@ -119,9 +121,7 @@ export interface NbtWriteOptions {
  * 位置を指定した読み込みの結果
  *
  * 読んだタグと、その直後の位置を持つ
- * 続けて読むときは `end` を次の開始位置として渡す
- *
- * 仕様: `docs/spec/10-nbt-binary.md` 3.1章
+ * 続けて読むときは`end`を次の開始位置として渡す
  */
 export interface NbtReadResult {
   /** 読んだタグ */
@@ -137,7 +137,7 @@ const DEFAULT_MAX_DEPTH = 512;
 // ---------------------------------------------------------------------------
 
 /**
- * 展開済みのバイト列から NBT を読み出す
+ * 展開済みのバイト列からNBTを読み出す
  *
  * 入力全体をあらかじめメモリに持つ設計にしている
  * 「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため
@@ -184,13 +184,13 @@ class Reader {
   }
 
   /**
-   * ルートタグを 1 つ読む
+   * ルートタグを1つ読む
    * 形式によって名前の有無が変わる
    */
   readRootTag(format: NbtFormat): NamedTag {
     const type = tagTypeFromId(this.#readByte());
 
-    // Java版のファイル形式でもネットワーク形式でも、ルートは必ず TAG_Compound
+    // Java版のファイル形式でもネットワーク形式でも、ルートは必ずTAG_Compound
     if (type !== TagType.Compound) {
       throw SpringNbtError.malformed(
         `ルートタグは compound でなければならないが ${tagTypeAsString(type)} だった`,
@@ -211,7 +211,7 @@ class Reader {
   }
 
   #readPayload(type: TagType, depth: number): NbtTag {
-    // 深さ上限は再帰する型に入る手前で検査する
+    // 深さ上限は型を問わず、ペイロードを読む前に検査する
     if (depth > this.#maxDepth) {
       throw SpringNbtError.limitExceeded(`ネストが深すぎる (上限 ${this.#maxDepth})`);
     }
@@ -226,7 +226,8 @@ class Reader {
       case TagType.Long:
         return new NbtLong(this.#take(8, (offset) => this.#view.getBigInt64(offset, false)));
       case TagType.Float:
-        return new NbtFloat(this.#take(4, (offset) => this.#view.getFloat32(offset, false)));
+        // NaNのビットパターンを保つため、値ではなくビットとして読む
+        return float32FromBits(this.#take(4, (offset) => this.#view.getInt32(offset, false)));
       case TagType.Double:
         return new NbtDouble(this.#take(8, (offset) => this.#view.getFloat64(offset, false)));
       case TagType.ByteArray:
@@ -249,7 +250,7 @@ class Reader {
   #readCompoundPayload(depth: number): NbtCompound {
     const compound = new NbtCompound();
 
-    // TAG_End が現れるまで名前付きタグを読み続ける
+    // TAG_Endが現れるまで名前付きタグを読み続ける
     for (;;) {
       const type = tagTypeFromId(this.#readByte());
 
@@ -267,7 +268,7 @@ class Reader {
     const count = this.#readLength();
 
     if (elementType === TagType.End) {
-      // 要素型 End のリストは空でなければならない
+      // 要素型Endのリストは空でなければならない
       if (count !== 0) {
         throw SpringNbtError.malformed(`要素型 End のリストに ${count} 個の要素が宣言されている`);
       }
@@ -275,7 +276,7 @@ class Reader {
       return new NbtList(TagType.End);
     }
 
-    // 1 要素の最小バイト数から、宣言された個数が入力に収まるかを先に検査する
+    // 1要素の最小バイト数から、宣言された個数が入力に収まるかを先に検査する
     this.#ensureAvailable(count * minimumPayloadSize(elementType));
 
     const list = new NbtList(elementType);
@@ -309,7 +310,7 @@ class Reader {
 
     const result = new Int32Array(count);
 
-    // 4 バイトずつビッグエンディアンで読む
+    // 4バイトずつビッグエンディアンで読む
     for (let index = 0; index < count; index++) {
       result[index] = this.#view.getInt32(this.#position + index * 4, false);
     }
@@ -324,7 +325,7 @@ class Reader {
 
     const result = new BigInt64Array(count);
 
-    // 8 バイトずつビッグエンディアンで読む
+    // 8バイトずつビッグエンディアンで読む
     for (let index = 0; index < count; index++) {
       result[index] = this.#view.getBigInt64(this.#position + index * 8, false);
     }
@@ -333,7 +334,7 @@ class Reader {
     return result;
   }
 
-  /** MUTF-8 の文字列（u16 の長さ + 本体）を読む */
+  /** MUTF-8の文字列（u16の長さ + 本体）を読む */
   #readString(): string {
     const length = this.#take(2, (offset) => this.#view.getUint16(offset, false));
     this.#ensureAvailable(length);
@@ -350,7 +351,7 @@ class Reader {
   #readLength(): number {
     const length = this.#take(4, (offset) => this.#view.getInt32(offset, false));
 
-    // 長さは i32 だが、負値は仕様上ありえない
+    // 長さはi32だが、負値は仕様上ありえない
     if (length < 0) {
       throw SpringNbtError.malformed(`長さが負値: ${length}`);
     }
@@ -402,18 +403,18 @@ function minimumPayloadSize(type: TagType): number {
     case TagType.Long:
     case TagType.Double:
       return 8;
-    // 長さフィールドの 4 バイトは必ずある
+    // 長さフィールドの4バイトは必ずある
     case TagType.ByteArray:
     case TagType.IntArray:
     case TagType.LongArray:
       return 4;
-    // 長さフィールドの 2 バイトは必ずある
+    // 長さフィールドの2バイトは必ずある
     case TagType.String:
       return 2;
-    // 要素型 1 バイト + 個数 4 バイト
+    // 要素型1バイト + 個数4バイト
     case TagType.List:
       return 5;
-    // 終端の TAG_End 1 バイトは必ずある
+    // 終端のTAG_End 1バイトは必ずある
     default:
       return 1;
   }
@@ -422,8 +423,8 @@ function minimumPayloadSize(type: TagType): number {
 /**
  * キーやルート名として使える文字列か検査する
  *
- * 値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）
- * Minecraft が書き出すキーは ASCII の識別子のみで、
+ * 値と違い、キーには孤立サロゲートを許さない
+ * Minecraftが書き出すキーはASCIIの識別子のみで、
  * 孤立サロゲートが現れるのはデータ破損を意味する
  */
 function requireUtf8Representable(text: string, role: string): string {
@@ -456,17 +457,17 @@ function requireUtf8Representable(text: string, role: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * NBT を展開済みのバイト列へ書き出す
+ * NBTを展開済みのバイト列へ書き出す
  *
  * 出力は一意でなければならない（ラウンドトリップ検証が成立するため）
- * Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す
+ * Compoundは挿入順のまま、浮動小数点はビットパターンのまま書き出す
  */
 class Writer {
   #chunks: Uint8Array[] = [];
   #scratch = new DataView(new ArrayBuffer(8));
 
   /**
-   * ルートタグを 1 つ書き出す
+   * ルートタグを1つ書き出す
    * 形式によって名前の有無が変わる
    */
   writeRoot(named: NamedTag, format: NbtFormat): Uint8Array {
@@ -496,8 +497,8 @@ class Writer {
         this.#writeScalar(8, (view) => view.setBigInt64(0, tag.value, false));
         break;
       case TagType.Float:
-        // NaN や -0.0 を保つため、そのまま書く
-        this.#writeScalar(4, (view) => view.setFloat32(0, tag.value, false));
+        // NaNや-0.0を保つため、値ではなくビットパターンを書く
+        this.#writeScalar(4, (view) => view.setInt32(0, float32BitsOf(tag), false));
         break;
       case TagType.Double:
         this.#writeScalar(8, (view) => view.setFloat64(0, tag.value, false));
@@ -518,7 +519,7 @@ class Writer {
       case TagType.IntArray:
         this.#writeScalar(4, (view) => view.setInt32(0, tag.value.length, false));
 
-        // 4 バイトずつビッグエンディアンで書く
+        // 4バイトずつビッグエンディアンで書く
         for (const value of tag.value) {
           this.#writeScalar(4, (view) => view.setInt32(0, value, false));
         }
@@ -527,7 +528,7 @@ class Writer {
       case TagType.LongArray:
         this.#writeScalar(4, (view) => view.setInt32(0, tag.value.length, false));
 
-        // 8 バイトずつビッグエンディアンで書く
+        // 8バイトずつビッグエンディアンで書く
         for (const value of tag.value) {
           this.#writeScalar(8, (view) => view.setBigInt64(0, value, false));
         }
@@ -562,8 +563,8 @@ class Writer {
   #writeString(text: string): void {
     const encoded = mutf8.encode(text);
 
-    // 長さフィールドは u16
-    // キー名は素の string なのでここでも検査する
+    // 長さフィールドはu16
+    // キー名は素のstringなのでここでも検査する
     if (encoded.length > mutf8.MAX_BYTE_LENGTH) {
       throw SpringNbtError.invalidArgument(
         `文字列が長すぎる: MUTF-8 で ${encoded.length} バイト (上限 ${mutf8.MAX_BYTE_LENGTH})`,
@@ -586,7 +587,7 @@ class Writer {
   #concat(): Uint8Array {
     let total = 0;
 
-    // 先に全体長を数えてから 1 回で確保する
+    // 先に全体長を数えてから1回で確保する
     for (const chunk of this.#chunks) {
       total += chunk.length;
     }
@@ -594,7 +595,7 @@ class Writer {
     const result = new Uint8Array(total);
     let offset = 0;
 
-    // 溜めた断片を 1 つの配列へ連結する
+    // 溜めた断片を1つの配列へ連結する
     for (const chunk of this.#chunks) {
       result.set(chunk, offset);
       offset += chunk.length;
@@ -618,13 +619,13 @@ export function detectCompression(bytes: Uint8Array): Compression {
     throw SpringNbtError.malformed("入力が空で圧縮方式を判定できない");
   }
 
-  // GZip は必ず 1F 8B で始まる
+  // GZipは必ず1F 8Bで始まる
   if (bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
     return Compression.Gzip;
   }
 
   if (bytes.length >= 2) {
-    // zlib ヘッダは「圧縮法が 8 (deflate)」かつ「先頭2バイトが 31 の倍数」
+    // zlibヘッダは「圧縮法が8 (deflate)」かつ「先頭2バイトが31の倍数」
     const isDeflate = (bytes[0] & 0x0f) === 0x08;
     const header = (bytes[0] << 8) | bytes[1];
 
@@ -633,7 +634,7 @@ export function detectCompression(bytes: Uint8Array): Compression {
     }
   }
 
-  // 無圧縮なら先頭は TAG_Compound のタグID
+  // 無圧縮なら先頭はTAG_CompoundのタグID
   if (bytes[0] === TagType.Compound) {
     return Compression.None;
   }
@@ -699,7 +700,7 @@ function compress(plain: Uint8Array, method: Compression): Uint8Array {
 }
 
 // ---------------------------------------------------------------------------
-// 公開 API
+// 公開API
 // ---------------------------------------------------------------------------
 
 /** 省略された項目を既定値で埋める */
@@ -758,7 +759,7 @@ function fillWriteOptions(options?: NbtWriteOptions): Required<NbtWriteOptions> 
   return filled;
 }
 
-/** バイト列から NBT を読む */
+/** バイト列からNBTを読む */
 export function readBytes(bytes: Uint8Array, options?: NbtReadOptions): NamedTag {
   const effective = fillReadOptions(options);
   const plain = decompress(bytes, effective);
@@ -766,10 +767,10 @@ export function readBytes(bytes: Uint8Array, options?: NbtReadOptions): NamedTag
 }
 
 /**
- * バイト列の指定した位置から NBT を 1 つ読む
+ * バイト列の指定した位置からNBTを1つ読む
  *
- * 複数の NBT が連なっているデータを、先頭から順に読み進めるために使う
- * 戻り値の `end` が次の開始位置になる
+ * 複数のNBTが連なっているデータを、先頭から順に読み進めるために使う
+ * 戻り値の`end`が次の開始位置になる
  *
  * 位置は渡したバイト列そのものを指すので、圧縮されたデータは扱えない
  *
@@ -795,12 +796,12 @@ export function readBytesAt(
 }
 
 /**
- * バイト列に連なっている NBT をすべて読む
+ * バイト列に連なっているNBTをすべて読む
  *
  * 入力を使い切るまで読み続ける
  * 空のバイト列なら空の一覧を返す
  *
- * 圧縮は入力全体に 1 回かかっているものとして扱う
+ * 圧縮は入力全体に1回かかっているものとして扱う
  *
  * @throws {SpringNbtError} 読み込みに失敗した場合
  */
@@ -808,7 +809,7 @@ export function readBytesAll(bytes: Uint8Array, options?: NbtReadOptions): Named
   const effective = fillReadOptions(options);
   const tags: NamedTag[] = [];
 
-  // 空の入力は「0 個」であってエラーではない
+  // 空の入力は「0個」であってエラーではない
   if (bytes.length === 0) {
     return tags;
   }
@@ -833,7 +834,7 @@ function requirePlainInput(options: Required<NbtReadOptions>): void {
   }
 }
 
-/** ファイルから NBT を読む */
+/** ファイルからNBTを読む */
 export function readFile(path: string, options?: NbtReadOptions): NamedTag {
   let raw: Uint8Array;
 
@@ -847,11 +848,11 @@ export function readFile(path: string, options?: NbtReadOptions): NamedTag {
   return readBytes(raw, options);
 }
 
-/** NBT をバイト列へ書き出す */
+/** NBTをバイト列へ書き出す */
 export function writeBytes(named: NamedTag, options?: NbtWriteOptions): Uint8Array {
   const effective = fillWriteOptions(options);
 
-  // 書き込み時に Auto は決められない
+  // 書き込み時にAutoは決められない
   if (effective.compression === Compression.Auto) {
     throw SpringNbtError.invalidArgument("書き込みで Compression.Auto は指定できない");
   }
@@ -860,7 +861,7 @@ export function writeBytes(named: NamedTag, options?: NbtWriteOptions): Uint8Arr
   return compress(plain, effective.compression);
 }
 
-/** NBT をファイルへ書き出す */
+/** NBTをファイルへ書き出す */
 export function writeFile(path: string, named: NamedTag, options?: NbtWriteOptions): void {
   const bytes = writeBytes(named, options);
 

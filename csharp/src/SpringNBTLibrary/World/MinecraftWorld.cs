@@ -14,10 +14,10 @@ public sealed class WorldOpenOptions
     public bool Writable { get; set; }
 
     /// <summary>
-    /// <c>session.lock</c> の確認を飛ばすか
+    /// <c>session.lock</c>の確認を飛ばすか
     /// </summary>
     /// <remarks>
-    /// Minecraft が起動中のワールドへ書き込むとデータが壊れる
+    /// Minecraftが起動中のワールドへ書き込むとデータがおかしくなる
     /// 既定では書き込みモードで開くときに必ず確認する
     /// これを立てるのは自己責任
     /// </remarks>
@@ -31,14 +31,12 @@ public sealed class WorldOpenOptions
 }
 
 /// <summary>
-/// Minecraft Java版のセーブデータ 1 つ分
+/// Minecraft Java版のセーブデータ1つ分
 /// </summary>
 /// <remarks>
 /// <para>
-/// 26.x では構成が大きく変わっており、標準の3次元も
-/// <c>dimensions/&lt;名前空間&gt;/&lt;パス&gt;/</c> の下に並ぶ
+/// 26.xでは構成が大きく変わっており、標準の3次元も<c>dimensions/&lt;名前空間&gt;/&lt;パス&gt;/</c>の下に並ぶ
 /// </para>
-/// <para>仕様: <c>docs/spec/40-world-layout.md</c></para>
 /// </remarks>
 public sealed class MinecraftWorld : IDisposable
 {
@@ -56,15 +54,15 @@ public sealed class MinecraftWorld : IDisposable
     /// <summary>ワールドディレクトリのパス</summary>
     public string Directory { get; }
 
-    /// <summary><c>level.dat</c> の内容</summary>
+    /// <summary><c>level.dat</c>の内容</summary>
     public LevelData Level { get; }
 
     /// <summary>
     /// ワールドを開く
     /// </summary>
     /// <exception cref="SpringNbtException">
-    /// ディレクトリや <c>level.dat</c> が無い場合、
-    /// または書き込みモードで <c>session.lock</c> を取得できない場合
+    /// ディレクトリや<c>level.dat</c>が無い場合、
+    /// または書き込みモードで<c>session.lock</c>を取得できない場合
     /// </exception>
     public static MinecraftWorld Open(string directory, WorldOpenOptions? options = null)
     {
@@ -93,7 +91,7 @@ public sealed class MinecraftWorld : IDisposable
             throw new SpringNbtException(ErrorCode.Io, $"level.dat が無い: {levelPath}");
         }
 
-        // 書き込むなら、Minecraft が起動中でないことを先に確かめる
+        // 書き込むなら、Minecraftが起動中でないことを先に確かめる
         if (effective.Writable && !effective.IgnoreSessionLock)
         {
             CheckSessionLock(directory);
@@ -104,7 +102,7 @@ public sealed class MinecraftWorld : IDisposable
     }
 
     /// <summary>
-    /// <c>session.lock</c> を排他で開けるか確かめる
+    /// <c>session.lock</c>を排他で開けるか確かめる
     /// </summary>
     private static void CheckSessionLock(string directory)
     {
@@ -131,12 +129,11 @@ public sealed class MinecraftWorld : IDisposable
     }
 
     /// <summary>
-    /// <c>data/minecraft/&lt;name&gt;.dat</c> を読む
-    /// 存在しなければ null
+    /// <c>data/minecraft/&lt;name&gt;.dat</c>を読む
+    /// 存在しなければnull
     /// </summary>
     /// <remarks>
-    /// 26.x では <c>game_rules</c> / <c>weather</c> / <c>world_gen_settings</c> などが
-    /// この形で <c>level.dat</c> から分離されている
+    /// 26.xでは<c>game_rules</c> / <c>weather</c> / <c>world_gen_settings</c>などがこの形で<c>level.dat</c>から分離されている
     /// </remarks>
     public NbtCompound? DataFile(string name)
     {
@@ -157,7 +154,7 @@ public sealed class MinecraftWorld : IDisposable
         EnsureOpen();
         string root = Path.Combine(Directory, "dimensions");
 
-        // dimensions/ が無いワールドには次元が 1 つも無い
+        // dimensions/が無いワールドには次元が1つも無い
         if (!System.IO.Directory.Exists(root))
         {
             yield break;
@@ -165,12 +162,12 @@ public sealed class MinecraftWorld : IDisposable
 
         List<string> found = new List<string>();
 
-        // dimensions/<名前空間>/<パス>/ の 2 段を辿る
+        // dimensions/<名前空間>/<パス>/の2段を辿る
         foreach (string namespaceDir in System.IO.Directory.EnumerateDirectories(root))
         {
             string namespaceName = Path.GetFileName(namespaceDir);
 
-            // dimensions/<名前空間>/<パス>/ の 2 段目を次元の名前として拾う
+            // dimensions/<名前空間>/<パス>/の2段目を次元の名前として拾う
             foreach (string pathDir in System.IO.Directory.EnumerateDirectories(namespaceDir))
             {
                 found.Add(namespaceName + ":" + Path.GetFileName(pathDir));
@@ -180,7 +177,7 @@ public sealed class MinecraftWorld : IDisposable
         // 走査順がファイルシステム依存にならないよう並べる
         found.Sort(StringComparer.Ordinal);
 
-        // 並べ替えたものを 1 件ずつ返す
+        // 並べ替えたものを1件ずつ返す
         foreach (string id in found)
         {
             yield return id;
@@ -189,11 +186,11 @@ public sealed class MinecraftWorld : IDisposable
 
     /// <summary>
     /// 次元を得る
-    /// ディレクトリが無ければ null
+    /// ディレクトリが無ければnull
     /// </summary>
     /// <param name="dimensionId">
-    /// <c>minecraft:overworld</c> のような名前空間つきのID
-    /// 名前空間が省略されていたら <c>minecraft:</c> を補う
+    /// <c>minecraft:overworld</c>のような名前空間つきのID
+    /// 名前空間が省略されていたら<c>minecraft:</c>を補う
     /// </param>
     public Dimension? Dimension(string dimensionId)
     {
@@ -228,7 +225,7 @@ public sealed class MinecraftWorld : IDisposable
         EnsureOpen();
         string directory = Path.Combine(Directory, "players", "data");
 
-        // players/data/ が無ければプレイヤーは 1 人もいない
+        // players/data/が無ければプレイヤーは1人もいない
         if (!System.IO.Directory.Exists(directory))
         {
             yield break;
@@ -236,7 +233,7 @@ public sealed class MinecraftWorld : IDisposable
 
         List<string> found = new List<string>();
 
-        // <uuid>.dat の名前部分が UUID にあたる
+        // <uuid>.datの名前部分がUUIDにあたる
         foreach (string path in System.IO.Directory.EnumerateFiles(directory, "*.dat"))
         {
             found.Add(Path.GetFileNameWithoutExtension(path));
@@ -244,7 +241,7 @@ public sealed class MinecraftWorld : IDisposable
 
         found.Sort(StringComparer.Ordinal);
 
-        // 並べ替えたものを 1 件ずつ返す
+        // 並べ替えたものを1件ずつ返す
         foreach (string id in found)
         {
             yield return id;
@@ -252,7 +249,7 @@ public sealed class MinecraftWorld : IDisposable
     }
 
     /// <summary>プレイヤーデータを読む
-    /// 存在しなければ null</summary>
+    /// 存在しなければnull</summary>
     public NbtCompound? Player(string uuid)
     {
         EnsureOpen();
@@ -269,11 +266,11 @@ public sealed class MinecraftWorld : IDisposable
     }
 
     /// <summary>
-    /// <c>level.dat</c> を書き戻す
+    /// <c>level.dat</c>を書き戻す
     /// </summary>
     /// <remarks>
-    /// 壊れるとワールド全体が開けなくなるため、
-    /// 一時ファイルへ書いてから <c>level.dat_old</c> へ退避し、最後に置き換える
+    /// <c>level.dat</c>がおかしくなるとワールド全体が開けなくなるため、
+    /// 一時ファイルへ書いて内容をディスクへ確実に書き出してから、既存の<c>level.dat</c>を<c>level.dat_old</c>へ退避し、最後に置き換える
     /// </remarks>
     public void SaveLevel()
     {
@@ -290,9 +287,16 @@ public sealed class MinecraftWorld : IDisposable
 
         try
         {
-            NbtIo.WriteFile(temporary, Level.ToNamedTag());
+            byte[] encoded = NbtIo.WriteBytes(Level.ToNamedTag());
 
-            // 既存の level.dat は、置き換える前に level.dat_old へ退避する
+            // 一時ファイルへ書き、置き換える前に内容をディスクへ確実に書き出す
+            using (FileStream stream = new FileStream(temporary, FileMode.Create, FileAccess.Write))
+            {
+                stream.Write(encoded);
+                stream.Flush(flushToDisk: true);
+            }
+
+            // 既存のlevel.datは、置き換える前にlevel.dat_oldへ退避する
             if (File.Exists(path))
             {
                 File.Copy(path, backup, overwrite: true);
@@ -335,7 +339,7 @@ public sealed class MinecraftWorld : IDisposable
         }
     }
 
-    /// <summary>名前空間が省略されていたら <c>minecraft:</c> を補う</summary>
+    /// <summary>名前空間が省略されていたら<c>minecraft:</c>を補う</summary>
     private static string NormalizeDimensionId(string dimensionId)
     {
         if (dimensionId.Contains(':', StringComparison.Ordinal))
@@ -348,13 +352,10 @@ public sealed class MinecraftWorld : IDisposable
 }
 
 /// <summary>
-/// <c>level.dat</c> の内容
+/// <c>level.dat</c>の内容
 /// </summary>
 /// <remarks>
-/// 26.x では大幅に軽量化されており、ゲームルールやワールド生成設定は
-/// <c>data/minecraft/</c> 配下の個別ファイルへ分離されている
-///
-/// <para>仕様: <c>docs/spec/40-world-layout.md</c> 2章</para>
+/// 26.xでは大幅に軽量化されており、ゲームルールやワールド生成設定は<c>data/minecraft/</c>配下の個別ファイルへ分離されている
 /// </remarks>
 public sealed class LevelData
 {
@@ -367,11 +368,11 @@ public sealed class LevelData
         Data = named.Tag.GetCompound("Data");
     }
 
-    /// <summary>ルートの NBT
-    /// <c>Data</c> を含む</summary>
+    /// <summary>ルートのNBT
+    /// <c>Data</c>を含む</summary>
     public NbtCompound Raw { get; }
 
-    /// <summary><c>Data</c> の中身
+    /// <summary><c>Data</c>の中身
     /// 実際の設定はここに入っている</summary>
     public NbtCompound Data { get; }
 
@@ -388,21 +389,21 @@ public sealed class LevelData
     /// 0=サバイバル 1=クリエイティブ 2=アドベンチャー 3=スペクテイター</summary>
     public int GameType => Data.GetInt("GameType");
 
-    /// <summary>スポーン地点の <c>[x, y, z]</c></summary>
+    /// <summary>スポーン地点の<c>[x, y, z]</c></summary>
     public int[] SpawnPos => Data.GetCompound("spawn").GetIntArray("pos");
 
     /// <summary>スポーン地点の次元ID</summary>
     public string SpawnDimension => Data.GetCompound("spawn").GetString("dimension");
 
-    /// <summary>難易度（<c>normal</c> など）</summary>
+    /// <summary>難易度（<c>normal</c>など）</summary>
     public string Difficulty => Data.GetCompound("difficulty_settings").GetString("difficulty");
 
     /// <summary>ハードコアか</summary>
     public bool IsHardcore => Data.GetCompound("difficulty_settings").GetBool("hardcore");
 
-    /// <summary>バージョン名（<c>26.2</c> など）</summary>
+    /// <summary>バージョン名（<c>26.2</c>など）</summary>
     public string VersionName => Data.GetCompound("Version").GetString("Name");
 
-    /// <summary>書き出し用の <see cref="NamedTag"/> を作る</summary>
+    /// <summary>書き出し用の<see cref="NamedTag"/>を作る</summary>
     public NamedTag ToNamedTag() => new NamedTag(rootName, Raw);
 }

@@ -1,6 +1,4 @@
-"""NBT のファイル・バイト列・ストリームからの読み書き
-
-仕様: ``docs/spec/10-nbt-binary.md`` 3章〜6章
+"""NBTのファイル・バイト列・ストリームからの読み書き
 """
 
 from __future__ import annotations
@@ -50,14 +48,14 @@ __all__ = [
 
 
 class NbtFormat(enum.Enum):
-    """NBT のルートタグの並び方"""
+    """NBTのルートタグの並び方"""
 
     #: ファイル形式
-    # ルートは「タグID + 名前長 + 名前 + ペイロード」の順
+    #: ルートは「タグID + 名前長 + 名前 + ペイロード」の順
     JAVA = "java"
 
-    #: ネットワーク形式 (1.20.2 以降)
-    # ルートに名前が付かない
+    #: ネットワーク形式 (1.20.2以降)
+    #: ルートに名前が付かない
     NETWORK = "network"
 
 
@@ -65,9 +63,7 @@ class NbtReadResult:
     """位置を指定した読み込みの結果
 
     読んだタグと、その直後の位置を持つ
-    続けて読むときは end を次の開始位置として渡す
-
-    仕様: docs/spec/10-nbt-binary.md 3.1章
+    続けて読むときはendを次の開始位置として渡す
     """
 
     __slots__ = ("tag", "end")
@@ -90,7 +86,7 @@ class Compression(enum.Enum):
     ZLIB = "zlib"
 
     #: 先頭バイトから自動判定する
-    # 読み込み時のみ指定できる
+    #: 読み込み時のみ指定できる
     AUTO = "auto"
 
 
@@ -108,7 +104,7 @@ class NamedTag:
 
 
 class NbtReadOptions:
-    """NBT 読み込みのオプション"""
+    """NBT読み込みのオプション"""
 
     def __init__(self, fmt: NbtFormat = NbtFormat.JAVA,
                  compression: Compression = Compression.AUTO,
@@ -117,24 +113,24 @@ class NbtReadOptions:
         #: ルートタグの並び方
         self.format = fmt
         #: 圧縮方式
-        # 既定は自動判定
+        #: 既定は自動判定
         self.compression = compression
         #: ネストの深さ上限
         self.max_depth = max_depth
         #: 展開後の総バイト数の上限
-        # 負値なら無制限
+        #: 負値なら無制限
         self.max_decompressed_size = max_decompressed_size
 
 
 class NbtWriteOptions:
-    """NBT 書き込みのオプション"""
+    """NBT書き込みのオプション"""
 
     def __init__(self, fmt: NbtFormat = NbtFormat.JAVA,
                  compression: Compression = Compression.GZIP) -> None:
         #: ルートタグの並び方
         self.format = fmt
         #: 圧縮方式
-        # 既定は GZip
+        #: 既定はGZip
         self.compression = compression
 
     @staticmethod
@@ -154,7 +150,7 @@ _DEFAULT_WRITE = NbtWriteOptions()
 
 
 class _Reader:
-    """展開済みのバイト列から NBT を読み出す
+    """展開済みのバイト列からNBTを読み出す
 
     入力全体をあらかじめメモリに持つ設計にしている
     「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため
@@ -191,13 +187,13 @@ class _Reader:
         return tag
 
     def read_root_tag(self, fmt: NbtFormat) -> NamedTag:
-        """ルートタグを 1 つ読む
+        """ルートタグを1つ読む
         形式によって名前の有無が変わる
         末尾の余りは見ない
         """
         tag_type = TagType.from_id(self._read_byte())
 
-        # Java版のファイル形式でもネットワーク形式でも、ルートは必ず TAG_Compound
+        # Java版のファイル形式でもネットワーク形式でも、ルートは必ずTAG_Compound
         if tag_type != TagType.COMPOUND:
             raise SpringNbtError.malformed(
                 "ルートタグは compound でなければならないが %s だった" % tag_type.as_string())
@@ -213,7 +209,7 @@ class _Reader:
         return NamedTag(name, root)
 
     def _read_payload(self, tag_type: TagType, depth: int) -> NbtTag:
-        # 深さ上限は再帰する型に入る手前で検査する
+        # 深さ上限は型を問わず、ペイロードを読む前に検査する
         if depth > self._max_depth:
             raise SpringNbtError.limit_exceeded("ネストが深すぎる (上限 %d)" % self._max_depth)
 
@@ -230,7 +226,8 @@ class _Reader:
             return NbtLong(struct.unpack(">q", self._take(8))[0])
 
         if tag_type == TagType.FLOAT:
-            return NbtFloat(struct.unpack(">f", self._take(4))[0])
+            # NaNのビットパターンを保つため、読んだビットをそのまま渡す
+            return NbtFloat._from_bits(self._take(4))
 
         if tag_type == TagType.DOUBLE:
             return NbtDouble(struct.unpack(">d", self._take(8))[0])
@@ -258,7 +255,7 @@ class _Reader:
     def _read_compound_payload(self, depth: int) -> NbtCompound:
         compound = NbtCompound()
 
-        # TAG_End が現れるまで名前付きタグを読み続ける
+        # TAG_Endが現れるまで名前付きタグを読み続ける
         while True:
             tag_type = TagType.from_id(self._read_byte())
 
@@ -273,13 +270,13 @@ class _Reader:
         count = self._read_length()
 
         if element_type == TagType.END:
-            # 要素型 End のリストは空でなければならない
+            # 要素型Endのリストは空でなければならない
             if count != 0:
                 raise SpringNbtError.malformed("要素型 End のリストに %d 個の要素が宣言されている" % count)
 
             return NbtList(TagType.END)
 
-        # 1 要素の最小バイト数から、宣言された個数が入力に収まるかを先に検査する
+        # 1要素の最小バイト数から、宣言された個数が入力に収まるかを先に検査する
         self._ensure_available(count * _minimum_payload_size(element_type))
 
         elements = []
@@ -314,7 +311,7 @@ class _Reader:
     def _read_length(self) -> int:
         length = struct.unpack(">i", self._take(4))[0]
 
-        # 長さは i32 だが、負値は仕様上ありえない
+        # 長さはi32だが、負値は仕様上ありえない
         if length < 0:
             raise SpringNbtError.malformed("長さが負値: %d" % length)
 
@@ -344,19 +341,19 @@ class _Reader:
 def _require_utf8_representable(text: str, role: str) -> str:
     """キーやルート名として使える文字列か検査する
 
-    値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）
-    Minecraft が書き出すキーは ASCII の識別子のみで、
+    値と違い、キーには孤立サロゲートを許さない
+    Minecraftが書き出すキーはASCIIの識別子のみで、
     孤立サロゲートが現れるのはデータ破損を意味する
     """
     # 対にならないサロゲートが含まれていないか調べる
     index = 0
-    # コード単位を 1 つずつ見て、サロゲート対をまとめる
+    # コード単位を1つずつ見て、サロゲート対をまとめる
     while index < len(text):
         code = ord(text[index])
 
-        # 上位サロゲートは、対になる下位サロゲートとまとめて 1 文字を成す
+        # 上位サロゲートは、対になる下位サロゲートとまとめて1文字を成す
         if 0xD800 <= code <= 0xDBFF:
-            # 対が揃っていれば 2 コード単位を消費する
+            # 対が揃っていれば2コード単位を消費する
             # 揃わなければ孤立サロゲート
             if index + 1 < len(text) and 0xDC00 <= ord(text[index + 1]) <= 0xDFFF:
                 index += 2
@@ -386,15 +383,15 @@ _MINIMUM_PAYLOAD_SIZE = {
     TagType.FLOAT: 4,
     TagType.LONG: 8,
     TagType.DOUBLE: 8,
-    # 長さフィールドの 4 バイトは必ずある
+    # 長さフィールドの4バイトは必ずある
     TagType.BYTE_ARRAY: 4,
     TagType.INT_ARRAY: 4,
     TagType.LONG_ARRAY: 4,
-    # 長さフィールドの 2 バイトは必ずある
+    # 長さフィールドの2バイトは必ずある
     TagType.STRING: 2,
-    # 要素型 1 バイト + 個数 4 バイト
+    # 要素型1バイト + 個数4バイト
     TagType.LIST: 5,
-    # 終端の TAG_End 1 バイトは必ずある
+    # 終端のTAG_End 1バイトは必ずある
     TagType.COMPOUND: 1,
 }
 
@@ -405,17 +402,17 @@ _MINIMUM_PAYLOAD_SIZE = {
 
 
 class _Writer:
-    """NBT を展開済みのバイト列へ書き出す
+    """NBTを展開済みのバイト列へ書き出す
 
     出力は一意でなければならない（ラウンドトリップ検証が成立するため）
-    Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す
+    Compoundは挿入順のまま、浮動小数点はビットパターンのまま書き出す
     """
 
     def __init__(self) -> None:
         self._buffer = bytearray()
 
     def write_root(self, named: NamedTag, fmt: NbtFormat) -> bytes:
-        """ルートタグを 1 つ書き出す
+        """ルートタグを1つ書き出す
         形式によって名前の有無が変わる
         """
         self._buffer.append(TagType.COMPOUND.value)
@@ -438,7 +435,8 @@ class _Writer:
         elif isinstance(tag, NbtLong):
             self._buffer += struct.pack(">q", tag.value)
         elif isinstance(tag, NbtFloat):
-            self._buffer += struct.pack(">f", tag.value)
+            # NaNや-0.0を保つため、値ではなくビットパターンを書く
+            self._buffer += tag._to_bits()
         elif isinstance(tag, NbtDouble):
             self._buffer += struct.pack(">d", tag.value)
         elif isinstance(tag, NbtByteArray):
@@ -483,8 +481,8 @@ class _Writer:
     def _write_string(self, text: str) -> None:
         encoded = mutf8.encode(text)
 
-        # 長さフィールドは u16
-        # キー名は素の str なのでここでも検査する
+        # 長さフィールドはu16
+        # キー名は素のstrなのでここでも検査する
         if len(encoded) > mutf8.MAX_BYTE_LENGTH:
             raise SpringNbtError.invalid_argument(
                 "文字列が長すぎる: MUTF-8 で %d バイト (上限 %d)"
@@ -507,19 +505,19 @@ def detect_compression(data: bytes) -> Compression:
     if len(data) == 0:
         raise SpringNbtError.malformed("入力が空で圧縮方式を判定できない")
 
-    # GZip は必ず 1F 8B で始まる
+    # GZipは必ず1F 8Bで始まる
     if len(data) >= 2 and data[0] == 0x1F and data[1] == 0x8B:
         return Compression.GZIP
 
     if len(data) >= 2:
-        # zlib ヘッダは「圧縮法が 8 (deflate)」かつ「先頭2バイトが 31 の倍数」
+        # zlibヘッダは「圧縮法が8 (deflate)」かつ「先頭2バイトが31の倍数」
         is_deflate = (data[0] & 0x0F) == 0x08
         header = (data[0] << 8) | data[1]
 
         if is_deflate and header % 31 == 0:
             return Compression.ZLIB
 
-    # 無圧縮なら先頭は TAG_Compound のタグID
+    # 無圧縮なら先頭はTAG_CompoundのタグID
     if data[0] == TagType.COMPOUND.value:
         return Compression.NONE
 
@@ -527,19 +525,20 @@ def detect_compression(data: bytes) -> Compression:
 
 
 def _decompress(data: bytes, options: NbtReadOptions) -> bytes:
-    # AUTO なら先頭バイトから圧縮方式を見分ける
+    # AUTOなら先頭バイトから圧縮方式を見分ける
     if options.compression == Compression.AUTO:
         method = detect_compression(data)
     else:
         method = options.compression
 
-    # 方式ごとに圧縮する
+    # 方式ごとに展開する
     if method == Compression.NONE:
         plain = data
     elif method == Compression.GZIP:
         try:
             plain = gzip.decompress(data)
-        except OSError as error:
+        except (OSError, EOFError, zlib.error) as error:
+            # GZipでないデータ、途中で切れたデータ、中身の壊れたデータのどれも、仕様に反するデータとして扱う
             raise SpringNbtError(ErrorCode.MALFORMED_DATA, "GZip データを展開できない") from error
     elif method == Compression.ZLIB:
         try:
@@ -562,7 +561,7 @@ def _compress(plain: bytes, method: Compression) -> bytes:
         return plain
 
     if method == Compression.GZIP:
-        # mtime を 0 に固定して、同じ入力から同じバイト列が出るようにする
+        # mtimeを0に固定して、同じ入力から同じバイト列が出るようにする
         return gzip.compress(plain, mtime=0)
 
     if method == Compression.ZLIB:
@@ -572,12 +571,12 @@ def _compress(plain: bytes, method: Compression) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# 公開 API
+# 公開API
 # ---------------------------------------------------------------------------
 
 
 def read_bytes(data: bytes, options: Optional[NbtReadOptions] = None) -> NamedTag:
-    """バイト列から NBT を読む"""
+    """バイト列からNBTを読む"""
     if options is None:
         effective = _DEFAULT_READ
     else:
@@ -585,17 +584,17 @@ def read_bytes(data: bytes, options: Optional[NbtReadOptions] = None) -> NamedTa
 
     reader = _Reader(_decompress(data, effective), effective.max_depth)
 
-    # Python は既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
+    # Pythonは既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
     with _recursion.guard(effective.max_depth, "ネストが深すぎて読み込めない"):
         return reader.read_root(effective.format)
 
 
 def read_bytes_at(data: bytes, offset: int,
                   options: Optional[NbtReadOptions] = None) -> "NbtReadResult":
-    """バイト列の指定した位置から NBT を 1 つ読む
+    """バイト列の指定した位置からNBTを1つ読む
 
-    複数の NBT が連なっているデータを、先頭から順に読み進めるために使う
-    戻り値の end が次の開始位置になる
+    複数のNBTが連なっているデータを、先頭から順に読み進めるために使う
+    戻り値のendが次の開始位置になる
 
     位置は渡したバイト列そのものを指すので、圧縮されたデータは扱えない
 
@@ -610,7 +609,7 @@ def read_bytes_at(data: bytes, offset: int,
 
     reader = _Reader(data, effective.max_depth, offset)
 
-    # Python は既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
+    # Pythonは既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
     with _recursion.guard(effective.max_depth, "ネストが深すぎて読み込めない"):
         tag = reader.read_root_tag(effective.format)
 
@@ -619,25 +618,25 @@ def read_bytes_at(data: bytes, offset: int,
 
 def read_bytes_all(data: bytes,
                    options: Optional[NbtReadOptions] = None) -> List[NamedTag]:
-    """バイト列に連なっている NBT をすべて読む
+    """バイト列に連なっているNBTをすべて読む
 
     入力を使い切るまで読み続ける
     空のバイト列なら空の一覧を返す
 
-    圧縮は入力全体に 1 回かかっているものとして扱う
+    圧縮は入力全体に1回かかっているものとして扱う
 
     :raises SpringNbtError: 読み込みに失敗した場合
     """
     effective = _effective_read_options(options)
     tags: List[NamedTag] = []
 
-    # 空の入力は「0 個」であってエラーではない
+    # 空の入力は「0個」であってエラーではない
     if len(data) == 0:
         return tags
 
     reader = _Reader(_decompress(data, effective), effective.max_depth)
 
-    # Python は既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
+    # Pythonは既定の再帰上限が仕様の深さ上限に届かないため、ここで引き上げる
     with _recursion.guard(effective.max_depth, "ネストが深すぎて読み込めない"):
         # 入力を使い切るまでルートタグを読み続ける
         while reader.has_more:
@@ -662,7 +661,7 @@ def _require_plain_input(options: NbtReadOptions) -> None:
 
 
 def read_file(path: str, options: Optional[NbtReadOptions] = None) -> NamedTag:
-    """ファイルから NBT を読む"""
+    """ファイルからNBTを読む"""
     try:
         with open(path, "rb") as handle:
             data = handle.read()
@@ -673,7 +672,7 @@ def read_file(path: str, options: Optional[NbtReadOptions] = None) -> NamedTag:
 
 
 def read_stream(stream, options: Optional[NbtReadOptions] = None) -> NamedTag:
-    """ストリームから NBT を読む
+    """ストリームからNBTを読む
     ストリームは最後まで読み切る
     """
     try:
@@ -685,13 +684,13 @@ def read_stream(stream, options: Optional[NbtReadOptions] = None) -> NamedTag:
 
 
 def write_bytes(named: NamedTag, options: Optional[NbtWriteOptions] = None) -> bytes:
-    """NBT をバイト列へ書き出す"""
+    """NBTをバイト列へ書き出す"""
     if options is None:
         effective = _DEFAULT_WRITE
     else:
         effective = options
 
-    # 書き込み時に Auto は決められない
+    # 書き込み時にAutoは決められない
     if effective.compression == Compression.AUTO:
         raise SpringNbtError.invalid_argument("書き込みで Compression.AUTO は指定できない")
 
@@ -705,7 +704,7 @@ def write_bytes(named: NamedTag, options: Optional[NbtWriteOptions] = None) -> b
 
 
 def write_file(path: str, named: NamedTag, options: Optional[NbtWriteOptions] = None) -> None:
-    """NBT をファイルへ書き出す"""
+    """NBTをファイルへ書き出す"""
     data = write_bytes(named, options)
 
     try:
@@ -716,7 +715,7 @@ def write_file(path: str, named: NamedTag, options: Optional[NbtWriteOptions] = 
 
 
 def write_stream(stream, named: NamedTag, options: Optional[NbtWriteOptions] = None) -> None:
-    """NBT をストリームへ書き出す"""
+    """NBTをストリームへ書き出す"""
     data = write_bytes(named, options)
 
     try:

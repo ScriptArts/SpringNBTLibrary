@@ -3,13 +3,11 @@ package io.github.scriptarts.springnbt.nbt;
 import io.github.scriptarts.springnbt.SpringNbtException;
 
 /**
- * 展開済みのバイト列から NBT を読み出す
+ * 展開済みのバイト列からNBTを読み出す
  *
  * <p>入力全体をあらかじめメモリに持つ設計にしている
  * 「宣言された長さが残り入力長を超えていないか」を確保前に検査できるようにするため
- * これがないと、長さ 0x7FFFFFFF を宣言しただけの数バイトの入力でメモリを枯渇させられる
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md}
+ * これがないと、長さ0x7FFFFFFFを宣言しただけの数バイトの入力でメモリを枯渇させられる
  */
 final class NbtBinaryReader {
 
@@ -56,13 +54,13 @@ final class NbtBinaryReader {
     }
 
     /**
-     * ルートタグを 1 つ読む
+     * ルートタグを1つ読む
      * 末尾の余りは見ない
      */
     NamedTag readRootTag(NbtFormat format) {
         TagType type = TagType.fromId(readByteRaw() & 0xFF);
 
-        // Java版のファイル形式でもネットワーク形式でも、ルートは必ず TAG_Compound
+        // Java版のファイル形式でもネットワーク形式でも、ルートは必ずTAG_Compound
         if (type != TagType.COMPOUND) {
             throw SpringNbtException.malformed(
                     "ルートタグは compound でなければならないが " + type.asString() + " だった");
@@ -83,7 +81,7 @@ final class NbtBinaryReader {
 
     /** 指定した型のペイロードを読む */
     private NbtTag readPayload(TagType type, int depth) {
-        // 深さ上限は再帰する型に入る手前で検査する
+        // 深さ上限は型を問わず、ペイロードを読む前に検査する
         if (depth > maxDepth) {
             throw SpringNbtException.limitExceeded("ネストが深すぎる (上限 " + maxDepth + ")");
         }
@@ -105,11 +103,11 @@ final class NbtBinaryReader {
         };
     }
 
-    /** TAG_Compound のペイロード（名前付きタグの並び + TAG_End）を読む */
+    /** TAG_Compoundのペイロード（名前付きタグの並び + TAG_End）を読む */
     private NbtCompound readCompoundPayload(int depth) {
         NbtCompound compound = new NbtCompound();
 
-        // TAG_End が現れるまで名前付きタグを読み続ける
+        // TAG_Endが現れるまで名前付きタグを読み続ける
         while (true) {
             TagType type = TagType.fromId(readByteRaw() & 0xFF);
 
@@ -122,13 +120,13 @@ final class NbtBinaryReader {
         }
     }
 
-    /** TAG_List のペイロードを読む */
+    /** TAG_Listのペイロードを読む */
     private NbtList readListPayload(int depth) {
         TagType elementType = TagType.fromId(readByteRaw() & 0xFF);
         int count = readLength();
 
         if (elementType == TagType.END) {
-            // 要素型 End のリストは空でなければならない
+            // 要素型Endのリストは空でなければならない
             if (count != 0) {
                 throw SpringNbtException.malformed(
                         "要素型 End のリストに " + count + " 個の要素が宣言されている");
@@ -137,7 +135,7 @@ final class NbtBinaryReader {
             return new NbtList(TagType.END);
         }
 
-        // 1 要素の最小バイト数から、宣言された個数が入力に収まるかを先に検査する
+        // 1要素の最小バイト数から、宣言された個数が入力に収まるかを先に検査する
         ensureAvailable((long) count * minimumPayloadSize(elementType));
 
         NbtList list = new NbtList(elementType);
@@ -166,7 +164,7 @@ final class NbtBinaryReader {
 
         int[] result = new int[count];
 
-        // 4 バイトずつビッグエンディアンで読む
+        // 4バイトずつビッグエンディアンで読む
         for (int index = 0; index < count; index++) {
             result[index] = (int) readUnsigned(4);
         }
@@ -180,7 +178,7 @@ final class NbtBinaryReader {
 
         long[] result = new long[count];
 
-        // 8 バイトずつビッグエンディアンで読む
+        // 8バイトずつビッグエンディアンで読む
         for (int index = 0; index < count; index++) {
             result[index] = readUnsigned(8);
         }
@@ -188,7 +186,7 @@ final class NbtBinaryReader {
         return result;
     }
 
-    /** MUTF-8 の文字列（u16 の長さ + 本体）を読む */
+    /** MUTF-8の文字列（u16の長さ + 本体）を読む */
     private String readString() {
         int length = (int) readUnsigned(2);
         ensureAvailable(length);
@@ -205,7 +203,7 @@ final class NbtBinaryReader {
     private int readLength() {
         int length = (int) readUnsigned(4);
 
-        // 長さは i32 だが、負値は仕様上ありえない
+        // 長さはi32だが、負値は仕様上ありえない
         if (length < 0) {
             throw SpringNbtException.malformed("長さが負値: " + length);
         }
@@ -248,8 +246,8 @@ final class NbtBinaryReader {
     /**
      * キーやルート名として使える文字列か検査する
      *
-     * <p>値と違い、キーには孤立サロゲートを許さない（仕様 10 の 2.2章）
-     * Minecraft が書き出すキーは ASCII の識別子のみで、
+     * <p>値と違い、キーには孤立サロゲートを許さない
+     * Minecraftが書き出すキーはASCIIの識別子のみで、
      * 孤立サロゲートが現れるのはデータ破損を意味する
      */
     private static String requireUtf8Representable(String text, String role) {
@@ -257,9 +255,9 @@ final class NbtBinaryReader {
         for (int index = 0; index < text.length(); index++) {
             char c = text.charAt(index);
 
-            // 上位サロゲートは、対になる下位サロゲートとまとめて 1 文字を成す
+            // 上位サロゲートは、対になる下位サロゲートとまとめて1文字を成す
             if (Character.isHighSurrogate(c)) {
-                // 対が揃っていれば 2 コード単位を消費する
+                // 対が揃っていれば2コード単位を消費する
                 // 揃わなければ孤立サロゲート
                 if (index + 1 < text.length() && Character.isLowSurrogate(text.charAt(index + 1))) {
                     index += 1;
@@ -284,13 +282,13 @@ final class NbtBinaryReader {
             case SHORT -> 2;
             case INT, FLOAT -> 4;
             case LONG, DOUBLE -> 8;
-            // 長さフィールドの 4 バイトは必ずある
+            // 長さフィールドの4バイトは必ずある
             case BYTE_ARRAY, INT_ARRAY, LONG_ARRAY -> 4;
-            // 長さフィールドの 2 バイトは必ずある
+            // 長さフィールドの2バイトは必ずある
             case STRING -> 2;
-            // 要素型 1 バイト + 個数 4 バイト
+            // 要素型1バイト + 個数4バイト
             case LIST -> 5;
-            // 終端の TAG_End 1 バイトは必ずある
+            // 終端のTAG_End 1バイトは必ずある
             case COMPOUND, END -> 1;
         };
     }

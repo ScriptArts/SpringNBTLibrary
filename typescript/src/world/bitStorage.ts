@@ -1,20 +1,18 @@
 /**
- * 添字を 64bit 整数の配列へ詰めた表現
- * 1.16 以降の**跨ぎなし**パッキング
+ * 添字を64bit整数の配列へ詰めた表現
+ * 1.16以降の**跨ぎなし**パッキング
  *
- * 1 つの `bigint` に入りきらない分は、その値の残りビットを未使用のまま捨て、
+ * 1つの`bigint`に入りきらない分は、その値の残りビットを未使用のまま捨て、
  * 次の値の最下位ビットから始める
- *
- * 仕様: `docs/spec/31-paletted-container.md` 2章
  */
 
 import { SpringNbtError } from "../errors.js";
 
 /**
- * 添字を 64bit 整数の配列へ詰めた表現
- * 1.16 以降の**跨ぎなし**パッキング
+ * 添字を64bit整数の配列へ詰めた表現
+ * 1.16以降の**跨ぎなし**パッキング
  *
- * 1 つの `bigint` に入りきらない分は、その値の残りビットを未使用のまま捨て、
+ * 1つの`bigint`に入りきらない分は、その値の残りビットを未使用のまま捨て、
  * 次の値の最下位ビットから始める
  */
 export class BitStorage {
@@ -28,20 +26,20 @@ export class BitStorage {
     this.#entryCount = entryCount;
   }
 
-  /** 1 エントリあたりのビット数 */
+  /** 1エントリあたりのビット数 */
   get bitsPerEntry(): number {
     return this.#bitsPerEntry;
   }
 
   /**
    * エントリ数
-   * ブロックなら 4096、バイオームなら 64
+   * ブロックなら4096、バイオームなら64
    */
   get entryCount(): number {
     return this.#entryCount;
   }
 
-  /** 1 つの 64bit 値に入るエントリ数 */
+  /** 1つの64bit値に入るエントリ数 */
   get valuesPerLong(): number {
     return Math.floor(64 / this.#bitsPerEntry);
   }
@@ -60,9 +58,10 @@ export class BitStorage {
   }
 
   /**
-   * 既存の 64bit 配列から作る
+   * 既存の64bit配列から作る
    *
-   * @param lenient true なら配列長からビット幅を逆算して読む（第三者ツール由来の救済）
+   * @param lenient trueなら、配列長が期待値と違う場合に配列長からビット幅を逆算して読む
+   * 第三者ツールが書いたデータの救済用
    */
   static fromLongs(
     data: BigInt64Array,
@@ -95,7 +94,7 @@ export class BitStorage {
     );
   }
 
-  /** 必要な 64bit 値の個数を求める */
+  /** 必要な64bit値の個数を求める */
   static longCount(bitsPerEntry: number, entryCount: number): number {
     const valuesPerLong = Math.floor(64 / bitsPerEntry);
     return Math.ceil(entryCount / valuesPerLong);
@@ -138,7 +137,7 @@ export class BitStorage {
   }
 
   /**
-   * packed な配列を返す
+   * packedな配列を返す
    * 内部の配列をそのまま返す（コピーしない）
    */
   toLongs(): BigInt64Array {

@@ -5,28 +5,25 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 圧縮方式ID 4 (LZ4) のチャンクを展開する
+ * 圧縮方式ID 4（LZ4）のチャンクを展開する
  *
- * <p>素の LZ4 ブロックでも LZ4 フレーム形式でもなく、
- * 独自ヘッダを持つブロックの連結である
+ * <p>素のLZ4ブロックでもLZ4フレーム形式でもなく、独自ヘッダを持つブロックの連結である
  *
  * <p>書き込みには対応しない
- * 書き戻すときは Zlib になる
- *
- * <p>仕様: {@code docs/spec/20-anvil-region.md} 3.1.1 / 3.1.2
+ * NBTとして書き戻すときは既定でZlibになり、生バイトのまま書き戻すとLZ4のまま残る
  */
 final class Lz4 {
 
-    /** ブロックの先頭に必ず置かれる 8 バイト */
+    /** ブロックの先頭に必ず置かれる8バイト */
     private static final byte[] MAGIC = "LZ4Block".getBytes(StandardCharsets.US_ASCII);
 
     /** ブロックヘッダの長さ */
     private static final int HEADER_LENGTH = 21;
 
-    /** トークン上位 4 ビット: 本体が無圧縮 */
+    /** トークン上位4ビット: 本体が無圧縮 */
     private static final int METHOD_STORED = 0x10;
 
-    /** トークン上位 4 ビット: 本体が LZ4 圧縮 */
+    /** トークン上位4ビット: 本体がLZ4圧縮 */
     private static final int METHOD_COMPRESSED = 0x20;
 
     /** マッチの最小長 */
@@ -37,7 +34,7 @@ final class Lz4 {
     }
 
     /**
-     * LZ4Block の連結を展開する
+     * LZ4Blockの連結を展開する
      *
      * @param payload 圧縮済みペイロード
      * @return 展開後のバイト列
@@ -54,14 +51,14 @@ final class Lz4 {
         return output.toByteArray();
     }
 
-    /** ブロックを 1 つ展開し、次のブロックの開始位置を返す */
+    /** ブロックを1つ展開し、次のブロックの開始位置を返す */
     private static int decompressBlock(byte[] payload, int position, ByteArrayOutputStream output) {
         if (position + HEADER_LENGTH > payload.length) {
             throw SpringNbtException.malformed(
                     "LZ4: ブロックヘッダが足りない（" + (payload.length - position) + " バイト）");
         }
 
-        // マジックが違えばそもそも LZ4Block ではない
+        // マジックが違えばそもそもLZ4Blockではない
         for (int index = 0; index < MAGIC.length; index++) {
             if (payload[position + index] != MAGIC[index]) {
                 throw SpringNbtException.malformed("LZ4: ブロックが LZ4Block で始まっていない");
@@ -80,7 +77,7 @@ final class Lz4 {
         }
 
         if (method == METHOD_STORED) {
-            // 無圧縮なら 2 つの長さは一致していなければならない
+            // 無圧縮なら2つの長さは一致していなければならない
             if (compressedLength != originalLength) {
                 throw SpringNbtException.malformed(
                         "LZ4: 無圧縮ブロックの長さが食い違う（"
@@ -99,19 +96,19 @@ final class Lz4 {
         return body + compressedLength;
     }
 
-    /** ヘッダに書かれた 2 つの長さが妥当か調べる */
+    /** ヘッダに書かれた2つの長さが妥当か調べる */
     private static void validateLengths(int compressedLength, int originalLength) {
         if (compressedLength < 0 || originalLength < 0) {
             throw SpringNbtException.malformed("LZ4: ブロックの長さが負値");
         }
 
-        // 片方だけが 0 になることはない
+        // 片方だけが0になることはない
         if ((compressedLength == 0) != (originalLength == 0)) {
             throw SpringNbtException.malformed("LZ4: ブロックの長さが片方だけ 0");
         }
     }
 
-    /** 素の LZ4 ブロックを展開する */
+    /** 素のLZ4ブロックを展開する */
     private static byte[] decompressRawBlock(byte[] source, int start, int length,
                                              int originalLength) {
         byte[] output = new byte[originalLength];
@@ -126,7 +123,7 @@ final class Lz4 {
 
             int literalLength = token >> 4;
 
-            // 15 なら追加バイトで長さが続く
+            // 15なら追加バイトで長さが続く
             if (literalLength == 15) {
                 literalLength += readLength(source, input, end);
             }
@@ -151,7 +148,7 @@ final class Lz4 {
 
             int matchLength = (token & 0x0F) + MIN_MATCH;
 
-            // 下位 4 ビットが 15 なら追加バイトで長さが続く
+            // 下位4ビットが15なら追加バイトで長さが続く
             if ((token & 0x0F) == 15) {
                 matchLength += readLength(source, input, end);
             }
@@ -167,11 +164,11 @@ final class Lz4 {
         return output;
     }
 
-    /** 255 が続く形式の追加長さを読む */
+    /** 255が続く形式の追加長さを読む */
     private static int readLength(byte[] source, int[] input, int end) {
         int total = 0;
 
-        // 255 未満のバイトが出るまで足し続ける
+        // 255未満のバイトが出るまで足し続ける
         while (true) {
             if (input[0] >= end) {
                 throw SpringNbtException.malformed("LZ4: 長さの追加バイトが途中で切れた");
@@ -211,7 +208,7 @@ final class Lz4 {
 
         int from = written - offset;
 
-        // コピー元と先は重なりうるので 1 バイトずつ写す
+        // コピー元と先は重なりうるので1バイトずつ写す
         for (int index = 0; index < length; index++) {
             output[written + index] = output[from + index];
         }
@@ -219,7 +216,10 @@ final class Lz4 {
         return written + length;
     }
 
-    /** リトルエンディアンの i32 を読む。この形式だけ他と逆になる */
+    /**
+     * リトルエンディアンのi32を読む
+     * この形式だけ他と逆になる
+     */
     private static int readInt32LittleEndian(byte[] source, int position) {
         return (source[position] & 0xFF)
                 | ((source[position + 1] & 0xFF) << 8)

@@ -21,7 +21,7 @@ public final class WorldOpenOptions {
      * 読み書きで開くか
      * 既定は読み取り専用
      *
-     * @return 読み書きなら true
+     * @return 読み書きならtrue
      */
     public boolean writable() {
         return writable;
@@ -30,7 +30,7 @@ public final class WorldOpenOptions {
     /**
      * 読み書きで開くかを設定する
      *
-     * @param value 読み書きなら true
+     * @param value 読み書きならtrue
      * @return このオブジェクト
      */
     public WorldOpenOptions setWritable(boolean value) {
@@ -39,22 +39,22 @@ public final class WorldOpenOptions {
     }
 
     /**
-     * {@code session.lock} の確認を飛ばすか
+     * {@code session.lock}の確認を飛ばすか
      *
-     * <p>Minecraft が起動中のワールドへ書き込むとデータが壊れる
+     * <p>Minecraftが起動中のワールドへ書き込むとデータがおかしくなる
      * 既定では書き込みモードで開くときに必ず確認する
      * これを立てるのは自己責任
      *
-     * @return 飛ばすなら true
+     * @return 飛ばすならtrue
      */
     public boolean ignoreSessionLock() {
         return ignoreSessionLock;
     }
 
     /**
-     * {@code session.lock} の確認を飛ばすかを設定する
+     * {@code session.lock}の確認を飛ばすかを設定する
      *
-     * @param value 飛ばすなら true
+     * @param value 飛ばすならtrue
      * @return このオブジェクト
      */
     public WorldOpenOptions setIgnoreSessionLock(boolean value) {

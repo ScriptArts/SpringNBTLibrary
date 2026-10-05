@@ -1,9 +1,9 @@
 /**
- * NBT レイヤの単体テスト。
+ * NBTレイヤの単体テスト
  *
- * 他言語版と同じ検証項目を持つ。
- * 共通テストベクタによる言語間比較は spec/run-conformance.sh が担当し、
- * ここでは API の振る舞いを直接確かめる。
+ * 他言語版と同じ検証項目を持つ
+ * 共通テストベクタによる言語間比較はspec/run-conformance.shが担当し、
+ * ここではAPIの振る舞いを直接確かめる
  */
 
 import assert from "node:assert/strict";
@@ -40,7 +40,7 @@ import {
 const UNCOMPRESSED_READ = { compression: Compression.None };
 const UNCOMPRESSED_WRITE = { compression: Compression.None };
 
-/** 仕様書どおりに組んだ最小の NBT。 */
+/** 仕様書どおりに組んだ最小のNBT */
 function helloWorldBytes(): Uint8Array {
   return Uint8Array.from([
     // ルート: TAG_Compound、名前 "hello world"
@@ -101,7 +101,7 @@ test("MUTF-8: 不正な入力を弾く", () => {
     Uint8Array.from([0xe3, 0x81]),
   ];
 
-  // 素の 0x00 / 冗長符号化 / 4バイト形式 / 途中で切れた入力 のすべてを拒否する
+  // 素の0x00、冗長符号化、4バイト形式、途中で切れた入力のすべてを拒否する
   for (const data of cases) {
     assertErrorCode(() => mutf8.decode(data), ErrorCode.MalformedData);
   }
@@ -122,6 +122,16 @@ test("手で組んだ hello_world を読める", () => {
   assert.equal(named.name, "hello world");
   assert.equal(named.tag.size, 1);
   assert.equal(named.tag.getString("name"), "Bananrama");
+});
+
+test("NaNのビットパターンを変えずに書き戻す", () => {
+  // ペイロード付き・負・シグナリングのNaNを、Float / Doubleの両方で持つCompound
+  const original = Uint8Array.from([
+    0x0a, 0x00, 0x00, 0x05, 0x00, 0x01, 0x61, 0x7f, 0xc0, 0x00, 0x01, 0x05, 0x00, 0x01, 0x62, 0xff, 0xc0, 0x00, 0x00, 0x05, 0x00, 0x01, 0x63, 0x7f, 0x80, 0x00, 0x01, 0x06, 0x00, 0x01, 0x64, 0x7f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x06, 0x00, 0x01, 0x65, 0xff, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x66, 0x7f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+  ]);
+  const named = readBytes(original, UNCOMPRESSED_READ);
+
+  assert.deepEqual(writeBytes(named, UNCOMPRESSED_WRITE), original);
 });
 
 test("読んで書き直すと同じバイト列になる", () => {
@@ -148,7 +158,7 @@ test("浮動小数点の特殊値はビットパターンが保たれる", () =>
   const encoded = writeBytes(new NamedTag("", root), UNCOMPRESSED_WRITE);
   const decoded = readBytes(encoded, UNCOMPRESSED_READ).tag;
 
-  // -0 と +0 は === では区別できないので Object.is で見る
+  // -0と+0は === では区別できないので、Object.isで見る
   assert.ok(Object.is(decoded.getDouble("negative_zero"), -0));
   assert.ok(Number.isNaN(decoded.getFloat("nan")));
   assert.equal(decoded.getDouble("infinity"), Number.POSITIVE_INFINITY);
@@ -188,11 +198,23 @@ test("リストは異なる型の混在を拒否する", () => {
   assertErrorCode(() => list.add(new NbtString("x")), ErrorCode.UnexpectedTagType);
 });
 
+test("リストの範囲外の位置は要素型を確定させずに拒否する", () => {
+  const list = new NbtList();
+
+  assert.throws(() => list.set(0, new NbtInt(1)), RangeError);
+  assert.throws(() => list.insert(1, new NbtInt(1)), RangeError);
+  assert.throws(() => list.get(0), RangeError);
+  assert.throws(() => list.removeAt(0), RangeError);
+
+  // 失敗した操作で要素型が確定していない
+  assert.equal(list.elementType, TagType.End);
+});
+
 test("型付き取得子はキー欠落と型不一致を区別する", () => {
   const root = new NbtCompound();
   root.set("value", new NbtString("text"));
 
-  // キーが無い場合は undefined
+  // キーが無い場合はundefined
   assert.equal(root.optInt("missing"), undefined);
 
   // 型が違う場合はキーの有無に関わらず例外
@@ -203,11 +225,24 @@ test("型付き取得子はキー欠落と型不一致を区別する", () => {
 test("圧縮方式が自動判定される", () => {
   const named = readBytes(helloWorldBytes(), UNCOMPRESSED_READ);
 
-  // 3 種の方式それぞれで、書き出した結果を方式指定なしで読み戻せること
+  // 3種の方式それぞれで、書き出した結果を方式指定なしで読み戻せること
   for (const method of [Compression.Gzip, Compression.Zlib, Compression.None]) {
     const encoded = writeBytes(named, { compression: method });
     assert.equal(detectCompression(encoded), method);
     assert.equal(readBytes(encoded).tag.getString("name"), "Bananrama");
+  }
+});
+
+test("壊れた圧縮データはMALFORMED_DATAになる", () => {
+  const named = readBytes(helloWorldBytes(), UNCOMPRESSED_READ);
+  const gzip = writeBytes(named, { compression: Compression.Gzip });
+  const truncated = gzip.slice(0, Math.floor(gzip.length / 2));
+  const brokenGzip = Uint8Array.from([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff]);
+  const brokenZlib = Uint8Array.from([0x78, 0x9c, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+
+  // 途中で切れたGZip、中身の壊れたGZip、中身の壊れたZlibは、どれも仕様に反するデータとして扱う
+  for (const data of [truncated, brokenGzip, brokenZlib]) {
+    assertErrorCode(() => readBytes(data), ErrorCode.MalformedData);
   }
 });
 
@@ -220,7 +255,7 @@ test("ネットワーク形式はルート名を持たない", () => {
     compression: Compression.None,
   });
 
-  // タグID + ペイロード のみで、名前長の 2 バイトが無い
+  // タグID + ペイロードのみで、名前長の2バイトが無い
   assert.equal(encoded[0], 0x0a);
   assert.equal(encoded[1], 0x03);
 
@@ -242,7 +277,7 @@ test("途中で切れた入力を弾く", () => {
 });
 
 test("巨大な宣言長は確保前に弾く", () => {
-  // ルート直下に「長さ 0x7FFFFFFF の ByteArray」を宣言するだけの入力
+  // ルート直下に「長さ0x7FFFFFFFのByteArray」を宣言するだけの入力
   const data = Uint8Array.from([
     0x0a, 0x00, 0x00, 0x07, 0x00, 0x01, 0x61, 0x7f, 0xff, 0xff, 0xff,
   ]);
@@ -278,7 +313,7 @@ test("書き込みで Auto は指定できない", () => {
 });
 
 test("整数の範囲は構築時に検査される", () => {
-  // number は幅を持たないため、構築時に検査しないと書き出しで黙って壊れる
+  // numberは幅を持たないため、構築時に検査しないと書き出しで気づかないうちにおかしくなる
   assertErrorCode(() => new NbtByte(128), ErrorCode.InvalidArgument);
   assertErrorCode(() => new NbtByte(-129), ErrorCode.InvalidArgument);
   assertErrorCode(() => new NbtShort(32768), ErrorCode.InvalidArgument);
@@ -287,7 +322,7 @@ test("整数の範囲は構築時に検査される", () => {
 });
 
 test("Long は bigint で保持され精度が落ちない", () => {
-  // number では 2^53 を超える整数を正確に表せないため bigint を使う
+  // numberでは2^53を超える整数を正確に表せないため、bigintを使う
   const root = new NbtCompound();
   root.set("seed", new NbtLong(-4172144997902289642n));
 
@@ -303,6 +338,10 @@ test("Float は構築時に binary32 へ丸められる", () => {
   assert.notEqual(value, 0.1);
 });
 
+/**
+ * TAG_Endを除く12種のタグ型をすべて含むCompoundを作る
+ * TAG_EndはCompoundの終端として書き出されるので、往復させれば13種すべてを読み書きする
+ */
 function buildAllTags(): NbtCompound {
   const root = new NbtCompound();
   root.set("byte", new NbtByte(-128));
@@ -335,7 +374,7 @@ function buildAllTags(): NbtCompound {
 function buildNestedCompound(depth: number): Uint8Array {
   const bytes: number[] = [0x0a, 0x00, 0x00];
 
-  // ルート + (depth - 1) 段の入れ子
+  // ルート + (depth - 1)段の入れ子
   for (let index = 0; index < depth - 1; index++) {
     bytes.push(0x0a, 0x00, 0x01, 0x63);
   }
@@ -389,7 +428,8 @@ test("拡張された整数リテラル", () => {
 });
 
 test("16進リテラルの接尾辞の扱いは仕様で固定されている", () => {
-  // 仕様 11 の 2.1: 16進では b/d/f を数字として読む。幅接尾辞は s/l のみ
+  // 16進ではb/d/fを数字として読む
+  // 幅接尾辞はs/lのみ
   assert.equal((snbt.parse("0xFF") as NbtInt).value, 255);
   assert.equal((snbt.parse("0xFFb") as NbtInt).value, 4091);
   assert.equal((snbt.parse("0xFFl") as NbtLong).value, 255n);
@@ -422,7 +462,7 @@ test("型付き配列", () => {
     BigInt64Array.from([1n, 2n]),
   );
 
-  // 接尾辞なしでも範囲内なら受理する（Minecraft 自身がそう書き出すため）
+  // 接尾辞なしでも範囲内なら受理する（Minecraft自身がそう書き出すため）
   assert.deepEqual((snbt.parse("[B; 1, 2]") as NbtByteArray).value, Int8Array.from([1, 2]));
   assertErrorCode(() => snbt.parse("[B; 200]"), ErrorCode.MalformedData);
 });
@@ -433,7 +473,7 @@ test("末尾カンマを許す", () => {
 });
 
 test("異種リストは受理しない", () => {
-  // バイナリ NBT へ写せないため受理しない (adr/0006)
+  // バイナリNBTへ写せないため受理しない
   assertErrorCode(() => snbt.parse('[1, "a"]'), ErrorCode.MalformedData);
 });
 
@@ -444,6 +484,26 @@ test("エスケープシーケンス", () => {
   assert.equal((snbt.parse('"\\s"') as NbtString).value, " ");
   assert.equal((snbt.parse('"\\U0001F600"') as NbtString).value, "\u{1F600}");
   assertErrorCode(() => snbt.parse('"\\N{SNOWMAN}"'), ErrorCode.UnsupportedFeature);
+});
+
+test("サロゲートのエスケープはどこでも同じ規則に従う", () => {
+  const lone = String.fromCharCode(0xd800);
+
+  // \Uでサロゲートの範囲を書くと、\uと同じく孤立サロゲートになる
+  assert.equal((snbt.parse('"\\U0000D800"') as NbtString).value, lone);
+  assert.equal((snbt.parse('"\\uD800"') as NbtString).value, lone);
+
+  // 対になったサロゲートは補助文字1文字と同じ
+  assert.equal((snbt.parse('"\\uD83D\\uDE00"') as NbtString).value, "\u{1F600}");
+
+  // コードポイントの範囲外と、キーの孤立サロゲートは仕様に反する
+  for (const source of ['"\\U00110000"', '{"\\uD800":1}', '{"\\U0000D800":1}']) {
+    assertErrorCode(() => snbt.parse(source), ErrorCode.MalformedData);
+  }
+
+  // APIからも孤立サロゲートのキーは設定できない
+  const compound = new NbtCompound();
+  assertErrorCode(() => compound.set(lone, new NbtInt(1)), ErrorCode.InvalidArgument);
 });
 
 test("単一引用符の文字列", () => {
@@ -533,7 +593,7 @@ test("Double の正準10進表記", () => {
 });
 
 test("負のゼロは符号を保つ", () => {
-  // JavaScript の toExponential は -0 の符号を落とすため、ここが崩れやすい
+  // JavaScriptのtoExponentialは-0の符号を落とすため、ここで出力を間違えやすい
   assert.equal(snbt.write(new NbtDouble(-0)), "-0.0d");
   assert.equal(snbt.write(new NbtFloat(-0)), "-0.0f");
 });
@@ -543,6 +603,12 @@ test("特殊値の表記", () => {
   assert.equal(snbt.write(new NbtDouble(Number.POSITIVE_INFINITY)), "Infinityd");
   assert.equal(snbt.write(new NbtDouble(Number.NEGATIVE_INFINITY)), "-Infinityd");
   assert.equal(snbt.write(new NbtFloat(Number.NaN)), "NaNf");
+});
+
+test("binary32の範囲を超える値は符号付きの無限大になる", () => {
+  assert.equal((snbt.parse("1e39f") as NbtFloat).value, Number.POSITIVE_INFINITY);
+  assert.equal((snbt.parse("-1e39f") as NbtFloat).value, Number.NEGATIVE_INFINITY);
+  assert.equal(new NbtFloat(1e39).value, Number.POSITIVE_INFINITY);
 });
 
 test("書き出した表記を読み戻すとビットが一致する", () => {
@@ -580,14 +646,14 @@ test("equals: 同じ型で同じ値なら等しい", () => {
 });
 
 test("equals: 型が違えば等しくない", () => {
-  // 値が同じでもタグの型が違えば別物
+  // 値が同じでもタグの型が違えば等しくない
   assert.ok(!new NbtInt(1).equals(new NbtShort(1)));
   assert.ok(!new NbtInt(1).equals(1));
   assert.ok(!new NbtInt(1).equals(undefined));
 });
 
 test("equals: 浮動小数点はビットパターンで比べる", () => {
-  // NaN 同士は等しく、+0.0 と -0.0 は等しくない
+  // NaN同士は等しく、+0.0と-0.0は等しくない
   assert.ok(new NbtFloat(NaN).equals(new NbtFloat(NaN)));
   assert.ok(new NbtDouble(NaN).equals(new NbtDouble(NaN)));
   assert.ok(!new NbtFloat(0).equals(new NbtFloat(-0)));
@@ -609,7 +675,7 @@ test("equals: リストは要素型と並びを見る", () => {
   reversed.add(new NbtInt(1));
   assert.ok(!left.equals(reversed));
 
-  // 空でも要素型が違えば別物
+  // 空でも要素型が違えば等しくない
   assert.ok(!new NbtList(TagType.Int).equals(new NbtList(TagType.Byte)));
 });
 
@@ -623,7 +689,7 @@ test("equals: Compound はキーの並び順も見る", () => {
   same.set("b", new NbtInt(2));
   assert.ok(left.equals(same));
 
-  // 中身は同じでも挿入順が違えば別物
+  // 中身は同じでも挿入順が違えば等しくない
   const reordered = new NbtCompound();
   reordered.set("b", new NbtInt(2));
   reordered.set("a", new NbtInt(1));
@@ -719,7 +785,7 @@ test("型付き設定子は取得子と対になっている", () => {
   assert.deepEqual(root.getIntArray("ia"), Int32Array.from([1, -1]));
   assert.deepEqual(root.getLongArray("la"), BigInt64Array.from([1n, -1n]));
 
-  // 真偽値は TAG_Byte の 0 / 1 として入る
+  // 真偽値はTAG_Byteの0 / 1として入る
   assert.equal(root.get("t").type, TagType.Byte);
 });
 
@@ -736,7 +802,7 @@ test("型付き設定子は挿入順を変えない", () => {
 });
 
 test("どの型も人が読める文字列になる", () => {
-  // 中身の形式は仕様で決めていないので、[object Object] にならないことだけを見る
+  // 中身の形式は仕様で決めていないので、[object Object]にならないことだけを見る
   const list = new NbtList();
   list.add(new NbtInt(1));
 
@@ -759,7 +825,7 @@ test("どの型も人が読める文字列になる", () => {
     new NamedTag("root", compound),
   ];
 
-  // どれも既定の [object Object] のままになっていないこと
+  // どれも既定の[object Object]のままになっていないこと
   for (const value of values) {
     assert.notEqual(String(value), "[object Object]", value.constructor.name);
   }
@@ -770,7 +836,7 @@ test("どの型も人が読める文字列になる", () => {
   assert.equal(String(compound), "{1 要素}");
 });
 
-/** 複数のバイト列をつなぐ。 */
+/** 複数のバイト列をつなぐ */
 function concat(...parts: Uint8Array[]): Uint8Array {
   let total = 0;
 
@@ -791,6 +857,6 @@ function concat(...parts: Uint8Array[]): Uint8Array {
   return joined;
 }
 
-/** 型が推論できることを確かめるだけの参照（未使用変数の警告を避ける）。 */
+/** 型が推論できることを確かめるだけの参照（未使用変数の警告を避ける） */
 const _tagTypeReference: NbtTag | undefined = undefined;
 void _tagTypeReference;

@@ -7,8 +7,7 @@ on:
 
 # ドキュメント・コメントの規約から外れたものを検出する。
 #
-# 人手で5言語ぶんを揃え続けるのは必ず破綻するので、ここで機械的に守る
-# （docs/adr/0009-static-api-extraction.md）。
+# 人手で5言語ぶんを揃え続けると必ずうまくいかなくなるので、ここで機械的に守る。
 jobs:
   check:
     name: ドキュメントとコメントの規約
@@ -28,6 +27,6 @@ jobs:
         run: python3 spec/tools/check_links.py
 
       # 「if / ループにコメントを入れる」は独自の規約なので、
-      # 各言語の標準 Linter には該当ルールが無い。自前で見るしかない
+      # 各言語の標準Linterには該当ルールが無い。自前で見るしかない
       - name: コメントと禁止記法の規約適合を調べる
         run: python3 spec/tools/check_comments.py

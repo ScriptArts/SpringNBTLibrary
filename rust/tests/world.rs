@@ -1,10 +1,7 @@
-//! World / Block レイヤ。
+//! World / Blockレイヤ
 //!
-//! 仕様: `docs/spec/30-chunk-format.md` / `31-paletted-container.md` / `40-world-layout.md`
-//!
-//! 他言語版と同じ検証項目を持つ。
-//! 共通テストベクタによる言語間比較は `spec/run-conformance.sh` が担当し、
-//! ここでは API の振る舞いを直接確かめる。
+//! 他言語版と同じ検証項目を持つ
+//! 共通テストベクタによる言語間比較は`spec/run-conformance.sh`が担当し、ここではAPIの振る舞いを直接確かめる
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -13,15 +10,16 @@ use std::rc::Rc;
 use spring_nbt_library::error::{Error, ErrorCode};
 use spring_nbt_library::nbt::tag::{NbtCompound, NbtString, NbtTag};
 use spring_nbt_library::nbt::{
-    read_file, write_bytes, Compression, NamedTag, NbtReadOptions, NbtWriteOptions,
+    read_file, write_bytes, write_file, Compression, NamedTag, NbtReadOptions, NbtWriteOptions,
 };
+use spring_nbt_library::anvil::{ChunkCompression, RegionFile, RegionFileMode};
 use spring_nbt_library::world::{
     ceil_log2, BitStorage, BlockState, Chunk, ChunkReadOptions, ChunkWriteOptions, MinecraftWorld,
     PalettedContainer, VersionMismatchAction, WorldOpenOptions,
 };
 use spring_nbt_library::TARGET_DATA_VERSION;
 
-/// 共通テストベクタ（world/*.nbt）のパス。
+/// 共通テストベクタ（world/*.nbt）のパス
 fn vector_path(name: &str) -> PathBuf {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -35,20 +33,20 @@ fn vector_path(name: &str) -> PathBuf {
     path
 }
 
-/// テストベクタをチャンクとして読む。
+/// テストベクタをチャンクとして読む
 fn load_chunk(name: &str) -> Chunk {
     let named = read_file(vector_path(name), &NbtReadOptions::default()).expect("読めない");
     Chunk::from_nbt(named.tag, &ChunkReadOptions::default()).expect("チャンクとして解釈できない")
 }
 
-/// ブロックのパレット要素を作る。
+/// ブロックのパレット要素を作る
 fn block_entry(name: &str) -> NbtTag {
     let mut entry = NbtCompound::new();
     entry.set("Name", NbtTag::String(NbtString::new(name)));
     NbtTag::Compound(entry)
 }
 
-/// エラーが期待したコードであることを確かめる。
+/// エラーが期待したコードであることを確かめる
 fn assert_code(expected: ErrorCode, error: Error) {
     assert_eq!(expected, error.code(), "エラーコードが違う: {error}");
 }
@@ -132,7 +130,7 @@ fn 壊れた文字列はinvalid_argument() {
         "minecraft:oak_stairs[]extra",
     ];
 
-    // 壊し方ごとに同じエラーコードになることを確かめる
+    // 崩し方ごとに同じエラーコードになることを確かめる
     for text in broken {
         match BlockState::parse(text) {
             Ok(_) => panic!("解釈が通ってしまった: {text}"),
@@ -171,7 +169,8 @@ fn 書いた値をそのまま読み出せる() {
 fn long境界を跨がずに詰める() {
     let mut storage = BitStorage::create(5, 4096).unwrap();
 
-    // bits=5 なら 1 つの long に 12 個。12 個目は次の long の最下位から始まる
+    // bits=5なら1つのlongに12個
+    // 添字12は次のlongの最下位から始まる
     storage.set(11, 31).unwrap();
     storage.set(12, 1).unwrap();
     let longs = storage.as_longs();
@@ -207,7 +206,7 @@ fn ビット幅に対して長さが合わない配列はmalformed_data() {
 
 #[test]
 fn 寛容モードなら長さからビット幅を逆算する() {
-    // 4096 エントリを 342 long で表せるのは bits=5 のときだけ
+    // 4096エントリを342 longで表せるのはbits=5のときだけ
     let storage = BitStorage::from_longs(vec![0; 342], 4, 4096, true).unwrap();
     assert_eq!(5, storage.bits_per_entry());
 }
@@ -259,7 +258,7 @@ fn 単一値のコンテナはdataを持たない() {
 fn 値を足すとパレットとビット幅が広がる() {
     let mut container = PalettedContainer::filled(block_entry("minecraft:air"), 4096, 4);
 
-    // パレットを 17 要素まで増やして bits=4 から 5 への拡張を起こす
+    // 17種のブロックを足してパレットを18要素にし、bits=4から5への拡張を起こす
     for index in 0..17 {
         container
             .set(index, block_entry(&format!("minecraft:block_{index}")))
@@ -291,7 +290,7 @@ fn compactで未使用のパレット要素が消える() {
 
     container.compact().unwrap();
 
-    // 残るのは実際に使われている air と dirt の 2 つ
+    // 残るのは実際に使われているairとdirtの2つ
     assert_eq!(2, container.palette().len());
 
     match container.get(0).unwrap() {
@@ -354,7 +353,8 @@ fn ビット幅5のチャンクを端から端まで読める() {
     let chunk = load_chunk("palette_17");
     let head = ["minecraft:air", "minecraft:stone"];
 
-    // ベクタの添字は (位置 * 11) % 17。パレット先頭 2 つだけ名前が違う
+    // ベクタの添字は (位置 * 11) % 17
+    // パレットの先頭2つだけ名前が違う
     for position in 0..4096i32 {
         let palette_index = ((position * 11) % 17) as usize;
         let block = chunk
@@ -412,7 +412,7 @@ fn バイオームは4ブロック単位で効く() {
     let mut chunk = load_chunk("palette_1");
     chunk.set_biome(0, -64, 0, "minecraft:desert").unwrap();
 
-    // 同じ 4×4×4 の枠内はまとめて変わる
+    // 同じ4×4×4の枠内はまとめて変わる
     assert_eq!(
         Some("minecraft:desert".to_string()),
         chunk.get_biome(3, -61, 3).unwrap()
@@ -465,14 +465,14 @@ fn ブロックを置き換えると同じ座標の付随データが消える()
     assert_eq!(2, chunk.raw().get_list("block_ticks").unwrap().len());
     assert_eq!(1, chunk.raw().get_list("fluid_ticks").unwrap().len());
 
-    // (0,-64,0) には chest と block_tick、(1,-64,1) には furnace と fluid_tick がある
+    // (0,-64,0)にはchestとblock_tick、(1,-64,1)にはfurnaceとfluid_tickがある
     let stone = BlockState::parse("minecraft:stone").unwrap();
     chunk.set_block(0, -64, 0, &stone).unwrap();
     chunk.set_block(1, -64, 1, &stone).unwrap();
 
     let entities = chunk.raw().get_list("block_entities").unwrap();
 
-    // 触っていない (15,-50,15) の barrel だけが残る
+    // 触っていない(15,-50,15)のbarrelだけが残る
     assert_eq!(1, entities.len());
 
     match entities.get(0).unwrap() {
@@ -507,8 +507,7 @@ fn 同じブロックを置き直しても付随データは消えない() {
 
 #[test]
 fn 別のチャンクの同じ相対座標は消さない() {
-    // 付随データは絶対座標で持つので、チャンク座標を取り違えると
-    // 無関係な要素を消してしまう
+    // 付随データは絶対座標で持つので、チャンク座標を間違えると無関係な要素を消してしまう
     let named = read_file(vector_path("block_entities"), &NbtReadOptions::default()).unwrap();
     let mut root = named.tag;
     root.set("xPos", NbtTag::Int(1));
@@ -518,7 +517,8 @@ fn 別のチャンクの同じ相対座標は消さない() {
     let stone = BlockState::parse("minecraft:stone").unwrap();
     chunk.set_block(0, -64, 0, &stone).unwrap();
 
-    // このチャンクの (0,-64,0) は絶対座標 (16,-64,16)。どれとも一致しない
+    // このチャンクの(0,-64,0)は絶対座標(16,-64,16)
+    // どれとも一致しない
     assert_eq!(3, chunk.raw().get_list("block_entities").unwrap().len());
 }
 
@@ -572,10 +572,10 @@ fn チャンク内の相対座標が範囲外ならinvalid_argument() {
 }
 
 // ---------------------------------------------------------------------------
-// DataVersion の扱い
+// DataVersionの扱い
 // ---------------------------------------------------------------------------
 
-/// DataVersion だけを差し替えたチャンクを作る。
+/// DataVersionだけを差し替えたチャンクを作る
 fn foreign_chunk() -> NbtCompound {
     let named = read_file(vector_path("palette_1"), &NbtReadOptions::default()).unwrap();
     let mut root = named.tag;
@@ -654,12 +654,12 @@ fn 許可すれば古いチャンクも元のバージョンのまま書き戻�
         allow_foreign_data_version: true,
     };
 
-    // DataVersion は読んだ値のまま残す
+    // DataVersionは読んだ値のまま残す
     let written = chunk.to_nbt(&write).unwrap();
     assert_eq!(3953, written.get_int("DataVersion").unwrap());
 }
 
-/// 対象より新しい DataVersion を持つチャンクを作る。
+/// 対象より新しいDataVersionを持つチャンクを作る
 fn newer_chunk() -> NbtCompound {
     let named = read_file(vector_path("palette_1"), &NbtReadOptions::default()).unwrap();
     let mut root = named.tag;
@@ -679,7 +679,7 @@ fn 新しいバージョンのチャンクは警告を出さない() {
         lenient_bit_storage: false,
     };
 
-    // 形式が同じであれば、新しいバージョンでも黙って読める
+    // 形式が同じであれば、新しいバージョンでも警告を出さずに読める
     let chunk = Chunk::from_nbt(newer_chunk(), &read).unwrap();
     assert_eq!(chunk.data_version().unwrap(), 5015);
     assert!(warnings.borrow().is_empty());
@@ -699,7 +699,7 @@ fn 新しいバージョンのチャンクはエラー設定でも通る() {
 fn 新しいバージョンのチャンクはそのまま書き戻せる() {
     let chunk = Chunk::from_nbt(newer_chunk(), &ChunkReadOptions::default()).unwrap();
 
-    // 許可を出さなくても書き戻せて、DataVersion も変わらない
+    // 許可を出さなくても書き戻せて、DataVersionも変わらない
     let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
     assert_eq!(5015, written.get_int("DataVersion").unwrap());
 }
@@ -741,6 +741,52 @@ fn level_datが無いディレクトリはio() {
     }
 }
 
+#[test]
+fn 次元経由で読んだチャンクの警告も通知先へ届く() {
+    let work = std::env::temp_dir().join(format!("springnbt-warn-{}", std::process::id()));
+    let region = work.join("dimensions").join("minecraft").join("overworld").join("region");
+    std::fs::create_dir_all(&region).unwrap();
+
+    // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
+    let mut level = NbtCompound::new();
+    level.set("Data", NbtTag::Compound(NbtCompound::new()));
+    write_file(work.join("level.dat"), &NamedTag::new("", level), &NbtWriteOptions::default())
+        .unwrap();
+
+    {
+        let mut file = RegionFile::open(region.join("r.0.0.mca"), RegionFileMode::ReadWrite).unwrap();
+        file.write_chunk(0, 0, &foreign_chunk(), ChunkCompression::Zlib).unwrap();
+        file.close().unwrap();
+    }
+
+    let warnings: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&warnings);
+    let options = WorldOpenOptions {
+        chunk_read: ChunkReadOptions {
+            on_warning: Some(Box::new(move |message: &str| {
+                sink.borrow_mut().push(message.to_string());
+            })),
+            ..ChunkReadOptions::default()
+        },
+        ..WorldOpenOptions::default()
+    };
+
+    let found = {
+        let mut world = MinecraftWorld::open(&work, options).unwrap();
+        let overworld = world.dimension("minecraft:overworld").unwrap().unwrap();
+        let found = overworld.chunk(0, 0).unwrap().is_some();
+        world.close().unwrap();
+        found
+    };
+
+    // 判定の前に一時ディレクトリを片付ける
+    std::fs::remove_dir_all(&work).unwrap();
+
+    // ワールドを開くときに渡した通知先が、次元経由の読み込みでも呼ばれる
+    assert!(found);
+    assert_eq!(1, warnings.borrow().len());
+}
+
 
 // ---------------------------------------------------------------------------
 // 文字列でのブロック指定と、変更の印
@@ -765,7 +811,7 @@ fn marks_the_chunk_as_modified() {
     chunk.set_block(3, -60, 7, "minecraft:stone").unwrap();
     assert!(chunk.is_modified());
 
-    // 保存済みとして印を下ろせる
+    // 保存済みとして印を外せる
     chunk.set_is_modified(false);
     assert!(!chunk.is_modified());
 

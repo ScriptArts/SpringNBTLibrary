@@ -1,10 +1,8 @@
-//! チャンク 1 つ分
-//! 地形の読み書きの入口
+//! チャンク1つ分
+//! 地形の読み書きはここから行う
 //!
-//! 読んだ NBT をそのまま保持し、変更した部分だけを書き戻す
-//! 未知のキーを落とさないので、将来の追加要素があってもデータを壊さない
-//!
-//! 仕様: `docs/spec/30-chunk-format.md`
+//! 読んだNBTをそのまま保持し、書き戻すときに作り直すのはセクションだけにする
+//! 未知のキーを落とさないので、将来の追加要素があってもデータをおかしくしない
 
 use std::collections::BTreeMap;
 
@@ -15,10 +13,10 @@ use crate::MIN_SUPPORTED_DATA_VERSION;
 use super::block_state::{BlockState, IntoBlockState};
 use super::paletted_container::PalettedContainer;
 
-/// セクション 1 つに入るブロック数
+/// セクション1つに入るブロック数
 pub const BLOCKS_PER_SECTION: usize = 4096;
 
-/// セクション 1 つに入るバイオームのエントリ数（4×4×4 単位）
+/// セクション1つに入るバイオームのエントリ数（4×4×4単位）
 pub const BIOMES_PER_SECTION: usize = 64;
 
 /// ブロックに紐づく付随データのキー
@@ -44,28 +42,26 @@ fn matches_position(entry: &NbtCompound, x: i32, y: i32, z: i32) -> bool {
     entry_x == x && entry_y == y && entry_z == z
 }
 
-/// DataVersion が対象と違ったときの動作
+/// DataVersionが扱える形式より古いときの動作
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VersionMismatchAction {
     /// 警告コールバックを呼んで続行する
     /// 既定
     Warn,
-    /// [`ErrorCode::UnsupportedDataVersion`] の例外にする
+    /// [`ErrorCode::UnsupportedDataVersion`]の例外にする
     Error,
     /// 何もしない
     Ignore,
 }
 
 /// チャンク読み込みのオプション
-///
-/// 仕様: `docs/spec/30-chunk-format.md` 5章
 pub struct ChunkReadOptions {
-    /// DataVersion が扱える形式より古いときの動作
+    /// DataVersionが扱える形式より古いときの動作
     pub on_version_mismatch: VersionMismatchAction,
     /// 警告の通知先
-    /// `None` なら何もしない
+    /// `None`なら何もしない
     pub on_warning: Option<Box<dyn Fn(&str)>>,
-    /// data の長さが期待値と違うとき、長さからビット幅を逆算して読むか
+    /// dataの長さが期待値と違うとき、長さからビット幅を逆算して読むか
     pub lenient_bit_storage: bool,
 }
 
@@ -91,17 +87,17 @@ impl std::fmt::Debug for ChunkReadOptions {
 /// チャンク書き込みのオプション
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ChunkWriteOptions {
-    /// 対象バージョン以外の DataVersion を持つチャンクの書き戻しを許すか
+    /// 扱える形式より古いDataVersionを持つチャンクの書き戻しを許すか
     ///
-    /// 既定は `false`
-    /// 古いワールドを黙って新形式で上書きし、
-    /// 利用者が気づかないうちに壊すことを防ぐため（`docs/adr/0003-version-policy.md`）
+    /// 既定は`false`
+    /// エラーを出さずに古いワールドを新形式で上書きし、
+    /// 利用者が気づかないうちに使えなくすることを防ぐため
     pub allow_foreign_data_version: bool,
 }
 
-/// チャンクを Y 方向に 16 ブロックずつ区切った 16×16×16 の立方体
+/// チャンクをY方向に16ブロックずつ区切った16×16×16の立方体
 ///
-/// `BlockLight` / `SkyLight` などの解釈していないキーは元の NBT に残り、
+/// `BlockLight` / `SkyLight`などの解釈していないキーは元のNBTに残り、
 /// 書き戻しでそのまま出力される
 #[derive(Debug, Clone)]
 pub struct ChunkSection {
@@ -113,13 +109,13 @@ pub struct ChunkSection {
 
 impl ChunkSection {
     /// セクションのY位置
-    /// オーバーワールドは -5..20
+    /// オーバーワールドは-5..20
     pub fn y(&self) -> i32 {
         self.y
     }
 
     /// ブロック状態
-    /// 持たないセクション（光源専用）では `None`
+    /// 持たないセクション（光源専用）では`None`
     pub fn block_states(&self) -> Option<&PalettedContainer> {
         self.block_states.as_ref()
     }
@@ -130,7 +126,7 @@ impl ChunkSection {
     }
 
     /// バイオーム
-    /// 持たないセクションでは `None`
+    /// 持たないセクションでは`None`
     pub fn biomes(&self) -> Option<&PalettedContainer> {
         self.biomes.as_ref()
     }
@@ -150,13 +146,13 @@ impl ChunkSection {
         self.biomes.is_some()
     }
 
-    /// 元の NBT
+    /// 元のNBT
     /// 解釈していないキーもここに残っている
     pub fn raw(&self) -> &NbtCompound {
         &self.raw
     }
 
-    /// NBT からセクションを読む
+    /// NBTからセクションを読む
     pub fn from_nbt(nbt: &NbtCompound, options: &ChunkReadOptions) -> Result<ChunkSection> {
         let mut section = ChunkSection {
             raw: nbt.clone(),
@@ -165,7 +161,7 @@ impl ChunkSection {
             biomes: None,
         };
 
-        // 光源専用のセクションは block_states を持たない
+        // 光源専用のセクションはblock_statesを持たない
         if let Some(block_states) = nbt.opt_compound("block_states")? {
             section.block_states = Some(PalettedContainer::from_nbt(
                 block_states,
@@ -188,7 +184,7 @@ impl ChunkSection {
         Ok(section)
     }
 
-    /// NBT へ書き戻す
+    /// NBTへ書き戻す
     /// 解釈していないキーはそのまま残る
     pub fn to_nbt(&self) -> Result<NbtCompound> {
         let mut result = self.raw.clone();
@@ -224,7 +220,7 @@ impl ChunkSection {
     }
 }
 
-/// チャンク 1 つ分
+/// チャンク1つ分
 #[derive(Debug, Clone)]
 pub struct Chunk {
     raw: NbtCompound,
@@ -249,12 +245,12 @@ impl Chunk {
     }
 
     /// 最下段セクションのY位置
-    /// オーバーワールドは -4
+    /// オーバーワールドは-4
     pub fn min_section_y(&self) -> Result<i32> {
         self.raw.get_int("yPos")
     }
 
-    /// 生成段階（`minecraft:full` など）
+    /// 生成段階（`minecraft:full`など）
     pub fn status(&self) -> Result<&str> {
         self.raw.get_string("Status")
     }
@@ -271,11 +267,10 @@ impl Chunk {
     /// このチャンクに変更が加わったか
     ///
     /// ブロックやバイオームを書き換えると立つ
-    /// [`Dimension::flush`](crate::world::Dimension::flush) は
+    /// [`Dimension::flush`](crate::world::Dimension::flush)は
     /// これが立っているチャンクだけを書き戻す
     ///
-    /// [`Chunk::raw`] を直接いじった場合はここが立たないので、
-    /// 自分で [`Chunk::set_is_modified`] を呼ぶこと
+    /// [`Chunk::raw`]を直接いじった場合は立たないので、自分で[`Chunk::set_is_modified`]を呼ぶこと
     pub fn is_modified(&self) -> bool {
         self.modified
     }
@@ -291,13 +286,13 @@ impl Chunk {
         self.sections.keys().copied().collect()
     }
 
-    /// 元の NBT
+    /// 元のNBT
     /// 解釈していないキーもここに残っている
     pub fn raw(&self) -> &NbtCompound {
         &self.raw
     }
 
-    /// NBT からチャンクを読む
+    /// NBTからチャンクを読む
     pub fn from_nbt(nbt: NbtCompound, options: &ChunkReadOptions) -> Result<Chunk> {
         let mut chunk = Chunk { raw: nbt, sections: BTreeMap::new(), modified: false };
         chunk.check_data_version(options)?;
@@ -307,7 +302,7 @@ impl Chunk {
             None => return Ok(chunk),
         };
 
-        // 並び順に依存しないよう、Y から索引を作る
+        // 並び順に依存しないよう、Yから索引を作る
         for entry in section_list.iter() {
             let section_tag = match entry {
                 NbtTag::Compound(compound) => compound,
@@ -329,7 +324,7 @@ impl Chunk {
         Ok(chunk)
     }
 
-    /// DataVersion を検査し、オプションに従って警告またはエラーにする
+    /// DataVersionを検査し、オプションに従って警告またはエラーにする
     fn check_data_version(&self, options: &ChunkReadOptions) -> Result<()> {
         let version = self.data_version()?;
 
@@ -358,12 +353,12 @@ impl Chunk {
         Ok(())
     }
 
-    /// NBT へ書き戻す
-    /// 変更したセクションだけを反映し、他のキーはそのまま残す
+    /// NBTへ書き戻す
+    /// 全セクションを書き戻し、他のキーはそのまま残す
     pub fn to_nbt(&self, options: &ChunkWriteOptions) -> Result<NbtCompound> {
         let version = self.data_version()?;
 
-        // 形式の違う古いチャンクは、書き戻すと壊しかねない
+        // 形式の違う古いチャンクは、書き戻すと使えなくなりかねない
         if version < MIN_SUPPORTED_DATA_VERSION && !options.allow_foreign_data_version {
             return Err(Error::new(
                 ErrorCode::UnsupportedDataVersion,
@@ -375,7 +370,7 @@ impl Chunk {
             ));
         }
 
-        // DataVersion は読んだ値のまま残す
+        // DataVersionは読んだ値のまま残す
         // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
         let mut result = self.raw.clone();
 
@@ -385,7 +380,7 @@ impl Chunk {
 
         let mut section_list = NbtList::with_element_type(TagType::Compound);
 
-        // Y の昇順で書き出す
+        // Yの昇順で書き出す
         for section in self.sections.values() {
             section_list.push(NbtTag::Compound(section.to_nbt()?))?;
         }
@@ -395,7 +390,7 @@ impl Chunk {
     }
 
     /// Y位置からセクションを得る
-    /// 無ければ `None`
+    /// 無ければ`None`
     pub fn section(&self, section_y: i32) -> Option<&ChunkSection> {
         self.sections.get(&section_y)
     }
@@ -406,7 +401,7 @@ impl Chunk {
     }
 
     /// ブロックを取得する
-    /// X と Z はチャンク内相対 (0..15)、Y は絶対座標
+    /// XとZはチャンク内相対 (0..15)、Yは絶対座標
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Result<Option<BlockState>> {
         check_local_coordinates(x, z)?;
 
@@ -431,13 +426,12 @@ impl Chunk {
 
     /// ブロックを設定する
     ///
-    /// `&BlockState` のほか、`"minecraft:oak_stairs[facing=north]"` の形の
-    /// 文字列でも指定できる
+    /// `&BlockState`のほか、`"minecraft:oak_stairs[facing=north]"`の形の文字列でも指定できる
     pub fn set_block<S>(&mut self, x: i32, y: i32, z: i32, state: &S) -> Result<()>
     where
         S: IntoBlockState + ?Sized,
     {
-        // すでに BlockState を持っているなら借りるだけで済ませる
+        // すでにBlockStateを持っているなら借りるだけで済ませる
         let borrowed = state.as_block_state()?;
         let state: &BlockState = &borrowed;
         check_local_coordinates(x, z)?;
@@ -445,7 +439,7 @@ impl Chunk {
         let index = block_index(x, y, z);
 
         // 同じ状態を置き直すだけなら、付随データを触る理由がない
-        // プロパティの並び順に左右されないよう、NBT ではなく BlockState として比べる
+        // プロパティの並び順に左右されないよう、NBTではなくBlockStateとして比べる
         if let Some(current) = self.get_block(x, y, z)? {
             if &current == state {
                 return Ok(());
@@ -477,13 +471,13 @@ impl Chunk {
 
     /// その座標を指す付随データを取り除く
     ///
-    /// `block_entities` / `block_ticks` / `fluid_ticks` の要素は
-    /// いずれも `x` `y` `z` を**絶対座標**で持つ
+    /// `block_entities` / `block_ticks` / `fluid_ticks`の要素は
+    /// いずれも`x` `y` `z`を**絶対座標**で持つ
     fn remove_block_data(&mut self, x: i32, y: i32, z: i32) -> Result<()> {
         let absolute_x = (self.x()? * 16) + x;
         let absolute_z = (self.z()? * 16) + z;
 
-        // 3 つのリストは形が同じなので、まとめて同じ処理をかける
+        // 3つのリストは形が同じなので、まとめて同じ処理をかける
         for key in BLOCK_DATA_KEYS {
             let filtered = match self.raw.opt_list(key)? {
                 Some(list) if !list.is_empty() => {
@@ -526,7 +520,7 @@ impl Chunk {
     }
 
     /// バイオームを取得する
-    /// 4×4×4 の単位なので、座標は自動的に丸められる
+    /// 4×4×4の単位なので、座標は自動的に丸められる
     pub fn get_biome(&self, x: i32, y: i32, z: i32) -> Result<Option<String>> {
         check_local_coordinates(x, z)?;
 
@@ -556,7 +550,7 @@ impl Chunk {
     }
 
     /// バイオームを設定する
-    /// 4×4×4 の単位
+    /// 4×4×4の単位
     pub fn set_biome(&mut self, x: i32, y: i32, z: i32, biome: &str) -> Result<()> {
         check_local_coordinates(x, z)?;
         let section_y = y >> 4;
@@ -581,17 +575,16 @@ impl Chunk {
         Ok(())
     }
 
-    /// `Heightmaps` を削除し、Minecraft に再計算させる
+    /// `Heightmaps`を削除し、Minecraftに再計算させる
     ///
     /// 本ライブラリは高さマップを再計算しない
     /// ブロックを改変したら呼ぶこと
-    /// （`docs/adr/0004-defer-heightmap-recalc.md`）
     pub fn clear_heightmaps(&mut self) {
         self.raw.remove("Heightmaps");
         self.modified = true;
     }
 
-    /// `isLightOn` を 0 にし、光源の再計算を促す
+    /// `isLightOn`を0にし、光源の再計算を促す
     pub fn invalidate_lighting(&mut self) {
         self.raw.set_byte("isLightOn", 0);
         self.modified = true;
@@ -610,19 +603,19 @@ impl Chunk {
 
 /// セクション内のブロック添字
 ///
-/// `& 15` により負のY座標でも正しく求まる
+/// `& 15`により負のY座標でも正しく求まる
 pub fn block_index(x: i32, y: i32, z: i32) -> usize {
     (((y & 15) * 256) + ((z & 15) * 16) + (x & 15)) as usize
 }
 
 /// セクション内のバイオーム添字
-/// 1 エントリが 4×4×4 ブロック
+/// 1エントリが4×4×4ブロック
 pub fn biome_index(x: i32, y: i32, z: i32) -> usize {
     ((((y & 15) / 4) * 16) + (((z & 15) / 4) * 4) + ((x & 15) / 4)) as usize
 }
 
 fn check_local_coordinates(x: i32, z: i32) -> Result<()> {
-    // チャンク内相対座標は 0..15 でなければならない
+    // チャンク内相対座標は0..15でなければならない
     if !(0..=15).contains(&x) || !(0..=15).contains(&z) {
         return Err(Error::new(
             ErrorCode::InvalidArgument,

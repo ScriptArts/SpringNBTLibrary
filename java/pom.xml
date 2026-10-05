@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
 
     <name>SpringNBTLibrary</name>
-    <description>Minecraft Java Edition の NBT / Anvil ワールドデータを読み書きするライブラリ</description>
+    <description>Minecraft Java EditionのNBT / Anvilワールドデータを読み書きするライブラリ</description>
     <url>https://github.com/scriptarts/SpringNBTLibrary</url>
 
     <licenses>
@@ -27,8 +27,7 @@
     </properties>
 
     <dependencies>
-        <!-- LZ4 (圧縮ID=4) は v0.1.0 では未実装。生バイトでのみ取り出せる。
-             実装するときに lz4-java を任意依存として足す（docs/features.md） -->
+        <!-- LZ4（圧縮ID 4）の展開は自前で持つ。外部の依存を増やさないため -->
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>

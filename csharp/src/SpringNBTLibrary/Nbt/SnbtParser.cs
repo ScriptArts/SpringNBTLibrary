@@ -4,9 +4,8 @@ using System.Text;
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// SNBT (Stringified NBT) のパーサ
+/// SNBT (Stringified NBT)のパーサ
 /// </summary>
-/// <remarks>仕様: <c>docs/spec/11-snbt.md</c></remarks>
 internal sealed class SnbtParser
 {
     private readonly string text;
@@ -18,7 +17,7 @@ internal sealed class SnbtParser
         this.position = 0;
     }
 
-    /// <summary>入力全体を 1 つの値として読む
+    /// <summary>入力全体を1つの値として読む
     /// 末尾に余りがあれば例外</summary>
     internal NbtTag ParseWhole()
     {
@@ -69,14 +68,14 @@ internal sealed class SnbtParser
         NbtCompound compound = new NbtCompound();
         SkipWhitespace();
 
-        // 空の Compound
+        // 空のCompound
         if (Peek() == '}')
         {
             position += 1;
             return compound;
         }
 
-        // 要素を 1 つずつ読む
+        // 要素を1つずつ読む
         while (true)
         {
             SkipWhitespace();
@@ -119,13 +118,13 @@ internal sealed class SnbtParser
     {
         Expect('[');
 
-        // "[B;" のような型付き配列かどうかを先に判定する
+        // "[B;"のような型付き配列かどうかを先に判定する
         if (position + 1 < text.Length && text[position + 1] == ';')
         {
             char marker = text[position];
 
-            // [B; [I; [L; は型付き配列の印
-            // ただの List と見分ける
+            // [B; [I; [L;は型付き配列の印
+            // ただのListと見分ける
             if (marker == 'B' || marker == 'I' || marker == 'L')
             {
                 position += 2;
@@ -148,7 +147,7 @@ internal sealed class SnbtParser
             return list;
         }
 
-        // 要素を 1 つずつ読む
+        // 要素を1つずつ読む
         while (true)
         {
             SkipWhitespace();
@@ -162,7 +161,7 @@ internal sealed class SnbtParser
 
             NbtTag value = ParseValue();
 
-            // 異種リストはバイナリ NBT へ写せないため受理しない (adr/0006)
+            // 異種リストはバイナリNBTへ写せないため受理しない
             if (list.ElementType != TagType.End && list.ElementType != value.Type)
             {
                 throw Malformed(
@@ -240,12 +239,12 @@ internal sealed class SnbtParser
             }
         }
 
-        // [B; は TAG_Byte_Array
+        // [B;はTAG_Byte_Array
         if (marker == 'B')
         {
             sbyte[] result = new sbyte[values.Count];
 
-            // 各要素が Byte の範囲に収まるか確認しながら詰める
+            // 各要素がByteの範囲に収まるか確認しながら詰める
             for (int i = 0; i < values.Count; i++)
             {
                 if (values[i] < sbyte.MinValue || values[i] > sbyte.MaxValue)
@@ -259,13 +258,13 @@ internal sealed class SnbtParser
             return new NbtByteArray(result);
         }
 
-        // [I; は TAG_Int_Array
-        // 残りは TAG_Long_Array
+        // [I;はTAG_Int_Array
+        // 残りはTAG_Long_Array
         if (marker == 'I')
         {
             int[] result = new int[values.Count];
 
-            // 各要素が Int の範囲に収まるか確認しながら詰める
+            // 各要素がIntの範囲に収まるか確認しながら詰める
             for (int i = 0; i < values.Count; i++)
             {
                 if (values[i] < int.MinValue || values[i] > int.MaxValue)
@@ -305,9 +304,18 @@ internal sealed class SnbtParser
     {
         char c = Peek();
 
+        // 引用符で始まるキーは、エスケープを解いて読む
         if (c == '"' || c == '\'')
         {
-            return ParseQuotedString();
+            string quoted = ParseQuotedString();
+
+            // バイナリの読み込みと同じく、キーには孤立サロゲートを許さない
+            if (Mutf8.HasLoneSurrogate(quoted))
+            {
+                throw Malformed("Compound のキーが UTF-8 に写せない（孤立サロゲートを含む）");
+            }
+
+            return quoted;
         }
 
         string bare = ReadBareToken();
@@ -422,7 +430,7 @@ internal sealed class SnbtParser
 
         long value = 0;
 
-        // 指定桁数ぶん 16進数字を読む
+        // 指定桁数ぶん16進数字を読む
         for (int i = 0; i < count; i++)
         {
             char c = text[position + i];
@@ -442,16 +450,23 @@ internal sealed class SnbtParser
 
     private void AppendCodePoint(StringBuilder builder, long codePoint)
     {
-        // Unicode のコードポイント範囲を外れていないか確認する
+        // Unicodeのコードポイント範囲を外れていないか確認する
         if (codePoint < 0 || codePoint > 0x10FFFF)
         {
             throw Malformed($"コードポイントが範囲外: U+{codePoint:X}");
         }
 
+        // サロゲートの範囲は、\uXXXXと同じくそのコード単位を1つ置く
+        if (codePoint >= 0xD800 && codePoint <= 0xDFFF)
+        {
+            builder.Append((char)codePoint);
+            return;
+        }
+
         builder.Append(char.ConvertFromUtf32((int)codePoint));
     }
 
-    /// <summary>Unicode 文字名によるエスケープ <c>\N{...}</c> を読む</summary>
+    /// <summary>Unicode文字名によるエスケープ<c>\N{...}</c>を読む</summary>
     private void AppendNamedCharacter(StringBuilder builder)
     {
         Expect('{');
@@ -471,7 +486,7 @@ internal sealed class SnbtParser
         string name = text.Substring(start, position - start);
         position += 1;
 
-        // .NET には Unicode 文字名の表が無い
+        // .NETにはUnicode文字名の表が無い
         // 実装間で表が揃わないため対応しない
         throw new SpringNbtException(
             ErrorCode.UnsupportedFeature,
@@ -487,7 +502,7 @@ internal sealed class SnbtParser
             throw Malformed($"値が来るべき位置に解釈できない文字がある: '{PeekOrNul()}'");
         }
 
-        // bool(...) / uuid(...) の関数呼び出し
+        // bool(...) / uuid(...)の関数呼び出し
         SkipWhitespace();
         if (PeekOrNul() == '(' && (token == "bool" || token == "uuid"))
         {
@@ -523,7 +538,7 @@ internal sealed class SnbtParser
 
         if (name == "bool")
         {
-            // 0 以外を真とする
+            // 0以外を真とする
             if (ToIntegral(argument) != 0)
             {
                 return new NbtByte(1);
@@ -547,11 +562,11 @@ internal sealed class SnbtParser
             throw Malformed($"UUID として解釈できない: {stringTag.Value}");
         }
 
-        // UUID を上位から 32bit ずつ 4 要素の IntArray へ写す
+        // UUIDを上位から32bitずつ4要素のIntArrayへ写す
         byte[] bytes = guid.ToByteArray(bigEndian: true);
         int[] result = new int[4];
 
-        // UUID の 16 バイトを、4 バイトずつ 4 つの i32 へ詰める
+        // UUIDの16バイトを、4バイトずつ4つのi32へ詰める
         for (int i = 0; i < 4; i++)
         {
             result[i] = (bytes[i * 4] << 24)
@@ -565,7 +580,7 @@ internal sealed class SnbtParser
 
     /// <summary>
     /// 数値トークンを解釈する
-    /// 数値として読めなければ null を返す（文字列として扱われる）
+    /// 数値として読めなければnullを返す（文字列として扱われる）
     /// </summary>
     private NbtTag? TryParseNumber(string token)
     {
@@ -594,11 +609,10 @@ internal sealed class SnbtParser
         bool unsignedSuffix = false;
 
         // 幅接尾辞を末尾から剥がす
-        // 16進では b/d/f が数字と紛れるため s/l だけを認める
         char last = body[body.Length - 1];
         bool suffixAllowed;
 
-        // 16 進では b/d/f が数字なので、型の印として使えるのは s と l だけ
+        // 16進ではb/d/fが数字と紛れるためs/lだけを認める
         if (isHex)
         {
             suffixAllowed = last == 's' || last == 'S' || last == 'l' || last == 'L';
@@ -608,20 +622,20 @@ internal sealed class SnbtParser
             suffixAllowed = "bBsSlLfFdD".IndexOf(last) >= 0;
         }
 
-        // 末尾 1 文字が型の印なら切り離す
-        // 1 文字だけの token は数字そのもの
+        // 末尾1文字が型の印なら切り離す
+        // 符号を除いた本体が1文字だけなら、接尾辞とみなさず剥がさない
         if (suffixAllowed && body.Length >= 2)
         {
             widthSuffix = char.ToLowerInvariant(last);
             body = body.Substring(0, body.Length - 1);
 
-            // 符号接尾辞 u / s は幅接尾辞の手前に置かれる
+            // 符号接尾辞u / sは幅接尾辞の手前に置かれる
             if (body.Length >= 2)
             {
                 char signChar = body[body.Length - 1];
 
-                // u / U は符号なしの印
-                // 1.21.5 以降の拡張構文
+                // u / Uは符号なしの印
+                // 1.21.5以降の拡張構文
                 if (signChar == 'u' || signChar == 'U')
                 {
                     unsignedSuffix = true;
@@ -669,7 +683,7 @@ internal sealed class SnbtParser
 
         bool looksFloating = body.IndexOf('.') >= 0 || body.IndexOf('e') >= 0 || body.IndexOf('E') >= 0;
 
-        // 小数点・指数・f/d の印があれば浮動小数点として読む
+        // 小数点・指数・f/dの印があれば浮動小数点として読む
         if (looksFloating || widthSuffix == 'f' || widthSuffix == 'd')
         {
             if (!double.TryParse(body, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
@@ -690,7 +704,7 @@ internal sealed class SnbtParser
             return false;
         }
 
-        // 2進リテラルの本体は 0 と 1 と桁区切りだけ
+        // 2進リテラルの本体は0と1と桁区切りだけ
         foreach (char c in body)
         {
             if (c != '0' && c != '1' && c != '_')
@@ -721,7 +735,7 @@ internal sealed class SnbtParser
             return new NbtFloat((float)signed);
         }
 
-        // 接尾辞なしの小数は Double
+        // 接尾辞なしの小数はDouble
         if (widthSuffix == '\0' || widthSuffix == 'd')
         {
             return new NbtDouble(signed);
@@ -796,8 +810,8 @@ internal sealed class SnbtParser
             case 'd':
                 return new NbtDouble(value);
             default:
-                // 接尾辞なしの整数は Int
-                // 暗黙に Long へ格上げしない
+                // 接尾辞なしの整数はInt
+                // 暗黙にLongへ格上げしない
                 return new NbtInt((int)CheckRange(value, int.MinValue, int.MaxValue, "int"));
         }
     }
@@ -816,7 +830,7 @@ internal sealed class SnbtParser
     {
         if (negative)
         {
-            // long.MinValue の絶対値は long に収まらないため個別に扱う
+            // long.MinValueの絶対値はlongに収まらないため個別に扱う
             if (magnitude == 9223372036854775808UL)
             {
                 return long.MinValue;
@@ -934,7 +948,7 @@ internal sealed class SnbtParser
     }
 
     /// <summary>末尾でも例外にしない先読み
-    /// 入力が尽きていれば NUL を返す</summary>
+    /// 入力が尽きていればNULを返す</summary>
     private char PeekOrNul()
     {
         if (position >= text.Length)

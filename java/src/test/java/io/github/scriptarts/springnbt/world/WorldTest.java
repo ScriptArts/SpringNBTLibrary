@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,6 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.scriptarts.springnbt.ErrorCode;
 import io.github.scriptarts.springnbt.SpringNbt;
 import io.github.scriptarts.springnbt.SpringNbtException;
+import io.github.scriptarts.springnbt.anvil.RegionFile;
+import io.github.scriptarts.springnbt.anvil.RegionFileMode;
 import io.github.scriptarts.springnbt.nbt.Compression;
 import io.github.scriptarts.springnbt.nbt.NamedTag;
 import io.github.scriptarts.springnbt.nbt.NbtCompound;
@@ -31,20 +34,17 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * World / Block レイヤ。
+ * World / Blockレイヤ
  *
- * <p>仕様: {@code docs/spec/30-chunk-format.md} / {@code 31-paletted-container.md} /
- * {@code 40-world-layout.md}
- *
- * <p>他言語版と同じ検証項目を持つ。
+ * <p>他言語版と同じ検証項目を持つ
  */
 class WorldTest {
 
-    /** 共通テストベクタ（world/*.nbt）のパス。 */
+    /** 共通テストベクタ（world/*.nbt）のパス */
     private static Path vectorPath(String name) {
         Path current = Path.of("").toAbsolutePath();
 
-        // 実行ディレクトリからリポジトリ直下まで遡って spec/testdata を探す
+        // 実行ディレクトリからリポジトリ直下まで遡ってspec/testdataを探す
         while (current != null) {
             Path candidate = current.resolve("spec").resolve("testdata")
                     .resolve("world").resolve(name + ".nbt");
@@ -59,7 +59,7 @@ class WorldTest {
         throw new IllegalStateException("テストベクタが見つからない: world/" + name + ".nbt");
     }
 
-    /** テストベクタをチャンクとして読む。 */
+    /** テストベクタをチャンクとして読む */
     private static Chunk loadChunk(String name) {
         return loadChunk(name, ChunkReadOptions.defaults());
     }
@@ -169,7 +169,8 @@ class WorldTest {
         void long境界を跨がずに詰める() {
             BitStorage storage = BitStorage.create(5, 4096);
 
-            // bits=5 なら 1 つの long に 12 個。12 個目は次の long の最下位から始まる
+            // bits=5なら1つのlongに12個
+            // 添字12は次のlongの最下位から始まる
             storage.set(11, 31);
             storage.set(12, 1);
             long[] longs = storage.toLongs();
@@ -204,7 +205,7 @@ class WorldTest {
 
         @Test
         void 寛容モードなら長さからビット幅を逆算する() {
-            // 4096 エントリを 342 long で表せるのは bits=5 のときだけ
+            // 4096エントリを342 longで表せるのはbits=5のときだけ
             BitStorage storage = BitStorage.fromLongs(new long[342], 4, 4096, true);
             assertEquals(5, storage.bitsPerEntry());
         }
@@ -253,7 +254,7 @@ class WorldTest {
         void 値を足すとパレットとビット幅が広がる() {
             PalettedContainer container = PalettedContainer.filled(blockEntry("minecraft:air"), 4096, 4);
 
-            // パレットを 17 要素まで増やして bits=4 から 5 への拡張を起こす
+            // 17種のブロックを足してパレットを18要素にし、bits=4から5への拡張を起こす
             for (int index = 0; index < 17; index++) {
                 container.set(index, blockEntry("minecraft:block_" + index));
             }
@@ -282,7 +283,7 @@ class WorldTest {
 
             container.compact();
 
-            // 残るのは実際に使われている air と dirt の 2 つ
+            // 残るのは実際に使われているairとdirtの2つ
             assertEquals(2, container.palette().size());
             assertEquals("minecraft:dirt", ((NbtCompound) container.get(0)).getString("Name"));
         }
@@ -328,7 +329,8 @@ class WorldTest {
             Chunk chunk = loadChunk("palette_17");
             String[] head = {"minecraft:air", "minecraft:stone"};
 
-            // ベクタの添字は (位置 * 11) % 17。パレット先頭 2 つだけ名前が違う
+            // ベクタの添字は (位置 * 11) % 17
+            // パレットの先頭2つだけ名前が違う
             for (int position = 0; position < 4096; position++) {
                 int paletteIndex = (position * 11) % 17;
                 BlockState block = chunk.getBlock(
@@ -383,7 +385,7 @@ class WorldTest {
             chunk.setBlock(3, -60, 7, "minecraft:stone");
             assertTrue(chunk.isModified());
 
-            // 保存済みとして印を下ろせる
+            // 保存済みとして印を外せる
             chunk.setIsModified(false);
             assertFalse(chunk.isModified());
 
@@ -400,7 +402,7 @@ class WorldTest {
             Chunk chunk = loadChunk("palette_1");
             chunk.setBiome(0, -64, 0, "minecraft:desert");
 
-            // 同じ 4×4×4 の枠内はまとめて変わる
+            // 同じ4×4×4の枠内はまとめて変わる
             assertEquals("minecraft:desert", chunk.getBiome(3, -61, 3));
             assertEquals("minecraft:plains", chunk.getBiome(4, -64, 0));
         }
@@ -435,13 +437,13 @@ class WorldTest {
             assertEquals(2, chunk.raw().getList("block_ticks").size());
             assertEquals(1, chunk.raw().getList("fluid_ticks").size());
 
-            // (0,-64,0) には chest と block_tick、(1,-64,1) には furnace と fluid_tick がある
+            // (0,-64,0)にはchestとblock_tick、(1,-64,1)にはfurnaceとfluid_tickがある
             chunk.setBlock(0, -64, 0, BlockState.parse("minecraft:stone"));
             chunk.setBlock(1, -64, 1, BlockState.parse("minecraft:stone"));
 
             NbtList entities = chunk.raw().getList("block_entities");
 
-            // 触っていない (15,-50,15) の barrel だけが残る
+            // 触っていない(15,-50,15)のbarrelだけが残る
             assertEquals(1, entities.size());
             assertEquals("minecraft:barrel", ((NbtCompound) entities.get(0)).getString("id"));
 
@@ -466,8 +468,7 @@ class WorldTest {
 
         @Test
         void 別のチャンクの同じ相対座標は消さない() {
-            // 付随データは絶対座標で持つので、チャンク座標を取り違えると
-            // 無関係な要素を消してしまう
+            // 付随データは絶対座標で持つので、チャンク座標を間違えると無関係な要素を消してしまう
             NamedTag named = NbtIo.readFile(vectorPath("block_entities"), null);
             NbtCompound root = (NbtCompound) named.tag();
             root.set("xPos", new NbtInt(1));
@@ -476,7 +477,8 @@ class WorldTest {
             Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
             chunk.setBlock(0, -64, 0, BlockState.parse("minecraft:stone"));
 
-            // このチャンクの (0,-64,0) は絶対座標 (16,-64,16)。どれとも一致しない
+            // このチャンクの(0,-64,0)は絶対座標(16,-64,16)
+            // どれとも一致しない
             assertEquals(3, chunk.raw().getList("block_entities").size());
         }
 
@@ -517,7 +519,7 @@ class WorldTest {
     @Nested
     class DataVersionTest {
 
-        /** DataVersion だけを差し替えたチャンクを作る。 */
+        /** DataVersionだけを差し替えたチャンクを作る */
         private NbtCompound foreignChunk() {
             NamedTag named = NbtIo.readFile(vectorPath("palette_1"), null);
             NbtCompound root = (NbtCompound) named.tag();
@@ -574,11 +576,11 @@ class WorldTest {
                     new ChunkReadOptions().setOnVersionMismatch(VersionMismatchAction.IGNORE));
             ChunkWriteOptions write = new ChunkWriteOptions().setAllowForeignDataVersion(true);
 
-            // DataVersion は読んだ値のまま残す
+            // DataVersionは読んだ値のまま残す
             assertEquals(3953, chunk.toNbt(write).getInt("DataVersion"));
         }
 
-        /** 対象より新しい DataVersion を持つチャンクを作る。 */
+        /** 対象より新しいDataVersionを持つチャンクを作る */
         private NbtCompound newerChunk() {
             NamedTag named = NbtIo.readFile(vectorPath("palette_1"), null);
             NbtCompound root = (NbtCompound) named.tag();
@@ -593,7 +595,7 @@ class WorldTest {
                     .setOnVersionMismatch(VersionMismatchAction.WARN)
                     .setOnWarning(warnings::add);
 
-            // 形式が同じであれば、新しいバージョンでも黙って読める
+            // 形式が同じであれば、新しいバージョンでも警告を出さずに読める
             Chunk chunk = Chunk.fromNbt(newerChunk(), options);
             assertEquals(5015, chunk.dataVersion());
             assertTrue(warnings.isEmpty());
@@ -610,7 +612,7 @@ class WorldTest {
         void 新しいバージョンのチャンクはそのまま書き戻せる() {
             Chunk chunk = Chunk.fromNbt(newerChunk(), null);
 
-            // 許可を出さなくても書き戻せて、DataVersion も変わらない
+            // 許可を出さなくても書き戻せて、DataVersionも変わらない
             assertEquals(5015, chunk.toNbt(null).getInt("DataVersion"));
         }
 
@@ -641,6 +643,35 @@ class WorldTest {
             SpringNbtException error = assertThrows(SpringNbtException.class,
                     () -> MinecraftWorld.open(work));
             assertEquals(ErrorCode.IO, error.code());
+        }
+
+        @Test
+        void 次元経由で読んだチャンクの警告も通知先へ届く() throws Exception {
+            Path region = work.resolve("dimensions").resolve("minecraft").resolve("overworld").resolve("region");
+            Files.createDirectories(region);
+
+            // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
+            NbtCompound level = new NbtCompound();
+            level.set("Data", new NbtCompound());
+            NbtIo.writeFile(work.resolve("level.dat"), new NamedTag("", level), null);
+
+            NbtCompound chunk = (NbtCompound) NbtIo.readFile(vectorPath("palette_1"), null).tag();
+            chunk.set("DataVersion", new NbtInt(3953));
+
+            try (RegionFile file = RegionFile.open(region.resolve("r.0.0.mca"), RegionFileMode.READ_WRITE)) {
+                file.writeChunk(0, 0, chunk);
+            }
+
+            List<String> warnings = new ArrayList<>();
+            WorldOpenOptions options = WorldOpenOptions.defaults()
+                    .setChunkRead(ChunkReadOptions.defaults().setOnWarning(warnings::add));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work, options)) {
+                assertNotNull(world.dimension(Dimension.OVERWORLD).chunk(0, 0));
+            }
+
+            // ワールドを開くときに渡した通知先が、次元経由の読み込みでも呼ばれる
+            assertEquals(1, warnings.size());
         }
     }
 }

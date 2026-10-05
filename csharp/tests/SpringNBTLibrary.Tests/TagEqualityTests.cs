@@ -3,17 +3,17 @@ using SpringNBTLibrary.Nbt;
 namespace SpringNBTLibrary.Tests;
 
 /// <summary>
-/// タグの等値比較と深い複製。仕様: docs/spec/10-nbt-binary.md 7.3
+/// タグの等値比較と深い複製
 /// </summary>
 /// <remarks>
-/// 規則は全言語で同じでなければならない。
-/// 各言語の同名テストと突き合わせて読むこと。
+/// 規則は全言語で同じでなければならない
+/// 各言語の同名テストと見比べながら読むこと
 /// </remarks>
 public class TagEqualityTests
 {
-    // NbtList / NbtCompound は IEnumerable なので、Assert.Equal を使うと
-    // xUnit がコレクション比較に切り替えてしまう
-    // 等値の規則そのものを見たいので、Equals を直接呼ぶ
+    // NbtList / NbtCompoundはIEnumerableなので、Assert.Equalを使うと
+    // xUnitがコレクション比較に切り替えてしまう
+    // 等値の規則そのものを見たいので、Equalsを直接呼ぶ
 
     [Fact]
     public void SameTypeSameValueIsEqual()
@@ -31,7 +31,7 @@ public class TagEqualityTests
     [Fact]
     public void DifferentTagTypeIsNotEqual()
     {
-        // 値が同じでもタグの型が違えば別物
+        // 値が同じでもタグの型が違えば等しくない
         Assert.False(new NbtInt(1).Equals(new NbtShort(1)));
         Assert.False(new NbtInt(1).Equals(null));
     }
@@ -39,7 +39,7 @@ public class TagEqualityTests
     [Fact]
     public void FloatsCompareByBitPattern()
     {
-        // NaN 同士は等しく、+0.0 と -0.0 は等しくない
+        // NaN同士は等しく、+0.0と-0.0は等しくない
         Assert.True(new NbtFloat(float.NaN).Equals(new NbtFloat(float.NaN)));
         Assert.True(new NbtDouble(double.NaN).Equals(new NbtDouble(double.NaN)));
         Assert.False(new NbtFloat(0.0f).Equals(new NbtFloat(-0.0f)));
@@ -63,7 +63,7 @@ public class TagEqualityTests
         reversed.Add(new NbtInt(1));
         Assert.False(left.Equals(reversed));
 
-        // 空でも要素型が違えば別物
+        // 空でも要素型が違えば等しくない
         Assert.False(new NbtList(TagType.Int).Equals(new NbtList(TagType.Byte)));
     }
 
@@ -79,7 +79,7 @@ public class TagEqualityTests
         same.Set("b", new NbtInt(2));
         Assert.True(left.Equals(same));
 
-        // 中身は同じでも挿入順が違えば別物
+        // 中身は同じでも挿入順が違えば等しくない
         NbtCompound reordered = new NbtCompound();
         reordered.Set("b", new NbtInt(2));
         reordered.Set("a", new NbtInt(1));

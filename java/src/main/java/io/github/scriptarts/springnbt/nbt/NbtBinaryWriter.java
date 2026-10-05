@@ -5,12 +5,10 @@ import java.io.ByteArrayOutputStream;
 import java.util.Map;
 
 /**
- * NBT を展開済みのバイト列へ書き出す
+ * NBTを展開済みのバイト列へ書き出す
  *
  * <p>出力は一意でなければならない（ラウンドトリップ検証が成立するため）
- * Compound は挿入順のまま、浮動小数点はビットパターンのまま書き出す
- *
- * <p>仕様: {@code docs/spec/10-nbt-binary.md} 5章
+ * Compoundは挿入順のまま、浮動小数点はビットパターンのまま書き出す
  */
 final class NbtBinaryWriter {
 
@@ -35,7 +33,7 @@ final class NbtBinaryWriter {
             case NbtShort value -> writeUnsigned(value.value(), 2);
             case NbtInt value -> writeUnsigned(value.value(), 4);
             case NbtLong value -> writeUnsigned(value.value(), 8);
-            // NaN や -0.0 を保つため、ビットパターンをそのまま書く
+            // NaNや-0.0を保つため、ビットパターンをそのまま書く
             case NbtFloat value -> writeUnsigned(Float.floatToRawIntBits(value.value()), 4);
             case NbtDouble value -> writeUnsigned(Double.doubleToRawLongBits(value.value()), 8);
             case NbtByteArray value -> writeByteArrayPayload(value.value());
@@ -76,7 +74,7 @@ final class NbtBinaryWriter {
     private void writeIntArrayPayload(int[] values) {
         writeUnsigned(values.length, 4);
 
-        // 4 バイトずつビッグエンディアンで書く
+        // 4バイトずつビッグエンディアンで書く
         for (int value : values) {
             writeUnsigned(value, 4);
         }
@@ -85,7 +83,7 @@ final class NbtBinaryWriter {
     private void writeLongArrayPayload(long[] values) {
         writeUnsigned(values.length, 4);
 
-        // 8 バイトずつビッグエンディアンで書く
+        // 8バイトずつビッグエンディアンで書く
         for (long value : values) {
             writeUnsigned(value, 8);
         }
@@ -94,8 +92,8 @@ final class NbtBinaryWriter {
     private void writeString(String text) {
         byte[] encoded = Mutf8.encode(text);
 
-        // 長さフィールドは u16
-        // キー名は素の String なのでここでも検査する
+        // 長さフィールドはu16
+        // キー名は素のStringなのでここでも検査する
         if (encoded.length > Mutf8.MAX_BYTE_LENGTH) {
             throw SpringNbtException.invalidArgument(
                     "文字列が長すぎる: MUTF-8 で " + encoded.length + " バイト (上限 "

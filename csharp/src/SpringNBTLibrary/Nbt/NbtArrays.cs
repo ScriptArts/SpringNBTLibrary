@@ -1,11 +1,11 @@
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>TAG_Byte_Array
-/// 8bit 符号付き整数の配列</summary>
+/// 8bit符号付き整数の配列</summary>
 public sealed class NbtByteArray : NbtTag
 {
     /// <summary>配列を指定して作る
-    /// 渡した配列をそのまま保持する（コピーしない）</summary>
+    /// 渡した配列をコピーせずにそのまま保持する</summary>
     public NbtByteArray(sbyte[] value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -35,11 +35,11 @@ public sealed class NbtByteArray : NbtTag
 }
 
 /// <summary>TAG_Int_Array
-/// 32bit 符号付き整数の配列</summary>
+/// 32bit符号付き整数の配列</summary>
 public sealed class NbtIntArray : NbtTag
 {
     /// <summary>配列を指定して作る
-    /// 渡した配列をそのまま保持する（コピーしない）</summary>
+    /// 渡した配列をコピーせずにそのまま保持する</summary>
     public NbtIntArray(int[] value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -69,11 +69,11 @@ public sealed class NbtIntArray : NbtTag
 }
 
 /// <summary>TAG_Long_Array
-/// 64bit 符号付き整数の配列</summary>
+/// 64bit符号付き整数の配列</summary>
 public sealed class NbtLongArray : NbtTag
 {
     /// <summary>配列を指定して作る
-    /// 渡した配列をそのまま保持する（コピーしない）</summary>
+    /// 渡した配列をコピーせずにそのまま保持する</summary>
     public NbtLongArray(long[] value)
     {
         ArgumentNullException.ThrowIfNull(value);

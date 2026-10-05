@@ -1,15 +1,14 @@
 namespace SpringNBTLibrary.Nbt;
 
 /// <summary>
-/// NBT のタグ
-/// 具象型は <see cref="NbtByte"/> などの派生クラス
+/// NBTのタグ
+/// 具象型は<see cref="NbtByte"/>などの派生クラス
 /// </summary>
 /// <remarks>
 /// <para>
 /// パターンマッチで分岐することを想定している
-/// <c>if (tag is NbtInt intTag) { ... }</c> のように使う
+/// <c>if (tag is NbtInt intTag) { ... }</c>のように使う
 /// </para>
-/// <para>仕様: <c>docs/spec/10-nbt-binary.md</c> 1章</para>
 /// </remarks>
 public abstract class NbtTag
 {
@@ -26,7 +25,7 @@ public abstract class NbtTag
 }
 
 /// <summary>TAG_Byte
-/// 8bit 符号付き整数</summary>
+/// 8bit符号付き整数</summary>
 public sealed class NbtByte : NbtTag
 {
     /// <summary>値を指定して作る</summary>
@@ -55,7 +54,7 @@ public sealed class NbtByte : NbtTag
 }
 
 /// <summary>TAG_Short
-/// 16bit 符号付き整数</summary>
+/// 16bit符号付き整数</summary>
 public sealed class NbtShort : NbtTag
 {
     /// <summary>値を指定して作る</summary>
@@ -84,7 +83,7 @@ public sealed class NbtShort : NbtTag
 }
 
 /// <summary>TAG_Int
-/// 32bit 符号付き整数</summary>
+/// 32bit符号付き整数</summary>
 public sealed class NbtInt : NbtTag
 {
     /// <summary>値を指定して作る</summary>
@@ -113,7 +112,7 @@ public sealed class NbtInt : NbtTag
 }
 
 /// <summary>TAG_Long
-/// 64bit 符号付き整数</summary>
+/// 64bit符号付き整数</summary>
 public sealed class NbtLong : NbtTag
 {
     /// <summary>値を指定して作る</summary>
@@ -161,7 +160,7 @@ public sealed class NbtFloat : NbtTag
     public override NbtTag Copy() => new NbtFloat(Value);
 
     /// <inheritdoc/>
-    /// <remarks>NaN や -0.0 を区別するため、値ではなくビットパターンで比較する</remarks>
+    /// <remarks>NaNや-0.0を区別するため、値ではなくビットパターンで比較する</remarks>
     public override bool Equals(object? obj)
     {
         return obj is NbtFloat other
@@ -195,7 +194,7 @@ public sealed class NbtDouble : NbtTag
     public override NbtTag Copy() => new NbtDouble(Value);
 
     /// <inheritdoc/>
-    /// <remarks>NaN や -0.0 を区別するため、値ではなくビットパターンで比較する</remarks>
+    /// <remarks>NaNや-0.0を区別するため、値ではなくビットパターンで比較する</remarks>
     public override bool Equals(object? obj)
     {
         return obj is NbtDouble other
@@ -210,14 +209,14 @@ public sealed class NbtDouble : NbtTag
 }
 
 /// <summary>TAG_String
-/// MUTF-8 で符号化される文字列</summary>
+/// MUTF-8で符号化される文字列</summary>
 public sealed class NbtString : NbtTag
 {
     private string value;
 
     /// <summary>値を指定して作る</summary>
     /// <exception cref="SpringNbtException">
-    /// MUTF-8 に符号化すると 65535 バイトを超える場合（<see cref="ErrorCode.InvalidArgument"/>）
+    /// MUTF-8に符号化すると65535バイトを超える場合（<see cref="ErrorCode.InvalidArgument"/>）
     /// </exception>
     public NbtString(string value)
     {
@@ -228,7 +227,7 @@ public sealed class NbtString : NbtTag
 
     /// <summary>保持している値</summary>
     /// <exception cref="SpringNbtException">
-    /// MUTF-8 に符号化すると 65535 バイトを超える場合（<see cref="ErrorCode.InvalidArgument"/>）
+    /// MUTF-8に符号化すると65535バイトを超える場合（<see cref="ErrorCode.InvalidArgument"/>）
     /// </exception>
     public string Value
     {
@@ -259,13 +258,13 @@ public sealed class NbtString : NbtTag
     /// <inheritdoc/>
     public override string ToString() => value;
 
-    /// <summary>長さフィールドが u16 のため、符号化後 65535 バイトを超える文字列は保持できない</summary>
+    /// <summary>長さフィールドがu16のため、符号化後65535バイトを超える文字列は保持できない</summary>
     private static void Validate(string candidate)
     {
         int byteLength = Mutf8.ByteLength(candidate);
 
-        // 長さフィールドは u16
-        // 65535 を超えると書き出せない
+        // 長さフィールドはu16
+        // 65535を超えると書き出せない
         if (byteLength > Mutf8.MaxByteLength)
         {
             throw SpringNbtException.InvalidArgument(

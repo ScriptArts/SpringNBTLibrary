@@ -5,7 +5,7 @@ public enum RegionFileMode {
 
     /**
      * 読み取り専用
-     * 書き込み系の操作はエラーになる
+     * 書き込み系の操作はエラーになる（{@code flush}は何もしない）
      */
     READ_ONLY,
 

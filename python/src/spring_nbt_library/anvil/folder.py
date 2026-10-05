@@ -1,20 +1,15 @@
-"""リージョンファイルが並ぶディレクトリ 1 つ分
+"""リージョンファイルが並ぶディレクトリ1つ分
 
-``region/``、``entities/``、``poi/`` のいずれかを表す
-開いたリージョンファイルはキャッシュし、:meth:`RegionFolder.close` でまとめて閉じる
+``region/``、``entities/``、``poi/``のいずれかを表す
+開いたリージョンファイルはキャッシュし、:meth:`RegionFolder.close`でまとめて閉じる
 チャンク座標からリージョンを解決するので、利用側はリージョンの存在を意識しなくてよい
 
-:class:`RegionFile` はファイル全体をメモリへ載せるため、キャッシュには
-``max_cached_regions`` 件の上限がある
-上限を超えると、最も長く使われていない
-ものから書き出して閉じる
+:class:`RegionFile`はファイル全体をメモリへ載せるため、キャッシュには``max_cached_regions``件の上限がある
+上限を超えると、最も長く使われていないものから書き出して閉じる
 大きなワールドを端から走査してもメモリを使い切らない
 
-このため :meth:`RegionFolder.region` が返した参照は、
-**別のリージョンへアクセスすると閉じられている場合がある**
+このため:meth:`RegionFolder.region`が返した参照は、**別のリージョンへアクセスすると閉じられている場合がある**
 参照を保持せず、必要なたびに取得すること
-
-仕様: ``docs/spec/20-anvil-region.md`` 5章
 """
 
 from __future__ import annotations
@@ -31,14 +26,14 @@ __all__ = ["DEFAULT_MAX_CACHED_REGIONS", "RegionFolder"]
 
 #: 同時に開いておくリージョンファイル数の既定の上限
 #:
-#: 1 リージョンは最大 255 セクタ × 1024 チャンク＝理論上 1GiB になりうる
-#: 実データでは数 MB から数十 MB 程度
-# 8 件なら通常のワールドで数百 MB に収まる
+#: 1リージョンは最大255セクタ × 1024チャンク＝理論上1GiBになりうる
+#: 実データでは数MBから数十MB程度
+#: 8件なら通常のワールドで数百MBに収まる
 DEFAULT_MAX_CACHED_REGIONS = 8
 
 
 class RegionFolder:
-    """リージョンフォルダ 1 つ分"""
+    """リージョンフォルダ1つ分"""
 
     def __init__(self, directory: str, mode: RegionFileMode,
                  max_cached_regions: int = DEFAULT_MAX_CACHED_REGIONS) -> None:
@@ -59,7 +54,10 @@ class RegionFolder:
     def open(directory: str,
              mode: RegionFileMode = RegionFileMode.READ_ONLY,
              max_cached_regions: int = DEFAULT_MAX_CACHED_REGIONS) -> "RegionFolder":
-        """リージョンフォルダを開く"""
+        """リージョンフォルダを開く
+
+        :raises SpringNbtError: 読み取り専用でディレクトリが存在しない場合、または上限が1未満の場合
+        """
         if max_cached_regions < 1:
             raise SpringNbtError.invalid_argument(
                 "max_cached_regions は 1 以上でなければならない: %d" % max_cached_regions)
@@ -85,11 +83,11 @@ class RegionFolder:
 
         found = []
 
-        # r.X.Z.mca として解釈できるファイルだけを拾う
+        # r.X.Z.mcaとして解釈できるファイルだけを拾う
         for name in os.listdir(self.directory):
             position = RegionPos.from_file_name(name)
 
-            # r.X.Z.mca として解釈できるファイルだけを拾う
+            # r.X.Z.mcaとして解釈できるファイルだけを拾う
             if position is not None:
                 found.append(position)
 
@@ -99,20 +97,20 @@ class RegionFolder:
 
     def region(self, region_x: int, region_z: int) -> Optional[RegionFile]:
         """リージョンファイルを取得する
-        読み取り専用で存在しなければ None
+        読み取り専用で存在しなければNone
         """
         self._ensure_open()
         position = RegionPos(region_x, region_z)
         cached = self._cache.get(position)
 
         if cached is not None:
-            # 使ったものを末尾へ move して、最近使った順を保つ
+            # 使ったものを末尾へ移して、最近使った順を保つ
             self._cache.move_to_end(position)
             return cached
 
         path = os.path.join(self.directory, position.file_name())
 
-        # 読み取り専用では、存在しないリージョンは「チャンクが無い」として None を返す
+        # 読み取り専用では、存在しないリージョンは「チャンクが無い」としてNoneを返す
         if not os.path.exists(path) and self._mode == RegionFileMode.READ_ONLY:
             return None
 
@@ -125,7 +123,7 @@ class RegionFolder:
         return opened
 
     def _evict_until_below_limit(self) -> None:
-        """新しく 1 件開けるよう、上限を下回るまで古いものを閉じる"""
+        """新しく1件開けるよう、上限を下回るまで古いものを閉じる"""
         # 上限に達している間、いちばん長く使っていないものから閉じる
         while len(self._cache) >= self.max_cached_regions:
             _, oldest = self._cache.popitem(last=False)
@@ -143,8 +141,8 @@ class RegionFolder:
         return file.has_chunk(chunk_x, chunk_z)
 
     def read_chunk(self, chunk_x: int, chunk_z: int) -> Optional[NbtCompound]:
-        """チャンクを NBT として読む
-        存在しなければ None
+        """チャンクをNBTとして読む
+        存在しなければNone
         """
         file = self._region_for(chunk_x, chunk_z)
 
@@ -154,7 +152,7 @@ class RegionFolder:
         return file.read_chunk(chunk_x, chunk_z)
 
     def write_chunk(self, chunk_x: int, chunk_z: int, tag: NbtCompound) -> None:
-        """チャンクを NBT として書き込む"""
+        """チャンクをNBTとして書き込む"""
         file = self._region_for(chunk_x, chunk_z)
 
         if file is None:
@@ -165,7 +163,7 @@ class RegionFolder:
 
     def delete_chunk(self, chunk_x: int, chunk_z: int) -> bool:
         """チャンクを削除する
-        削除できたら True
+        削除できたらTrue
         """
         file = self._region_for(chunk_x, chunk_z)
 

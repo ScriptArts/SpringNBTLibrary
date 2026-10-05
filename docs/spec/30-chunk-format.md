@@ -1,25 +1,24 @@
 # 30. チャンク形式
 
-`.mca` 内に格納されるチャンク1つ分の NBT 構造。**ここから先は形式依存**である。
-本書は **26.1 で導入された形式（DataVersion 4786 以降）** を対象とし、
-記述は **Java版 26.2 (DataVersion 4903)** の実データで確認した。
+`.mca`内に格納されるチャンク1つ分のNBT構造。**ここから先は形式依存**である。
+本書は**26.1で導入された形式（DataVersion 4786以降）** を対象とし、記述はJava版26.2（DataVersion 4903）の実データで確認した。
 
-前提: [20 Anvil リージョン形式](20-anvil-region.md) / [31 パレット付きコンテナ](31-paletted-container.md)
+前提: [20 Anvilリージョン形式](20-anvil-region.md) / [31 パレット付きコンテナ](31-paletted-container.md)
 
 ---
 
 ## 1. ルート要素
 
-ルートは名前なし（空文字列）の `TAG_Compound`。
-下表は **Java版 26.2 の実ワールド（3,481 チャンク）を走査して確認した**内容である。
-「出現」欄は、走査した full／未完成を含む全チャンクのうち何割に現れたかを示す。
+ルートは名前なし（空文字列）の`TAG_Compound`。
+下表はJava版26.2の実ワールド（3,481チャンク）を走査して確認した内容である。
+「出現」欄は、走査したチャンク（full／未完成の両方を含む）のすべてに現れたキーを「全部」、一部のチャンクにだけ現れたキーを「一部」と示す。
 
 | キー | 型 | 出現 | 内容 |
 |---|---|---|---|
-| `DataVersion` | `Int` | 全部 | チャンク構造のバージョン。26.1 は `4786`、26.2 は `4903` |
+| `DataVersion` | `Int` | 全部 | チャンク構造のバージョン。26.1は`4786`、26.2は`4903` |
 | `xPos` | `Int` | 全部 | 絶対チャンクX座標 |
 | `zPos` | `Int` | 全部 | 絶対チャンクZ座標 |
-| `yPos` | `Int` | 全部 | 最下段セクションのY位置。オーバーワールドは `-4` |
+| `yPos` | `Int` | 全部 | 最下段セクションのY位置。オーバーワールドは`-4` |
 | `Status` | `String` | 全部 | 生成段階（→ 1.1） |
 | `LastUpdate` | `Long` | 全部 | 最終更新のゲーム内時刻 |
 | `InhabitedTime` | `Long` | 全部 | プレイヤー滞在時間（tick） |
@@ -28,11 +27,11 @@
 | `block_ticks` | `List<Compound>` | 全部 | 予約されたブロック更新 |
 | `fluid_ticks` | `List<Compound>` | 全部 | 予約された液体更新 |
 | `Heightmaps` | `Compound` | 全部 | 高さマップ（→ 3章） |
-| `structures` | `Compound` | 全部 | `starts` と `References` を持つ |
+| `structures` | `Compound` | 全部 | `starts`と`References`を持つ |
 | `PostProcessing` | `List<List>` | 全部 | 生成後処理の待ち位置 |
-| `isLightOn` | `Byte` | 一部 | 光源計算済みフラグ。実データでは `minecraft:full` のチャンクにのみ現れた |
-| `entities` | `List<Compound>` | 一部 | **生成途中のチャンクだけが持つ**。完成すると `entities/` のリージョンへ移る |
-| `carving_mask` | `ByteArray` | 一部 | 洞窟の削り取り状況。`minecraft:carvers` 前後の段階でのみ現れる |
+| `isLightOn` | `Byte` | 一部 | 光源計算済みフラグ。実データでは`minecraft:full`のチャンクにのみ現れた |
+| `entities` | `List<Compound>` | 一部 | **生成途中のチャンクだけが持つ**。完成すると`entities/`のリージョンへ移る |
+| `carving_mask` | `ByteArray` | 一部 | 洞窟の削り取り状況。`minecraft:carvers`前後の段階でのみ現れる |
 
 ### 1.1 Status
 
@@ -46,40 +45,40 @@
 | `minecraft:initialize_light` | 光源の初期化まで済んだ段階 |
 | `minecraft:full` | 生成完了。ブロック操作の対象になるのはこれ |
 
-**`minecraft:full` 以外のチャンクは構造が不完全**である。
-`set_block` は `minecraft:full` のチャンクに対してのみ行うのが安全で、
-それ以外は既定でエラーとする（`allow_incomplete_chunk` で明示的に許可できる）。
+**`minecraft:full`以外のチャンクは構造が不完全**である。
+`set_block`は`minecraft:full`のチャンクに対してのみ行うのが安全である。
+本ライブラリは生成段階を検査せず、それ以外のチャンクにもそのまま書き込む。
+生成済みかどうかは`is_fully_generated`で確かめられる。
 
 本ライブラリは**上記以外のキーも含め、読んだ要素をすべて保持する**。
-未知のキーを落とさないことで、将来の追加要素があってもデータを壊さない。
+未知のキーを落とさないので、将来の追加要素があってもデータはおかしくならない。
 
-`Chunk` 型は解釈済みの値（`sections` など）と、元の `NbtCompound` の両方を持ち、
-書き出し時は「解釈して変更した部分だけを元の Compound に反映する」方式をとる。
+`Chunk`型は解釈済みの値（`sections`など）と元の`NbtCompound`の両方を持ち、書き出し時は「解釈した部分（各セクションの`block_states`と`biomes`）を元のCompoundへ書き戻し、解釈していないキーはそのまま残す」方式をとる。
 
 ---
 
 ## 2. セクション
 
-`sections` は `List<Compound>`。1要素が 16×16×16 ブロックを表す。
+`sections`は`List<Compound>`。1要素が16×16×16ブロックを表す。
 
 | キー | 型 | 内容 |
 |---|---|---|
-| `Y` | `Byte` | セクションのY位置。オーバーワールドは `-5`..`20` |
-| `block_states` | `Compound` | ブロック状態のパレット付きコンテナ（4096 エントリ） |
-| `biomes` | `Compound` | バイオームのパレット付きコンテナ（64 エントリ） |
-| `BlockLight` | `ByteArray` | 2048 バイト。1ブロックあたり 4bit |
-| `SkyLight` | `ByteArray` | 2048 バイト。1ブロックあたり 4bit |
+| `Y` | `Byte` | セクションのY位置。オーバーワールドは`-5`..`20` |
+| `block_states` | `Compound` | ブロック状態のパレット付きコンテナ（4096エントリ） |
+| `biomes` | `Compound` | バイオームのパレット付きコンテナ（64エントリ） |
+| `BlockLight` | `ByteArray` | 2048バイト。1ブロックあたり4bit |
+| `SkyLight` | `ByteArray` | 2048バイト。1ブロックあたり4bit |
 
-`Y` が `yPos - 1` や最上段+1 になっている**光源専用セクション**が存在しうる。
-これらは `block_states` を持たないため、ブロックAPIから見ると空セクションとして扱う。
-（26.2 の実ワールドでは観測されず、全セクションが `block_states` と `biomes` を持っていた。
-ただし将来・他の生成条件で現れうるため、`block_states` の有無は必ず確認する。）
+`Y`が`yPos - 1`や最上段+1になっている光源専用セクションが存在しうる。
+光源専用セクションは`block_states`を持たないため、ブロックAPIでは空セクションとして扱う。
+（26.2の実ワールドでは観測されず、全セクションが`block_states`と`biomes`を持っていた。
+ただし将来や他の生成条件で現れうるため、`block_states`の有無は必ず確認する。）
 
-`BlockLight` / `SkyLight` は**必要なセクションにしか無い**。
-実データでは 83,544 セクションのうち `BlockLight` が 5,103、`SkyLight` が 4,904 だった。
+`BlockLight` / `SkyLight`は**必要なセクションにしか無い**。
+実データでは83,544セクションのうち`BlockLight`が5,103、`SkyLight`が4,904だった。
 
-`sections` は `Y` の昇順に並んでいるが、**並び順に依存してはならない**。
-読み込み時に `Y` から索引を作る。
+`sections`は`Y`の昇順に並んでいるが、**並び順に依存してはならない**。
+読み込み時に`Y`から索引を作る。
 
 ### 2.1 ブロック状態のパレット要素
 
@@ -87,9 +86,9 @@
 { Name: "minecraft:oak_stairs", Properties: { facing: "north", half: "top", waterlogged: "false" } }
 ```
 
-- `Name` は必須の `String`。名前空間が省略されていたら `minecraft:` を補う
-- `Properties` は任意の `Compound`。値はすべて `String`（数値や真偽値も文字列）
-- `Properties` が空の場合、Minecraft はキー自体を出力しない。本ライブラリも同様にする
+- `Name`は必須の`String`。名前空間が省略されていたら`minecraft:`を補う
+- `Properties`は任意の`Compound`。値はすべて`String`（数値や真偽値も文字列）
+- `Properties`が空の場合、Minecraftはキー自体を出力しない。本ライブラリも同様にする
 
 ### 2.1.1 ブロック状態の文字列表現
 
@@ -99,14 +98,12 @@
 <名前空間>:<パス>[<キー>=<値>,<キー>=<値>,...]
 ```
 
-- **プロパティは必ず名前の昇順に並べて出力する。** これにより、同じブロック状態は
-  内部の並び順に関係なく常に同じ文字列になり、全言語で一致する
+- **プロパティは必ず名前の昇順に並べて出力する。** これにより、同じブロック状態は内部の並び順に関係なく常に同じ文字列になり、全言語で一致する
 - プロパティが空のときは角括弧ごと省略する
-- 解析時は名前空間の省略を許し、`minecraft:` を補う
-- 解析時のみ、`=` の前後と `,` の直後の空白を読み飛ばす。出力側は空白を入れない
+- 解析時は名前空間の省略を許し、`minecraft:`を補う
+- 解析時のみ、`=`の前後と`,`の直後の空白を読み飛ばす。出力側は空白を入れない
 
-解析の失敗はすべて `INVALID_ARGUMENT`（呼び出し側が渡した文字列の誤りであり、
-ファイルの中身の破損ではないため）。
+解析の失敗はすべて`INVALID_ARGUMENT`（呼び出し側が渡した文字列の誤りであり、ファイルの中身の破損ではないため）。
 
 | 入力 | 結果 |
 |---|---|
@@ -115,13 +112,12 @@
 | `minecraft:oak_stairs[]` | `minecraft:oak_stairs` |
 | `` （空文字列） | `INVALID_ARGUMENT` |
 | `minecraft:oak_stairs[facing=north` | `INVALID_ARGUMENT`（閉じ括弧が無い） |
-| `minecraft:oak_stairs[]extra` | `INVALID_ARGUMENT`（`]` で終わっていない） |
-| `minecraft:oak_stairs[facing]` | `INVALID_ARGUMENT`（`=` が無い） |
+| `minecraft:oak_stairs[]extra` | `INVALID_ARGUMENT`（`]`で終わっていない） |
+| `minecraft:oak_stairs[facing]` | `INVALID_ARGUMENT`（`=`が無い） |
 | `minecraft:oak_stairs[=north]` | `INVALID_ARGUMENT`（キーが空） |
 | `minecraft:oak_stairs[facing=north,facing=south]` | `INVALID_ARGUMENT`（キーの重複） |
 
-キーの重複を後勝ちで受け入れないのは、どちらが採用されたのかが呼び出し側から
-分からないまま書き込まれてしまうため。
+キーの重複を後勝ちで受け入れないのは、どちらが採用されたのかが呼び出し側から分からないまま書き込まれてしまうため。
 
 ### 2.2 座標とエントリ添字
 
@@ -130,13 +126,12 @@ block index = (y & 15) * 256 + (z & 15) * 16 + (x & 15)
 biome index = ((y & 15) / 4) * 16 + ((z & 15) / 4) * 4 + ((x & 15) / 4)
 ```
 
-`& 15` により負の座標でも正しくセクション内相対値になる。
-セクションの選択は `sectionY = y >> 4`（算術右シフト）で行う。
+`& 15`により、負の座標でも正しくセクション内の相対値になる。
+セクションの選択は`sectionY = y >> 4`（算術右シフト）で行う。
 
 ### 2.3 ブロックに紐づく付随データ
 
-ブロックそのもの以外に、**特定の座標に結びついたデータ**が
-チャンクのルート直下に 3 つある。
+ブロックそのもの以外に、特定の座標に結びついたデータがチャンクのルート直下に3つある。
 
 | キー | 内容 | 主なキー |
 |---|---|---|
@@ -144,10 +139,10 @@ biome index = ((y & 15) / 4) * 16 + ((z & 15) / 4) * 4 + ((x & 15) / 4)
 | `block_ticks` | ブロックのティック予約 | `i`（ブロックID）, `x`, `y`, `z`, `t`, `p` |
 | `fluid_ticks` | 液体のティック予約 | 同上 |
 
-いずれも `List<Compound>` で、**座標は絶対ワールド座標の `Int`** で持つ。
-チャンク内相対ではないので、チャンク座標から換算して突き合わせる必要がある。
+いずれも`List<Compound>`で、**座標は絶対ワールド座標の`Int`で持つ**。
+チャンク内の相対座標ではないので、チャンク座標から換算して比べる必要がある。
 
-実データの例（Java版 26.2）:
+Java版26.2の実データの例を示す。
 
 ```
 block_entities: {id:"minecraft:mob_spawner", x:-318, y:-40, z:-302, SpawnData:{...}, ...}
@@ -156,31 +151,28 @@ block_ticks:    {i:"minecraft:acacia_leaves", x:-93, y:75, z:-305, t:0, p:0}
 
 ### 2.4 ブロックを置き換えたときの掃除
 
-**ブロックを別の種類へ置き換えたら、その座標を指す 2.3 の要素をすべて取り除く。**
+**ブロックを別の種類へ置き換えたら、その座標を指す2.3の要素をすべて取り除く。**
 
-取り除かないと、たとえばチェストのあった座標に石を置いたとき
-`block_entities` にチェストの中身が残る。ブロックと中身が食い違った状態になり、
-Minecraft 側で警告やアイテムの復活といった予期しない挙動を招く。
-しかも**利用者からは見えにくい**壊れ方をする。
+取り除かないと、たとえばチェストのあった座標に石を置いたとき、`block_entities`にチェストの中身が残る。
+ブロックと中身が食い違った状態になり、Minecraft側で警告やアイテムの復活といった予期しない挙動を招く。
+しかも、**利用者からは見えにくい**形でデータがおかしくなる。
 
 | 状況 | 動作 |
 |---|---|
-| 別の種類のブロックを置いた | その座標の要素を 3 つのリストすべてから取り除く |
+| 別の種類のブロックを置いた | その座標の要素を3つのリストすべてから取り除く |
 | **同じブロック状態**を置き直した | 何もしない（状態が変わっていないので掃除する理由がない） |
-| 要素が `x` `y` `z` を持たない | 対象か判断できないので触らない |
+| 要素が`x` `y` `z`を持たない | 対象か判断できないので触らない |
 
-新しいブロックが本来必要とする `block_entity`（置いたのがチェストなら空のチェスト）は
-**生成しない**。どのブロックが block entity を必要とするかの判定には
-ブロック定義テーブルが要り、それ自体が別の成果物になるため
-（[adr/0004](../adr/0004-defer-heightmap-recalc.md) と同じ理由）。
-必要なら利用者が生の NBT へ直接足す。
+新しいブロックが本来必要とする`block_entity`（置いたのがチェストなら空のチェスト）は**生成しない**。
+どのブロックがblock entityを必要とするかの判定にはブロック定義テーブルが要り、それ自体が別の成果物になるため（[adr/0004](../adr/0004-defer-heightmap-recalc.md)と同じ理由）。
+必要なら利用者が生のNBTへ直接足す。
 
 ---
 
 ## 3. Heightmaps
 
-`Heightmaps` は `Compound` で、各値は `LongArray`。
-256 エントリ（16×16）を **9 ビット幅**の BitStorage（跨ぎなし）で詰めたもの。
+`Heightmaps`は`Compound`で、各値は`LongArray`。
+256エントリ（16×16）を**9ビット幅**のBitStorage（跨ぎなし）で詰めたもの。
 
 ```
 bits            = 9
@@ -198,45 +190,43 @@ index           = z * 16 + x
 | `OCEAN_FLOOR` | 移動を妨げる固体の最上位ブロック |
 
 **読み書き（そのまま保持）のみ対応し、再計算は行わない。**
-どのブロックが「移動を妨げる」かの判定にはブロック定義テーブルが必要で、
-それ自体が別の大きな成果物になるため（→ [adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+どのブロックが「移動を妨げる」かの判定にはブロック定義テーブルが必要で、それ自体が別の大きな成果物になるため（→ [adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
 
 ブロックを改変した後は次のいずれかを推奨する。
 
-- `chunk.clear_heightmaps()` — `Heightmaps` を削除する。Minecraft が次回読み込み時に再計算する
-- 何もしない — 見た目（草の生成やモブスポーン判定）が一時的にずれる可能性がある
+- `chunk.clear_heightmaps()`で`Heightmaps`を削除する。Minecraftが次回読み込み時に再計算する
+- 何もしない。見た目（草の生成やモブスポーン判定）が一時的にずれる可能性がある
 
-同様に `chunk.invalidate_lighting()` は `isLightOn` を `0` にし、光源の再計算を促す。
+同様に`chunk.invalidate_lighting()`は`isLightOn`を`0`にし、光源の再計算を促す。
 
 ---
 
 ## 4. entities / poi
 
-`entities/` と `poi/` のリージョンファイルも同じ Anvil 形式だが、中身が異なる。
+`entities/`と`poi/`のリージョンファイルも同じAnvil形式だが、中身が異なる。
 
 **entities**（`dimensions/<ns>/<path>/entities/r.X.Z.mca`）
 
 | キー | 型 | 内容 |
 |---|---|---|
 | `DataVersion` | `Int` | |
-| `Position` | `IntArray` | `[chunkX, chunkZ]` の 2 要素 |
-| `Entities` | `List<Compound>` | エンティティ。各要素が `id`(String) と `Pos`(List&lt;Double&gt;) を持つ |
+| `Position` | `IntArray` | `[chunkX, chunkZ]`の2要素 |
+| `Entities` | `List<Compound>` | エンティティ。各要素が`id`(String)と`Pos`(List&lt;Double&gt;)を持つ |
 
 **poi**（`dimensions/<ns>/<path>/poi/r.X.Z.mca`）
 
 | キー | 型 | 内容 |
 |---|---|---|
 | `DataVersion` | `Int` | |
-| `Sections` | `Compound` | キーが**セクションYの10進文字列**（`"-1"` など）、値が下記 |
+| `Sections` | `Compound` | キーが**セクションYの10進文字列**（`"-1"`など）、値が下記 |
 
-`Sections` の各値:
+`Sections`の各値は次の形をとる。
 
 ```
 { Valid: 1b, Records: [ { pos: [I; 279, -16, 182], free_tickets: 1, type: "minecraft:home" } ] }
 ```
 
-これらは**生の `NbtCompound` として読み書き**できるところまでを対象とし、
-型付きの API は提供しない。
+これらは**生の`NbtCompound`として読み書き**できるところまでを対象とし、型付きのAPIは提供しない。
 
 ---
 
@@ -258,10 +248,10 @@ Cuboid { min_x, min_y, min_z, max_x, max_y, max_z }
     positions()                  範囲内の座標を順に返す
 ```
 
-`Cuboid` は**両端を含む**。`of(0, 0, 0, 0, 0, 0)` は 1 ブロックで `volume()` は 1。
+`Cuboid`は**両端を含む**。`of(0, 0, 0, 0, 0, 0)`は1ブロックで、`volume()`は1。
 
-`positions()` の並びは **Y、Z、X の順**とし、X をいちばん内側で動かす。
-X はチャンク内で連続するので、同じセクションを続けて触れる。
+`positions()`の並びは**Y、Z、Xの順**とし、Xをいちばん内側で動かす。
+Xはチャンク内で連続するので、同じセクションに続けてアクセスできる。
 
 チャンク座標への変換は**算術右シフト**で行う。
 論理右シフトでは負の座標が正しく求まらない。
@@ -270,9 +260,9 @@ X はチャンク内で連続するので、同じセクションを続けて触
 
 ## 6. バージョン検査
 
-対応の判定はワールドの形式で行う。Minecraft のバージョン番号は条件にしない。
+対応の判定はワールドの形式で行う。Minecraftのバージョン番号は条件にしない。
 
-いまの形式は **26.1（DataVersion `4786`）** で入った。
+いまの形式は26.1（DataVersion `4786`）で入った。
 これ以降のバージョンは、形式が変わらない限りそのまま読み書きできる。
 
 ```
@@ -280,20 +270,18 @@ MIN_SUPPORTED_DATA_VERSION = 4786   扱える形式の下限
 TARGET_DATA_VERSION        = 4903   動作を確かめたバージョン（26.2）
 ```
 
-- 読み込み時、`DataVersion` が `4786` **以上なら何もしない**
+- 読み込み時、`DataVersion`が`4786`**以上なら何もしない**
   - 対象より新しいバージョンでも警告を出さない
   - 形式が同じなら読めるので、知らせる必要がない
-- `4786` 未満なら `ReadOptions.on_version_mismatch` に従う
+- `4786`未満なら`ChunkReadOptions.on_version_mismatch`に従う
   - `Warn`（既定）: 警告コールバックを呼んで続行する
   - `Error`: `UNSUPPORTED_DATA_VERSION`
   - `Ignore`: 何もしない
-- 書き込み時、`DataVersion` は**読んだ値をそのまま残す**
+- 書き込み時、`DataVersion`は**読んだ値をそのまま残す**
   - 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
-  - `4786` 未満のチャンクは既定で `UNSUPPORTED_DATA_VERSION`
-  - `WriteOptions.allow_foreign_data_version = true` で明示的に許可できる。
-    このときも `DataVersion` は書き換えない
+  - `4786`未満のチャンクは既定で`UNSUPPORTED_DATA_VERSION`
+  - `ChunkWriteOptions.allow_foreign_data_version = true`で明示的に許可できる。このときも`DataVersion`は書き換えない
 
-**形式が変わったときだけ下限を上げる。** 上げたら、そのワールドを扱えなくなる
-利用者が出るので、バージョン番号のいちばん上の桁も上げる。
+**形式が変わったときだけ下限を上げる。** 下限を上げると、そのワールドを扱えなくなる利用者が出るので、バージョン番号のいちばん上の桁も上げる。
 
-詳細は [07 バージョンポリシー](../guide/07-version-policy.md)。
+詳細は[07 バージョンポリシー](../guide/07-version-policy.md)。

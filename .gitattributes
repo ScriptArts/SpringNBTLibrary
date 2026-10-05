@@ -1,6 +1,6 @@
 * text=auto eol=lf
 
-# 共通テストベクタはバイナリとして厳密に扱う（改行変換されると検証が壊れるため）
+# 共通テストベクタはバイナリとして厳密に扱う（改行変換されると検証がおかしくなるため）
 spec/testdata/**/*.nbt   binary
 spec/testdata/**/*.mca   binary
 spec/testdata/**/*.mcc   binary

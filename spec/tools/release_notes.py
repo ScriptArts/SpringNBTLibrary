@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """リリース本文を組み立てる。
 
-CHANGELOG.md からその版の節を抜き出し、毎回同じ案内文（`.github/release-common.md`）
-と合わせて 1 つの本文にする。
+CHANGELOG.mdからその版の節を抜き出し、
+毎回同じ案内文（`.github/release-common.md`）と合わせて1つの本文にする。
 
-パッチノートの実体を CHANGELOG.md 側に置くのは、
-同じ内容を 2 か所へ書かせないため。
-CHANGELOG に節が無ければ失敗させるので、書き忘れたままリリースできない。
+パッチノートの実体をCHANGELOG.md側に置くのは、
+同じ内容を2か所へ書かせないため。
+CHANGELOGに節が無ければ失敗させるので、書き忘れたままリリースできない。
 
 使い方:
     python3 spec/tools/release_notes.py 1.1.0
@@ -22,10 +22,10 @@ import sys
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-#: 版ごとの節の見出し。`## [1.1.0]` の形。
+#: 版ごとの節の見出し。`## [1.1.0]`の形。
 SECTION = re.compile(r"^## \[([^\]]+)\]\s*$")
 
-#: 節の終わりとみなす見出し。版以外の `## 〜` でも区切る。
+#: 節の終わりとみなす見出し。版以外の`## 〜`でも区切る。
 HEADING = re.compile(r"^## ")
 
 #: リポジトリ内への相対リンク。リリースのページからは辿れないので絶対URLへ直す。
@@ -41,7 +41,7 @@ def read_text(path: str) -> str:
 
 
 def extract_section(changelog: str, version: str):
-    """CHANGELOG から指定した版の節の中身を取り出す。無ければ None。"""
+    """CHANGELOGから指定した版の節の中身を取り出す。無ければNone。"""
     lines = changelog.split("\n")
     start = None
 

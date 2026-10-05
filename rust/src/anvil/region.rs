@@ -1,12 +1,10 @@
-//! Anvil のリージョンファイル (`r.X.Z.mca`)
-//! 32×32 チャンクを格納する
+//! Anvilのリージョンファイル (`r.X.Z.mca`)
+//! 32×32チャンクを格納する
 //!
 //! ファイル全体をメモリに読み込んで扱う
-//! 実データのリージョンは数 MB 程度で、
-//! この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
-//! 開いて何も変えずに [`RegionFile::flush`] すると、バイト単位で元と同じファイルになる
-//!
-//! 仕様: `docs/spec/20-anvil-region.md`
+//! 実データのリージョンは数MB程度で、この方が「触っていないチャンクのバイト配置をそのまま保つ」ことを保証しやすい
+//! 開いて何も変えずに[`RegionFile::flush`]すると、バイト単位で元と同じファイルになる
+//! ただし空のファイルは、8KiBのヘッダだけのファイルになる
 
 use std::collections::HashMap;
 use std::fmt;
@@ -32,7 +30,7 @@ const HEADER_SECTORS: usize = 2;
 /// 1リージョンに入るチャンク数
 const CHUNK_COUNT: usize = 1024;
 
-/// 1チャンクが確保できるセクタ数の上限（長さフィールドが u8 のため）
+/// 1チャンクが確保できるセクタ数の上限（長さフィールドがu8のため）
 const MAX_SECTORS: usize = 255;
 
 /// リージョン内に収められるペイロードの上限
@@ -41,23 +39,21 @@ const MAX_INLINE_PAYLOAD: usize = (MAX_SECTORS * SECTOR_SIZE) - 5;
 
 /// リージョンファイル内でチャンクに使われる圧縮方式
 ///
-/// NBT 層の [`Compression`] とは別物であることに注意
-/// あちらはファイル全体の圧縮を表し、こちらはリージョン内の 1 チャンクに付く
-/// 1 バイトのIDを表す
-///
-/// 仕様: `docs/spec/20-anvil-region.md` 3.1章
+/// NBT層の[`Compression`]とは違うものであることに注意
+/// あちらはファイル全体の圧縮を表し、こちらはリージョン内の1チャンクに付く1バイトのIDを表す
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChunkCompression {
     /// GZip (RFC 1952)
     /// 実データではほぼ使われない
     Gzip,
     /// Zlib (RFC 1950)
-    /// Minecraft が実際に書き出す方式
+    /// Minecraftが実際に書き出す方式
     Zlib,
     /// 無圧縮
     None,
-    /// LZ4（ブロック形式）
-    /// 任意依存
+    /// LZ4（独自ヘッダ付きのブロック連結）
+    /// 読み込みのみ対応
+    /// 展開は自前で行い、外部の依存は使わない
     Lz4,
     /// サードパーティ製サーバのカスタム方式
     /// 中身は解釈できない
@@ -87,10 +83,10 @@ impl ChunkCompression {
         }
     }
 
-    /// 圧縮方式IDから [`ChunkCompression`] を得る
+    /// 圧縮方式IDから[`ChunkCompression`]を得る
     /// 未知のIDならエラー
     pub fn from_id(id: u8) -> Result<ChunkCompression> {
-        // 仕様が定めるのは 1・2・3・4・127 の 5 種類だけ
+        // 仕様が定めるのは1・2・3・4・127の5種類だけ
         match id {
             1 => Ok(ChunkCompression::Gzip),
             2 => Ok(ChunkCompression::Zlib),
@@ -109,7 +105,7 @@ impl ChunkCompression {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegionFileMode {
     /// 読み取り専用
-    /// 書き込み系の操作はエラーになる
+    /// 書き込み系の操作はエラーになる（`flush`は何もしない）
     ReadOnly,
     /// 読み書き
     /// ファイルが無ければ空のリージョンとして扱う
@@ -117,7 +113,7 @@ pub enum RegionFileMode {
 }
 
 /// リージョンの座標
-/// 1リージョンは 32×32 チャンクを担当する
+/// 1リージョンは32×32チャンクを担当する
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RegionPos {
     /// リージョンX座標
@@ -137,12 +133,12 @@ impl RegionPos {
         format!("r.{}.{}.mca", self.x, self.z)
     }
 
-    /// `r.X.Z.mca` 形式のファイル名から座標を得る
-    /// 解釈できなければ `None`
+    /// `r.X.Z.mca`形式のファイル名から座標を得る
+    /// 解釈できなければ`None`
     pub fn from_file_name(file_name: &str) -> Option<RegionPos> {
         let parts: Vec<&str> = file_name.split('.').collect();
 
-        // "r" "<x>" "<z>" "mca" の 4 つに分かれるはず
+        // "r" "<x>" "<z>" "mca"の4つに分かれるはず
         if parts.len() != 4 || parts[0] != "r" || parts[3] != "mca" {
             return None;
         }
@@ -178,7 +174,7 @@ impl ChunkPos {
 
     /// このチャンクを含むリージョンの座標
     ///
-    /// Rust の `>>` は符号付き整数では算術右シフトなので、負の座標でも正しく求まる
+    /// Rustの`>>`は符号付き整数では算術右シフトなので、負の座標でも正しく求まる
     pub fn region(&self) -> RegionPos {
         RegionPos::new(self.x >> 5, self.z >> 5)
     }
@@ -201,8 +197,7 @@ impl ChunkPos {
 
 /// リージョンファイルに格納されたままの、圧縮済みチャンクデータ
 ///
-/// 本ライブラリが解釈できない圧縮方式（LZ4 未導入、カスタム方式）でも
-/// これなら取り出せる
+/// 本ライブラリが解釈できない圧縮方式（カスタム方式）のチャンクでも、これなら取り出せる
 /// バックアップや別ツールへの受け渡しに使う
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawChunk {
@@ -210,7 +205,7 @@ pub struct RawChunk {
     pub compression: ChunkCompression,
     /// 圧縮されたままの本体
     pub data: Vec<u8>,
-    /// 外部ファイル `c.X.Z.mcc` に格納されていたか
+    /// 外部ファイル`c.X.Z.mcc`に格納されていたか
     pub external: bool,
 }
 
@@ -221,7 +216,7 @@ impl RawChunk {
     }
 }
 
-/// リージョンファイル 1 つ分
+/// リージョンファイル1つ分
 pub struct RegionFile {
     path: PathBuf,
     directory: PathBuf,
@@ -239,7 +234,7 @@ pub struct RegionFile {
 impl RegionFile {
     /// リージョンファイルを開く
     ///
-    /// `path` は `r.X.Z.mca` という名前でなければならない
+    /// `path`は`r.X.Z.mca`という名前でなければならない
     /// 座標はファイル名から読み取る
     pub fn open(path: impl AsRef<Path>, mode: RegionFileMode) -> Result<RegionFile> {
         let path = path.as_ref();
@@ -315,7 +310,7 @@ impl RegionFile {
 
     /// ヘッダを解析し、ロケーションとタイムスタンプを取り込む
     fn parse_header(&mut self) -> Result<()> {
-        // 空ファイルは「チャンクが 1 つも無いリージョン」として受け入れる
+        // 空ファイルは「チャンクが1つも無いリージョン」として受け入れる
         if self.data.is_empty() {
             self.data = vec![0u8; HEADER_SECTORS * SECTOR_SIZE];
             return Ok(());
@@ -342,7 +337,7 @@ impl RegionFile {
         let total_sectors = self.data.len() / SECTOR_SIZE;
         let mut sector_owner: HashMap<usize, usize> = HashMap::new();
 
-        // ロケーションテーブルの 1024 エントリを順に取り込む
+        // ロケーションテーブルの1024エントリを順に取り込む
         for index in 0..CHUNK_COUNT {
             let entry = self.read_unsigned(index * 4, 4);
             let offset = (entry >> 8) as usize;
@@ -376,7 +371,7 @@ impl RegionFile {
                 ));
             }
 
-            // 同じセクタを 2 つのチャンクが指していたら、どちらかが壊れている
+            // 同じセクタを2つのチャンクが指していたら、どちらかがおかしくなっている
             for sector in offset..offset + count {
                 if let Some(owner) = sector_owner.insert(sector, index) {
                     return Err(Error::new(
@@ -393,9 +388,9 @@ impl RegionFile {
         Ok(())
     }
 
-    /// ロケーションテーブルとタイムスタンプテーブルを先頭 2 セクタへ書き戻す
+    /// ロケーションテーブルとタイムスタンプテーブルを先頭2セクタへ書き戻す
     fn write_header(&mut self) {
-        // 位置表とタイムスタンプ表を、添字順に組み立て直す
+        // ロケーションテーブルとタイムスタンプテーブルを、添字順に組み立て直す
         for index in 0..CHUNK_COUNT {
             let entry = ((self.offsets[index] as u64) << 8) | (self.sector_counts[index] as u64);
             self.write_unsigned(index * 4, entry, 4);
@@ -459,7 +454,7 @@ impl RegionFile {
         self.ensure_open()?;
         let mut result = Vec::new();
 
-        // 添字の昇順に走査する（local_z が外、local_x が内）
+        // 添字の昇順に走査する（local_zが外、local_xが内）
         for index in 0..CHUNK_COUNT {
             if self.sector_counts[index] == 0 {
                 continue;
@@ -476,8 +471,8 @@ impl RegionFile {
         Ok(result)
     }
 
-    /// チャンクの最終更新時刻（Unix 秒）
-    /// 存在しなければ 0
+    /// チャンクの最終更新時刻（Unix秒）
+    /// タイムスタンプテーブルの値をそのまま返すため、チャンクが無くても0とは限らない
     pub fn timestamp(&self, chunk_x: i32, chunk_z: i32) -> Result<i32> {
         self.ensure_open()?;
         let index = self.index_of(chunk_x, chunk_z)?;
@@ -495,7 +490,7 @@ impl RegionFile {
     }
 
     /// チャンクを圧縮されたまま取り出す
-    /// 存在しなければ `None`
+    /// 存在しなければ`None`
     pub fn read_chunk_raw(&self, chunk_x: i32, chunk_z: i32) -> Result<Option<RawChunk>> {
         self.ensure_open()?;
         let index = self.index_of(chunk_x, chunk_z)?;
@@ -526,7 +521,7 @@ impl RegionFile {
         let compression = ChunkCompression::from_id(scheme_byte & 0x7F)?;
 
         if external {
-            // 最上位ビットが立っている場合、本体は c.X.Z.mcc にある
+            // 最上位ビットが立っている場合、本体はc.X.Z.mccにある
             let payload = self.read_external_file(chunk_x, chunk_z)?;
             return Ok(Some(RawChunk { compression, data: payload, external: true }));
         }
@@ -535,8 +530,8 @@ impl RegionFile {
         Ok(Some(RawChunk { compression, data: body, external: false }))
     }
 
-    /// チャンクを NBT として読む
-    /// 存在しなければ `None`
+    /// チャンクをNBTとして読む
+    /// 存在しなければ`None`
     pub fn read_chunk(&self, chunk_x: i32, chunk_z: i32) -> Result<Option<NbtCompound>> {
         let raw = match self.read_chunk_raw(chunk_x, chunk_z)? {
             Some(value) => value,
@@ -549,7 +544,7 @@ impl RegionFile {
         Ok(Some(read_bytes(&plain, &options)?.tag))
     }
 
-    /// チャンクを NBT として書き込む
+    /// チャンクをNBTとして書き込む
     pub fn write_chunk(
         &mut self,
         chunk_x: i32,
@@ -575,7 +570,7 @@ impl RegionFile {
         let scheme_byte: u8;
 
         if use_external {
-            // 1MiB を超えるチャンクは外部ファイルへ退避し、リージョンには目印だけ残す
+            // 255セクタ（約1MiB）に収まらないチャンクは外部ファイルへ退避し、リージョンには目印だけ残す
             self.write_external_file(chunk_x, chunk_z, &raw.data)?;
             payload = Vec::new();
             scheme_byte = raw.compression.id() | 0x80;
@@ -614,7 +609,7 @@ impl RegionFile {
     }
 
     /// チャンクを削除する
-    /// 削除できたら `true`
+    /// 削除できたら`true`
     pub fn delete_chunk(&mut self, chunk_x: i32, chunk_z: i32) -> Result<bool> {
         self.ensure_open()?;
         self.ensure_writable()?;
@@ -635,7 +630,7 @@ impl RegionFile {
 
     /// 必要なセクタ数を確保し、開始セクタ番号を返す
     ///
-    /// 既存の割り当てがちょうど同じ大きさならその場を使い、
+    /// 既存の割り当てがちょうど同じ大きさなら、その場所をそのまま使う
     /// そうでなければ先頭から空き領域を探し、無ければ末尾へ追加する
     fn allocate_sectors(&mut self, index: usize, needed: usize) -> usize {
         // 大きさが変わらないなら動かさない
@@ -671,12 +666,12 @@ impl RegionFile {
     }
 
     /// セクタの使用状況を作る
-    /// `ignore_index` のチャンクは空きとして扱う
+    /// `ignore_index`のチャンクは空きとして扱う
     fn build_sector_usage(&self, ignore_index: usize) -> Vec<bool> {
         let total_sectors = self.data.len() / SECTOR_SIZE;
         let mut used = vec![false; total_sectors];
 
-        // ヘッダの 2 セクタは常に使用中
+        // ヘッダの2セクタは常に使用中
         for sector in used.iter_mut().take(HEADER_SECTORS.min(total_sectors)) {
             *sector = true;
         }
@@ -776,6 +771,8 @@ impl RegionFile {
         }
 
         self.write_header();
+        // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        self.ensure_directory()?;
 
         match std::fs::write(&self.path, &self.data) {
             Ok(()) => {
@@ -861,8 +858,22 @@ impl RegionFile {
         })
     }
 
+    /// ファイルを置くディレクトリが無ければ作る
+    /// 読むだけの操作で空のディレクトリができないよう、書き出す直前にだけ呼ぶ
+    fn ensure_directory(&self) -> Result<()> {
+        std::fs::create_dir_all(&self.directory).map_err(|error| {
+            Error::with_source(
+                ErrorCode::Io,
+                format!("ディレクトリを作れない: {}", self.directory.display()),
+                error,
+            )
+        })
+    }
+
     fn write_external_file(&self, chunk_x: i32, chunk_z: i32, payload: &[u8]) -> Result<()> {
         let external = self.external_path(chunk_x, chunk_z);
+        // 読み書きで開いたフォルダがまだ無ければ、書き出す前に作る
+        self.ensure_directory()?;
 
         std::fs::write(&external, payload).map_err(|error| {
             Error::with_source(
@@ -922,7 +933,7 @@ fn decompress_chunk(raw: &RawChunk) -> Result<Vec<u8>> {
             read_all(&mut decoder, &mut plain)?;
             Ok(plain)
         }
-        // LZ4 は読み込みのみ対応
+        // LZ4は読み込みのみ対応
         ChunkCompression::Lz4 => lz4::decompress(&raw.data),
         other => Err(Error::new(
             ErrorCode::UnsupportedFeature,

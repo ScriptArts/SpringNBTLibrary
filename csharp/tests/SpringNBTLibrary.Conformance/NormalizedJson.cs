@@ -5,19 +5,21 @@ using SpringNBTLibrary.Nbt;
 namespace SpringNBTLibrary.Conformance;
 
 /// <summary>
-/// NBT を、言語をまたいで文字列として完全一致する JSON へ写す。
+/// NBTを、言語をまたいで文字列として完全一致するJSONへ写す
 /// </summary>
 /// <remarks>
 /// <para>
-/// 浮動小数点をビットパターンで、64bit 整数を10進文字列で表すのが要。
-/// 10進表記の丸めや JSON 数値の精度は処理系ごとに差が出るため、
-/// そのまま出すと4言語の出力が一致しない。
+/// 浮動小数点をビットパターンで、64bit整数を10進文字列で表すのが要
+/// 10進表記の丸めやJSON数値の精度は処理系ごとに差が出るため、
+/// そのまま出すと言語間で出力が一致しない
 /// </para>
-/// <para>仕様: <c>docs/spec/00-conventions.md</c> 6章 / <c>docs/spec/90-conformance.md</c></para>
 /// </remarks>
 internal static class NormalizedJson
 {
-    /// <summary>ルートを含む全体を JSON 文字列へ変換する。末尾に改行を1つ付ける。</summary>
+    /// <summary>
+    /// ルートを含む全体をJSON文字列へ変換する
+    /// 末尾に改行を1つ付ける
+    /// </summary>
     internal static string Write(NamedTag named, NbtFormat format)
     {
         StringBuilder builder = new StringBuilder();
@@ -46,7 +48,7 @@ internal static class NormalizedJson
         builder.Append("{\"type\":");
         AppendString(builder, tag.Type.AsString());
 
-        // list だけは value の前に element_type が入る（仕様が定めるキー順）
+        // listだけはvalueの前にelement_typeが入る（仕様が定めるキー順）
         if (tag is NbtList listTag)
         {
             builder.Append(",\"element_type\":");
@@ -67,7 +69,7 @@ internal static class NormalizedJson
                 builder.Append(value.Value.ToString(CultureInfo.InvariantCulture));
                 break;
             case NbtLong value:
-                // 64bit 整数は JSON 数値だと処理系によって精度が落ちるため10進文字列で表す
+                // 64bit整数はJSON数値だと処理系によって精度が落ちるため10進文字列で表す
                 AppendString(builder, value.Value.ToString(CultureInfo.InvariantCulture));
                 break;
             case NbtFloat value:
@@ -79,7 +81,8 @@ internal static class NormalizedJson
             case NbtString value:
                 AppendString(builder, value.Value);
 
-                // MUTF-8 のバイト列も併記する。孤立サロゲートなど UTF-8 に写せない値を厳密に比較するため
+                // MUTF-8のバイト列も併記する
+                // 孤立サロゲートなどUTF-8に写せない値を厳密に比較するため
                 builder.Append(",\"mutf8\":");
                 AppendString(builder, ToHex(Mutf8.Encode(value.Value)));
                 break;
@@ -127,7 +130,7 @@ internal static class NormalizedJson
 
     private static void AppendCompound(StringBuilder builder, NbtCompound compound)
     {
-        // JSON オブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
+        // JSONオブジェクトだと挿入順の保持が処理系依存になるため、組の配列で表す
         builder.Append('[');
         bool first = true;
 
@@ -187,7 +190,7 @@ internal static class NormalizedJson
     {
         builder.Append('[');
 
-        // 64bit 整数は10進文字列の配列で表す
+        // 64bit整数は10進文字列の配列で表す
         for (int i = 0; i < values.Length; i++)
         {
             if (i > 0)
@@ -201,7 +204,7 @@ internal static class NormalizedJson
         builder.Append(']');
     }
 
-    /// <summary>浮動小数点のビットパターンを "0x..." 形式で表す。</summary>
+    /// <summary>浮動小数点のビットパターンを"0x..."形式で表す</summary>
     private static string HexBits(ulong bits, int digits)
     {
         return "0x" + bits.ToString("x" + digits.ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
@@ -220,10 +223,11 @@ internal static class NormalizedJson
     }
 
     /// <summary>
-    /// JSON 文字列を書き出す。非 ASCII は必ず <c>\uXXXX</c> へ逃がす。
+    /// JSON文字列を書き出す
+    /// 非ASCIIは必ず<c>\uXXXX</c>へエスケープする
     /// </summary>
     /// <remarks>
-    /// 言語ごとに既定のエスケープ方針が違うため、ここで一律に固定しないと出力が一致しない。
+    /// 言語ごとに既定のエスケープ方針が違うため、ここで一律に固定しないと出力が一致しない
     /// </remarks>
     private static void AppendString(StringBuilder builder, string text)
     {
@@ -255,7 +259,7 @@ internal static class NormalizedJson
                     builder.Append("\\t");
                     break;
                 default:
-                    // ASCII の印字可能文字だけ生で出し、それ以外は \\uXXXX にする
+                    // ASCIIの印字可能文字だけ生で出し、それ以外は\uXXXXにする
                     if (c >= 0x20 && c <= 0x7E)
                     {
                         builder.Append(c);

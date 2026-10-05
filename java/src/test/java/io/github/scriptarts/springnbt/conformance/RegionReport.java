@@ -15,9 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * リージョンファイルの中身を、言語をまたいで文字列として完全一致する形へ写す。
- *
- * <p>仕様: {@code docs/spec/90-conformance.md} 2.3章
+ * リージョンファイルの中身を、言語をまたいで文字列として完全一致する形へ写す
  */
 final class RegionReport {
 
@@ -26,9 +24,10 @@ final class RegionReport {
     }
 
     /**
-     * 存在するチャンクを 1 行 1 チャンクで書き出す。並びはロケーションテーブルの添字順。
+     * 存在するチャンクを1行1チャンクで書き出す
+     * 並びはロケーションテーブルの添字順
      *
-     * <p>各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 キー数」。
+     * <p>各行は「絶対X 絶対Z タイムスタンプ 圧縮方式 圧縮後バイト数 展開後バイト数 ルート直下キー数」
      */
     static String list(RegionFile region) {
         StringBuilder builder = new StringBuilder();
@@ -70,10 +69,10 @@ final class RegionReport {
     }
 
     /**
-     * 全チャンクを読み直し、無圧縮で新しいリージョンへ詰め直して書き出す。
+     * 全チャンクを読み直し、無圧縮で新しいリージョンへ詰め直して書き出す
      *
-     * <p>無圧縮にするのは、zlib の出力が処理系ごとに違い、
-     * 圧縮したままでは言語間でバイトが一致しないため。
+     * <p>無圧縮にするのは、zlibの出力が処理系ごとに違い、
+     * 圧縮したままでは言語間でバイトが一致しないため
      */
     static void rewrite(RegionFile source, Path outputPath) throws IOException {
         // 途中結果が残らないよう、書き出し先は必ず作り直す
