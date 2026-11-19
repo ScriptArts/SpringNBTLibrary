@@ -1,7 +1,9 @@
 # 30. チャンク形式
 
 `.mca`内に格納されるチャンク1つ分のNBT構造。**ここから先は形式依存**である。
-本書は**26.3で導入された形式（DataVersion 5006以降）** を対象とし、記述はJava版26.3（DataVersion 5023）の実データで確認した。
+本書は**1.13の正式版（DataVersion 1519）以降の形式**を対象とする。
+1〜5章は26.3で導入された形式（DataVersion 5006以降。7章の世代C5）を説明し、記述はJava版26.3（DataVersion 5023）の実データで確認した。
+それより前の世代との違いは7章にまとめる。
 
 前提: [20 Anvilリージョン形式](20-anvil-region.md) / [31 パレット付きコンテナ](31-paletted-container.md)
 
@@ -78,6 +80,10 @@
 
 `sections`は`Y`の昇順に並んでいるが、**並び順に依存してはならない**。
 読み込み時に`Y`から索引を作る。
+
+書き戻すときは、**読んだときの並びのまま**`sections`を書く。`Y`の昇順に並べ直さない。
+実ワールドには、`Y`が`0`..`15`のあとに`-1`が続く1.13.2のチャンクがあった。
+同じ`Y`の要素が2つあれば、後の要素を採り、最初に現れた位置へ書き出す。
 
 ### 2.1 ブロック状態のパレット要素
 
@@ -187,6 +193,8 @@ biome index = ((y & 15) / 4) * 16 + ((z & 15) / 4) * 4 + ((x & 15) / 4)
 いずれも`List<Compound>`で、**座標は絶対ワールド座標の`Int`で持つ**。
 チャンク内の相対座標ではないので、チャンク座標から換算して比べる必要がある。
 
+1.17までの形式では、同じ役割のリストが`Level`の中の`TileEntities` / `TileTicks` / `LiquidTicks`にある（→ 7.3）。
+
 Java版26.3の実データの例を示す。
 
 ```
@@ -246,6 +254,8 @@ index           = z * 16 + x
 - 何もしない。見た目（草の生成やモブスポーン判定）が一時的にずれる可能性がある
 
 同様に`chunk.invalidate_lighting()`は`isLightOn`を`0`にし、光源の再計算を促す。
+`isLightOn`の無いチャンクには`isLightOn`を書き足す。
+1.17までの形式は扱いが違う（→ 7.3）。
 
 ---
 
@@ -310,26 +320,174 @@ Xはチャンク内で連続するので、同じセクションに続けてア�
 
 対応の判定はワールドの形式で行う。Minecraftのバージョン番号は条件にしない。
 
-いまの形式は26.3（DataVersion `5006`）で入った。ブロックのパレットの形式が変わった（→ 2.1）。
-これ以降のバージョンは、形式が変わらない限りそのまま読み書きできる。
+チャンクの形式は5つの世代に分かれる（→ 7章）。
+本ライブラリは1.13の正式版（DataVersion `1519`）以降の世代を、読んだときの形式のまま読み書きする。
+新しいバージョンのチャンクも、形式が変わらない限り、いちばん新しい世代でそのまま読み書きできる。
 
 ```
-MIN_SUPPORTED_DATA_VERSION = 5006   扱える形式の下限
+MIN_SUPPORTED_DATA_VERSION = 1519   扱える形式の下限（1.13）
 TARGET_DATA_VERSION        = 5023   動作を確かめたバージョン（26.3）
 ```
 
-- 読み込み時、`DataVersion`が`5006`**以上なら何もしない**
+- 読み込み時、チャンク自身の`DataVersion`が`1519`**以上なら何もしない**
   - 対象より新しいバージョンでも警告を出さない
   - 形式が同じなら読めるので、知らせる必要がない
-- `5006`未満なら`ChunkReadOptions.on_version_mismatch`に従う
+- `1519`未満か、`DataVersion`が無ければ`ChunkReadOptions.on_version_mismatch`に従う
   - `Warn`（既定）: 警告コールバックを呼んで続行する
   - `Error`: `UNSUPPORTED_DATA_VERSION`
   - `Ignore`: 何もしない
 - 書き込み時、`DataVersion`は**読んだ値をそのまま残す**
   - 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
-  - `5006`未満のチャンクは既定で`UNSUPPORTED_DATA_VERSION`
-  - `ChunkWriteOptions.allow_foreign_data_version = true`で明示的に許可できる。このときも`DataVersion`は書き換えない
+  - `1519`未満のチャンクと`DataVersion`の無いチャンクは、既定で`UNSUPPORTED_DATA_VERSION`
+  - `ChunkWriteOptions.allow_foreign_data_version = true`で明示的に許可できる。このときは読んだNBTをそのまま書き出し、`DataVersion`も書き換えない
 
-**形式が変わったときだけ下限を上げる。** 下限を上げると、そのワールドを扱えなくなる利用者が出るので、バージョン番号のいちばん上の桁も上げる。
+下限との比較には`format_data_version`の指定（→ 7.1）を使わず、常にチャンク自身の`DataVersion`を使う。
+
+**形式が変わったら、下限を上げずに世代を足す**（[adr/0011](../adr/0011-format-eras.md)）。
 
 詳細は[07 バージョンポリシー](../guide/07-version-policy.md)。
+
+---
+
+## 7. 形式の世代
+
+### 7.1 世代の表
+
+チャンクの形式は`DataVersion`で次の5つの世代に分かれる。境界の値はMinecraftが形式を変えたDataVersionである。
+
+| 世代 | DataVersion | バージョン | 本体 | セクションのブロック | ビット詰め | バイオーム |
+|---|---|---|---|---|---|---|
+| C1 | `1519`〜`2202` | 1.13〜1.14.x | `Level`の中 | `Palette` / `BlockStates` | 値が64bitの境目をまたぐ | `Level.Biomes`の`int[256]`（列ごと） |
+| C2 | `2203`〜`2528` | 1.15〜1.15.2 | `Level`の中 | `Palette` / `BlockStates` | 値が64bitの境目をまたぐ | `Level.Biomes`の`int[1024]`（4×4×4ブロックごと） |
+| C3 | `2529`〜`2843` | 1.16〜1.17.x | `Level`の中 | `Palette` / `BlockStates` | またがない | `Level.Biomes`の`int[1024]`（4×4×4ブロックごと） |
+| C4 | `2844`〜`5005` | 1.18〜26.2 | ルート | `block_states`。パレットの要素は`{Name, Properties}` | またがない | セクションの`biomes` |
+| C5 | `5006`以降 | 26.3以降 | ルート | `block_states`。パレットの要素は文字列か`{id, properties}`（→ 2.1） | またがない | セクションの`biomes` |
+
+ビット詰めの2つの方式は[31](31-paletted-container.md)で定める。
+
+世代はチャンクを読んだときにチャンク自身の`DataVersion`で決める。
+1つのワールドに形式の違うチャンクが混ざりうるためである。26.2で作ったワールドを26.3で開いても、行っていない場所のチャンクは26.2の形式のまま残る。
+書き戻すときも読んだときの世代を使い、利用者が書き出す形式を選ぶ手段は設けない。
+
+`ChunkReadOptions.format_data_version`を指定すると、チャンク自身の`DataVersion`の代わりにその値で世代を選ぶ。
+ワールドから読むときは`WorldOpenOptions.format_data_version`がこれに優先する（→ [40 5章](40-world-layout.md#5-261より前の構成)）。
+
+- 指定できる値は`1519`以上。それ未満は`INVALID_ARGUMENT`
+- 選んだ世代とチャンクの構造が合わなければ、推測で読み進めずにエラーにする。`Level`の有無が合わなければ`MALFORMED_DATA`、パレットの要素の型が合わなければ`UNEXPECTED_TAG_TYPE`か`MALFORMED_DATA`
+- チャンク自身の`DataVersion`が`1519`未満なら、指定があってもどの世代でも解釈しない（→ 7.4）
+
+`Chunk.format_data_version`は、世代を選ぶのに使ったDataVersionを返す。
+指定していればその値、指定が無ければチャンク自身の`DataVersion`である。`DataVersion`の無いチャンクで指定も無ければ`-1`を返す。
+
+境界の値はMinecraftの資料に基づく。実ワールドで確かめたのは、観測したDataVersionの間に境界があることまでである。
+
+| 境界 | 変わること | 境界の前で観測したDataVersion | 境界の後で観測したDataVersion |
+|---|---|---|---|
+| `2203` | バイオームが`int[256]`から`int[1024]`になる | 1976 | 2225 |
+| `2529` | ビット詰めが値をまたがなくなる | 2230 | 2567 |
+| `2844` | `Level`が無くなる | 2730 | 2860 |
+| `5006` | パレットの要素が文字列か`{id, properties}`になる | 4903 | 5023 |
+
+### 7.2 1.18〜26.2の形式（C4）
+
+チャンクの構造は1〜5章と同じで、ブロックのパレットの要素だけが違う。
+
+```
+{ Name: "minecraft:oak_stairs", Properties: { facing: "north", half: "top", shape: "straight", waterlogged: "false" } }
+```
+
+- 要素は`Name`と`Properties`を持つ`Compound`。プロパティの無いブロックは`Properties`を持たない
+- 文字列の要素と包み（`{"": <値>}`）は無い
+- 本ライブラリは`BlockState`を同じ形で書き出す。プロパティが空なら`Properties`のキーを書かない
+
+`Status`は、1.18と1.19では名前空間の無い値（`full`など）、1.20.1以降は`minecraft:`の付いた値だった。
+`is_fully_generated`は`minecraft:`を外してから比べる。
+
+1.18、1.19、1.20.1、1.21 Pre-Release 1、26.1.2、26.2の実ワールドで、本ライブラリが触る範囲の構造が1〜5章と同じことを確かめた。
+
+### 7.3 1.13〜1.17の形式（C1〜C3）
+
+チャンクの本体はルートの`Level`の中にある。`DataVersion`だけはルートの直下に置かれる。
+本ライブラリが読み書きするキーは次のとおりで、ほかのキー（`Entities`など）は読んだまま残す。
+
+| キー | 型 | 内容 |
+|---|---|---|
+| `DataVersion` | `Int` | ルートの直下 |
+| `Level.xPos` / `Level.zPos` | `Int` | 絶対チャンク座標 |
+| `Level.Status` | `String` | 生成段階 |
+| `Level.Sections` | `List<Compound>` | セクション |
+| `Level.Biomes` | `IntArray` | 数値のバイオームID |
+| `Level.TileEntities` / `Level.TileTicks` / `Level.LiquidTicks` | `List<Compound>` | ブロックに紐づく付随データ（2.3と同じく絶対座標の`x` `y` `z`を持つ） |
+| `Level.Heightmaps` | `Compound` | 高さマップ |
+| `Level.isLightOn` | `Byte` | 光源計算済みフラグ |
+
+`yPos`は無い。セクションは0段目から始まり、`min_section_y`は`0`を返す。
+
+**セクション**
+
+| キー | 型 | 内容 |
+|---|---|---|
+| `Y` | `Byte` | セクションのY位置 |
+| `Palette` | `List<Compound>` | ブロック状態のパレット。要素は`{Name, Properties}`（7.2と同じ） |
+| `BlockStates` | `LongArray` | パレットへの添字を詰めたもの |
+| `BlockLight` / `SkyLight` | `ByteArray` | 光源 |
+
+- `BlockStates`は、パレットが1要素のときも必ずある。ビット幅は4以上で、1要素なら4ビット・256 long
+- `Palette`と`BlockStates`がそろったセクションだけがブロックを持つ。片方しか無いセクション（光源だけを持つ`Y`が`-1`や`16`のものなど）は、ブロックAPIでは空のセクションとして扱い、元のまま残す
+- `Palette`の要素が`Compound`でなければ`UNEXPECTED_TAG_TYPE`
+- ビット詰めは、C1とC2が値をまたぐ方式、C3がまたがない方式（[31](31-paletted-container.md)）
+
+実ワールドでは、パレットが1要素のセクション（C1 247,504、C2 1,228、C3 141,984）はすべて256 longの`BlockStates`を持ち、片方しか無いセクションは無かった。
+
+**バイオーム**
+
+`Level.Biomes`の数値のIDを、`get_biome_id` / `set_biome_id`でそのまま読み書きする。IDは名前に直さない。1.16.2以降はデータパックで独自のバイオームを足せるので、固定の表では正しく引けないためである。
+この世代では`get_biome` / `set_biome`が`UNSUPPORTED_FEATURE`、1.18以降の世代では`get_biome_id` / `set_biome_id`が`UNSUPPORTED_FEATURE`になる。
+
+| 世代 | 長さ | 添字 |
+|---|---|---|
+| C1 | `int[256]` | `z * 16 + x`。列ごとに持つので`y`を見ない |
+| C2 / C3 | `int[1024]` | `((y >> 2) & 63) * 16 + (z >> 2) * 4 + (x >> 2)`。`y`は絶対Y座標で`0`..`255` |
+
+- C2 / C3で`y`が`0`..`255`の外なら、`get_biome_id`は`None`、`set_biome_id`は`INVALID_ARGUMENT`
+- `Biomes`が無い、`IntArray`でない、長さが合わないときは、`get_biome_id`は`None`、`set_biome_id`は`INVALID_ARGUMENT`。元のNBTはそのまま残す。
+  実ワールドではC1に`int[0]`（13,488チャンク）と`byte[256]`（482チャンク。`Sections`の無いチャンク）があった
+
+**Status**
+
+| 世代 | 実ワールドに現れた値 | 生成済みとみなす値 |
+|---|---|---|
+| C1 | `mobs_spawned`、`full`、`structure_starts`、`postprocessed`、`fullchunk`、`features`、`liquid_carvers`、`carved`、`liquid_carved`、`decorated`、`spawn`、`empty`、`light` | `full`、`postprocessed`、`fullchunk` |
+| C2 | `full`、`structure_starts`、`liquid_carvers`、`features`、`light`、`heightmaps`、`noise`、`surface`、`carvers` | `full` |
+| C3 | `full`、`structure_starts`、`liquid_carvers`、`features`、`heightmaps`、`spawn`、`noise`、`light`、`biomes` | `full` |
+
+`postprocessed`と`fullchunk`は1.13のチャンクにだけ現れた。1.13は生成を終えたチャンクをこの2つの値でも保存する。
+
+**高さマップと光源**
+
+`clear_heightmaps`は`Level.Heightmaps`を削除する。高さマップの中身は解釈しない。
+
+`invalidate_lighting`は`Level.isLightOn`を`0`にする。`isLightOn`の無いチャンクには書き足さず、`UNSUPPORTED_FEATURE`にする。書き足すと、元に無いキーが増えるためである。
+実ワールドでは、DataVersion 1631（1.13.2）のチャンクはどれも`isLightOn`を持たず、1968以降の生成済みのチャンクはほぼすべてが持っていた。生成途中のチャンクで持つものは少なかった。
+
+**ブロックの置き換え**
+
+ブロックを置き換えたときは、`Level.TileEntities` / `Level.TileTicks` / `Level.LiquidTicks`から、その座標を指す要素を取り除く（2.4と同じ規則）。
+
+### 7.4 1.13より前のチャンク
+
+`DataVersion`が`1519`未満のチャンクと、`DataVersion`の無いチャンク（1.9より前）は、どの世代でも解釈せず、元のNBTだけを持つ。
+ブロックが数値IDなので、1.13以降の世代で読むとブロックが1つも無いように見えてしまうためである。
+
+- 読み込みは`on_version_mismatch`に従う（6章）
+- `get_block` / `set_block` / `get_biome` / `set_biome` / `get_biome_id` / `set_biome_id` / `min_section_y` / `clear_heightmaps` / `invalidate_lighting`は`UNSUPPORTED_DATA_VERSION`
+- `section_ys`は空になる。`is_fully_generated`は、`Status`が無いか文字列でなければ偽を返す
+- `allow_foreign_data_version`で許可したときだけ書き戻せる。書き戻すときは読んだNBTをそのまま返す
+
+1.13より前のチャンクが混ざったワールドでも、ほかのチャンクは読み書きできる。
+
+### 7.5 パレットへの追加
+
+`set_block`は、パレットに同じ`BlockState`を表す要素があればその要素を使う。
+要素はチャンクの世代の形式で`BlockState`へ直してから比べるので、キーの並びが違う要素（実ワールドには`{Properties, Name}`の順のものがある）も同じ状態として見つかる。
+新しく足す要素はチャンクの世代の形式で書く。

@@ -1,6 +1,6 @@
 # 過去バージョンへの対応の設計
 
-- 状態: 設計中
+- 状態: 実装済み（[0011](../adr/0011-format-eras.md)）
 - 日付: 2026-11-20
 - 前提: [過去バージョンへの対応の調査](legacy-version-support.md)
 
@@ -131,18 +131,19 @@
 ### 7.2 公開APIの変化
 
 いまのAPIは保ち、世代によって意味が変わらないものはそのまま使えるようにする。足すもの・変わるものは次のとおり。
+表は実装で決めたことに合わせて直した。
 
 | API | 変化 |
 |---|---|
 | `Chunk.get_block` / `set_block` / `compact` / `section_ys` / `section` | 全世代で使える |
 | `Chunk.get_biome` / `set_biome` | C4以降だけ。C1〜C3では`UNSUPPORTED_FEATURE` |
 | `Chunk.get_biome_id` / `set_biome_id`（新規） | C1〜C3だけ。数値のバイオームIDをそのまま読み書きする。C1では`y`を見ない。C4以降では`UNSUPPORTED_FEATURE` |
-| `Chunk.min_section_y` | C4以降は`yPos`。C1〜C3は`0` |
-| `Chunk.status` / `is_fully_generated` | 世代ごとの`Status`の場所と値で判定する |
-| `Chunk.clear_heightmaps` / `invalidate_lighting` | 世代ごとの場所に対して行う。`isLightOn`の無い世代では`UNSUPPORTED_FEATURE` |
-| `Chunk`に世代を選んだDataVersionを返す取得子（新規） | 指定で上書きしたときは、その値を返す |
-| `BlockState.from_nbt` / `to_nbt` | DataVersionを受け取る引数を足す。省いたらいちばん新しい世代（いまと同じ動き） |
-| `ChunkReadOptions` / `WorldOpenOptions` | 世代を指定するDataVersionの項目を足す。既定は自動の判別 |
+| `Chunk.min_section_y` | C4以降は`yPos`。C1〜C3は`0`。元のNBTだけを持つチャンク（6.1）では`UNSUPPORTED_DATA_VERSION` |
+| `Chunk.status` / `is_fully_generated` | 世代ごとの`Status`の場所と値で判定する。`is_fully_generated`は`minecraft:`を外して比べ、C1では`postprocessed`と`fullchunk`も生成済みとみなす。`Status`が無いか文字列でなければ偽 |
+| `Chunk.clear_heightmaps` / `invalidate_lighting` | 世代ごとの場所に対して行う。`isLightOn`の無いC1〜C3のチャンクでは、`invalidate_lighting`が`UNSUPPORTED_FEATURE`。元のNBTだけを持つチャンクでは、どちらも`UNSUPPORTED_DATA_VERSION` |
+| `Chunk.format_data_version`（新規） | 世代を選んだDataVersionを返す。指定で上書きしたときは、その値を返す。`DataVersion`の無いチャンクで指定も無ければ`-1` |
+| `BlockState.from_nbt` / `to_nbt` | いまと同じく、いちばん新しい世代で読み書きする。DataVersionを受け取る`from_nbt_for_data_version` / `to_nbt_for_data_version`を別に足す |
+| `ChunkReadOptions` / `WorldOpenOptions` | 世代を指定するDataVersionの項目`format_data_version`を足す。既定は自動の判別 |
 | `MinecraftWorld.dimension_ids` / `dimension` | L1では`minecraft:overworld`を直下、`minecraft:the_nether`を`DIM-1/`、`minecraft:the_end`を`DIM1/`に当てる。データパックの次元は`dimensions/`から探す |
 | `MinecraftWorld.player_ids` / `player` | L1では`playerdata/`を読む |
 | `MinecraftWorld.data_file` / `Dimension.data_file` | L1では`<次元のフォルダ>/data/<名前>.dat`を読む |
@@ -219,3 +220,10 @@ C1とC2のビット詰めは、値が64bitの境目をまたぐ。`BitStorage`�
 - 世代の境界のうち、2203、2529、2844は調査の結果で、このリポジトリでは確かめていない。1.13の正式版のDataVersion（1519）も同じである
 - C4（1.18〜26.2）のチャンクの構造が、このライブラリが触る範囲で同じであること。26.1と26.2の実ワールドでは確かめたが、1.18〜1.21.xでは確かめていない
 - L1の`level.dat`のキー（`SpawnX`など）。[40](../spec/40-world-layout.md)の「1.21.xからの変更点」に基づく
+
+実装のあとに、1.12.2から26.3までの実ワールドを走査して次のことを確かめた（[90 適合性](../spec/90-conformance.md#検証実績)）。
+
+- 世代の境界は観測したDataVersionの間にあることまで確かめた。2203は1976と2225の間、2529は2230と2567の間、2844は2730と2860の間にある。1519そのものは確かめていない
+- C4のチャンクの構造は、1.18、1.19、1.20.1、1.21 Pre-Release 1の実ワールドでも、このライブラリが触る範囲で26.1と同じだった
+- L1の`level.dat`のキーはL1の実ワールド30個で読めた
+- `isLightOn`は、DataVersion 1631のチャンクには無く、1968以降の生成済みのチャンクにはほぼすべてにあった。入ったDataVersionそのものは確かめていない

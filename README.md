@@ -4,12 +4,12 @@
 [![lint](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/lint.yml/badge.svg)](https://github.com/ScriptArts/SpringNBTLibrary/actions/workflows/lint.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Minecraft Java版26.3以降のワールドデータ・NBTファイルを読み書きするライブラリです。
+Minecraft Java版1.13以降のワールドデータ・NBTファイルを読み書きするライブラリです。
 複数の言語に、同じ概念モデルと同じ挙動のものを用意しています。
 
-いまのワールド形式は26.3で入ったものです。
-それ以降のバージョンなら、形式が変わらない限りそのまま扱えます。
-動作は26.3の実ワールドで確かめています。
+1.13から26.3までのワールドを、読んだときの形式のまま読み書きします。バージョン間の変換はしません。
+これより新しいバージョンでも、形式が変わらない限りそのまま扱えます。
+動作は1.13.2から26.3までの各バージョンの実ワールドで確かめています。
 
 ## 対応言語
 

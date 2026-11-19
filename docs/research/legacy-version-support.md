@@ -1,6 +1,6 @@
 # 過去バージョンへの対応の調査
 
-- 状態: 調査済み。設計は[過去バージョンへの対応の設計](legacy-version-support-design.md)へ
+- 状態: 調査済み。設計は[過去バージョンへの対応の設計](legacy-version-support-design.md)へ。実装済み（[0011](../adr/0011-format-eras.md)）
 - 日付: 2026-11-20
 - ブランチ: `research/legacy-version-support`（2.0.0のコミットから切った）
 
