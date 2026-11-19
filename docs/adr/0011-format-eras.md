@@ -62,6 +62,6 @@
 - 世代によって使えるAPIが変わる。
   1.17までの形式では`get_biome` / `set_biome`が、1.18以降の形式では`get_biome_id` / `set_biome_id`が`UNSUPPORTED_FEATURE`になる。
   `isLightOn`の無い1.17までのチャンクでは、`invalidate_lighting`も`UNSUPPORTED_FEATURE`になる
-- Rustの公開APIに、互換性の崩れる変更が入る。`ChunkReadOptions`に公開の項目が増え、`clear_heightmaps` / `invalidate_lighting` / `LevelData::spawn_pos`の戻り値の型が変わる
+- Rustの公開APIに、互換性の崩れる変更が入る。`ChunkReadOptions`と`WorldOpenOptions`に公開の項目が増え、`clear_heightmaps` / `invalidate_lighting` / `LevelData::spawn_pos`の戻り値の型が変わる
 - 開発版（スナップショット）で書かれたチャンクのうち、正式版と形式が違うものは扱わない
 - 世代の境界のDataVersionは、実ワールドでは観測したDataVersionの間にあることまでしか確かめていない（[30 7.1](../spec/30-chunk-format.md#71-世代の表)）
