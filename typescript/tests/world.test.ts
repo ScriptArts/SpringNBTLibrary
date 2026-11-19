@@ -12,7 +12,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { TARGET_DATA_VERSION } from "../src/index.js";
+import { MIN_SUPPORTED_DATA_VERSION, TARGET_DATA_VERSION } from "../src/index.js";
 import { ErrorCode, SpringNbtError } from "../src/errors.js";
 import {
   BitStorage,
@@ -67,6 +67,92 @@ function wrapped(tag: NbtTag): NbtCompound {
   const wrapper = new NbtCompound();
   wrapper.set("", tag);
   return wrapper;
+}
+
+/** 26.2までの形式（Name / Properties）のパレット要素を作る */
+function nameProperties(name: string, properties?: [string, string][]): NbtCompound {
+  const entry = new NbtCompound();
+  entry.setString("Name", name);
+
+  // プロパティがあるときだけPropertiesを足す
+  if (properties !== undefined) {
+    const propertiesTag = new NbtCompound();
+
+    // 渡された順に入れる
+    for (const [key, value] of properties) {
+      propertiesTag.setString(key, value);
+    }
+
+    entry.set("Properties", propertiesTag);
+  }
+
+  return entry;
+}
+
+/** 26.3からの形式（id / properties）のパレット要素を作る */
+function idProperties(name: string, properties: [string, string][]): NbtCompound {
+  const entry = new NbtCompound();
+  entry.setString("id", name);
+  const propertiesTag = new NbtCompound();
+
+  // 渡された順に入れる
+  for (const [key, value] of properties) {
+    propertiesTag.setString(key, value);
+  }
+
+  entry.set("properties", propertiesTag);
+  return entry;
+}
+
+/**
+ * 扱える形式の下限より古く、1.13より前でもあるDataVersion
+ * どの世代でも解釈しない
+ */
+const PRE_FLATTENING_DATA_VERSION = 1400;
+
+/** 1.13より前のようにLevelに本体を包み、ブロックを数値IDで持つチャンクを作る */
+function preFlatteningChunk(): NbtCompound {
+  const section = new NbtCompound();
+  section.setByte("Y", 0);
+  section.setByteArray("Blocks", new Int8Array(4096).fill(1));
+  section.setByteArray("Data", new Int8Array(2048));
+  const sections = new NbtList(TagType.Compound);
+  sections.add(section);
+
+  const level = new NbtCompound();
+  level.setInt("xPos", 3);
+  level.setInt("zPos", -2);
+  level.set("Sections", sections);
+
+  const root = new NbtCompound();
+  root.setInt("DataVersion", PRE_FLATTENING_DATA_VERSION);
+  root.set("Level", level);
+  return root;
+}
+
+/** 1.17までのようにLevelに本体を包んだチャンクを作る */
+function levelChunk(dataVersion: number): NbtCompound {
+  const level = new NbtCompound();
+  level.setInt("xPos", 0);
+  level.setInt("zPos", 0);
+  level.setString("Status", "full");
+  level.set("Sections", new NbtList(TagType.Compound));
+
+  const root = new NbtCompound();
+  root.setInt("DataVersion", dataVersion);
+  root.set("Level", level);
+  return root;
+}
+
+/** チャンクのNBTを無圧縮のバイト列にする */
+function chunkBytes(tag: NbtCompound): Uint8Array {
+  return writeBytes(new NamedTag("", tag), { compression: Compression.None });
+}
+
+/** 書き出したチャンクの最初のセクションのブロックのパレット */
+function firstBlockPalette(written: NbtCompound): NbtList {
+  const section = written.getList("sections").get(0) as NbtCompound;
+  return section.getCompound("block_states").getList("palette");
 }
 
 /** SpringNbtErrorが指定のコードで投げられることを確かめる */
@@ -628,11 +714,6 @@ test("Chunk: data 長が合わないチャンクは MALFORMED_DATA", () => {
   assertErrorCode(ErrorCode.MalformedData, () => loadChunk("bitstorage_wrong_length"));
 });
 
-test("Chunk: パレットが 26.2 までの形式ならブロックを読むと MALFORMED_DATA", () => {
-  const chunk = loadChunk("palette_old_format", { onVersionMismatch: VersionMismatchAction.Ignore });
-  assertErrorCode(ErrorCode.MalformedData, () => chunk.getBlock(0, -64, 0));
-});
-
 test("Chunk: チャンク内の相対座標が範囲外なら INVALID_ARGUMENT", () => {
   const chunk = loadChunk("palette_1");
   assertErrorCode(ErrorCode.InvalidArgument, () => chunk.getBlock(16, -64, 0));
@@ -642,10 +723,10 @@ test("Chunk: チャンク内の相対座標が範囲外なら INVALID_ARGUMENT",
 // DataVersionの扱い
 // ---------------------------------------------------------------------------
 
-/** DataVersionだけを差し替えたチャンクを作る */
+/** DataVersionだけを、扱える形式の下限より古い値に差し替えたチャンクを作る */
 function foreignChunk(): NbtCompound {
   const root = readFile(vectorPath("palette_1")).tag;
-  root.set("DataVersion", new NbtInt(3953));
+  root.set("DataVersion", new NbtInt(PRE_FLATTENING_DATA_VERSION));
   return root;
 }
 
@@ -656,20 +737,24 @@ test("DataVersion: 既定では警告として通す", () => {
     onWarning: (message: string) => warnings.push(message),
   });
 
-  assert.equal(chunk.dataVersion, 3953);
+  assert.equal(chunk.dataVersion, PRE_FLATTENING_DATA_VERSION);
   assert.equal(warnings.length, 1);
 });
 
-test("DataVersion: 26.2 のチャンクは扱える形式より古い", () => {
+test("DataVersion: 26.2 のチャンクは警告を出さずに読める", () => {
   const warnings: string[] = [];
 
-  // 26.2まではパレットの形式が違う
+  // 26.2の形式も扱う形式に含まれる
   loadChunk("palette_old_format", {
     onVersionMismatch: VersionMismatchAction.Warn,
     onWarning: (message: string) => warnings.push(message),
   });
 
-  assert.equal(warnings.length, 1);
+  assert.equal(warnings.length, 0);
+});
+
+test("DataVersion: 扱える形式の下限は 1.18", () => {
+  assert.equal(MIN_SUPPORTED_DATA_VERSION, 2844);
 });
 
 test("DataVersion: Error を指定すると読み込みで弾く", () => {
@@ -702,7 +787,10 @@ test("DataVersion: 許可すれば古いチャンクも元のバージョンの�
   });
 
   // DataVersionは読んだ値のまま残す
-  assert.equal(chunk.toNbt({ allowForeignDataVersion: true }).getInt("DataVersion"), 3953);
+  assert.equal(
+    chunk.toNbt({ allowForeignDataVersion: true }).getInt("DataVersion"),
+    PRE_FLATTENING_DATA_VERSION,
+  );
 });
 
 /** 対象より新しいDataVersionを持つチャンクを作る */
@@ -743,6 +831,143 @@ test("DataVersion: 新しいバージョンのチャンクはそのまま書き�
 test("DataVersion: 対象バージョンのチャンクはそのまま書き戻せる", () => {
   const chunk = loadChunk("palette_1");
   assert.equal(chunk.toNbt().getInt("DataVersion"), TARGET_DATA_VERSION);
+});
+
+// ---------------------------------------------------------------------------
+// チャンクの形式の世代
+// ---------------------------------------------------------------------------
+
+test("ChunkFormat: DataVersion 4903 のチャンクを読み無変更で書き戻すと元と同じになる", () => {
+  const tag = readFile(vectorPath("v4903_edit")).tag;
+  const before = chunkBytes(tag);
+  const chunk = Chunk.fromNbt(tag);
+
+  // ベクタの添字は (位置 * 7) % 5
+  assert.equal(chunk.dataVersion, 4903);
+  assert.equal(chunk.getBlock(0, -64, 0)!.toString(), "minecraft:air");
+  assert.equal(chunk.getBlock(1, -64, 0)!.toString(), "minecraft:dirt");
+  assert.equal(chunk.getBlock(2, -64, 0)!.toString(), "minecraft:oak_stairs[facing=west,half=top]");
+  assert.equal(chunk.getBlock(3, -64, 0)!.toString(), "minecraft:stone");
+  assert.equal(chunk.getBlock(4, -64, 0)!.toString(), "minecraft:oak_stairs[facing=east,half=bottom]");
+  assert.equal(chunk.getBiome(0, -64, 0), "minecraft:plains");
+
+  assert.deepEqual(chunkBytes(chunk.toNbt()), before);
+});
+
+test("ChunkFormat: DataVersion 4903 のチャンクに置いたブロックは Name / Properties で入る", () => {
+  const chunk = loadChunk("v4903_edit");
+  chunk.setBlock(5, -64, 5, BlockState.parse("minecraft:oak_stairs[facing=north]"));
+  const written = chunk.toNbt();
+
+  // パレットの末尾に26.2の形式で足される
+  const palette = firstBlockPalette(written);
+  assert.ok(palette.get(palette.size - 1).equals(nameProperties("minecraft:oak_stairs", [["facing", "north"]])));
+
+  // DataVersionは読んだ値のまま
+  assert.equal(written.getInt("DataVersion"), 4903);
+
+  // 読み直しても同じ状態が返る
+  const reread = Chunk.fromNbt(written);
+  assert.equal(reread.getBlock(5, -64, 5)!.toString(), "minecraft:oak_stairs[facing=north]");
+});
+
+test("ChunkFormat: 形式の違うチャンクはそれぞれ読んだ形式で書き出す", () => {
+  const older = loadChunk("v4903_edit");
+  const newer = loadChunk("palette_5");
+
+  // 2つのチャンクに同じ手順で同じブロックを置く
+  for (const chunk of [older, newer]) {
+    chunk.setBlock(5, -64, 5, BlockState.parse("minecraft:oak_stairs[facing=north]"));
+    chunk.setBlock(6, -64, 6, BlockState.parse("minecraft:edited_plain"));
+  }
+
+  const olderWritten = older.toNbt();
+  const olderPalette = firstBlockPalette(olderWritten);
+  assert.ok(
+    olderPalette
+      .get(olderPalette.size - 2)
+      .equals(nameProperties("minecraft:oak_stairs", [["facing", "north"]])),
+  );
+  assert.ok(olderPalette.get(olderPalette.size - 1).equals(nameProperties("minecraft:edited_plain")));
+  assert.equal(olderWritten.getInt("DataVersion"), 4903);
+
+  const newerWritten = newer.toNbt();
+  const newerPalette = firstBlockPalette(newerWritten);
+
+  // 型の混ざったパレットはCompoundのリストになり、文字列の要素だけが包まれる
+  assert.ok(
+    newerPalette
+      .get(newerPalette.size - 2)
+      .equals(idProperties("minecraft:oak_stairs", [["facing", "north"]])),
+  );
+  assert.ok(
+    newerPalette.get(newerPalette.size - 1).equals(wrapped(new NbtString("minecraft:edited_plain"))),
+  );
+  assert.equal(newerWritten.getInt("DataVersion"), TARGET_DATA_VERSION);
+});
+
+test("ChunkFormat: 指定した世代と Level の有無が食い違えば MALFORMED_DATA", () => {
+  // Levelを持つチャンクを、Levelの無い世代で読ませる
+  assertErrorCode(ErrorCode.MalformedData, () =>
+    Chunk.fromNbt(levelChunk(2586), {
+      onVersionMismatch: VersionMismatchAction.Ignore,
+      formatDataVersion: 5023,
+    }),
+  );
+});
+
+test("ChunkFormat: 世代を指定しても下限より古いチャンクは書き戻せない", () => {
+  const chunk = Chunk.fromNbt(preFlatteningChunk(), {
+    onVersionMismatch: VersionMismatchAction.Ignore,
+    formatDataVersion: 5023,
+  });
+
+  assertErrorCode(ErrorCode.UnsupportedDataVersion, () => chunk.toNbt());
+});
+
+test("ChunkFormat: 世代に 1519 未満を指定すると INVALID_ARGUMENT", () => {
+  assertErrorCode(ErrorCode.InvalidArgument, () =>
+    loadChunk("palette_1", { formatDataVersion: 1518 }),
+  );
+});
+
+test("ChunkFormat: DataVersion が 1519 未満のチャンクは元の NBT だけを持つ", () => {
+  const root = preFlatteningChunk();
+  const before = chunkBytes(root);
+  const chunk = Chunk.fromNbt(root, { onVersionMismatch: VersionMismatchAction.Ignore });
+
+  // 座標はLevelの中から読み、セクションは解釈しない
+  assert.equal(chunk.x, 3);
+  assert.equal(chunk.z, -2);
+  assert.deepEqual(chunk.sectionYs, []);
+
+  // ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない
+  const operations: (() => unknown)[] = [
+    () => chunk.getBlock(0, 0, 0),
+    () => chunk.setBlock(0, 0, 0, "minecraft:stone"),
+    () => chunk.getBiome(0, 0, 0),
+    () => chunk.setBiome(0, 0, 0, "minecraft:plains"),
+    () => chunk.clearHeightmaps(),
+    () => chunk.invalidateLighting(),
+  ];
+
+  // 操作ごとにUNSUPPORTED_DATA_VERSIONになることを確かめる
+  for (const operation of operations) {
+    assertErrorCode(ErrorCode.UnsupportedDataVersion, operation);
+  }
+
+  // 許可すれば、読んだNBTがそのまま返る
+  assert.deepEqual(chunkBytes(chunk.toNbt({ allowForeignDataVersion: true })), before);
+});
+
+test("ChunkFormat: 世代を選んだ DataVersion を返す", () => {
+  const tag = readFile(vectorPath("v4903_edit")).tag;
+  assert.equal(Chunk.fromNbt(tag).formatDataVersion, 4903);
+
+  // 指定すれば、チャンク自身のDataVersionではなくその値になる
+  const chunk = Chunk.fromNbt(tag, { formatDataVersion: 5023 });
+  assert.equal(chunk.formatDataVersion, 5023);
+  assert.equal(chunk.dataVersion, 4903);
 });
 
 // ---------------------------------------------------------------------------

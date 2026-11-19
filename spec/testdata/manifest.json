@@ -464,9 +464,19 @@
       "input": "world/palette_old_format.nbt",
       "format": "java",
       "compression": "none",
-      "description": "26.2 までの形式（Name / Properties）のパレット。ブロックを読むと弾かれる",
-      "expect_error": "MALFORMED_DATA",
-      "roundtrip": false
+      "description": "26.2の形式（Name / Properties）のパレット1要素。26.2の形式のまま読み書きできる",
+      "expect": "expect/world/palette_old_format.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/v4903_edit",
+      "kind": "world",
+      "input": "world/v4903_edit.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "26.2の形式のチャンク（DataVersion 4903）。chunk-editで置いたブロックもName / Propertiesで書き出される",
+      "expect": "expect/world/v4903_edit.json",
+      "roundtrip": true
     },
     {
       "id": "world/palette_index_out_of_range",

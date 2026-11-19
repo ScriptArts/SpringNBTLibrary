@@ -10,6 +10,7 @@ public final class ChunkReadOptions {
     private VersionMismatchAction onVersionMismatch = VersionMismatchAction.WARN;
     private Consumer<String> onWarning;
     private boolean lenientBitStorage;
+    private Integer formatDataVersion;
 
     /**
      * 既定のオプションを作る
@@ -78,6 +79,32 @@ public final class ChunkReadOptions {
      */
     public ChunkReadOptions setLenientBitStorage(boolean value) {
         this.lenientBitStorage = value;
+        return this;
+    }
+
+    /**
+     * チャンクの形式の世代を選ぶDataVersion
+     *
+     * <p>nullなら、チャンク自身のDataVersionで選ぶ
+     * 1519以上でなければならない
+     * 扱える形式の下限との比較には使わず、常にチャンク自身のDataVersionで比べる
+     *
+     * @return DataVersion
+     * 指定が無ければnull
+     */
+    public Integer formatDataVersion() {
+        return formatDataVersion;
+    }
+
+    /**
+     * チャンクの形式の世代を選ぶDataVersionを設定する
+     *
+     * @param value DataVersion
+     * nullならチャンク自身のDataVersionで選ぶ
+     * @return このオブジェクト
+     */
+    public ChunkReadOptions setFormatDataVersion(Integer value) {
+        this.formatDataVersion = value;
         return this;
     }
 }

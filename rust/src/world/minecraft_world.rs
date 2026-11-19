@@ -155,6 +155,7 @@ impl Dimension {
                 on_version_mismatch: options.chunk_read.on_version_mismatch,
                 on_warning: None,
                 lenient_bit_storage: options.chunk_read.lenient_bit_storage,
+                format_data_version: options.chunk_read.format_data_version,
             },
             warning,
             chunk_write: options.chunk_write,
@@ -260,6 +261,7 @@ impl Dimension {
                 on_version_mismatch: self.chunk_read.on_version_mismatch,
                 on_warning: forward_warning(&self.warning),
                 lenient_bit_storage: self.chunk_read.lenient_bit_storage,
+                format_data_version: self.chunk_read.format_data_version,
             };
             self.chunk_cache.insert(key, Chunk::from_nbt(nbt, &options)?);
         }

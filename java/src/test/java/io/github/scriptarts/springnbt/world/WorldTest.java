@@ -28,9 +28,11 @@ import io.github.scriptarts.springnbt.nbt.NbtWriteOptions;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -77,6 +79,95 @@ class WorldTest {
         NbtCompound wrapper = new NbtCompound();
         wrapper.set("", tag);
         return wrapper;
+    }
+
+    /** 26.2までの形式（Name / Properties）のパレット要素を作る */
+    private static NbtCompound nameProperties(String name, String... properties) {
+        NbtCompound entry = new NbtCompound();
+        entry.setString("Name", name);
+
+        // プロパティがあるときだけPropertiesを足す
+        if (properties.length > 0) {
+            NbtCompound propertiesTag = new NbtCompound();
+
+            // キーと値の組を渡された順に入れる
+            for (int index = 0; index < properties.length; index += 2) {
+                propertiesTag.setString(properties[index], properties[index + 1]);
+            }
+
+            entry.set("Properties", propertiesTag);
+        }
+
+        return entry;
+    }
+
+    /** 26.3からの形式（id / properties）のパレット要素を作る */
+    private static NbtCompound idProperties(String name, String... properties) {
+        NbtCompound entry = new NbtCompound();
+        entry.setString("id", name);
+        NbtCompound propertiesTag = new NbtCompound();
+
+        // キーと値の組を渡された順に入れる
+        for (int index = 0; index < properties.length; index += 2) {
+            propertiesTag.setString(properties[index], properties[index + 1]);
+        }
+
+        entry.set("properties", propertiesTag);
+        return entry;
+    }
+
+    /**
+     * 扱える形式の下限より古く、1.13より前でもあるDataVersion
+     * どの世代でも解釈しない
+     */
+    private static final int PRE_FLATTENING_DATA_VERSION = 1400;
+
+    /** 1.13より前のようにLevelに本体を包み、ブロックを数値IDで持つチャンクを作る */
+    private static NbtCompound preFlatteningChunk() {
+        byte[] blocks = new byte[4096];
+        Arrays.fill(blocks, (byte) 1);
+
+        NbtCompound section = new NbtCompound();
+        section.setByte("Y", (byte) 0);
+        section.setByteArray("Blocks", blocks);
+        section.setByteArray("Data", new byte[2048]);
+        NbtList sections = new NbtList(TagType.COMPOUND);
+        sections.add(section);
+
+        NbtCompound level = new NbtCompound();
+        level.setInt("xPos", 3);
+        level.setInt("zPos", -2);
+        level.set("Sections", sections);
+
+        NbtCompound root = new NbtCompound();
+        root.setInt("DataVersion", PRE_FLATTENING_DATA_VERSION);
+        root.set("Level", level);
+        return root;
+    }
+
+    /** 1.17までのようにLevelに本体を包んだチャンクを作る */
+    private static NbtCompound levelChunk(int dataVersion) {
+        NbtCompound level = new NbtCompound();
+        level.setInt("xPos", 0);
+        level.setInt("zPos", 0);
+        level.setString("Status", "full");
+        level.set("Sections", new NbtList(TagType.COMPOUND));
+
+        NbtCompound root = new NbtCompound();
+        root.setInt("DataVersion", dataVersion);
+        root.set("Level", level);
+        return root;
+    }
+
+    /** チャンクのNBTを無圧縮のバイト列にする */
+    private static byte[] chunkBytes(NbtCompound tag) {
+        return NbtIo.writeBytes(new NamedTag("", tag), new NbtWriteOptions().setCompression(Compression.NONE));
+    }
+
+    /** 書き出したチャンクの最初のセクションのブロックのパレット */
+    private static NbtList firstBlockPalette(NbtCompound written) {
+        NbtCompound section = (NbtCompound) written.getList("sections").get(0);
+        return section.getCompound("block_states").getList("palette");
     }
 
     @Nested
@@ -702,16 +793,6 @@ class WorldTest {
         }
 
         @Test
-        void パレットが26_2までの形式ならブロックを読むとMALFORMED_DATA() {
-            ChunkReadOptions options = new ChunkReadOptions()
-                    .setOnVersionMismatch(VersionMismatchAction.IGNORE);
-            Chunk chunk = loadChunk("palette_old_format", options);
-            SpringNbtException error = assertThrows(SpringNbtException.class,
-                    () -> chunk.getBlock(0, -64, 0));
-            assertEquals(ErrorCode.MALFORMED_DATA, error.code());
-        }
-
-        @Test
         void チャンク内の相対座標が範囲外ならINVALID_ARGUMENT() {
             Chunk chunk = loadChunk("palette_1");
             SpringNbtException error = assertThrows(SpringNbtException.class,
@@ -723,11 +804,11 @@ class WorldTest {
     @Nested
     class DataVersionTest {
 
-        /** DataVersionだけを差し替えたチャンクを作る */
+        /** DataVersionだけを、扱える形式の下限より古い値に差し替えたチャンクを作る */
         private NbtCompound foreignChunk() {
             NamedTag named = NbtIo.readFile(vectorPath("palette_1"), null);
             NbtCompound root = (NbtCompound) named.tag();
-            root.set("DataVersion", new NbtInt(3953));
+            root.set("DataVersion", new NbtInt(PRE_FLATTENING_DATA_VERSION));
             return root;
         }
 
@@ -739,20 +820,25 @@ class WorldTest {
                     .setOnWarning(warnings::add);
 
             Chunk chunk = Chunk.fromNbt(foreignChunk(), options);
-            assertEquals(3953, chunk.dataVersion());
+            assertEquals(PRE_FLATTENING_DATA_VERSION, chunk.dataVersion());
             assertEquals(1, warnings.size());
         }
 
         @Test
-        void DataVersionが26_2のチャンクは扱える形式より古い() {
+        void DataVersionが26_2のチャンクは警告を出さずに読める() {
             List<String> warnings = new ArrayList<>();
             ChunkReadOptions options = new ChunkReadOptions()
                     .setOnVersionMismatch(VersionMismatchAction.WARN)
                     .setOnWarning(warnings::add);
 
-            // 26.2まではパレットの形式が違う
+            // 26.2の形式も扱う形式に含まれる
             loadChunk("palette_old_format", options);
-            assertEquals(1, warnings.size());
+            assertTrue(warnings.isEmpty());
+        }
+
+        @Test
+        void 扱える形式の下限は1_18() {
+            assertEquals(2844, SpringNbt.MIN_SUPPORTED_DATA_VERSION);
         }
 
         @Test
@@ -793,7 +879,7 @@ class WorldTest {
             ChunkWriteOptions write = new ChunkWriteOptions().setAllowForeignDataVersion(true);
 
             // DataVersionは読んだ値のまま残す
-            assertEquals(3953, chunk.toNbt(write).getInt("DataVersion"));
+            assertEquals(PRE_FLATTENING_DATA_VERSION, chunk.toNbt(write).getInt("DataVersion"));
         }
 
         /** 対象より新しいDataVersionを持つチャンクを作る */
@@ -841,6 +927,151 @@ class WorldTest {
     }
 
     @Nested
+    class ChunkFormatTest {
+
+        @Test
+        void DataVersion4903のチャンクを読み無変更で書き戻すと元と同じになる() {
+            NbtCompound tag = (NbtCompound) NbtIo.readFile(vectorPath("v4903_edit"), null).tag();
+            byte[] before = chunkBytes(tag);
+            Chunk chunk = Chunk.fromNbt(tag, ChunkReadOptions.defaults());
+
+            // ベクタの添字は (位置 * 7) % 5
+            assertEquals(4903, chunk.dataVersion());
+            assertEquals("minecraft:air", chunk.getBlock(0, -64, 0).toString());
+            assertEquals("minecraft:dirt", chunk.getBlock(1, -64, 0).toString());
+            assertEquals("minecraft:oak_stairs[facing=west,half=top]", chunk.getBlock(2, -64, 0).toString());
+            assertEquals("minecraft:stone", chunk.getBlock(3, -64, 0).toString());
+            assertEquals("minecraft:oak_stairs[facing=east,half=bottom]", chunk.getBlock(4, -64, 0).toString());
+            assertEquals("minecraft:plains", chunk.getBiome(0, -64, 0));
+
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(ChunkWriteOptions.defaults())));
+        }
+
+        @Test
+        void DataVersion4903のチャンクに置いたブロックはName_Propertiesで入る() {
+            Chunk chunk = loadChunk("v4903_edit");
+            chunk.setBlock(5, -64, 5, BlockState.parse("minecraft:oak_stairs[facing=north]"));
+            NbtCompound written = chunk.toNbt(ChunkWriteOptions.defaults());
+
+            // パレットの末尾に26.2の形式で足される
+            NbtList palette = firstBlockPalette(written);
+            assertEquals(nameProperties("minecraft:oak_stairs", "facing", "north"), palette.get(palette.size() - 1));
+
+            // DataVersionは読んだ値のまま
+            assertEquals(4903, written.getInt("DataVersion"));
+
+            // 読み直しても同じ状態が返る
+            Chunk reread = Chunk.fromNbt(written, ChunkReadOptions.defaults());
+            assertEquals("minecraft:oak_stairs[facing=north]", reread.getBlock(5, -64, 5).toString());
+        }
+
+        @Test
+        void 形式の違うチャンクはそれぞれ読んだ形式で書き出す() {
+            Chunk older = loadChunk("v4903_edit");
+            Chunk newer = loadChunk("palette_5");
+
+            // 2つのチャンクに同じ手順で同じブロックを置く
+            for (Chunk chunk : List.of(older, newer)) {
+                chunk.setBlock(5, -64, 5, BlockState.parse("minecraft:oak_stairs[facing=north]"));
+                chunk.setBlock(6, -64, 6, BlockState.parse("minecraft:edited_plain"));
+            }
+
+            NbtCompound olderWritten = older.toNbt(ChunkWriteOptions.defaults());
+            NbtList olderPalette = firstBlockPalette(olderWritten);
+            assertEquals(nameProperties("minecraft:oak_stairs", "facing", "north"),
+                    olderPalette.get(olderPalette.size() - 2));
+            assertEquals(nameProperties("minecraft:edited_plain"), olderPalette.get(olderPalette.size() - 1));
+            assertEquals(4903, olderWritten.getInt("DataVersion"));
+
+            NbtCompound newerWritten = newer.toNbt(ChunkWriteOptions.defaults());
+            NbtList newerPalette = firstBlockPalette(newerWritten);
+
+            // 型の混ざったパレットはCompoundのリストになり、文字列の要素だけが包まれる
+            assertEquals(idProperties("minecraft:oak_stairs", "facing", "north"),
+                    newerPalette.get(newerPalette.size() - 2));
+            assertEquals(wrapped(new NbtString("minecraft:edited_plain")),
+                    newerPalette.get(newerPalette.size() - 1));
+            assertEquals(SpringNbt.TARGET_DATA_VERSION, newerWritten.getInt("DataVersion"));
+        }
+
+        @Test
+        void 指定した世代とLevelの有無が食い違えばMALFORMED_DATA() {
+            ChunkReadOptions options = new ChunkReadOptions()
+                    .setOnVersionMismatch(VersionMismatchAction.IGNORE)
+                    .setFormatDataVersion(5023);
+
+            // Levelを持つチャンクを、Levelの無い世代で読ませる
+            SpringNbtException error = assertThrows(SpringNbtException.class,
+                    () -> Chunk.fromNbt(levelChunk(2586), options));
+            assertEquals(ErrorCode.MALFORMED_DATA, error.code());
+        }
+
+        @Test
+        void 世代を指定しても下限より古いチャンクは書き戻せない() {
+            ChunkReadOptions options = new ChunkReadOptions()
+                    .setOnVersionMismatch(VersionMismatchAction.IGNORE)
+                    .setFormatDataVersion(5023);
+            Chunk chunk = Chunk.fromNbt(preFlatteningChunk(), options);
+
+            SpringNbtException error = assertThrows(SpringNbtException.class,
+                    () -> chunk.toNbt(ChunkWriteOptions.defaults()));
+            assertEquals(ErrorCode.UNSUPPORTED_DATA_VERSION, error.code());
+        }
+
+        @Test
+        void 世代に1519未満を指定するとINVALID_ARGUMENT() {
+            ChunkReadOptions options = new ChunkReadOptions().setFormatDataVersion(1518);
+
+            SpringNbtException error = assertThrows(SpringNbtException.class,
+                    () -> loadChunk("palette_1", options));
+            assertEquals(ErrorCode.INVALID_ARGUMENT, error.code());
+        }
+
+        @Test
+        void DataVersionが1519未満のチャンクは元のNBTだけを持つ() {
+            NbtCompound root = preFlatteningChunk();
+            byte[] before = chunkBytes(root);
+            Chunk chunk = Chunk.fromNbt(root,
+                    new ChunkReadOptions().setOnVersionMismatch(VersionMismatchAction.IGNORE));
+
+            // 座標はLevelの中から読み、セクションは解釈しない
+            assertEquals(3, chunk.x());
+            assertEquals(-2, chunk.z());
+            assertTrue(chunk.sectionYs().isEmpty());
+
+            // ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない
+            List<Executable> operations = List.of(
+                    () -> chunk.getBlock(0, 0, 0),
+                    () -> chunk.setBlock(0, 0, 0, "minecraft:stone"),
+                    () -> chunk.getBiome(0, 0, 0),
+                    () -> chunk.setBiome(0, 0, 0, "minecraft:plains"),
+                    chunk::clearHeightmaps,
+                    chunk::invalidateLighting);
+
+            // 操作ごとにUNSUPPORTED_DATA_VERSIONになることを確かめる
+            for (Executable operation : operations) {
+                SpringNbtException error = assertThrows(SpringNbtException.class, operation);
+                assertEquals(ErrorCode.UNSUPPORTED_DATA_VERSION, error.code());
+            }
+
+            // 許可すれば、読んだNBTがそのまま返る
+            ChunkWriteOptions write = new ChunkWriteOptions().setAllowForeignDataVersion(true);
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(write)));
+        }
+
+        @Test
+        void 世代を選んだDataVersionを返す() {
+            NbtCompound tag = (NbtCompound) NbtIo.readFile(vectorPath("v4903_edit"), null).tag();
+            assertEquals(4903, Chunk.fromNbt(tag, ChunkReadOptions.defaults()).formatDataVersion());
+
+            // 指定すれば、チャンク自身のDataVersionではなくその値になる
+            Chunk chunk = Chunk.fromNbt(tag, new ChunkReadOptions().setFormatDataVersion(5023));
+            assertEquals(5023, chunk.formatDataVersion());
+            assertEquals(4903, chunk.dataVersion());
+        }
+    }
+
+    @Nested
     class MinecraftWorldTest {
 
         @TempDir
@@ -872,7 +1103,7 @@ class WorldTest {
             NbtIo.writeFile(work.resolve("level.dat"), new NamedTag("", level), null);
 
             NbtCompound chunk = (NbtCompound) NbtIo.readFile(vectorPath("palette_1"), null).tag();
-            chunk.set("DataVersion", new NbtInt(3953));
+            chunk.set("DataVersion", new NbtInt(PRE_FLATTENING_DATA_VERSION));
 
             try (RegionFile file = RegionFile.open(region.resolve("r.0.0.mca"), RegionFileMode.READ_WRITE)) {
                 file.writeChunk(0, 0, chunk);

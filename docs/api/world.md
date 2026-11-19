@@ -67,6 +67,7 @@
 | `compact` | `Compact()` | `compact()` | `compact()` | `compact()` | `compact()` | 使われていないパレット要素を全セクションから取り除く |
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `data_version` | `DataVersion` | `dataVersion()` | `dataVersion()` | `data_version` | `data_version()` | チャンク構造のバージョン |
+| `format_data_version` | `FormatDataVersion` | `formatDataVersion()` | `formatDataVersion()` | `format_data_version` | `format_data_version()` | チャンクの形式の世代を選ぶのに使ったDataVersion |
 | `from_nbt` | `FromNbt()` | `fromNbt()` | `fromNbt()` | `from_nbt()` | `from_nbt()` | NBTからチャンクを読む |
 | `get_biome` | `GetBiome()` | `getBiome()` | `getBiome()` | `get_biome()` | `get_biome()` | バイオームを取得する |
 | `get_block` | `GetBlock()` | `getBlock()` | `getBlock()` | `get_block()` | `get_block()` | ブロックを取得する |
@@ -98,6 +99,7 @@
 | `to_nbt` | `ToNbt()` | `toNbt()` | `toNbt()` | `to_nbt()` | `to_nbt()` |  |
 | `y` | `Y` | `y()` | `y` | `y` | `y()` |  |
 | **ChunkReadOptions** | `ChunkReadOptions` | `ChunkReadOptions` | `ChunkReadOptions` | `ChunkReadOptions` | `ChunkReadOptions` | チャンク読み込みのオプション |
+| `format_data_version` | `FormatDataVersion` | `formatDataVersion()` | `formatDataVersion` | `format_data_version` | `format_data_version` | チャンクの形式の世代を選ぶDataVersion |
 | `lenient_bit_storage` | `LenientBitStorage` | `lenientBitStorage()` | `lenientBitStorage` | `lenient_bit_storage` | `lenient_bit_storage` | dataの長さが期待値と違うとき、長さからビット幅を逆算して読むか |
 | `on_version_mismatch` | `OnVersionMismatch` | `onVersionMismatch()` | `onVersionMismatch` | `on_version_mismatch` | `on_version_mismatch` | DataVersionが扱える形式より古いときの動作 |
 | `on_warning` | `OnWarning` | `onWarning()` | `onWarning` | `on_warning` | `on_warning` |  |

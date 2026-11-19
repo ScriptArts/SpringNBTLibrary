@@ -13,6 +13,7 @@ from typing import Callable, Dict, List, Optional, Union
 from .. import MIN_SUPPORTED_DATA_VERSION, TARGET_DATA_VERSION
 from ..errors import ErrorCode, SpringNbtError
 from ..nbt import NbtByte, NbtCompound, NbtInt, NbtList, NbtString, TagType
+from ._chunk_format import OLDEST_FORMAT_DATA_VERSION, ChunkFormat
 from .block_state import BlockState
 from .paletted_container import PalettedContainer
 
@@ -33,10 +34,6 @@ BLOCKS_PER_SECTION = 4096
 
 #: セクション1つに入るバイオームのエントリ数（4×4×4単位）
 BIOMES_PER_SECTION = 64
-
-#: ブロックに紐づく付随データのキー
-#: ブロックを置き換えたら整合が崩れる
-_BLOCK_DATA_KEYS = ("block_entities", "block_ticks", "fluid_ticks")
 
 
 def _matches_position(entry: NbtCompound, x: int, y: int, z: int) -> bool:
@@ -73,7 +70,8 @@ class ChunkReadOptions:
     def __init__(self,
                  on_version_mismatch: VersionMismatchAction = VersionMismatchAction.WARN,
                  on_warning: Optional[Callable[[str], None]] = None,
-                 lenient_bit_storage: bool = False) -> None:
+                 lenient_bit_storage: bool = False,
+                 format_data_version: Optional[int] = None) -> None:
         #: DataVersionが扱える形式より古いときの動作
         self.on_version_mismatch = on_version_mismatch
         #: 警告の通知先
@@ -81,6 +79,12 @@ class ChunkReadOptions:
         self.on_warning = on_warning
         #: dataの長さが期待値と違うとき、長さからビット幅を逆算して読むか
         self.lenient_bit_storage = lenient_bit_storage
+        #: チャンクの形式の世代を選ぶDataVersion
+        #:
+        #: Noneなら、チャンク自身のDataVersionで選ぶ
+        #: 1519以上でなければならない
+        #: 扱える形式の下限との比較には使わず、常にチャンク自身のDataVersionで比べる
+        self.format_data_version = format_data_version
 
 
 class ChunkWriteOptions:
@@ -171,12 +175,15 @@ class ChunkSection:
 class Chunk:
     """チャンク1つ分"""
 
-    __slots__ = ("raw", "_sections", "_modified")
+    __slots__ = ("raw", "_sections", "_modified", "_format", "_format_data_version")
 
     def __init__(self, raw: NbtCompound) -> None:
         self.raw = raw
         self._sections: Dict[int, ChunkSection] = {}
         self._modified = False
+        # 世代を引けなかったチャンクはNoneのままで、元のNBTだけを持つ
+        self._format: Optional[ChunkFormat] = None
+        self._format_data_version = 0
 
     @property
     def data_version(self) -> int:
@@ -184,14 +191,22 @@ class Chunk:
         return self.raw.get_int("DataVersion")
 
     @property
+    def format_data_version(self) -> int:
+        """チャンクの形式の世代を選ぶのに使ったDataVersion
+
+        読み込みのオプションで指定していればその値、指定が無ければ:attr:`data_version`
+        """
+        return self._format_data_version
+
+    @property
     def x(self) -> int:
         """絶対チャンクX座標"""
-        return self.raw.get_int("xPos")
+        return self._body().get_int("xPos")
 
     @property
     def z(self) -> int:
         """絶対チャンクZ座標"""
-        return self.raw.get_int("zPos")
+        return self._body().get_int("zPos")
 
     @property
     def min_section_y(self) -> int:
@@ -203,7 +218,7 @@ class Chunk:
     @property
     def status(self) -> str:
         """生成段階（``minecraft:full``など）"""
-        return self.raw.get_string("Status")
+        return self._body().get_string("Status")
 
     @property
     def is_fully_generated(self) -> bool:
@@ -239,16 +254,54 @@ class Chunk:
     def from_nbt(nbt: NbtCompound, options: Optional[ChunkReadOptions] = None) -> "Chunk":
         """NBTからチャンクを読む
 
-        :raises SpringNbtError: 必須のキーが無い、または構造が想定と違う場合
+        形式の世代は、オプションで指定したDataVersionか、チャンク自身のDataVersionで選ぶ
+        DataVersionが1519未満のチャンクは、指定があってもどの世代でも解釈せず、元のNBTだけを持つ
+
+        :raises SpringNbtError: 世代を選ぶDataVersionが1519未満の場合（INVALID_ARGUMENT）、
+            選んだ世代とチャンクの構造が合わない場合（MALFORMED_DATA）、
+            必須のキーが無い、または構造が想定と違う場合
         """
         if options is None:
             effective = _DEFAULT_READ
         else:
             effective = options
 
+        override = effective.format_data_version
+
+        # 1.13より前の形式は、どの世代の部品でも読めない
+        if override is not None and override < OLDEST_FORMAT_DATA_VERSION:
+            raise SpringNbtError.invalid_argument(
+                "世代を選ぶDataVersionは%d以上でなければならない: %d"
+                % (OLDEST_FORMAT_DATA_VERSION, override))
+
         chunk = Chunk(nbt)
         chunk._check_data_version(effective)
-        section_list = nbt.opt_list("sections")
+        data_version = chunk.data_version
+        chunk._format_data_version = data_version
+
+        # 指定があれば、チャンク自身のDataVersionの代わりにその値で世代を選ぶ
+        if override is not None:
+            chunk._format_data_version = override
+
+        # 1.13より前のチャンクはブロックが数値IDで、どの世代で読んでも誤った値になる
+        if data_version < OLDEST_FORMAT_DATA_VERSION:
+            return chunk
+
+        chunk._format = ChunkFormat.for_data_version(chunk._format_data_version)
+
+        # 表に無い世代のチャンクは、解釈せずに元のNBTだけを持つ
+        if chunk._format is None:
+            return chunk
+
+        has_level = nbt.opt_compound("Level") is not None
+
+        # 選んだ世代と本体の包み方が食い違うなら、黙って空のチャンクとして読まずに弾く
+        if has_level != chunk._format.wrapped_in_level:
+            raise SpringNbtError.malformed(
+                "DataVersion %dで選んだ形式と、ルートのLevelの有無が合わない"
+                % chunk._format_data_version)
+
+        section_list = chunk._body().opt_list(chunk._format.sections_key)
 
         if section_list is None:
             return chunk
@@ -285,7 +338,7 @@ class Chunk:
 
     def to_nbt(self, options: Optional[ChunkWriteOptions] = None) -> NbtCompound:
         """NBTへ書き戻す
-        全セクションを書き戻し、他のキーはそのまま残す
+        全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
 
         :raises SpringNbtError: DataVersionが扱える形式より古く、かつ書き戻しが許可されていない場合
         """
@@ -307,7 +360,8 @@ class Chunk:
         # DataVersionは読んだ値のまま残す
         # 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
-        if len(self._sections) == 0:
+        # 元のNBTだけを持つチャンクは、セクションも読んでいないのでそのまま返す
+        if self._format is None or len(self._sections) == 0:
             return self.raw
 
         section_list = NbtList(TagType.COMPOUND)
@@ -316,8 +370,33 @@ class Chunk:
         for section_y in self.section_ys:
             section_list.append(self._sections[section_y].to_nbt())
 
-        self.raw.set("sections", section_list)
+        self._body().set(self._format.sections_key, section_list)
         return self.raw
+
+    def _body(self) -> NbtCompound:
+        """チャンクの本体
+        1.17までの形式では``Level``の中、1.18以降はルート
+        """
+        level = self.raw.opt_compound("Level")
+
+        # 世代とLevelの有無は読み込みで突き合わせてあるので、Levelがあればその中が本体
+        if level is not None:
+            return level
+
+        return self.raw
+
+    def _require_format(self) -> ChunkFormat:
+        """チャンクの形式の世代を返す
+
+        :raises SpringNbtError: 世代を引けず、元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
+        """
+        if self._format is None:
+            raise SpringNbtError(
+                ErrorCode.UNSUPPORTED_DATA_VERSION,
+                "DataVersion %dのチャンクは形式を解釈せず元のNBTだけを持つので、この操作はできない"
+                % self.data_version)
+
+        return self._format
 
     def section(self, section_y: int) -> Optional[ChunkSection]:
         """Y位置からセクションを得る
@@ -333,15 +412,18 @@ class Chunk:
         :param z: チャンク内相対Z座標 (0..15)
         :return: ブロック
         セクションが無い、またはblock_statesを持たない場合はNone
+        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
         """
+        chunk_format = self._require_format()
         _check_local_coordinates(x, z)
         section = self.section(y >> 4)
 
         if section is None or not section.has_block_states:
             return None
 
-        # パレットの要素は文字列のこともCompoundのこともあり、どちらもBlockStateが読む
-        return BlockState.from_nbt(section.block_states.get(block_index(x, y, z)))
+        # パレットの要素の形は世代で違うので、世代ごとに決めたDataVersionで読む
+        return BlockState.from_nbt_for_data_version(
+            section.block_states.get(block_index(x, y, z)), chunk_format.palette_data_version)
 
     def set_block(self, x: int, y: int, z: int, state: Union[BlockState, str]) -> None:
         """ブロックを設定する
@@ -352,12 +434,16 @@ class Chunk:
         ``block_ticks`` / ``fluid_ticks``のうち、その座標を指すもの）は同時に取り除く
         残すとブロックと中身が食い違い、Minecraft側で予期しない挙動になるため
 
-        :raises SpringNbtError: 対象のセクションが無い、またはblock_statesを持たない場合
+        パレットには、チャンクを読んだときの世代の形式で入れる
+
+        :raises SpringNbtError: 対象のセクションが無い、またはblock_statesを持たない場合、
+            元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
         """
         # 文字列で渡されたらBlockStateへ直してから進む
         if isinstance(state, str):
             state = BlockState.parse(state)
 
+        chunk_format = self._require_format()
         _check_local_coordinates(x, z)
         section_y = y >> 4
         section = self.section(section_y)
@@ -374,11 +460,13 @@ class Chunk:
         if current is not None and current == state:
             return
 
-        section.block_states.set(block_index(x, y, z), state.to_nbt())
-        self._remove_block_data(x, y, z)
+        # 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで変換する
+        section.block_states.set(
+            block_index(x, y, z), state.to_nbt_for_data_version(chunk_format.palette_data_version))
+        self._remove_block_data(chunk_format, x, y, z)
         self._modified = True
 
-    def _remove_block_data(self, x: int, y: int, z: int) -> None:
+    def _remove_block_data(self, chunk_format: ChunkFormat, x: int, y: int, z: int) -> None:
         """その座標を指す付随データを取り除く
 
         ``block_entities`` / ``block_ticks`` / ``fluid_ticks``の要素は
@@ -386,10 +474,11 @@ class Chunk:
         """
         absolute_x = (self.x * 16) + x
         absolute_z = (self.z * 16) + z
+        body = self._body()
 
         # 3つのリストは形が同じなので、まとめて同じ処理をかける
-        for key in _BLOCK_DATA_KEYS:
-            values = self.raw.opt_list(key)
+        for key in chunk_format.block_data_keys:
+            values = body.opt_list(key)
 
             if values is None or len(values) == 0:
                 continue
@@ -406,7 +495,10 @@ class Chunk:
     def get_biome(self, x: int, y: int, z: int) -> Optional[str]:
         """バイオームを取得する
         4×4×4の単位なので、座標は自動的に丸められる
+
+        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
         """
+        self._require_format()
         _check_local_coordinates(x, z)
         section = self.section(y >> 4)
 
@@ -424,7 +516,11 @@ class Chunk:
     def set_biome(self, x: int, y: int, z: int, biome: str) -> None:
         """バイオームを設定する
         4×4×4の単位
+
+        :raises SpringNbtError: 対象のセクションが無い、またはバイオームを持たない場合、
+            元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
         """
+        self._require_format()
         _check_local_coordinates(x, z)
         section_y = y >> 4
         section = self.section(section_y)
@@ -441,13 +537,20 @@ class Chunk:
 
         本ライブラリは高さマップを再計算しない
         ブロックを改変したら呼ぶこと
+
+        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
         """
-        self.raw.remove("Heightmaps")
+        self._require_format()
+        self._body().remove("Heightmaps")
         self._modified = True
 
     def invalidate_lighting(self) -> None:
-        """``isLightOn``を0にし、光源の再計算を促す"""
-        self.raw.set_byte("isLightOn", 0)
+        """``isLightOn``を0にし、光源の再計算を促す
+
+        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
+        """
+        self._require_format()
+        self._body().set_byte("isLightOn", 0)
         self._modified = True
 
     def compact(self) -> None:

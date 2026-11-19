@@ -38,6 +38,9 @@ TAG_LONG_ARRAY = 12
 #: テストベクタのチャンクに入れるDataVersion。動作を確かめた26.3の値
 DATA_VERSION = 5023
 
+#: 26.2までの形式（パレットの要素がName / Properties）のベクタに入れるDataVersion。26.2の値
+OLD_PALETTE_DATA_VERSION = 4903
+
 
 def mutf8_encode(text: str) -> bytes:
     """文字列をMUTF-8へ符号化する。
@@ -916,6 +919,22 @@ def block_palette_entry(name, properties=None):
     ])
 
 
+def name_properties_entry(name, properties=None):
+    """ブロックのパレット要素。26.2までの形式で作る。
+
+    `Name`を持つCompoundにして、プロパティがあれば`Properties`を足す。
+    キーは実データと同じく`Name` -> `Properties`の順に置く。
+    """
+    entries = [("Name", t_string(name))]
+
+    # プロパティが無ければ、Propertiesキー自体を書かない
+    if properties is not None:
+        entries.append(
+            ("Properties", t_compound([(key, t_string(value)) for key, value in properties])))
+
+    return t_compound(entries)
+
+
 def palette_list(palette_entries):
     """パレットの要素をリストへ詰める。MinecraftのListTagと同じ規則に従う。
 
@@ -989,10 +1008,11 @@ def block_tick(block_id, x, y, z):
 
 
 def make_chunk(x, z, sections, status="minecraft:full",
-               block_entities=None, block_ticks=None, fluid_ticks=None):
+               block_entities=None, block_ticks=None, fluid_ticks=None,
+               data_version=DATA_VERSION):
     """チャンクのNBTを組み立てる。実データの構造をなぞる。"""
     entries = [
-        ("DataVersion", t_int(DATA_VERSION)),
+        ("DataVersion", t_int(data_version)),
         ("xPos", t_int(x)),
         ("zPos", t_int(z)),
         ("yPos", t_int(-4)),
@@ -1132,12 +1152,12 @@ def build_world():
         ]),
         "2 段目は文字列と未使用の Compound が混ざる。compact() で文字列だけのリストに戻る")
 
-    # 異常系: 26.2までの形式（Name / Properties）のパレット
-    old_palette = t_list(TAG_COMPOUND, [t_compound([("Name", t_string("minecraft:air"))])])
+    # 26.2までの形式（Name / Properties）のパレット。1要素なのでdataを持たない
+    old_palette = t_list(TAG_COMPOUND, [name_properties_entry("minecraft:air")])
     add_vector(
         "world/palette_old_format", "world/palette_old_format.nbt",
         to_java_file("", t_compound([
-            ("DataVersion", t_int(4903)),
+            ("DataVersion", t_int(OLD_PALETTE_DATA_VERSION)),
             ("xPos", t_int(0)),
             ("zPos", t_int(0)),
             ("yPos", t_int(-4)),
@@ -1148,8 +1168,34 @@ def build_world():
                 ("biomes", paletted_container([PLAINS], [0] * 64, 1)),
             ])])),
         ])),
-        "26.2 までの形式（Name / Properties）のパレット。ブロックを読むと弾かれる",
-        expect_error="MALFORMED_DATA")
+        "26.2の形式（Name / Properties）のパレット1要素。26.2の形式のまま読み書きできる")
+
+    # 26.2の形式のチャンク。chunk-editで置いたブロックもName / Propertiesで書き出される
+    old_palette5 = [
+        name_properties_entry("minecraft:air"),
+        name_properties_entry("minecraft:stone"),
+        name_properties_entry("minecraft:dirt"),
+        name_properties_entry("minecraft:oak_stairs", [("facing", "east"), ("half", "bottom")]),
+        name_properties_entry("minecraft:oak_stairs", [("facing", "west"), ("half", "top")]),
+    ]
+    add_vector(
+        "world/v4903_edit", "world/v4903_edit.nbt",
+        make_chunk(
+            0, 0,
+            [
+                make_section(-4, old_palette5, indices5, biome_palette, biome_indices),
+                make_section(-3, [name_properties_entry("minecraft:air")], [0] * 4096,
+                             [PLAINS], [0] * 64),
+            ],
+            block_entities=[
+                block_entity("minecraft:chest", 0, -64, 0),
+                block_entity("minecraft:barrel", 15, -50, 15),
+            ],
+            block_ticks=[
+                block_tick("minecraft:water", 1, -64, 1),
+            ],
+            data_version=OLD_PALETTE_DATA_VERSION),
+        "26.2の形式のチャンク（DataVersion 4903）。chunk-editで置いたブロックもName / Propertiesで書き出される")
 
     # 異常系: 添字がパレットの範囲外
     broken = t_compound([

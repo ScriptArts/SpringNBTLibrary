@@ -289,8 +289,8 @@ fn chunk_edit(chunk: &mut Chunk) -> Result<()> {
     chunk.compact()?;
 
     // 高さマップと光源は再計算しないので、無効化してMinecraftに任せる
-    chunk.clear_heightmaps();
-    chunk.invalidate_lighting();
+    chunk.clear_heightmaps()?;
+    chunk.invalidate_lighting()?;
     Ok(())
 }
 

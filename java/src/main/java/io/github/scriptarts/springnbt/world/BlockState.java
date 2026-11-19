@@ -213,7 +213,7 @@ public final class BlockState {
             // Name / Propertiesは26.2までの形式で、読み替えると誤った状態を返しかねない
             if (compound.containsKey("Name")) {
                 throw SpringNbtException.malformed(
-                        "ブロックのパレット要素に id が無い。Name は26.2までの形式で、本ライブラリでは扱わない");
+                        "ブロックのパレット要素に id が無い。NameはDataVersion 5006より前の形式なので、5006未満のDataVersionで読むこと");
             }
 
             throw SpringNbtException.malformed("ブロックのパレット要素に id が無い");
@@ -238,7 +238,6 @@ public final class BlockState {
 
         return state;
     }
-
 
     /** 26.2までの{@code Name} / {@code Properties}の形式から読む */
     private static BlockState fromNameProperties(NbtTag nbt) {

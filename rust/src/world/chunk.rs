@@ -11,6 +11,7 @@ use crate::nbt::tag::{NbtCompound, NbtList, NbtString, NbtTag, TagType};
 use crate::MIN_SUPPORTED_DATA_VERSION;
 
 use super::block_state::{BlockState, IntoBlockState};
+use super::chunk_format::{ChunkFormat, OLDEST_FORMAT_DATA_VERSION};
 use super::paletted_container::PalettedContainer;
 
 /// セクション1つに入るブロック数
@@ -18,10 +19,6 @@ pub const BLOCKS_PER_SECTION: usize = 4096;
 
 /// セクション1つに入るバイオームのエントリ数（4×4×4単位）
 pub const BIOMES_PER_SECTION: usize = 64;
-
-/// ブロックに紐づく付随データのキー
-/// ブロックを置き換えたら整合が崩れる
-const BLOCK_DATA_KEYS: [&str; 3] = ["block_entities", "block_ticks", "fluid_ticks"];
 
 /// 付随データの要素が、指定の絶対座標を指しているか
 fn matches_position(entry: &NbtCompound, x: i32, y: i32, z: i32) -> bool {
@@ -63,6 +60,12 @@ pub struct ChunkReadOptions {
     pub on_warning: Option<Box<dyn Fn(&str)>>,
     /// dataの長さが期待値と違うとき、長さからビット幅を逆算して読むか
     pub lenient_bit_storage: bool,
+    /// チャンクの形式の世代を選ぶDataVersion
+    ///
+    /// `None`なら、チャンク自身のDataVersionで選ぶ
+    /// 1519以上でなければならない
+    /// 扱える形式の下限との比較には使わず、常にチャンク自身のDataVersionで比べる
+    pub format_data_version: Option<i32>,
 }
 
 impl Default for ChunkReadOptions {
@@ -71,6 +74,7 @@ impl Default for ChunkReadOptions {
             on_version_mismatch: VersionMismatchAction::Warn,
             on_warning: None,
             lenient_bit_storage: false,
+            format_data_version: None,
         }
     }
 }
@@ -80,6 +84,7 @@ impl std::fmt::Debug for ChunkReadOptions {
         f.debug_struct("ChunkReadOptions")
             .field("on_version_mismatch", &self.on_version_mismatch)
             .field("lenient_bit_storage", &self.lenient_bit_storage)
+            .field("format_data_version", &self.format_data_version)
             .finish()
     }
 }
@@ -220,12 +225,33 @@ impl ChunkSection {
     }
 }
 
+/// チャンクの本体に手を加える
+/// 1.17までの形式では`Level`の中、1.18以降はルートが本体
+fn update_body(root: &mut NbtCompound, update: impl FnOnce(&mut NbtCompound)) -> Result<()> {
+    let mut level = match root.opt_compound("Level")? {
+        Some(level) => level.clone(),
+        None => {
+            update(root);
+            return Ok(());
+        }
+    };
+
+    // Levelの中は借りたまま書き換えられないので、複製を書き換えて置き直す
+    update(&mut level);
+    root.set("Level", NbtTag::Compound(level));
+    Ok(())
+}
+
 /// チャンク1つ分
 #[derive(Debug, Clone)]
 pub struct Chunk {
     raw: NbtCompound,
     sections: BTreeMap<i32, ChunkSection>,
     modified: bool,
+    /// チャンクの形式の世代
+    /// 引けなかったチャンクは`None`のままで、元のNBTだけを持つ
+    format: Option<&'static ChunkFormat>,
+    format_data_version: i32,
 }
 
 impl Chunk {
@@ -234,14 +260,21 @@ impl Chunk {
         self.raw.get_int("DataVersion")
     }
 
+    /// チャンクの形式の世代を選ぶのに使ったDataVersion
+    ///
+    /// 読み込みのオプションで指定していればその値、指定が無ければ[`Chunk::data_version`]
+    pub fn format_data_version(&self) -> i32 {
+        self.format_data_version
+    }
+
     /// 絶対チャンクX座標
     pub fn x(&self) -> Result<i32> {
-        self.raw.get_int("xPos")
+        self.body()?.get_int("xPos")
     }
 
     /// 絶対チャンクZ座標
     pub fn z(&self) -> Result<i32> {
-        self.raw.get_int("zPos")
+        self.body()?.get_int("zPos")
     }
 
     /// 最下段セクションのY位置
@@ -252,7 +285,7 @@ impl Chunk {
 
     /// 生成段階（`minecraft:full`など）
     pub fn status(&self) -> Result<&str> {
-        self.raw.get_string("Status")
+        self.body()?.get_string("Status")
     }
 
     /// 生成が完了しているか
@@ -293,11 +326,68 @@ impl Chunk {
     }
 
     /// NBTからチャンクを読む
+    ///
+    /// 形式の世代は、オプションで指定したDataVersionか、チャンク自身のDataVersionで選ぶ
+    /// DataVersionが1519未満のチャンクは、指定があってもどの世代でも解釈せず、元のNBTだけを持つ
+    ///
+    /// 世代を選ぶDataVersionが1519未満なら[`ErrorCode::InvalidArgument`]、
+    /// 選んだ世代とチャンクの構造が合わなければ[`ErrorCode::MalformedData`]を返す
     pub fn from_nbt(nbt: NbtCompound, options: &ChunkReadOptions) -> Result<Chunk> {
-        let mut chunk = Chunk { raw: nbt, sections: BTreeMap::new(), modified: false };
-        chunk.check_data_version(options)?;
+        // 1.13より前の形式は、どの世代の部品でも読めない
+        if let Some(requested) = options.format_data_version {
+            // 下限より古い値は指定として受け付けない
+            if requested < OLDEST_FORMAT_DATA_VERSION {
+                return Err(Error::new(
+                    ErrorCode::InvalidArgument,
+                    format!(
+                        "世代を選ぶDataVersionは{OLDEST_FORMAT_DATA_VERSION}以上でなければならない: {requested}"
+                    ),
+                ));
+            }
+        }
 
-        let section_list = match chunk.raw.opt_list("sections")? {
+        let mut chunk = Chunk {
+            raw: nbt,
+            sections: BTreeMap::new(),
+            modified: false,
+            format: None,
+            format_data_version: 0,
+        };
+        chunk.check_data_version(options)?;
+        let data_version = chunk.data_version()?;
+        chunk.format_data_version = data_version;
+
+        // 指定があれば、チャンク自身のDataVersionの代わりにその値で世代を選ぶ
+        if let Some(requested) = options.format_data_version {
+            chunk.format_data_version = requested;
+        }
+
+        // 1.13より前のチャンクはブロックが数値IDで、どの世代で読んでも誤った値になる
+        if data_version < OLDEST_FORMAT_DATA_VERSION {
+            return Ok(chunk);
+        }
+
+        // 表に無い世代のチャンクは、解釈せずに元のNBTだけを持つ
+        let format = match ChunkFormat::for_data_version(chunk.format_data_version) {
+            Some(format) => format,
+            None => return Ok(chunk),
+        };
+
+        chunk.format = Some(format);
+        let has_level = chunk.raw.opt_compound("Level")?.is_some();
+
+        // 選んだ世代と本体の包み方が食い違うなら、黙って空のチャンクとして読まずに弾く
+        if has_level != format.wrapped_in_level {
+            return Err(Error::new(
+                ErrorCode::MalformedData,
+                format!(
+                    "DataVersion {}で選んだ形式と、ルートのLevelの有無が合わない",
+                    chunk.format_data_version
+                ),
+            ));
+        }
+
+        let section_list = match chunk.body()?.opt_list(format.sections_key)? {
             Some(list) => list.clone(),
             None => return Ok(chunk),
         };
@@ -354,7 +444,7 @@ impl Chunk {
     }
 
     /// NBTへ書き戻す
-    /// 全セクションを書き戻し、他のキーはそのまま残す
+    /// 全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
     pub fn to_nbt(&self, options: &ChunkWriteOptions) -> Result<NbtCompound> {
         let version = self.data_version()?;
 
@@ -374,9 +464,11 @@ impl Chunk {
         // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
         let mut result = self.raw.clone();
 
-        if self.sections.is_empty() {
-            return Ok(result);
-        }
+        // 元のNBTだけを持つチャンクは、セクションも読んでいないのでそのまま返す
+        let format = match self.format {
+            Some(format) if !self.sections.is_empty() => format,
+            _ => return Ok(result),
+        };
 
         let mut section_list = NbtList::with_element_type(TagType::Compound);
 
@@ -385,8 +477,36 @@ impl Chunk {
             section_list.push(NbtTag::Compound(section.to_nbt()?))?;
         }
 
-        result.set("sections", NbtTag::List(section_list));
+        update_body(&mut result, |body| {
+            body.set(format.sections_key, NbtTag::List(section_list))
+        })?;
         Ok(result)
+    }
+
+    /// チャンクの本体
+    /// 1.17までの形式では`Level`の中、1.18以降はルート
+    fn body(&self) -> Result<&NbtCompound> {
+        // 世代とLevelの有無は読み込みで突き合わせてあるので、Levelがあればその中が本体
+        match self.raw.opt_compound("Level")? {
+            Some(level) => Ok(level),
+            None => Ok(&self.raw),
+        }
+    }
+
+    /// チャンクの形式の世代を返す
+    ///
+    /// 世代を引けず、元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]を返す
+    fn require_format(&self) -> Result<&'static ChunkFormat> {
+        match self.format {
+            Some(format) => Ok(format),
+            None => Err(Error::new(
+                ErrorCode::UnsupportedDataVersion,
+                format!(
+                    "DataVersion {}のチャンクは形式を解釈せず元のNBTだけを持つので、この操作はできない",
+                    self.data_version()?
+                ),
+            )),
+        }
     }
 
     /// Y位置からセクションを得る
@@ -402,7 +522,10 @@ impl Chunk {
 
     /// ブロックを取得する
     /// XとZはチャンク内相対 (0..15)、Yは絶対座標
+    ///
+    /// 元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]を返す
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> Result<Option<BlockState>> {
+        let format = self.require_format()?;
         check_local_coordinates(x, z)?;
 
         let section = match self.section(y >> 4) {
@@ -412,13 +535,22 @@ impl Chunk {
 
         let entry = section.block_states().unwrap().get(block_index(x, y, z))?;
 
-        // パレットの要素は文字列のこともCompoundのこともあり、どちらもBlockStateが読む
-        Ok(Some(BlockState::from_nbt(entry)?))
+        // パレットの要素の形は世代で違うので、世代ごとに決めたDataVersionで読む
+        Ok(Some(BlockState::from_nbt_for_data_version(
+            entry,
+            format.palette_data_version,
+        )?))
     }
 
     /// ブロックを設定する
     ///
     /// `&BlockState`のほか、`"minecraft:oak_stairs[facing=north]"`の形の文字列でも指定できる
+    ///
+    /// 置き換えによって不整合になる付随データ（`block_entities` /
+    /// `block_ticks` / `fluid_ticks`のうち、その座標を指すもの）は同時に取り除く
+    /// パレットには、チャンクを読んだときの世代の形式で入れる
+    ///
+    /// 元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]を返す
     pub fn set_block<S>(&mut self, x: i32, y: i32, z: i32, state: &S) -> Result<()>
     where
         S: IntoBlockState + ?Sized,
@@ -426,6 +558,7 @@ impl Chunk {
         // すでにBlockStateを持っているなら借りるだけで済ませる
         let borrowed = state.as_block_state()?;
         let state: &BlockState = &borrowed;
+        let format = self.require_format()?;
         check_local_coordinates(x, z)?;
         let section_y = y >> 4;
         let index = block_index(x, y, z);
@@ -451,12 +584,13 @@ impl Chunk {
             }
         };
 
-        section
-            .block_states_mut()
-            .unwrap()
-            .set(index, state.to_nbt())?;
+        // 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで変換する
+        section.block_states_mut().unwrap().set(
+            index,
+            state.to_nbt_for_data_version(format.palette_data_version)?,
+        )?;
 
-        self.remove_block_data(x, y, z)?;
+        self.remove_block_data(format, x, y, z)?;
         self.modified = true;
         Ok(())
     }
@@ -465,13 +599,13 @@ impl Chunk {
     ///
     /// `block_entities` / `block_ticks` / `fluid_ticks`の要素は
     /// いずれも`x` `y` `z`を**絶対座標**で持つ
-    fn remove_block_data(&mut self, x: i32, y: i32, z: i32) -> Result<()> {
+    fn remove_block_data(&mut self, format: &ChunkFormat, x: i32, y: i32, z: i32) -> Result<()> {
         let absolute_x = (self.x()? * 16) + x;
         let absolute_z = (self.z()? * 16) + z;
 
         // 3つのリストは形が同じなので、まとめて同じ処理をかける
-        for key in BLOCK_DATA_KEYS {
-            let filtered = match self.raw.opt_list(key)? {
+        for key in format.block_data_keys {
+            let filtered = match self.body()?.opt_list(key)? {
                 Some(list) if !list.is_empty() => {
                     // 全要素を消しても要素型が変わらないよう、元の型で作り直す
                     let mut kept = NbtList::with_element_type(list.element_type());
@@ -504,7 +638,7 @@ impl Chunk {
 
             // 減ったときだけ書き戻す
             if let Some(kept) = filtered {
-                self.raw.set(key, NbtTag::List(kept));
+                update_body(&mut self.raw, |body| body.set(key, NbtTag::List(kept)))?;
             }
         }
 
@@ -513,7 +647,10 @@ impl Chunk {
 
     /// バイオームを取得する
     /// 4×4×4の単位なので、座標は自動的に丸められる
+    ///
+    /// 元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]を返す
     pub fn get_biome(&self, x: i32, y: i32, z: i32) -> Result<Option<String>> {
+        self.require_format()?;
         check_local_coordinates(x, z)?;
 
         let section = match self.section(y >> 4) {
@@ -543,7 +680,10 @@ impl Chunk {
 
     /// バイオームを設定する
     /// 4×4×4の単位
+    ///
+    /// 元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]を返す
     pub fn set_biome(&mut self, x: i32, y: i32, z: i32, biome: &str) -> Result<()> {
+        self.require_format()?;
         check_local_coordinates(x, z)?;
         let section_y = y >> 4;
         let index = biome_index(x, y, z);
@@ -571,15 +711,25 @@ impl Chunk {
     ///
     /// 本ライブラリは高さマップを再計算しない
     /// ブロックを改変したら呼ぶこと
-    pub fn clear_heightmaps(&mut self) {
-        self.raw.remove("Heightmaps");
+    ///
+    /// 元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]を返す
+    pub fn clear_heightmaps(&mut self) -> Result<()> {
+        self.require_format()?;
+        update_body(&mut self.raw, |body| {
+            body.remove("Heightmaps");
+        })?;
         self.modified = true;
+        Ok(())
     }
 
     /// `isLightOn`を0にし、光源の再計算を促す
-    pub fn invalidate_lighting(&mut self) {
-        self.raw.set_byte("isLightOn", 0);
+    ///
+    /// 元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]を返す
+    pub fn invalidate_lighting(&mut self) -> Result<()> {
+        self.require_format()?;
+        update_body(&mut self.raw, |body| body.set_byte("isLightOn", 0))?;
         self.modified = true;
+        Ok(())
     }
 
     /// 使われていないパレット要素を全セクションから取り除く

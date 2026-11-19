@@ -324,7 +324,7 @@ fn from_palette_id(nbt: &NbtTag) -> Result<BlockState> {
             if compound.contains_key("Name") {
                 return Err(Error::new(
                     ErrorCode::MalformedData,
-                    "ブロックのパレット要素に id が無い。Name は26.2までの形式で、本ライブラリでは扱わない",
+                    "ブロックのパレット要素に id が無い。NameはDataVersion 5006より前の形式なので、5006未満のDataVersionで読むこと",
                 ));
             }
 

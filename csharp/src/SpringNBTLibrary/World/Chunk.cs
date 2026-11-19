@@ -35,6 +35,16 @@ public sealed class ChunkReadOptions
     /// 第三者ツールが書いたデータの救済用
     /// </summary>
     public bool LenientBitStorage { get; set; }
+
+    /// <summary>
+    /// チャンクの形式の世代を選ぶDataVersion
+    /// </summary>
+    /// <remarks>
+    /// nullなら、チャンク自身のDataVersionで選ぶ
+    /// 1519以上でなければならない
+    /// 扱える形式の下限との比較には使わず、常にチャンク自身のDataVersionで比べる
+    /// </remarks>
+    public int? FormatDataVersion { get; set; }
 }
 
 /// <summary>チャンク書き込みのオプション</summary>
@@ -72,16 +82,15 @@ public sealed class Chunk
     /// <summary>セクション1つに入るバイオームのエントリ数（4×4×4単位）</summary>
     public const int BiomesPerSection = 64;
 
-    /// <summary>
-    /// ブロックに紐づく付随データのキー
-    /// ブロックを置き換えたら整合が崩れる
-    /// </summary>
-    private static readonly string[] BlockDataKeys =
-        new[] { "block_entities", "block_ticks", "fluid_ticks" };
-
     private readonly NbtCompound root;
     private readonly SortedDictionary<int, ChunkSection> sections =
         new SortedDictionary<int, ChunkSection>();
+
+    /// <summary>
+    /// チャンクの形式の世代
+    /// 引けなかったチャンクはnullのままで、元のNBTだけを持つ
+    /// </summary>
+    private ChunkFormat? format;
 
     private Chunk(NbtCompound root)
     {
@@ -91,18 +100,26 @@ public sealed class Chunk
     /// <summary>チャンク構造のバージョン</summary>
     public int DataVersion => root.GetInt("DataVersion");
 
+    /// <summary>
+    /// チャンクの形式の世代を選ぶのに使ったDataVersion
+    /// </summary>
+    /// <remarks>
+    /// 読み込みのオプションで指定していればその値、指定が無ければ<see cref="DataVersion"/>
+    /// </remarks>
+    public int FormatDataVersion { get; private set; }
+
     /// <summary>絶対チャンクX座標</summary>
-    public int X => root.GetInt("xPos");
+    public int X => Body().GetInt("xPos");
 
     /// <summary>絶対チャンクZ座標</summary>
-    public int Z => root.GetInt("zPos");
+    public int Z => Body().GetInt("zPos");
 
     /// <summary>最下段セクションのY位置
     /// オーバーワールドは-4</summary>
     public int MinSectionY => root.GetInt("yPos");
 
     /// <summary>生成段階（<c>minecraft:full</c>など）</summary>
-    public string Status => root.GetString("Status");
+    public string Status => Body().GetString("Status");
 
     /// <summary>生成が完了しているか
     /// ブロック改変の対象にしてよいのはこれだけ</summary>
@@ -133,7 +150,13 @@ public sealed class Chunk
     /// <summary>
     /// NBTからチャンクを読む
     /// </summary>
+    /// <remarks>
+    /// 形式の世代は、オプションで指定したDataVersionか、チャンク自身のDataVersionで選ぶ
+    /// DataVersionが1519未満のチャンクは、指定があってもどの世代でも解釈せず、元のNBTだけを持つ
+    /// </remarks>
     /// <exception cref="SpringNbtException">
+    /// 世代を選ぶDataVersionが1519未満の場合（<see cref="ErrorCode.InvalidArgument"/>）、
+    /// 選んだ世代とチャンクの構造が合わない場合（<see cref="ErrorCode.MalformedData"/>）、
     /// 必須のキーが無い、または構造が想定と違う場合
     /// </exception>
     public static Chunk FromNbt(NbtCompound nbt, ChunkReadOptions? options = null)
@@ -151,10 +174,53 @@ public sealed class Chunk
             effective = options;
         }
 
+        int? requested = effective.FormatDataVersion;
+
+        // 1.13より前の形式は、どの世代の部品でも読めない
+        if (requested is not null && requested.Value < ChunkFormat.OldestFormatDataVersion)
+        {
+            throw SpringNbtException.InvalidArgument(string.Create(
+                CultureInfo.InvariantCulture,
+                $"世代を選ぶDataVersionは{ChunkFormat.OldestFormatDataVersion}以上でなければならない: {requested.Value}"));
+        }
+
         Chunk chunk = new Chunk(nbt);
         chunk.CheckDataVersion(effective);
+        int dataVersion = chunk.DataVersion;
+        chunk.FormatDataVersion = dataVersion;
 
-        NbtList? sectionList = nbt.OptList("sections");
+        // 指定があれば、チャンク自身のDataVersionの代わりにその値で世代を選ぶ
+        if (requested is not null)
+        {
+            chunk.FormatDataVersion = requested.Value;
+        }
+
+        // 1.13より前のチャンクはブロックが数値IDで、どの世代で読んでも誤った値になる
+        if (dataVersion < ChunkFormat.OldestFormatDataVersion)
+        {
+            return chunk;
+        }
+
+        ChunkFormat? format = ChunkFormat.ForDataVersion(chunk.FormatDataVersion);
+
+        // 表に無い世代のチャンクは、解釈せずに元のNBTだけを持つ
+        if (format is null)
+        {
+            return chunk;
+        }
+
+        chunk.format = format;
+        bool hasLevel = nbt.OptCompound("Level") is not null;
+
+        // 選んだ世代と本体の包み方が食い違うなら、黙って空のチャンクとして読まずに弾く
+        if (hasLevel != format.WrappedInLevel)
+        {
+            throw SpringNbtException.Malformed(string.Create(
+                CultureInfo.InvariantCulture,
+                $"DataVersion {chunk.FormatDataVersion}で選んだ形式と、ルートのLevelの有無が合わない"));
+        }
+
+        NbtList? sectionList = chunk.Body().OptList(format.SectionsKey);
 
         if (sectionList is null)
         {
@@ -210,7 +276,7 @@ public sealed class Chunk
 
     /// <summary>
     /// NBTへ書き戻す
-    /// 全セクションを書き戻し、他のキーはそのまま残す
+    /// 全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
     /// </summary>
     /// <exception cref="SpringNbtException">
     /// DataVersionが扱える形式より古く、かつ
@@ -246,7 +312,8 @@ public sealed class Chunk
         // DataVersionは読んだ値のまま残す
         // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
-        if (sections.Count == 0)
+        // 元のNBTだけを持つチャンクは、セクションも読んでいないのでそのまま返す
+        if (format is null || sections.Count == 0)
         {
             return root;
         }
@@ -259,8 +326,45 @@ public sealed class Chunk
             sectionList.Add(section.ToNbt());
         }
 
-        root.Set("sections", sectionList);
+        Body().Set(format.SectionsKey, sectionList);
         return root;
+    }
+
+    /// <summary>
+    /// チャンクの本体
+    /// 1.17までの形式では<c>Level</c>の中、1.18以降はルート
+    /// </summary>
+    private NbtCompound Body()
+    {
+        NbtCompound? level = root.OptCompound("Level");
+
+        // 世代とLevelの有無は読み込みで突き合わせてあるので、Levelがあればその中が本体
+        if (level is not null)
+        {
+            return level;
+        }
+
+        return root;
+    }
+
+    /// <summary>
+    /// チャンクの形式の世代を返す
+    /// </summary>
+    /// <exception cref="SpringNbtException">
+    /// 世代を引けず、元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）
+    /// </exception>
+    private ChunkFormat RequireFormat()
+    {
+        if (format is null)
+        {
+            throw new SpringNbtException(
+                ErrorCode.UnsupportedDataVersion,
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"DataVersion {DataVersion}のチャンクは形式を解釈せず元のNBTだけを持つので、この操作はできない"));
+        }
+
+        return format;
     }
 
     /// <summary>Y位置からセクションを得る
@@ -283,8 +387,12 @@ public sealed class Chunk
     /// <param name="z">チャンク内相対Z座標 (0..15)</param>
     /// <returns>ブロック
     /// セクションが無い、またはblock_statesを持たない場合はnull</returns>
+    /// <exception cref="SpringNbtException">
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）
+    /// </exception>
     public BlockState? GetBlock(int x, int y, int z)
     {
+        ChunkFormat chunkFormat = RequireFormat();
         CheckLocalCoordinates(x, z);
         ChunkSection? section = Section(y >> 4);
 
@@ -293,8 +401,9 @@ public sealed class Chunk
             return null;
         }
 
-        // パレットの要素は文字列のこともCompoundのこともあり、どちらもBlockStateが読む
-        return BlockState.FromNbt(section.BlockStates!.Get(BlockIndex(x, y, z)));
+        // パレットの要素の形は世代で違うので、世代ごとに決めたDataVersionで読む
+        return BlockState.FromNbtForDataVersion(
+            section.BlockStates!.Get(BlockIndex(x, y, z)), chunkFormat.PaletteDataVersion);
     }
 
     /// <summary>
@@ -314,17 +423,24 @@ public sealed class Chunk
     /// ブロックを設定する
     /// </summary>
     /// <remarks>
+    /// <para>
     /// 置き換えによって不整合になる付随データ（<c>block_entities</c> /
     /// <c>block_ticks</c> / <c>fluid_ticks</c>のうち、その座標を指すもの）は同時に取り除く
     /// 残すとブロックと中身が食い違い、Minecraft側で予期しない挙動になるため
+    /// </para>
+    /// <para>
+    /// パレットには、チャンクを読んだときの世代の形式で入れる
+    /// </para>
     /// </remarks>
     /// <exception cref="SpringNbtException">
     /// 対象のセクションが無い、またはblock_statesを持たない場合
-    /// （<see cref="ErrorCode.InvalidArgument"/>）
+    /// （<see cref="ErrorCode.InvalidArgument"/>）、
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）
     /// </exception>
     public void SetBlock(int x, int y, int z, BlockState state)
     {
         ArgumentNullException.ThrowIfNull(state);
+        ChunkFormat chunkFormat = RequireFormat();
         CheckLocalCoordinates(x, z);
 
         int sectionY = y >> 4;
@@ -349,8 +465,10 @@ public sealed class Chunk
             return;
         }
 
-        section.BlockStates!.Set(BlockIndex(x, y, z), state.ToNbt());
-        RemoveBlockData(x, y, z);
+        // 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで変換する
+        section.BlockStates!.Set(
+            BlockIndex(x, y, z), state.ToNbtForDataVersion(chunkFormat.PaletteDataVersion));
+        RemoveBlockData(chunkFormat, x, y, z);
         IsModified = true;
     }
 
@@ -361,15 +479,16 @@ public sealed class Chunk
     /// <c>block_entities</c> / <c>block_ticks</c> / <c>fluid_ticks</c>の要素は
     /// いずれも<c>x</c> <c>y</c> <c>z</c>を**絶対座標**で持つ
     /// </remarks>
-    private void RemoveBlockData(int x, int y, int z)
+    private void RemoveBlockData(ChunkFormat chunkFormat, int x, int y, int z)
     {
         int absoluteX = (X * 16) + x;
         int absoluteZ = (Z * 16) + z;
+        NbtCompound body = Body();
 
         // 3つのリストは形が同じなので、まとめて同じ処理をかける
-        foreach (string key in BlockDataKeys)
+        foreach (string key in chunkFormat.BlockDataKeys)
         {
-            NbtList? list = root.OptList(key);
+            NbtList? list = body.OptList(key);
 
             if (list is null || list.Count == 0)
             {
@@ -411,8 +530,12 @@ public sealed class Chunk
     /// </summary>
     /// <returns>バイオームID
     /// セクションが無い場合はnull</returns>
+    /// <exception cref="SpringNbtException">
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）
+    /// </exception>
     public string? GetBiome(int x, int y, int z)
     {
+        RequireFormat();
         CheckLocalCoordinates(x, z);
         ChunkSection? section = Section(y >> 4);
 
@@ -434,9 +557,14 @@ public sealed class Chunk
 
     /// <summary>バイオームを設定する
     /// 4×4×4の単位</summary>
+    /// <exception cref="SpringNbtException">
+    /// 対象のセクションが無い、またはバイオームを持たない場合（<see cref="ErrorCode.InvalidArgument"/>）、
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）
+    /// </exception>
     public void SetBiome(int x, int y, int z, string biome)
     {
         ArgumentNullException.ThrowIfNull(biome);
+        RequireFormat();
         CheckLocalCoordinates(x, z);
 
         int sectionY = y >> 4;
@@ -460,18 +588,26 @@ public sealed class Chunk
     /// 本ライブラリは高さマップを再計算しない
     /// ブロックを改変したら呼ぶこと
     /// </remarks>
+    /// <exception cref="SpringNbtException">
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）
+    /// </exception>
     public void ClearHeightmaps()
     {
-        root.Remove("Heightmaps");
+        RequireFormat();
+        Body().Remove("Heightmaps");
         IsModified = true;
     }
 
     /// <summary>
     /// <c>isLightOn</c>を0にし、光源の再計算を促す
     /// </summary>
+    /// <exception cref="SpringNbtException">
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）
+    /// </exception>
     public void InvalidateLighting()
     {
-        root.SetByte("isLightOn", 0);
+        RequireFormat();
+        Body().SetByte("isLightOn", 0);
         IsModified = true;
     }
 

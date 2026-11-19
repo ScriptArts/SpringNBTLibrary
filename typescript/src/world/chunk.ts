@@ -18,6 +18,7 @@ import {
   TagType,
 } from "../nbt/index.js";
 import { BlockState } from "./blockState.js";
+import { ChunkFormat, OLDEST_FORMAT_DATA_VERSION } from "./chunkFormat.js";
 import { PalettedContainer } from "./palettedContainer.js";
 
 /** セクション1つに入るブロック数 */
@@ -25,12 +26,6 @@ export const BLOCKS_PER_SECTION = 4096;
 
 /** セクション1つに入るバイオームのエントリ数（4×4×4単位） */
 export const BIOMES_PER_SECTION = 64;
-
-/**
- * ブロックに紐づく付随データのキー
- * ブロックを置き換えたら整合が崩れる
- */
-const BLOCK_DATA_KEYS = ["block_entities", "block_ticks", "fluid_ticks"] as const;
 
 /** 付随データの要素が、指定の絶対座標を指しているか */
 function matchesPosition(entry: NbtCompound, x: number, y: number, z: number): boolean {
@@ -70,6 +65,14 @@ export interface ChunkReadOptions {
   onWarning?: (message: string) => void;
   /** dataの長さが期待値と違うとき、長さからビット幅を逆算して読むか */
   lenientBitStorage?: boolean;
+  /**
+   * チャンクの形式の世代を選ぶDataVersion
+   *
+   * 省略すると、チャンク自身のDataVersionで選ぶ
+   * 1519以上でなければならない
+   * 扱える形式の下限との比較には使わず、常にチャンク自身のDataVersionで比べる
+   */
+  formatDataVersion?: number;
 }
 
 /** チャンク書き込みのオプション */
@@ -193,6 +196,13 @@ export class Chunk {
   readonly #sections = new Map<number, ChunkSection>();
   #modified = false;
 
+  /**
+   * チャンクの形式の世代
+   * 引けなかったチャンクはundefinedのままで、元のNBTだけを持つ
+   */
+  #format: ChunkFormat | undefined = undefined;
+  #formatDataVersion = 0;
+
   private constructor(readonly raw: NbtCompound) {}
 
   /** チャンク構造のバージョン */
@@ -200,14 +210,23 @@ export class Chunk {
     return this.raw.getInt("DataVersion");
   }
 
+  /**
+   * チャンクの形式の世代を選ぶのに使ったDataVersion
+   *
+   * 読み込みのオプションで指定していればその値、指定が無ければ`dataVersion`
+   */
+  get formatDataVersion(): number {
+    return this.#formatDataVersion;
+  }
+
   /** 絶対チャンクX座標 */
   get x(): number {
-    return this.raw.getInt("xPos");
+    return this.#body().getInt("xPos");
   }
 
   /** 絶対チャンクZ座標 */
   get z(): number {
-    return this.raw.getInt("zPos");
+    return this.#body().getInt("zPos");
   }
 
   /**
@@ -220,7 +239,7 @@ export class Chunk {
 
   /** 生成段階（`minecraft:full`など） */
   get status(): string {
-    return this.raw.getString("Status");
+    return this.#body().getString("Status");
   }
 
   /**
@@ -256,10 +275,62 @@ export class Chunk {
     return [...this.#sections.keys()].sort((left, right) => left - right);
   }
 
-  /** NBTからチャンクを読む */
+  /**
+   * NBTからチャンクを読む
+   *
+   * 形式の世代は、オプションで指定したDataVersionか、チャンク自身のDataVersionで選ぶ
+   * DataVersionが1519未満のチャンクは、指定があってもどの世代でも解釈せず、元のNBTだけを持つ
+   *
+   * @throws SpringNbtError 世代を選ぶDataVersionが1519未満の場合（INVALID_ARGUMENT）、
+   * 選んだ世代とチャンクの構造が合わない場合（MALFORMED_DATA）、
+   * 必須のキーが無い、または構造が想定と違う場合
+   */
   static fromNbt(nbt: NbtCompound, options?: ChunkReadOptions): Chunk {
+    let requested: number | undefined = undefined;
+
+    // 指定があるときだけ、その値で世代を選ぶ
+    if (options !== undefined) {
+      requested = options.formatDataVersion;
+    }
+
+    // 1.13より前の形式は、どの世代の部品でも読めない
+    if (requested !== undefined && requested < OLDEST_FORMAT_DATA_VERSION) {
+      throw SpringNbtError.invalidArgument(
+        `世代を選ぶDataVersionは${OLDEST_FORMAT_DATA_VERSION}以上でなければならない: ${requested}`,
+      );
+    }
+
     const chunk = new Chunk(nbt);
     chunk.#checkDataVersion(options);
+    const dataVersion = chunk.dataVersion;
+    chunk.#formatDataVersion = dataVersion;
+
+    // 指定があれば、チャンク自身のDataVersionの代わりにその値で世代を選ぶ
+    if (requested !== undefined) {
+      chunk.#formatDataVersion = requested;
+    }
+
+    // 1.13より前のチャンクはブロックが数値IDで、どの世代で読んでも誤った値になる
+    if (dataVersion < OLDEST_FORMAT_DATA_VERSION) {
+      return chunk;
+    }
+
+    const format = ChunkFormat.forDataVersion(chunk.#formatDataVersion);
+
+    // 表に無い世代のチャンクは、解釈せずに元のNBTだけを持つ
+    if (format === undefined) {
+      return chunk;
+    }
+
+    chunk.#format = format;
+    const hasLevel = nbt.optCompound("Level") !== undefined;
+
+    // 選んだ世代と本体の包み方が食い違うなら、黙って空のチャンクとして読まずに弾く
+    if (hasLevel !== format.wrappedInLevel) {
+      throw SpringNbtError.malformed(
+        `DataVersion ${chunk.#formatDataVersion}で選んだ形式と、ルートのLevelの有無が合わない`,
+      );
+    }
 
     let lenient = false;
 
@@ -267,7 +338,7 @@ export class Chunk {
       lenient = true;
     }
 
-    const sectionList = nbt.optList("sections");
+    const sectionList = chunk.#body().optList(format.sectionsKey);
 
     if (sectionList === undefined) {
       return chunk;
@@ -318,7 +389,7 @@ export class Chunk {
 
   /**
    * NBTへ書き戻す
-   * 全セクションを書き戻し、他のキーはそのまま残す
+   * 全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
    */
   toNbt(options?: ChunkWriteOptions): NbtCompound {
     const version = this.dataVersion;
@@ -341,7 +412,8 @@ export class Chunk {
     // DataVersionは読んだ値のまま残す
     // 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
 
-    if (this.#sections.size === 0) {
+    // 元のNBTだけを持つチャンクは、セクションも読んでいないのでそのまま返す
+    if (this.#format === undefined || this.#sections.size === 0) {
       return this.raw;
     }
 
@@ -352,8 +424,39 @@ export class Chunk {
       sectionList.add(this.#sections.get(sectionY)!.toNbt());
     }
 
-    this.raw.set("sections", sectionList);
+    this.#body().set(this.#format.sectionsKey, sectionList);
     return this.raw;
+  }
+
+  /**
+   * チャンクの本体
+   * 1.17までの形式では`Level`の中、1.18以降はルート
+   */
+  #body(): NbtCompound {
+    const level = this.raw.optCompound("Level");
+
+    // 世代とLevelの有無は読み込みで突き合わせてあるので、Levelがあればその中が本体
+    if (level !== undefined) {
+      return level;
+    }
+
+    return this.raw;
+  }
+
+  /**
+   * チャンクの形式の世代を返す
+   *
+   * @throws SpringNbtError 世代を引けず、元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
+   */
+  #requireFormat(): ChunkFormat {
+    if (this.#format === undefined) {
+      throw new SpringNbtError(
+        ErrorCode.UnsupportedDataVersion,
+        `DataVersion ${this.dataVersion}のチャンクは形式を解釈せず元のNBTだけを持つので、この操作はできない`,
+      );
+    }
+
+    return this.#format;
   }
 
   /**
@@ -370,8 +473,10 @@ export class Chunk {
    * @param x チャンク内相対X座標 (0..15)
    * @param y 絶対Y座標
    * @param z チャンク内相対Z座標 (0..15)
+   * @throws SpringNbtError 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
    */
   getBlock(x: number, y: number, z: number): BlockState | undefined {
+    const format = this.#requireFormat();
     checkLocalCoordinates(x, z);
     const section = this.section(y >> 4);
 
@@ -379,14 +484,26 @@ export class Chunk {
       return undefined;
     }
 
-    // パレットの要素は文字列のこともCompoundのこともあり、どちらもBlockStateが読む
-    return BlockState.fromNbt(section.blockStates!.get(blockIndex(x, y, z)));
+    // パレットの要素の形は世代で違うので、世代ごとに決めたDataVersionで読む
+    return BlockState.fromNbtForDataVersion(
+      section.blockStates!.get(blockIndex(x, y, z)),
+      format.paletteDataVersion,
+    );
   }
 
   /**
    * ブロックを設定する
    *
    * `minecraft:oak_stairs[facing=north]`の形の文字列でも指定できる
+   *
+   * 置き換えによって不整合になる付随データ（`block_entities` /
+   * `block_ticks` / `fluid_ticks`のうち、その座標を指すもの）は同時に取り除く
+   * 残すとブロックと中身が食い違い、Minecraft側で予期しない挙動になるため
+   *
+   * パレットには、チャンクを読んだときの世代の形式で入れる
+   *
+   * @throws SpringNbtError 対象のセクションが無い、またはblock_statesを持たない場合、
+   * 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
    */
   setBlock(x: number, y: number, z: number, state: BlockState | string): void {
     // 文字列で渡されたらBlockStateへ直してから進む
@@ -395,6 +512,7 @@ export class Chunk {
       return;
     }
 
+    const format = this.#requireFormat();
     checkLocalCoordinates(x, z);
 
     const sectionY = y >> 4;
@@ -414,8 +532,12 @@ export class Chunk {
       return;
     }
 
-    section.blockStates!.set(blockIndex(x, y, z), state.toNbt());
-    this.#removeBlockData(x, y, z);
+    // 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで変換する
+    section.blockStates!.set(
+      blockIndex(x, y, z),
+      state.toNbtForDataVersion(format.paletteDataVersion),
+    );
+    this.#removeBlockData(format, x, y, z);
     this.#modified = true;
   }
 
@@ -425,13 +547,14 @@ export class Chunk {
    * `block_entities` / `block_ticks` / `fluid_ticks`の要素は
    * いずれも`x` `y` `z`を**絶対座標**で持つ
    */
-  #removeBlockData(x: number, y: number, z: number): void {
+  #removeBlockData(format: ChunkFormat, x: number, y: number, z: number): void {
     const absoluteX = this.x * 16 + x;
     const absoluteZ = this.z * 16 + z;
+    const body = this.#body();
 
     // 3つのリストは形が同じなので、まとめて同じ処理をかける
-    for (const key of BLOCK_DATA_KEYS) {
-      const list = this.raw.optList(key);
+    for (const key of format.blockDataKeys) {
+      const list = body.optList(key);
 
       if (list === undefined || list.size === 0) {
         continue;
@@ -452,8 +575,11 @@ export class Chunk {
   /**
    * バイオームを取得する
    * 4×4×4の単位なので、座標は自動的に丸められる
+   *
+   * @throws SpringNbtError 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
    */
   getBiome(x: number, y: number, z: number): string | undefined {
+    this.#requireFormat();
     checkLocalCoordinates(x, z);
     const section = this.section(y >> 4);
 
@@ -473,8 +599,12 @@ export class Chunk {
   /**
    * バイオームを設定する
    * 4×4×4の単位
+   *
+   * @throws SpringNbtError 対象のセクションが無い、またはバイオームを持たない場合、
+   * 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
    */
   setBiome(x: number, y: number, z: number, biome: string): void {
+    this.#requireFormat();
     checkLocalCoordinates(x, z);
 
     const sectionY = y >> 4;
@@ -495,15 +625,23 @@ export class Chunk {
    *
    * 本ライブラリは高さマップを再計算しない
    * ブロックを改変したら呼ぶこと
+   *
+   * @throws SpringNbtError 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
    */
   clearHeightmaps(): void {
-    this.raw.remove("Heightmaps");
+    this.#requireFormat();
+    this.#body().remove("Heightmaps");
     this.#modified = true;
   }
 
-  /** `isLightOn`を0にし、光源の再計算を促す */
+  /**
+   * `isLightOn`を0にし、光源の再計算を促す
+   *
+   * @throws SpringNbtError 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
+   */
   invalidateLighting(): void {
-    this.raw.setByte("isLightOn", 0);
+    this.#requireFormat();
+    this.#body().setByte("isLightOn", 0);
     this.#modified = true;
   }
 

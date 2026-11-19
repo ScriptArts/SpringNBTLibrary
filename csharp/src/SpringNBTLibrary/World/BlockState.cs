@@ -207,7 +207,7 @@ public sealed class BlockState : IEquatable<BlockState>
             if (compound.ContainsKey("Name"))
             {
                 throw SpringNbtException.Malformed(
-                    "ブロックのパレット要素に id が無い。Name は26.2までの形式で、本ライブラリでは扱わない");
+                    "ブロックのパレット要素に id が無い。NameはDataVersion 5006より前の形式なので、5006未満のDataVersionで読むこと");
             }
 
             throw SpringNbtException.Malformed("ブロックのパレット要素に id が無い");
@@ -235,7 +235,6 @@ public sealed class BlockState : IEquatable<BlockState>
 
         return state;
     }
-
 
     /// <summary>26.2までの<c>Name</c> / <c>Properties</c>の形式から読む</summary>
     private static BlockState FromNameProperties(NbtTag nbt)

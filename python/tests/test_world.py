@@ -10,7 +10,12 @@ import os
 
 import pytest
 
-from spring_nbt_library import TARGET_DATA_VERSION, ErrorCode, SpringNbtError
+from spring_nbt_library import (
+    MIN_SUPPORTED_DATA_VERSION,
+    TARGET_DATA_VERSION,
+    ErrorCode,
+    SpringNbtError,
+)
 from spring_nbt_library.nbt import (
     Compression,
     NamedTag,
@@ -70,6 +75,82 @@ def wrapped(tag) -> NbtCompound:
     wrapper = NbtCompound()
     wrapper.set("", tag)
     return wrapper
+
+
+def name_properties(name: str, properties=None) -> NbtCompound:
+    """26.2までの形式（Name / Properties）のパレット要素を作る"""
+    entry = NbtCompound()
+    entry.set_string("Name", name)
+
+    # プロパティがあるときだけPropertiesを足す
+    if properties is not None:
+        properties_tag = NbtCompound()
+
+        # 渡された順に入れる
+        for key, value in properties:
+            properties_tag.set_string(key, value)
+
+        entry.set("Properties", properties_tag)
+
+    return entry
+
+
+def id_properties(name: str, properties) -> NbtCompound:
+    """26.3からの形式（id / properties）のパレット要素を作る"""
+    entry = NbtCompound()
+    entry.set_string("id", name)
+    properties_tag = NbtCompound()
+
+    # 渡された順に入れる
+    for key, value in properties:
+        properties_tag.set_string(key, value)
+
+    entry.set("properties", properties_tag)
+    return entry
+
+
+#: 扱える形式の下限より古く、1.13より前でもあるDataVersion
+#: どの世代でも解釈しない
+PRE_FLATTENING_DATA_VERSION = 1400
+
+
+def pre_flattening_chunk() -> NbtCompound:
+    """1.13より前のようにLevelに本体を包み、ブロックを数値IDで持つチャンクを作る"""
+    section = NbtCompound()
+    section.set_byte("Y", 0)
+    section.set_byte_array("Blocks", [1] * 4096)
+    section.set_byte_array("Data", [0] * 2048)
+    sections = NbtList(TagType.COMPOUND)
+    sections.append(section)
+
+    level = NbtCompound()
+    level.set_int("xPos", 3)
+    level.set_int("zPos", -2)
+    level.set("Sections", sections)
+
+    root = NbtCompound()
+    root.set_int("DataVersion", PRE_FLATTENING_DATA_VERSION)
+    root.set("Level", level)
+    return root
+
+
+def level_chunk(data_version: int) -> NbtCompound:
+    """1.17までのようにLevelに本体を包んだチャンクを作る"""
+    level = NbtCompound()
+    level.set_int("xPos", 0)
+    level.set_int("zPos", 0)
+    level.set_string("Status", "full")
+    level.set("Sections", NbtList(TagType.COMPOUND))
+
+    root = NbtCompound()
+    root.set_int("DataVersion", data_version)
+    root.set("Level", level)
+    return root
+
+
+def chunk_bytes(tag: NbtCompound) -> bytes:
+    """チャンクのNBTを無圧縮のバイト列にする"""
+    return write_bytes(NamedTag("", tag), NbtWriteOptions(compression=Compression.NONE))
 
 
 class TestBlockState:
@@ -596,15 +677,6 @@ class TestChunk:
 
         assert error.value.code == ErrorCode.MALFORMED_DATA
 
-    def test_パレットが26_2までの形式ならブロックを読むとMALFORMED_DATA(self):
-        options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.IGNORE)
-        chunk = load_chunk("palette_old_format", options)
-
-        with pytest.raises(SpringNbtError) as error:
-            chunk.get_block(0, -64, 0)
-
-        assert error.value.code == ErrorCode.MALFORMED_DATA
-
     def test_チャンク内の相対座標が範囲外ならINVALID_ARGUMENT(self):
         chunk = load_chunk("palette_1")
 
@@ -620,9 +692,9 @@ class TestDataVersion:
 
     @staticmethod
     def foreign_chunk() -> NbtCompound:
-        """DataVersionだけを差し替えたチャンクを作る"""
+        """DataVersionだけを、扱える形式の下限より古い値に差し替えたチャンクを作る"""
         root = read_file(vector_path("palette_1")).tag
-        root.set("DataVersion", NbtInt(3953))
+        root.set("DataVersion", NbtInt(PRE_FLATTENING_DATA_VERSION))
         return root
 
     def test_既定では警告として通す(self):
@@ -632,18 +704,21 @@ class TestDataVersion:
             on_warning=warnings.append)
 
         chunk = Chunk.from_nbt(self.foreign_chunk(), options)
-        assert chunk.data_version == 3953
+        assert chunk.data_version == PRE_FLATTENING_DATA_VERSION
         assert len(warnings) == 1
 
-    def test_DataVersionが26_2のチャンクは扱える形式より古い(self):
+    def test_DataVersionが26_2のチャンクは警告を出さずに読める(self):
         warnings = []
         options = ChunkReadOptions(
             on_version_mismatch=VersionMismatchAction.WARN,
             on_warning=warnings.append)
 
-        # 26.2まではパレットの形式が違う
+        # 26.2の形式も扱う形式に含まれる
         load_chunk("palette_old_format", options)
-        assert len(warnings) == 1
+        assert warnings == []
+
+    def test_扱える形式の下限は1_18(self):
+        assert MIN_SUPPORTED_DATA_VERSION == 2844
 
     def test_ERRORを指定すると読み込みで弾く(self):
         options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.ERROR)
@@ -679,7 +754,7 @@ class TestDataVersion:
 
         # DataVersionは読んだ値のまま残す
         written = chunk.to_nbt(ChunkWriteOptions(allow_foreign_data_version=True))
-        assert written.get_int("DataVersion") == 3953
+        assert written.get_int("DataVersion") == PRE_FLATTENING_DATA_VERSION
 
     def test_対象バージョンのチャンクはそのまま書き戻せる(self):
         chunk = load_chunk("palette_1")
@@ -714,6 +789,139 @@ class TestDataVersion:
         assert chunk.to_nbt().get_int("DataVersion") == 5100
 
 
+class TestChunkFormat:
+    """チャンクの形式の世代
+    """
+
+    def test_DataVersion4903のチャンクを読み無変更で書き戻すと元と同じになる(self):
+        named = read_file(vector_path("v4903_edit"))
+        before = chunk_bytes(named.tag)
+        chunk = Chunk.from_nbt(named.tag)
+
+        # ベクタの添字は (位置 * 7) % 5
+        assert chunk.data_version == 4903
+        assert str(chunk.get_block(0, -64, 0)) == "minecraft:air"
+        assert str(chunk.get_block(1, -64, 0)) == "minecraft:dirt"
+        assert str(chunk.get_block(2, -64, 0)) == "minecraft:oak_stairs[facing=west,half=top]"
+        assert str(chunk.get_block(3, -64, 0)) == "minecraft:stone"
+        assert str(chunk.get_block(4, -64, 0)) == "minecraft:oak_stairs[facing=east,half=bottom]"
+        assert chunk.get_biome(0, -64, 0) == "minecraft:plains"
+
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+    def test_DataVersion4903のチャンクに置いたブロックはName_Propertiesで入る(self):
+        chunk = load_chunk("v4903_edit")
+        chunk.set_block(5, -64, 5, BlockState.parse("minecraft:oak_stairs[facing=north]"))
+        written = chunk.to_nbt()
+
+        # パレットの末尾に26.2の形式で足される
+        palette = written.get_list("sections")[0].get_compound("block_states").get_list("palette")
+        assert palette[len(palette) - 1] == name_properties(
+            "minecraft:oak_stairs", [("facing", "north")])
+
+        # DataVersionは読んだ値のまま
+        assert written.get_int("DataVersion") == 4903
+
+        # 読み直しても同じ状態が返る
+        reread = Chunk.from_nbt(written)
+        assert str(reread.get_block(5, -64, 5)) == "minecraft:oak_stairs[facing=north]"
+
+    def test_形式の違うチャンクはそれぞれ読んだ形式で書き出す(self):
+        old = load_chunk("v4903_edit")
+        new = load_chunk("palette_5")
+
+        # 2つのチャンクに同じ手順で同じブロックを置く
+        for chunk in (old, new):
+            chunk.set_block(5, -64, 5, BlockState.parse("minecraft:oak_stairs[facing=north]"))
+            chunk.set_block(6, -64, 6, BlockState.parse("minecraft:edited_plain"))
+
+        old_written = old.to_nbt()
+        old_palette = old_written.get_list("sections")[0].get_compound(
+            "block_states").get_list("palette")
+        assert old_palette[len(old_palette) - 2] == name_properties(
+            "minecraft:oak_stairs", [("facing", "north")])
+        assert old_palette[len(old_palette) - 1] == name_properties("minecraft:edited_plain")
+        assert old_written.get_int("DataVersion") == 4903
+
+        new_written = new.to_nbt()
+        new_palette = new_written.get_list("sections")[0].get_compound(
+            "block_states").get_list("palette")
+        # 型の混ざったパレットはCompoundのリストになり、文字列の要素だけが包まれる
+        assert new_palette[len(new_palette) - 2] == id_properties(
+            "minecraft:oak_stairs", [("facing", "north")])
+        assert new_palette[len(new_palette) - 1] == wrapped(NbtString("minecraft:edited_plain"))
+        assert new_written.get_int("DataVersion") == TARGET_DATA_VERSION
+
+    def test_指定した世代とLevelの有無が食い違えばMALFORMED_DATA(self):
+        options = ChunkReadOptions(
+            on_version_mismatch=VersionMismatchAction.IGNORE, format_data_version=5023)
+
+        # Levelを持つチャンクを、Levelの無い世代で読ませる
+        with pytest.raises(SpringNbtError) as error:
+            Chunk.from_nbt(level_chunk(2586), options)
+
+        assert error.value.code == ErrorCode.MALFORMED_DATA
+
+    def test_世代を指定しても下限より古いチャンクは書き戻せない(self):
+        options = ChunkReadOptions(
+            on_version_mismatch=VersionMismatchAction.IGNORE, format_data_version=5023)
+        chunk = Chunk.from_nbt(pre_flattening_chunk(), options)
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.to_nbt()
+
+        assert error.value.code == ErrorCode.UNSUPPORTED_DATA_VERSION
+
+    def test_世代に1519未満を指定するとINVALID_ARGUMENT(self):
+        options = ChunkReadOptions(format_data_version=1518)
+
+        with pytest.raises(SpringNbtError) as error:
+            Chunk.from_nbt(read_file(vector_path("palette_1")).tag, options)
+
+        assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+    def test_DataVersionが1519未満のチャンクは元のNBTだけを持つ(self):
+        root = pre_flattening_chunk()
+        before = chunk_bytes(root)
+        options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.IGNORE)
+        chunk = Chunk.from_nbt(root, options)
+
+        # 座標はLevelの中から読み、セクションは解釈しない
+        assert chunk.x == 3
+        assert chunk.z == -2
+        assert chunk.section_ys == []
+
+        # ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない
+        operations = [
+            lambda: chunk.get_block(0, 0, 0),
+            lambda: chunk.set_block(0, 0, 0, "minecraft:stone"),
+            lambda: chunk.get_biome(0, 0, 0),
+            lambda: chunk.set_biome(0, 0, 0, "minecraft:plains"),
+            lambda: chunk.clear_heightmaps(),
+            lambda: chunk.invalidate_lighting(),
+        ]
+
+        # 操作ごとにUNSUPPORTED_DATA_VERSIONになることを確かめる
+        for operation in operations:
+            with pytest.raises(SpringNbtError) as error:
+                operation()
+
+            assert error.value.code == ErrorCode.UNSUPPORTED_DATA_VERSION
+
+        # 許可すれば、読んだNBTがそのまま返る
+        written = chunk.to_nbt(ChunkWriteOptions(allow_foreign_data_version=True))
+        assert chunk_bytes(written) == before
+
+    def test_世代を選んだDataVersionを返す(self):
+        tag = read_file(vector_path("v4903_edit")).tag
+        assert Chunk.from_nbt(tag).format_data_version == 4903
+
+        # 指定すれば、チャンク自身のDataVersionではなくその値になる
+        chunk = Chunk.from_nbt(tag, ChunkReadOptions(format_data_version=5023))
+        assert chunk.format_data_version == 5023
+        assert chunk.data_version == 4903
+
+
 class TestMinecraftWorld:
     """ワールドを開く
     """
@@ -740,7 +948,7 @@ class TestMinecraftWorld:
         write_file(str(tmp_path / "level.dat"), NamedTag("", level))
 
         chunk = read_file(vector_path("palette_1")).tag
-        chunk.set("DataVersion", NbtInt(3953))
+        chunk.set("DataVersion", NbtInt(PRE_FLATTENING_DATA_VERSION))
 
         with RegionFile.open(str(region / "r.0.0.mca"), RegionFileMode.READ_WRITE) as file:
             file.write_chunk(0, 0, chunk)

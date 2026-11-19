@@ -17,7 +17,7 @@ use spring_nbt_library::world::{
     ceil_log2, BitStorage, BlockState, Chunk, ChunkReadOptions, ChunkWriteOptions, MinecraftWorld,
     PalettedContainer, VersionMismatchAction, WorldOpenOptions,
 };
-use spring_nbt_library::TARGET_DATA_VERSION;
+use spring_nbt_library::{MIN_SUPPORTED_DATA_VERSION, TARGET_DATA_VERSION};
 
 /// 共通テストベクタ（world/*.nbt）のパス
 fn vector_path(name: &str) -> PathBuf {
@@ -52,19 +52,98 @@ fn wrapped(tag: NbtTag) -> NbtTag {
     NbtTag::Compound(wrapper)
 }
 
-/// テストベクタを、DataVersionの検査を止めてチャンクとして読む
-fn load_chunk_ignoring_version(name: &str) -> Chunk {
-    let named = read_file(vector_path(name), &NbtReadOptions::default()).expect("読めない");
-    let options = ChunkReadOptions {
-        on_version_mismatch: VersionMismatchAction::Ignore,
-        ..ChunkReadOptions::default()
-    };
-    Chunk::from_nbt(named.tag, &options).expect("チャンクとして解釈できない")
-}
-
 /// エラーが期待したコードであることを確かめる
 fn assert_code(expected: ErrorCode, error: Error) {
     assert_eq!(expected, error.code(), "エラーコードが違う: {error}");
+}
+
+/// 26.2までの形式（Name / Properties）のパレット要素を作る
+fn name_properties(name: &str, properties: &[(&str, &str)]) -> NbtTag {
+    let mut entry = NbtCompound::new();
+    entry.set_string("Name", name);
+
+    // プロパティがあるときだけPropertiesを足す
+    if !properties.is_empty() {
+        let mut properties_tag = NbtCompound::new();
+
+        // 渡された順に入れる
+        for (key, value) in properties {
+            properties_tag.set_string(key, value);
+        }
+
+        entry.set("Properties", NbtTag::Compound(properties_tag));
+    }
+
+    NbtTag::Compound(entry)
+}
+
+/// 26.3からの形式（id / properties）のパレット要素を作る
+fn id_properties(name: &str, properties: &[(&str, &str)]) -> NbtTag {
+    let mut entry = NbtCompound::new();
+    entry.set_string("id", name);
+    let mut properties_tag = NbtCompound::new();
+
+    // 渡された順に入れる
+    for (key, value) in properties {
+        properties_tag.set_string(key, value);
+    }
+
+    entry.set("properties", NbtTag::Compound(properties_tag));
+    NbtTag::Compound(entry)
+}
+
+/// 扱える形式の下限より古く、1.13より前でもあるDataVersion
+/// どの世代でも解釈しない
+const PRE_FLATTENING_DATA_VERSION: i32 = 1400;
+
+/// 1.13より前のようにLevelに本体を包み、ブロックを数値IDで持つチャンクを作る
+fn pre_flattening_chunk() -> NbtCompound {
+    let mut section = NbtCompound::new();
+    section.set_byte("Y", 0);
+    section.set_byte_array("Blocks", vec![1; 4096]);
+    section.set_byte_array("Data", vec![0; 2048]);
+    let mut sections = NbtList::with_element_type(TagType::Compound);
+    sections.push(NbtTag::Compound(section)).unwrap();
+
+    let mut level = NbtCompound::new();
+    level.set_int("xPos", 3);
+    level.set_int("zPos", -2);
+    level.set("Sections", NbtTag::List(sections));
+
+    let mut root = NbtCompound::new();
+    root.set_int("DataVersion", PRE_FLATTENING_DATA_VERSION);
+    root.set("Level", NbtTag::Compound(level));
+    root
+}
+
+/// 1.17までのようにLevelに本体を包んだチャンクを作る
+fn level_chunk(data_version: i32) -> NbtCompound {
+    let mut level = NbtCompound::new();
+    level.set_int("xPos", 0);
+    level.set_int("zPos", 0);
+    level.set_string("Status", "full");
+    level.set("Sections", NbtTag::List(NbtList::with_element_type(TagType::Compound)));
+
+    let mut root = NbtCompound::new();
+    root.set_int("DataVersion", data_version);
+    root.set("Level", NbtTag::Compound(level));
+    root
+}
+
+/// チャンクのNBTを無圧縮のバイト列にする
+fn chunk_bytes(tag: &NbtCompound) -> Vec<u8> {
+    let options = NbtWriteOptions { compression: Compression::None, ..NbtWriteOptions::default() };
+    write_bytes(&NamedTag::new("", tag.clone()), &options).unwrap()
+}
+
+/// 書き出したチャンクの最初のセクションのブロックのパレット
+fn first_block_palette(written: &NbtCompound) -> NbtList {
+    let section = match written.get_list("sections").unwrap().get(0) {
+        Some(NbtTag::Compound(section)) => section.clone(),
+        _ => panic!("最初のセクションが無い"),
+    };
+
+    section.get_compound("block_states").unwrap().get_list("palette").unwrap().clone()
 }
 
 // ---------------------------------------------------------------------------
@@ -766,8 +845,8 @@ fn 別のチャンクの同じ相対座標は消さない() {
 #[test]
 fn 高さマップと光源を無効化できる() {
     let mut chunk = load_chunk("palette_1");
-    chunk.clear_heightmaps();
-    chunk.invalidate_lighting();
+    chunk.clear_heightmaps().unwrap();
+    chunk.invalidate_lighting().unwrap();
 
     let raw = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
     assert!(raw.opt_compound("Heightmaps").unwrap().is_none());
@@ -803,16 +882,6 @@ fn data長が合わないチャンクはmalformed_data() {
 }
 
 #[test]
-fn パレットが26_2までの形式ならブロックを読むとmalformed_data() {
-    let chunk = load_chunk_ignoring_version("palette_old_format");
-
-    match chunk.get_block(0, -64, 0) {
-        Ok(_) => panic!("読めてしまった"),
-        Err(error) => assert_code(ErrorCode::MalformedData, error),
-    }
-}
-
-#[test]
 fn チャンク内の相対座標が範囲外ならinvalid_argument() {
     let chunk = load_chunk("palette_1");
 
@@ -826,11 +895,11 @@ fn チャンク内の相対座標が範囲外ならinvalid_argument() {
 // DataVersionの扱い
 // ---------------------------------------------------------------------------
 
-/// DataVersionだけを差し替えたチャンクを作る
+/// DataVersionだけを、扱える形式の下限より古い値に差し替えたチャンクを作る
 fn foreign_chunk() -> NbtCompound {
     let named = read_file(vector_path("palette_1"), &NbtReadOptions::default()).unwrap();
     let mut root = named.tag;
-    root.set("DataVersion", NbtTag::Int(3953));
+    root.set("DataVersion", NbtTag::Int(PRE_FLATTENING_DATA_VERSION));
     root
 }
 
@@ -843,16 +912,16 @@ fn 既定では警告として通す() {
         on_warning: Some(Box::new(move |message: &str| {
             sink.borrow_mut().push(message.to_string());
         })),
-        lenient_bit_storage: false,
+        ..ChunkReadOptions::default()
     };
 
     let chunk = Chunk::from_nbt(foreign_chunk(), &options).unwrap();
-    assert_eq!(3953, chunk.data_version().unwrap());
+    assert_eq!(PRE_FLATTENING_DATA_VERSION, chunk.data_version().unwrap());
     assert_eq!(1, warnings.borrow().len());
 }
 
 #[test]
-fn data_versionが26_2のチャンクは扱える形式より古い() {
+fn data_versionが26_2のチャンクは警告を出さずに読める() {
     let warnings: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
     let sink = Rc::clone(&warnings);
     let options = ChunkReadOptions {
@@ -860,13 +929,18 @@ fn data_versionが26_2のチャンクは扱える形式より古い() {
         on_warning: Some(Box::new(move |message: &str| {
             sink.borrow_mut().push(message.to_string());
         })),
-        lenient_bit_storage: false,
+        ..ChunkReadOptions::default()
     };
 
-    // 26.2まではパレットの形式が違う
+    // 26.2の形式も扱う形式に含まれる
     let named = read_file(vector_path("palette_old_format"), &NbtReadOptions::default()).unwrap();
     Chunk::from_nbt(named.tag, &options).unwrap();
-    assert_eq!(1, warnings.borrow().len());
+    assert!(warnings.borrow().is_empty());
+}
+
+#[test]
+fn 扱える形式の下限は1_18() {
+    assert_eq!(2844, MIN_SUPPORTED_DATA_VERSION);
 }
 
 #[test]
@@ -891,7 +965,7 @@ fn ignoreなら何も起きない() {
         on_warning: Some(Box::new(move |message: &str| {
             sink.borrow_mut().push(message.to_string());
         })),
-        lenient_bit_storage: false,
+        ..ChunkReadOptions::default()
     };
 
     Chunk::from_nbt(foreign_chunk(), &options).unwrap();
@@ -925,7 +999,7 @@ fn 許可すれば古いチャンクも元のバージョンのまま書き戻�
 
     // DataVersionは読んだ値のまま残す
     let written = chunk.to_nbt(&write).unwrap();
-    assert_eq!(3953, written.get_int("DataVersion").unwrap());
+    assert_eq!(PRE_FLATTENING_DATA_VERSION, written.get_int("DataVersion").unwrap());
 }
 
 /// 対象より新しいDataVersionを持つチャンクを作る
@@ -945,7 +1019,7 @@ fn 新しいバージョンのチャンクは警告を出さない() {
         on_warning: Some(Box::new(move |message: &str| {
             sink.borrow_mut().push(message.to_string());
         })),
-        lenient_bit_storage: false,
+        ..ChunkReadOptions::default()
     };
 
     // 形式が同じであれば、新しいバージョンでも警告を出さずに読める
@@ -978,6 +1052,192 @@ fn 対象バージョンのチャンクはそのまま書き戻せる() {
     let chunk = load_chunk("palette_1");
     let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
     assert_eq!(TARGET_DATA_VERSION, written.get_int("DataVersion").unwrap());
+}
+
+// ---------------------------------------------------------------------------
+// チャンクの形式の世代
+// ---------------------------------------------------------------------------
+
+#[test]
+fn data_version4903のチャンクを読み無変更で書き戻すと元と同じになる() {
+    let tag = read_file(vector_path("v4903_edit"), &NbtReadOptions::default()).unwrap().tag;
+    let before = chunk_bytes(&tag);
+    let chunk = Chunk::from_nbt(tag, &ChunkReadOptions::default()).unwrap();
+
+    // ベクタの添字は (位置 * 7) % 5
+    let block = |x: i32| chunk.get_block(x, -64, 0).unwrap().unwrap().to_string();
+    assert_eq!(4903, chunk.data_version().unwrap());
+    assert_eq!("minecraft:air", block(0));
+    assert_eq!("minecraft:dirt", block(1));
+    assert_eq!("minecraft:oak_stairs[facing=west,half=top]", block(2));
+    assert_eq!("minecraft:stone", block(3));
+    assert_eq!("minecraft:oak_stairs[facing=east,half=bottom]", block(4));
+    assert_eq!(Some("minecraft:plains".to_string()), chunk.get_biome(0, -64, 0).unwrap());
+
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    assert_eq!(before, chunk_bytes(&written));
+}
+
+#[test]
+fn data_version4903のチャンクに置いたブロックはname_propertiesで入る() {
+    let mut chunk = load_chunk("v4903_edit");
+    chunk.set_block(5, -64, 5, "minecraft:oak_stairs[facing=north]").unwrap();
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+
+    // パレットの末尾に26.2の形式で足される
+    let palette = first_block_palette(&written);
+    assert_eq!(
+        Some(&name_properties("minecraft:oak_stairs", &[("facing", "north")])),
+        palette.get(palette.len() - 1)
+    );
+
+    // DataVersionは読んだ値のまま
+    assert_eq!(4903, written.get_int("DataVersion").unwrap());
+
+    // 読み直しても同じ状態が返る
+    let reread = Chunk::from_nbt(written, &ChunkReadOptions::default()).unwrap();
+    assert_eq!(
+        "minecraft:oak_stairs[facing=north]",
+        reread.get_block(5, -64, 5).unwrap().unwrap().to_string()
+    );
+}
+
+#[test]
+fn 形式の違うチャンクはそれぞれ読んだ形式で書き出す() {
+    let mut older = load_chunk("v4903_edit");
+    let mut newer = load_chunk("palette_5");
+
+    // 2つのチャンクに同じ手順で同じブロックを置く
+    for chunk in [&mut older, &mut newer] {
+        chunk.set_block(5, -64, 5, "minecraft:oak_stairs[facing=north]").unwrap();
+        chunk.set_block(6, -64, 6, "minecraft:edited_plain").unwrap();
+    }
+
+    let older_written = older.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    let older_palette = first_block_palette(&older_written);
+    assert_eq!(
+        Some(&name_properties("minecraft:oak_stairs", &[("facing", "north")])),
+        older_palette.get(older_palette.len() - 2)
+    );
+    assert_eq!(
+        Some(&name_properties("minecraft:edited_plain", &[])),
+        older_palette.get(older_palette.len() - 1)
+    );
+    assert_eq!(4903, older_written.get_int("DataVersion").unwrap());
+
+    let newer_written = newer.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    let newer_palette = first_block_palette(&newer_written);
+
+    // 型の混ざったパレットはCompoundのリストになり、文字列の要素だけが包まれる
+    assert_eq!(
+        Some(&id_properties("minecraft:oak_stairs", &[("facing", "north")])),
+        newer_palette.get(newer_palette.len() - 2)
+    );
+    assert_eq!(
+        Some(&wrapped(block_entry("minecraft:edited_plain"))),
+        newer_palette.get(newer_palette.len() - 1)
+    );
+    assert_eq!(TARGET_DATA_VERSION, newer_written.get_int("DataVersion").unwrap());
+}
+
+#[test]
+fn 指定した世代とlevelの有無が食い違えばmalformed_data() {
+    let options = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Ignore,
+        format_data_version: Some(5023),
+        ..ChunkReadOptions::default()
+    };
+
+    // Levelを持つチャンクを、Levelの無い世代で読ませる
+    match Chunk::from_nbt(level_chunk(2586), &options) {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::MalformedData, error),
+    }
+}
+
+#[test]
+fn 世代を指定しても下限より古いチャンクは書き戻せない() {
+    let options = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Ignore,
+        format_data_version: Some(5023),
+        ..ChunkReadOptions::default()
+    };
+    let chunk = Chunk::from_nbt(pre_flattening_chunk(), &options).unwrap();
+
+    match chunk.to_nbt(&ChunkWriteOptions::default()) {
+        Ok(_) => panic!("書けてしまった"),
+        Err(error) => assert_code(ErrorCode::UnsupportedDataVersion, error),
+    }
+}
+
+#[test]
+fn 世代に1519未満を指定するとinvalid_argument() {
+    let named = read_file(vector_path("palette_1"), &NbtReadOptions::default()).unwrap();
+    let options = ChunkReadOptions {
+        format_data_version: Some(1518),
+        ..ChunkReadOptions::default()
+    };
+
+    match Chunk::from_nbt(named.tag, &options) {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::InvalidArgument, error),
+    }
+}
+
+#[test]
+fn data_versionが1519未満のチャンクは元のnbtだけを持つ() {
+    let root = pre_flattening_chunk();
+    let before = chunk_bytes(&root);
+    let options = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Ignore,
+        ..ChunkReadOptions::default()
+    };
+    let mut chunk = Chunk::from_nbt(root, &options).unwrap();
+
+    // 座標はLevelの中から読み、セクションは解釈しない
+    assert_eq!(3, chunk.x().unwrap());
+    assert_eq!(-2, chunk.z().unwrap());
+    assert!(chunk.section_ys().is_empty());
+
+    // ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない
+    let results = vec![
+        chunk.get_block(0, 0, 0).map(|_| ()),
+        chunk.get_biome(0, 0, 0).map(|_| ()),
+        chunk.set_block(0, 0, 0, "minecraft:stone"),
+        chunk.set_biome(0, 0, 0, "minecraft:plains"),
+        chunk.clear_heightmaps(),
+        chunk.invalidate_lighting(),
+    ];
+
+    // 操作ごとにUnsupportedDataVersionになることを確かめる
+    for result in results {
+        match result {
+            Ok(()) => panic!("操作できてしまった"),
+            Err(error) => assert_code(ErrorCode::UnsupportedDataVersion, error),
+        }
+    }
+
+    // 許可すれば、読んだNBTがそのまま返る
+    let write = ChunkWriteOptions {
+        allow_foreign_data_version: true,
+    };
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&write).unwrap()));
+}
+
+#[test]
+fn 世代を選んだdata_versionを返す() {
+    let tag = read_file(vector_path("v4903_edit"), &NbtReadOptions::default()).unwrap().tag;
+    let chunk = Chunk::from_nbt(tag.clone(), &ChunkReadOptions::default()).unwrap();
+    assert_eq!(4903, chunk.format_data_version());
+
+    // 指定すれば、チャンク自身のDataVersionではなくその値になる
+    let options = ChunkReadOptions {
+        format_data_version: Some(5023),
+        ..ChunkReadOptions::default()
+    };
+    let chunk = Chunk::from_nbt(tag, &options).unwrap();
+    assert_eq!(5023, chunk.format_data_version());
+    assert_eq!(4903, chunk.data_version().unwrap());
 }
 
 // ---------------------------------------------------------------------------
@@ -1088,6 +1348,6 @@ fn marks_the_chunk_as_modified() {
     chunk.set_block(3, -60, 7, "minecraft:stone").unwrap();
     assert!(!chunk.is_modified());
 
-    chunk.clear_heightmaps();
+    chunk.clear_heightmaps().unwrap();
     assert!(chunk.is_modified());
 }
