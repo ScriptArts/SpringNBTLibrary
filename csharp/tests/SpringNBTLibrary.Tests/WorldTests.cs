@@ -1963,6 +1963,31 @@ public class WorldTests
         }
 
         [Fact]
+        public void Statusの無いチャンクは生成済みとみなさない()
+        {
+            ChunkReadOptions options = new ChunkReadOptions { OnVersionMismatch = VersionMismatchAction.Ignore };
+            NbtCompound legacy = Biomes2DVector();
+            legacy.GetCompound("Level").Remove("Status");
+
+            // 1.13より前のチャンクはStatusを持たない
+            Assert.False(Chunk.FromNbt(PreFlatteningChunk(), options).IsFullyGenerated);
+            Assert.False(Chunk.FromNbt(legacy).IsFullyGenerated);
+        }
+
+        [Fact]
+        public void Statusが文字列でないチャンクは生成済みとみなさない()
+        {
+            NbtCompound root = Biomes2DVector();
+            root.GetCompound("Level").SetInt("Status", 1);
+            Chunk chunk = Chunk.FromNbt(root);
+
+            // 生成段階の取得子は、いまと同じく型の違いをエラーにする
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.Status);
+            Assert.Equal(ErrorCode.UnexpectedTagType, error.Code);
+            Assert.False(chunk.IsFullyGenerated);
+        }
+
+        [Fact]
         public void DataVersionの無いチャンクは元のNBTだけを持つ()
         {
             NbtCompound root = ChunkWithoutDataVersion();

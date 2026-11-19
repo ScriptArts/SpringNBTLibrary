@@ -1783,6 +1783,29 @@ class WorldTest {
         }
 
         @Test
+        void Statusの無いチャンクは生成済みとみなさない() {
+            ChunkReadOptions options = new ChunkReadOptions().setOnVersionMismatch(VersionMismatchAction.IGNORE);
+            NbtCompound legacy = biomes2DVector();
+            legacy.getCompound("Level").remove("Status");
+
+            // 1.13より前のチャンクはStatusを持たない
+            assertFalse(Chunk.fromNbt(preFlatteningChunk(), options).isFullyGenerated());
+            assertFalse(Chunk.fromNbt(legacy, ChunkReadOptions.defaults()).isFullyGenerated());
+        }
+
+        @Test
+        void Statusが文字列でないチャンクは生成済みとみなさない() {
+            NbtCompound root = biomes2DVector();
+            root.getCompound("Level").setInt("Status", 1);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+
+            // 生成段階の取得子は、いまと同じく型の違いをエラーにする
+            SpringNbtException error = assertThrows(SpringNbtException.class, chunk::status);
+            assertEquals(ErrorCode.UNEXPECTED_TAG_TYPE, error.code());
+            assertFalse(chunk.isFullyGenerated());
+        }
+
+        @Test
         void DataVersionの無いチャンクは元のNBTだけを持つ() {
             NbtCompound root = chunkWithoutDataVersion();
             byte[] before = chunkBytes(root);

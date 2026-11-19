@@ -1538,6 +1538,27 @@ class TestLegacyChunk:
 
         assert not Chunk.from_nbt(root).is_fully_generated
 
+    def test_Statusの無いチャンクは生成済みとみなさない(self):
+        options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.IGNORE)
+        legacy = biomes_2d_vector()
+        legacy.get_compound("Level").remove("Status")
+
+        # 1.13より前のチャンクはStatusを持たない
+        assert not Chunk.from_nbt(pre_flattening_chunk(), options).is_fully_generated
+        assert not Chunk.from_nbt(legacy).is_fully_generated
+
+    def test_Statusが文字列でないチャンクは生成済みとみなさない(self):
+        root = biomes_2d_vector()
+        root.get_compound("Level").set_int("Status", 1)
+        chunk = Chunk.from_nbt(root)
+
+        # 生成段階の取得子は、いまと同じく型の違いをエラーにする
+        with pytest.raises(SpringNbtError) as error:
+            chunk.status
+
+        assert error.value.code == ErrorCode.UNEXPECTED_TAG_TYPE
+        assert not chunk.is_fully_generated
+
     def test_DataVersionの無いチャンクは元のNBTだけを持つ(self):
         root = pre_flattening_chunk()
         root.remove("DataVersion")

@@ -164,12 +164,23 @@ public sealed class Chunk
 
     /// <summary>生成が完了しているか
     /// ブロック改変の対象にしてよいのはこれだけ</summary>
-    /// <remarks>1.14までの形式では、1.13の<c>postprocessed</c>と<c>fullchunk</c>も生成済みとみなす</remarks>
+    /// <remarks>1.14までの形式では、1.13の<c>postprocessed</c>と<c>fullchunk</c>も生成済みとみなす
+    /// <c>Status</c>が無いか文字列でないチャンク（1.13より前のものなど）は生成済みとみなさない</remarks>
     public bool IsFullyGenerated
     {
         get
         {
-            string status = Status;
+            string status;
+
+            // 1.13より前のチャンクなど、Statusを文字列として読めないものは生成済みとみなさない
+            try
+            {
+                status = Status;
+            }
+            catch (SpringNbtException)
+            {
+                return false;
+            }
 
             // 名前空間の有無はバージョンで違うので、外してから比べる
             if (status.StartsWith(MinecraftNamespace, StringComparison.Ordinal))

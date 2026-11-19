@@ -395,9 +395,22 @@ export class Chunk {
    * ブロック改変の対象にしてよいのはこれだけ
    *
    * 1.14までの形式では、1.13の`postprocessed`と`fullchunk`も生成済みとみなす
+   * `Status`が無いか文字列でないチャンク（1.13より前のものなど）は生成済みとみなさない
    */
   get isFullyGenerated(): boolean {
-    let status = this.status;
+    let status: string;
+
+    // 1.13より前のチャンクなど、Statusを文字列として読めないものは生成済みとみなさない
+    try {
+      status = this.status;
+    } catch (error) {
+      // ライブラリのエラー以外は、そのまま呼び出し元へ伝える
+      if (!(error instanceof SpringNbtError)) {
+        throw error;
+      }
+
+      return false;
+    }
 
     // 名前空間の有無はバージョンで違うので、外してから比べる
     if (status.startsWith(MINECRAFT_NAMESPACE)) {

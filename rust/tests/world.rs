@@ -1933,6 +1933,33 @@ fn 形式が1_15ならpostprocessedを生成済みとみなさない() {
 }
 
 #[test]
+fn statusの無いチャンクは生成済みとみなさない() {
+    let options = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Ignore,
+        ..ChunkReadOptions::default()
+    };
+    let mut legacy = biomes_2d_vector();
+    update_level(&mut legacy, |level| {
+        level.remove("Status");
+    });
+
+    // 1.13より前のチャンクはStatusを持たない
+    assert!(!Chunk::from_nbt(pre_flattening_chunk(), &options).unwrap().is_fully_generated());
+    assert!(!Chunk::from_nbt(legacy, &ChunkReadOptions::default()).unwrap().is_fully_generated());
+}
+
+#[test]
+fn statusが文字列でないチャンクは生成済みとみなさない() {
+    let mut root = biomes_2d_vector();
+    update_level(&mut root, |level| level.set_int("Status", 1));
+    let chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    // 生成段階の取得子は、いまと同じく型の違いをエラーにする
+    assert_eq!(ErrorCode::UnexpectedTagType, chunk.status().unwrap_err().code());
+    assert!(!chunk.is_fully_generated());
+}
+
+#[test]
 fn data_versionの無いチャンクは元のnbtだけを持つ() {
     let mut root = pre_flattening_chunk();
     root.remove("DataVersion");

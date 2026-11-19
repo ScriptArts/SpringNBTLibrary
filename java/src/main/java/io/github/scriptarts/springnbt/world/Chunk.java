@@ -169,11 +169,19 @@ public final class Chunk {
      * ブロック改変の対象にしてよいのはこれだけ
      *
      * <p>1.14までの形式では、1.13の{@code postprocessed}と{@code fullchunk}も生成済みとみなす
+     * {@code Status}が無いか文字列でないチャンク（1.13より前のものなど）は生成済みとみなさない
      *
      * @return 完了していればtrue
      */
     public boolean isFullyGenerated() {
-        String status = status();
+        String status;
+
+        // 1.13より前のチャンクなど、Statusを文字列として読めないものは生成済みとみなさない
+        try {
+            status = status();
+        } catch (SpringNbtException error) {
+            return false;
+        }
 
         // 名前空間の有無はバージョンで違うので、外してから比べる
         if (status.startsWith(MINECRAFT_NAMESPACE)) {

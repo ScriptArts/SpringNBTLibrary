@@ -1651,6 +1651,28 @@ test("LegacyChunk: 形式が 1.15 なら postprocessed を生成済みとみな�
   assert.equal(Chunk.fromNbt(root).isFullyGenerated, false);
 });
 
+test("LegacyChunk: Statusの無いチャンクは生成済みとみなさない", () => {
+  const legacy = biomes2DVector();
+  legacy.getCompound("Level").remove("Status");
+  const preFlattening = Chunk.fromNbt(preFlatteningChunk(), {
+    onVersionMismatch: VersionMismatchAction.Ignore,
+  });
+
+  // 1.13より前のチャンクはStatusを持たない
+  assert.equal(preFlattening.isFullyGenerated, false);
+  assert.equal(Chunk.fromNbt(legacy).isFullyGenerated, false);
+});
+
+test("LegacyChunk: Statusが文字列でないチャンクは生成済みとみなさない", () => {
+  const root = biomes2DVector();
+  root.getCompound("Level").setInt("Status", 1);
+  const chunk = Chunk.fromNbt(root);
+
+  // 生成段階の取得子は、いまと同じく型の違いをエラーにする
+  assertErrorCode(ErrorCode.UnexpectedTagType, () => chunk.status);
+  assert.equal(chunk.isFullyGenerated, false);
+});
+
 test("LegacyChunk: DataVersion の無いチャンクは元の NBT だけを持つ", () => {
   const root = chunkWithoutDataVersion();
   const before = chunkBytes(root);

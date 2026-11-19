@@ -455,7 +455,9 @@ impl Chunk {
     /// ブロック改変の対象にしてよいのはこれだけ
     ///
     /// 1.14までの形式では、1.13の`postprocessed`と`fullchunk`も生成済みとみなす
+    /// `Status`が無いか文字列でないチャンク（1.13より前のものなど）は生成済みとみなさない
     pub fn is_fully_generated(&self) -> bool {
+        // 1.13より前のチャンクなど、Statusを文字列として読めないものは生成済みとみなさない
         let status = match self.status() {
             Ok(status) => status,
             Err(_) => return false,
