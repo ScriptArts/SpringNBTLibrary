@@ -94,6 +94,8 @@ pub struct PalettedContainer {
     entry_count: usize,
     min_bits: usize,
     storage: Option<BitStorage>,
+    spanning: bool,
+    always_has_data: bool,
 }
 
 impl PalettedContainer {
@@ -130,6 +132,8 @@ impl PalettedContainer {
             entry_count,
             min_bits,
             storage: None,
+            spanning: false,
+            always_has_data: false,
         }
     }
 
@@ -152,8 +156,31 @@ impl PalettedContainer {
         // 異種リストの包みだけは外しておき、書くときに包み直す
         let palette: Vec<NbtTag> = palette_tag.iter().map(|entry| unwrap_list_element(entry).clone()).collect();
 
-        let data = match nbt.opt_long_array("data")? {
-            Some(values) => values.to_vec(),
+        let data = nbt.opt_long_array("data")?.map(|values| values.to_vec());
+
+        Self::from_parts(palette, data, entry_count, min_bits, false, false, lenient_bit_storage)
+    }
+
+    /// パレットとdataから作る
+    /// 1.13から1.15までの詰め方や、dataが必ず書かれる形式を読むための入口
+    ///
+    /// `palette`は異種リストの包みを外したものを渡す
+    #[allow(dead_code)] // 読み込み側から使われるまでは、テストだけが呼ぶ
+    pub(crate) fn from_parts(
+        palette: Vec<NbtTag>,
+        data: Option<Vec<i64>>,
+        entry_count: usize,
+        min_bits: usize,
+        spanning: bool,
+        always_has_data: bool,
+        lenient_bit_storage: bool,
+    ) -> Result<PalettedContainer> {
+        if palette.is_empty() {
+            return Err(Error::new(ErrorCode::MalformedData, "palette が無いか空"));
+        }
+
+        let data = match data {
+            Some(values) => values,
             None => {
                 // パレットが1要素ならdataは無くてよい
                 if palette.len() != 1 {
@@ -168,12 +195,15 @@ impl PalettedContainer {
                     entry_count,
                     min_bits,
                     storage: None,
+                    spanning,
+                    always_has_data,
                 });
             }
         };
 
         let bits = min_bits.max(ceil_log2(palette.len()));
-        let storage = BitStorage::from_longs(data, bits, entry_count, lenient_bit_storage)?;
+        let storage =
+            BitStorage::from_longs_with(data, bits, entry_count, lenient_bit_storage, spanning)?;
 
         // 取り出した添字がパレットの範囲に収まっているか確かめる
         // エラーを出さずに0番目で代替すると、おかしくなったデータをそうと分からない形で書き戻してしまう
@@ -196,7 +226,33 @@ impl PalettedContainer {
             entry_count,
             min_bits,
             storage: Some(storage),
+            spanning,
+            always_has_data,
         })
+    }
+
+    /// パレットとdataに分けて返す
+    /// パレットの要素は異種リストの包みを掛けないまま返す
+    /// dataは、パレットが1要素なら（`always_has_data`でない限り）`None`
+    #[allow(dead_code)] // 書き込み側から使われるまでは、テストだけが呼ぶ
+    pub(crate) fn to_parts(&self) -> Result<(Vec<NbtTag>, Option<Vec<i64>>)> {
+        let entries = self.palette.clone();
+
+        // パレットが2要素以上なら、記憶域をそのまま返す
+        if let Some(storage) = &self.storage {
+            if self.palette.len() > 1 {
+                return Ok((entries, Some(storage.to_longs())));
+            }
+        }
+
+        // 1要素でもdataを書く形式なら、記憶域が無くてもゼロで埋めた配列を作る
+        if self.always_has_data {
+            let bits = self.min_bits.max(ceil_log2(self.palette.len()));
+            let zeroed = BitStorage::create_with(bits, self.entry_count, self.spanning)?;
+            return Ok((entries, Some(zeroed.into_longs())));
+        }
+
+        Ok((entries, None))
     }
 
     /// NBTへ変換する
@@ -292,7 +348,7 @@ impl PalettedContainer {
         }
 
         let new_bits = self.min_bits.max(ceil_log2(compacted.len()));
-        let mut rebuilt = BitStorage::create(new_bits, self.entry_count)?;
+        let mut rebuilt = BitStorage::create_with(new_bits, self.entry_count, self.spanning)?;
 
         // 新しい添字へ置き換えながら詰め直す
         for index in 0..self.entry_count {
@@ -333,7 +389,7 @@ impl PalettedContainer {
         match &self.storage {
             None => {
                 // これまで単一値だったので、全エントリが0番目のまま始まる
-                self.storage = Some(BitStorage::create(required, self.entry_count)?);
+                self.storage = Some(BitStorage::create_with(required, self.entry_count, self.spanning)?);
                 Ok(())
             }
             Some(storage) => {
@@ -357,5 +413,67 @@ impl PalettedContainer {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nbt::tag::NbtString;
+
+    fn block_entry(name: &str) -> NbtTag {
+        NbtTag::String(NbtString::new(name))
+    }
+
+    #[test]
+    fn またぐ詰め方のコンテナは17種類目でビット幅が5になる() {
+        let palette: Vec<NbtTag> =
+            (0..16).map(|index| block_entry(&format!("minecraft:block_{index}"))).collect();
+        let mut container =
+            PalettedContainer::from_parts(palette, Some(vec![0; 256]), 4096, 4, true, false, false)
+                .unwrap();
+        assert_eq!(4, container.bits_per_entry());
+
+        // 全エントリに位置由来の値を書いてから、17種類目を1つ足す
+        for index in 0..4096 {
+            container.set(index, block_entry(&format!("minecraft:block_{}", index % 16))).unwrap();
+        }
+
+        container.set(7, block_entry("minecraft:block_16")).unwrap();
+        assert_eq!(5, container.bits_per_entry());
+        assert_eq!(320, container.to_parts().unwrap().1.unwrap().len());
+
+        // 位置7以外は元の値のまま読めることを確かめる
+        for index in 0..4096 {
+            let mut expected = format!("minecraft:block_{}", index % 16);
+
+            // 7番だけが17種類目に置き換わっている
+            if index == 7 {
+                expected = "minecraft:block_16".to_string();
+            }
+
+            assert_eq!(&block_entry(&expected), container.get(index).unwrap());
+        }
+    }
+
+    #[test]
+    fn dataが必ず書かれる形式なら_1要素のパレットでもビット幅4のdataを返す() {
+        // またがない詰め方とまたぐ詰め方の両方で、長さは256になる
+        for spanning in [false, true] {
+            let container = PalettedContainer::from_parts(
+                vec![block_entry("minecraft:air")],
+                None,
+                4096,
+                4,
+                spanning,
+                true,
+                false,
+            )
+            .unwrap();
+
+            let (palette, data) = container.to_parts().unwrap();
+            assert_eq!(1, palette.len());
+            assert_eq!(256, data.unwrap().len());
+        }
     }
 }

@@ -12,7 +12,7 @@ Minecraftはこうした異種リストをCompoundのリストとして保存し
 
 from __future__ import annotations
 
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 from ..errors import SpringNbtError
 from ..nbt import NbtCompound, NbtList, NbtLongArray, NbtTag, TagType
@@ -88,13 +88,15 @@ def _palette_to_list(entries: Sequence[NbtTag]) -> NbtList:
 class PalettedContainer:
     """パレット付きのコンテナ"""
 
-    __slots__ = ("_palette", "entry_count", "min_bits", "_storage")
+    __slots__ = ("_palette", "entry_count", "min_bits", "_storage", "_spanning", "_always_has_data")
 
     def __init__(self, entry_count: int, min_bits: int) -> None:
         self._palette: List[NbtTag] = []
         self.entry_count = entry_count
         self.min_bits = min_bits
         self._storage: Optional[BitStorage] = None
+        self._spanning = False
+        self._always_has_data = False
 
     @property
     def palette(self) -> Sequence[NbtTag]:
@@ -127,7 +129,6 @@ class PalettedContainer:
 
         :raises SpringNbtError: パレットが空、dataの長さが合わない、添字がパレット範囲外のいずれか
         """
-        result = PalettedContainer(entry_count, min_bits)
         palette_tag = nbt.opt_list("palette")
 
         if palette_tag is None or len(palette_tag) == 0:
@@ -136,10 +137,28 @@ class PalettedContainer:
         # パレットの要素は生のNbtTagのまま持つ
         # 並び順まで元どおりに書き戻すため
         # 異種リストの包みだけは外しておき、書くときに包み直す
-        for entry in palette_tag:
-            result._palette.append(_unwrap_list_element(entry))
+        entries = [_unwrap_list_element(entry) for entry in palette_tag]
 
-        data = nbt.opt_long_array("data")
+        return PalettedContainer._from_parts(
+            entries, nbt.opt_long_array("data"), entry_count, min_bits,
+            False, False, lenient_bit_storage)
+
+    @staticmethod
+    def _from_parts(palette: Sequence[NbtTag], data: Optional[List[int]], entry_count: int,
+                    min_bits: int, spanning: bool, always_has_data: bool,
+                    lenient_bit_storage: bool) -> "PalettedContainer":
+        """パレットとdataから作る（内部用）
+        1.13から1.15までの詰め方や、dataが必ず書かれる形式を読むための入口
+
+        :raises SpringNbtError: パレットが空、dataの長さが合わない、添字がパレット範囲外のいずれか
+        """
+        if len(palette) == 0:
+            raise SpringNbtError.malformed("palette が無いか空")
+
+        result = PalettedContainer(entry_count, min_bits)
+        result._spanning = spanning
+        result._always_has_data = always_has_data
+        result._palette.extend(palette)
 
         if data is None:
             # パレットが1要素ならdataは無くてよい
@@ -150,7 +169,8 @@ class PalettedContainer:
             return result
 
         bits = max(min_bits, ceil_log2(len(result._palette)))
-        result._storage = BitStorage.from_longs(data, bits, entry_count, lenient_bit_storage)
+        result._storage = BitStorage._from_longs_with(
+            data, bits, entry_count, lenient_bit_storage, spanning)
 
         # 取り出した添字がパレットの範囲に収まっているか確かめる
         # エラーを出さずに0番目で代替すると、おかしくなったデータをそうと分からない形で書き戻してしまう
@@ -163,6 +183,25 @@ class PalettedContainer:
                     % (index, value, len(result._palette)))
 
         return result
+
+    def _to_parts(self) -> Tuple[List[NbtTag], Optional[List[int]]]:
+        """パレットとdataに分けて返す（内部用）
+        パレットの要素は異種リストの包みを掛けないまま返す
+        dataは、パレットが1要素なら（``always_has_data``でない限り）None
+        """
+        entries = list(self._palette)
+
+        # パレットが2要素以上なら、記憶域をそのまま返す
+        if self._storage is not None and len(self._palette) > 1:
+            return entries, self._storage.to_longs()
+
+        # 1要素でもdataを書く形式なら、記憶域が無くてもゼロで埋めた配列を作る
+        if self._always_has_data:
+            bits = max(self.min_bits, ceil_log2(len(self._palette)))
+            zeroed = BitStorage._create_with(bits, self.entry_count, self._spanning)
+            return entries, zeroed.to_longs()
+
+        return entries, None
 
     def to_nbt(self) -> NbtCompound:
         """NBTへ変換する"""
@@ -240,7 +279,7 @@ class PalettedContainer:
             return
 
         new_bits = max(self.min_bits, ceil_log2(len(compacted)))
-        rebuilt = BitStorage.create(new_bits, self.entry_count)
+        rebuilt = BitStorage._create_with(new_bits, self.entry_count, self._spanning)
 
         # 新しい添字へ置き換えながら詰め直す
         for index in range(self.entry_count):
@@ -272,7 +311,7 @@ class PalettedContainer:
 
         if self._storage is None:
             # これまで単一値だったので、全エントリが0番目のまま始まる
-            self._storage = BitStorage.create(required, self.entry_count)
+            self._storage = BitStorage._create_with(required, self.entry_count, self._spanning)
             return
 
         if self._storage.bits_per_entry >= required:

@@ -394,6 +394,25 @@ class WorldTest {
         }
 
         @Test
+        void またぐ詰め方で長さが合う() {
+            assertEquals(320, BitStorage.longCount(5, 4096, true));
+            assertEquals(256, BitStorage.longCount(4, 4096, true));
+        }
+
+        @Test
+        void またぐ詰め方では値が64bitの境目をまたいで並ぶ() {
+            BitStorage storage = BitStorage.create(5, 4096, true);
+
+            // 添字12はビット60から64までなので、data[0]の上位4bitとdata[1]の最下位bitに分かれる
+            storage.set(12, 0b10111);
+            long[] longs = storage.toLongs();
+
+            assertEquals(0b0111L, (longs[0] >>> 60) & 0b1111L);
+            assertEquals(1L, longs[1] & 1L);
+            assertEquals(0b10111, storage.get(12));
+        }
+
+        @Test
         void long境界を跨がずに詰める() {
             BitStorage storage = BitStorage.create(5, 4096);
 
@@ -468,6 +487,49 @@ class WorldTest {
         @CsvSource({"1,0", "2,1", "4,2", "5,3", "17,5"})
         void 必要ビット数はceilLog2(int count, int expected) {
             assertEquals(expected, PalettedContainer.ceilLog2(count));
+        }
+
+        @Test
+        void またぐ詰め方のコンテナは17種類目でビット幅が5になる() {
+            List<NbtTag> palette = new ArrayList<>();
+
+            for (int index = 0; index < 16; index++) {
+                palette.add(blockEntry("minecraft:block_" + index));
+            }
+
+            PalettedContainer container = PalettedContainer.fromParts(
+                    palette, new long[256], 4096, 4, true, false, false);
+            assertEquals(4, container.bitsPerEntry());
+
+            // 全エントリに位置由来の値を書いてから、17種類目を1つ足す
+            for (int index = 0; index < 4096; index++) {
+                container.set(index, blockEntry("minecraft:block_" + (index % 16)));
+            }
+
+            container.set(7, blockEntry("minecraft:block_16"));
+            assertEquals(5, container.bitsPerEntry());
+            assertEquals(320, container.toParts().data().length);
+
+            for (int index = 0; index < 4096; index++) {
+                String expected = "minecraft:block_" + (index % 16);
+
+                if (index == 7) {
+                    expected = "minecraft:block_16";
+                }
+
+                assertEquals(new NbtString(expected), container.get(index));
+            }
+        }
+
+        @ParameterizedTest
+        @ValueSource(booleans = {false, true})
+        void dataが必ず書かれる形式なら1要素のパレットでもビット幅4のdataを返す(boolean spanning) {
+            PalettedContainer container = PalettedContainer.fromParts(
+                    List.of(blockEntry("minecraft:air")), null, 4096, 4, spanning, true, false);
+
+            PalettedContainer.Parts parts = container.toParts();
+            assertEquals(1, parts.palette().size());
+            assertEquals(256, parts.data().length);
         }
 
         @Test

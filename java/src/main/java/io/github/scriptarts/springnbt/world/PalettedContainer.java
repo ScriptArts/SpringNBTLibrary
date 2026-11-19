@@ -28,12 +28,25 @@ public final class PalettedContainer {
     private final List<NbtTag> palette = new ArrayList<>();
     private final int entryCount;
     private final int minBits;
+    private final boolean spanning;
+    private final boolean alwaysHasData;
 
     private BitStorage storage;
 
-    private PalettedContainer(int entryCount, int minBits) {
+    private PalettedContainer(int entryCount, int minBits, boolean spanning, boolean alwaysHasData) {
         this.entryCount = entryCount;
         this.minBits = minBits;
+        this.spanning = spanning;
+        this.alwaysHasData = alwaysHasData;
+    }
+
+    /**
+     * パレットとdataに分けた結果
+     *
+     * @param palette パレットの要素
+     * @param data    packedな配列（無ければnull）
+     */
+    record Parts(List<NbtTag> palette, long[] data) {
     }
 
     /**
@@ -90,7 +103,7 @@ public final class PalettedContainer {
      */
     public static PalettedContainer filled(NbtTag value, int entryCount, int minBits) {
         Objects.requireNonNull(value, "value");
-        PalettedContainer result = new PalettedContainer(entryCount, minBits);
+        PalettedContainer result = new PalettedContainer(entryCount, minBits, false, false);
         result.palette.add(value);
         return result;
     }
@@ -108,7 +121,6 @@ public final class PalettedContainer {
     public static PalettedContainer fromNbt(
             NbtCompound nbt, int entryCount, int minBits, boolean lenientBitStorage) {
         Objects.requireNonNull(nbt, "nbt");
-        PalettedContainer result = new PalettedContainer(entryCount, minBits);
         NbtList paletteTag = nbt.optList("palette");
 
         if (paletteTag == null || paletteTag.size() == 0) {
@@ -118,11 +130,41 @@ public final class PalettedContainer {
         // パレットの要素は生のNbtTagのまま持つ
         // 並び順まで元どおりに書き戻すため
         // 異種リストの包みだけは外しておき、書くときに包み直す
+        List<NbtTag> entries = new ArrayList<>();
+
+        // 包みを外しながら、パレットの要素を順に集める
         for (NbtTag entry : paletteTag) {
-            result.palette.add(unwrapListElement(entry));
+            entries.add(unwrapListElement(entry));
         }
 
-        long[] data = nbt.optLongArray("data");
+        return fromParts(entries, nbt.optLongArray("data"), entryCount, minBits, false, false,
+                lenientBitStorage);
+    }
+
+    /**
+     * パレットとdataから作る
+     * 1.13から1.15までの詰め方や、dataが必ず書かれる形式を読むための入口
+     *
+     * @param palette           パレットの要素（異種リストの包みは外してあること）
+     * @param data              packedな配列（無ければnull）
+     * @param entryCount        エントリ数
+     * @param minBits           ビット幅の下限
+     * @param spanning          64bitの境目をまたいで詰めるか
+     * @param alwaysHasData     パレットが1要素でもdataを書く形式か
+     * @param lenientBitStorage dataの長さが合わないとき、長さから逆算するか
+     * @return コンテナ
+     * @throws SpringNbtException パレットが空、dataの長さが合わない、添字がパレット範囲外のいずれか
+     */
+    static PalettedContainer fromParts(List<NbtTag> palette, long[] data, int entryCount, int minBits,
+            boolean spanning, boolean alwaysHasData, boolean lenientBitStorage) {
+        Objects.requireNonNull(palette, "palette");
+
+        if (palette.isEmpty()) {
+            throw SpringNbtException.malformed("palette が無いか空");
+        }
+
+        PalettedContainer result = new PalettedContainer(entryCount, minBits, spanning, alwaysHasData);
+        result.palette.addAll(palette);
 
         if (data == null) {
             // パレットが1要素ならdataは無くてよい
@@ -135,7 +177,7 @@ public final class PalettedContainer {
         }
 
         int bits = Math.max(minBits, ceilLog2(result.palette.size()));
-        result.storage = BitStorage.fromLongs(data, bits, entryCount, lenientBitStorage);
+        result.storage = BitStorage.fromLongs(data, bits, entryCount, lenientBitStorage, spanning);
 
         // 取り出した添字がパレットの範囲に収まっているか確かめる
         // エラーを出さずに0番目で代替すると、おかしくなったデータをそうと分からない形で書き戻してしまう
@@ -149,6 +191,30 @@ public final class PalettedContainer {
         }
 
         return result;
+    }
+
+    /**
+     * パレットとdataに分けて返す
+     * パレットの要素は異種リストの包みを掛けないまま返す
+     * dataは、パレットが1要素なら（{@code alwaysHasData}でない限り）null
+     *
+     * @return パレットとdata
+     */
+    Parts toParts() {
+        List<NbtTag> entries = new ArrayList<>(palette);
+
+        // パレットが2要素以上なら、記憶域をそのまま返す
+        if (storage != null && palette.size() > 1) {
+            return new Parts(entries, storage.toLongs());
+        }
+
+        // 1要素でもdataを書く形式なら、記憶域が無くてもゼロで埋めた配列を作る
+        if (alwaysHasData) {
+            int bits = Math.max(minBits, ceilLog2(palette.size()));
+            return new Parts(entries, BitStorage.create(bits, entryCount, spanning).toLongs());
+        }
+
+        return new Parts(entries, null);
     }
 
     /**
@@ -320,7 +386,7 @@ public final class PalettedContainer {
         }
 
         int newBits = Math.max(minBits, ceilLog2(compacted.size()));
-        BitStorage rebuilt = BitStorage.create(newBits, entryCount);
+        BitStorage rebuilt = BitStorage.create(newBits, entryCount, spanning);
 
         // 新しい添字へ置き換えながら詰め直す
         for (int index = 0; index < entryCount; index++) {
@@ -360,7 +426,7 @@ public final class PalettedContainer {
 
         if (storage == null) {
             // これまで単一値だったので、全エントリが0番目のまま始まる
-            storage = BitStorage.create(required, entryCount);
+            storage = BitStorage.create(required, entryCount, spanning);
             return;
         }
 

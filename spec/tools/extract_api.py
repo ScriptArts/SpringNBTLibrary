@@ -724,8 +724,24 @@ def extract_typescript() -> Api:
         in_enum = False
         in_interface = False
         in_constructor = False
+        internal_pending = False
 
         for line in read_lines(path):
+            stripped = line.strip()
+
+            # JSDocに@internalを書いたメンバは、公開しない内部の入口なので一覧へ入れない
+            # コメントの行を読み飛ばしながら、次のコード行までその印を持ち越す
+            if "@internal" in stripped:
+                internal_pending = True
+                continue
+
+            if internal_pending and stripped != "" and not stripped.startswith(("/**", "*", "//")):
+                internal_pending = False
+
+                # constructorの引数プロパティは公開なので、constructorには印を効かせない
+                if "constructor" not in stripped:
+                    continue
+
             type_match = TS_TYPE.match(line)
 
             if type_match is not None:

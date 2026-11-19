@@ -346,6 +346,23 @@ test("BitStorage: 必要な long 数は跨ぎなしで求まる", () => {
   assert.equal(BitStorage.longCount(6, 64), 7);
 });
 
+test("BitStorage: またぐ詰め方で long 数が合う", () => {
+  assert.equal(BitStorage.longCountWith(5, 4096, true), 320);
+  assert.equal(BitStorage.longCountWith(4, 4096, true), 256);
+});
+
+test("BitStorage: またぐ詰め方では値が 64bit の境目をまたいで並ぶ", () => {
+  const storage = BitStorage.createWith(5, 4096, true);
+
+  // 添字12はビット60から64までなので、data[0]の上位4bitとdata[1]の最下位bitに分かれる
+  storage.set(12, 0b10111);
+  const longs = storage.toLongs();
+
+  assert.equal((BigInt.asUintN(64, longs[0]) >> 60n) & 0b1111n, 0b0111n);
+  assert.equal(longs[1] & 1n, 1n);
+  assert.equal(storage.get(12), 0b10111);
+});
+
 test("BitStorage: 書いた値をそのまま読み出せる", () => {
   const storage = BitStorage.create(5, 4096);
 
@@ -421,6 +438,62 @@ test("PalettedContainer: 必要ビット数は ceilLog2", () => {
   assert.equal(ceilLog2(5), 3);
   assert.equal(ceilLog2(17), 5);
 });
+
+test("PalettedContainer: またぐ詰め方のコンテナは17種類目でビット幅が5になる", () => {
+  const palette: NbtTag[] = [];
+
+  for (let index = 0; index < 16; index++) {
+    palette.push(blockEntry(`minecraft:block_${index}`));
+  }
+
+  const container = PalettedContainer.fromParts(
+    palette,
+    new BigInt64Array(256),
+    4096,
+    4,
+    true,
+    false,
+    false,
+  );
+  assert.equal(container.bitsPerEntry, 4);
+
+  // 全エントリに位置由来の値を書いてから、17種類目を1つ足す
+  for (let index = 0; index < 4096; index++) {
+    container.set(index, blockEntry(`minecraft:block_${index % 16}`));
+  }
+
+  container.set(7, blockEntry("minecraft:block_16"));
+  assert.equal(container.bitsPerEntry, 5);
+  assert.equal(container.toParts().data?.length, 320);
+
+  for (let index = 0; index < 4096; index++) {
+    let expected = `minecraft:block_${index % 16}`;
+
+    if (index === 7) {
+      expected = "minecraft:block_16";
+    }
+
+    assert.deepEqual(container.get(index), new NbtString(expected));
+  }
+});
+
+for (const spanning of [false, true]) {
+  test(`PalettedContainer: dataが必ず書かれる形式なら1要素のパレットでもビット幅4のdataを返す（spanning=${spanning}）`, () => {
+    const container = PalettedContainer.fromParts(
+      [blockEntry("minecraft:air")],
+      undefined,
+      4096,
+      4,
+      spanning,
+      true,
+      false,
+    );
+
+    const parts = container.toParts();
+    assert.equal(parts.palette.length, 1);
+    assert.equal(parts.data?.length, 256);
+  });
+}
 
 test("PalettedContainer: 単一値のコンテナは data を持たない", () => {
   const container = PalettedContainer.filled(blockEntry("minecraft:air"), 4096, 4);

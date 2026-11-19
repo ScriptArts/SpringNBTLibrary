@@ -335,6 +335,21 @@ class TestBitStorage:
     def test_必要なlong数は跨ぎなしで求まる(self, bits, entry_count, expected):
         assert BitStorage.long_count(bits, entry_count) == expected
 
+    def test_またぐ詰め方で長さが合う(self):
+        assert BitStorage._long_count_with(5, 4096, True) == 320
+        assert BitStorage._long_count_with(4, 4096, True) == 256
+
+    def test_またぐ詰め方では値が64bitの境目をまたいで並ぶ(self):
+        storage = BitStorage._create_with(5, 4096, True)
+
+        # 添字12はビット60から64までなので、data[0]の上位4bitとdata[1]の最下位bitに分かれる
+        storage.set(12, 0b10111)
+        longs = storage.to_longs()
+
+        assert ((longs[0] & 0xFFFFFFFFFFFFFFFF) >> 60) & 0b1111 == 0b0111
+        assert longs[1] & 1 == 1
+        assert storage.get(12) == 0b10111
+
     def test_書いた値をそのまま読み出せる(self):
         storage = BitStorage.create(5, 4096)
 
@@ -405,6 +420,37 @@ class TestPalettedContainer:
     @pytest.mark.parametrize("count,expected", [(1, 0), (2, 1), (4, 2), (5, 3), (17, 5)])
     def test_必要ビット数はceil_log2(self, count, expected):
         assert ceil_log2(count) == expected
+
+    def test_またぐ詰め方のコンテナは17種類目でビット幅が5になる(self):
+        palette = [block_entry("minecraft:block_%d" % index) for index in range(16)]
+        container = PalettedContainer._from_parts(
+            palette, [0] * 256, 4096, 4, True, False, False)
+        assert container.bits_per_entry == 4
+
+        # 全エントリに位置由来の値を書いてから、17種類目を1つ足す
+        for index in range(4096):
+            container.set(index, block_entry("minecraft:block_%d" % (index % 16)))
+
+        container.set(7, block_entry("minecraft:block_16"))
+        assert container.bits_per_entry == 5
+        assert len(container._to_parts()[1]) == 320
+
+        for index in range(4096):
+            expected = "minecraft:block_%d" % (index % 16)
+
+            if index == 7:
+                expected = "minecraft:block_16"
+
+            assert container.get(index) == block_entry(expected)
+
+    @pytest.mark.parametrize("spanning", [False, True])
+    def test_dataが必ず書かれる形式なら1要素のパレットでもビット幅4のdataを返す(self, spanning):
+        container = PalettedContainer._from_parts(
+            [block_entry("minecraft:air")], None, 4096, 4, spanning, True, False)
+
+        palette, data = container._to_parts()
+        assert len(palette) == 1
+        assert len(data) == 256
 
     def test_単一値のコンテナはdataを持たない(self):
         container = PalettedContainer.filled(block_entry("minecraft:air"), 4096, 4)

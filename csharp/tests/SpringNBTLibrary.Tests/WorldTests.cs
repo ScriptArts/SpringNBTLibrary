@@ -383,6 +383,27 @@ public class WorldTests
         }
 
         [Fact]
+        public void またぐ詰め方で長さが合う()
+        {
+            Assert.Equal(320, BitStorage.LongCount(5, 4096, true));
+            Assert.Equal(256, BitStorage.LongCount(4, 4096, true));
+        }
+
+        [Fact]
+        public void またぐ詰め方では値が64bitの境目をまたいで並ぶ()
+        {
+            BitStorage storage = BitStorage.Create(5, 4096, true);
+
+            // 添字12はビット60から64までなので、data[0]の上位4bitとdata[1]の最下位bitに分かれる
+            storage.Set(12, 0b10111);
+            long[] longs = storage.ToLongs();
+
+            Assert.Equal(0b0111L, (long)((ulong)longs[0] >> 60) & 0b1111L);
+            Assert.Equal(1L, longs[1] & 1L);
+            Assert.Equal(0b10111, storage.Get(12));
+        }
+
+        [Fact]
         public void 書いた値をそのまま読み出せる()
         {
             BitStorage storage = BitStorage.Create(5, 4096);
@@ -489,6 +510,57 @@ public class WorldTests
         public void 必要ビット数はceil_log2(int count, int expected)
         {
             Assert.Equal(expected, PalettedContainer.CeilLog2(count));
+        }
+
+        [Fact]
+        public void またぐ詰め方のコンテナは17種類目でビット幅が5になる()
+        {
+            List<NbtTag> palette = new List<NbtTag>();
+
+            for (int index = 0; index < 16; index++)
+            {
+                palette.Add(BlockEntry("minecraft:block_" + index));
+            }
+
+            PalettedContainer container = PalettedContainer.FromParts(
+                palette, new long[256], 4096, 4, true, false, false);
+            Assert.Equal(4, container.BitsPerEntry);
+
+            // 全エントリに位置由来の値を書いてから、17種類目を1つ足す
+            for (int index = 0; index < 4096; index++)
+            {
+                container.Set(index, BlockEntry("minecraft:block_" + (index % 16)));
+            }
+
+            container.Set(7, BlockEntry("minecraft:block_16"));
+            Assert.Equal(5, container.BitsPerEntry);
+            Assert.Equal(320, container.ToParts().Data!.Length);
+
+            for (int index = 0; index < 4096; index++)
+            {
+                string expected = "minecraft:block_" + (index % 16);
+
+                if (index == 7)
+                {
+                    expected = "minecraft:block_16";
+                }
+
+                Assert.Equal(new NbtString(expected), container.Get(index));
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void dataが必ず書かれる形式なら1要素のパレットでもビット幅4のdataを返す(bool spanning)
+        {
+            PalettedContainer container = PalettedContainer.FromParts(
+                new List<NbtTag> { BlockEntry("minecraft:air") }, null, 4096, 4, spanning, true, false);
+
+            (List<NbtTag> palette, long[]? data) = container.ToParts();
+            Assert.Single(palette);
+            Assert.NotNull(data);
+            Assert.Equal(256, data!.Length);
         }
 
         [Fact]
