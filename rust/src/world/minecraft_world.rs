@@ -1,6 +1,7 @@
 //! Minecraft Java版のセーブデータ1つ分と、その中の次元
 //!
-//! 26.xでは構成が大きく変わっており、標準の3次元も`dimensions/<名前空間>/<パス>/`の下に並ぶ
+//! 26.1以降は構成が大きく変わっており、標準の3次元も`dimensions/<名前空間>/<パス>/`の下に並ぶ
+//! それより前の構成も、`level.dat`のDataVersionで見分けて読み書きできる
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -14,6 +15,7 @@ use crate::nbt::{read_file, write_bytes, NamedTag, NbtReadOptions, NbtWriteOptio
 
 use super::block_state::{BlockState, IntoBlockState};
 use super::chunk::{Chunk, ChunkReadOptions, ChunkWriteOptions};
+use super::world_layout::WorldLayout;
 
 /// ワールドを開くときの動作
 #[derive(Debug, Default)]
@@ -33,15 +35,25 @@ pub struct WorldOpenOptions {
     pub chunk_read: ChunkReadOptions,
     /// チャンク書き込みのオプション
     pub chunk_write: ChunkWriteOptions,
+    /// ワールドの構成の世代を選ぶDataVersion
+    ///
+    /// `None`なら、`level.dat`のDataVersionで選ぶ
+    /// 1519以上でなければならない
+    /// そのワールドから読むすべてのチャンクの世代にも効き、`chunk_read.format_data_version`より優先する
+    pub format_data_version: Option<i32>,
 }
 
 /// `level.dat`の内容
 ///
-/// 26.xでは大幅に軽量化されており、ゲームルールやワールド生成設定は`data/minecraft/`配下の個別ファイルへ分離されている
+/// 26.1以降は大幅に軽量化されており、ゲームルールやワールド生成設定は`data/minecraft/`配下の個別ファイルへ分離されている
+/// それより前は、`level.dat`の中に入っている
+///
+/// スポーン地点・難易度・ハードコアの取得子は、構成の世代ごとのキーを読む
 #[derive(Debug, Clone)]
 pub struct LevelData {
     root_name: String,
     raw: NbtCompound,
+    layout: &'static WorldLayout,
 }
 
 impl LevelData {
@@ -79,27 +91,27 @@ impl LevelData {
     }
 
     /// スポーン地点の`[x, y, z]`
-    pub fn spawn_pos(&self) -> Result<&[i32]> {
-        self.data()?.get_compound("spawn")?.get_int_array("pos")
+    pub fn spawn_pos(&self) -> Result<Vec<i32>> {
+        self.layout.spawn_pos(self.data()?)
     }
 
     /// スポーン地点の次元ID
+    ///
+    /// 26.1より前の`level.dat`には無いので、`UnsupportedFeature`になる
     pub fn spawn_dimension(&self) -> Result<&str> {
-        self.data()?.get_compound("spawn")?.get_string("dimension")
+        self.layout.spawn_dimension(self.data()?)
     }
 
     /// 難易度（`normal`など）
+    ///
+    /// 26.1より前の数値は、0 `peaceful` 1 `easy` 2 `normal` 3 `hard`に直す
     pub fn difficulty(&self) -> Result<&str> {
-        self.data()?
-            .get_compound("difficulty_settings")?
-            .get_string("difficulty")
+        self.layout.difficulty(self.data()?)
     }
 
     /// ハードコアか
     pub fn is_hardcore(&self) -> Result<bool> {
-        self.data()?
-            .get_compound("difficulty_settings")?
-            .get_bool("hardcore")
+        self.layout.is_hardcore(self.data()?)
     }
 
     /// バージョン名（`26.3`など）
@@ -124,6 +136,7 @@ pub struct Dimension {
     chunk_read: ChunkReadOptions,
     warning: Option<SharedWarning>,
     chunk_write: ChunkWriteOptions,
+    layout: &'static WorldLayout,
     regions: Option<RegionFolder>,
     entities: Option<RegionFolder>,
     poi: Option<RegionFolder>,
@@ -146,6 +159,7 @@ impl Dimension {
         directory: PathBuf,
         options: &WorldOpenOptions,
         warning: Option<SharedWarning>,
+        layout: &'static WorldLayout,
     ) -> Dimension {
         Dimension {
             id,
@@ -159,6 +173,7 @@ impl Dimension {
             },
             warning,
             chunk_write: options.chunk_write,
+            layout,
             regions: None,
             entities: None,
             poi: None,
@@ -217,12 +232,9 @@ impl Dimension {
     /// 存在しなければ`None`
     ///
     /// 次元ごとの`world_border` / `raids` / `chunk_tickets`などが入る
+    /// 26.1より前は`data/<name>.dat`を読む
     pub fn data_file(&self, name: &str) -> Result<Option<NbtCompound>> {
-        let path = self
-            .directory
-            .join("data")
-            .join("minecraft")
-            .join(format!("{name}.dat"));
+        let path = self.layout.data_file_path(&self.directory, name);
 
         if !path.exists() {
             return Ok(None);
@@ -506,6 +518,7 @@ pub struct MinecraftWorld {
     directory: PathBuf,
     options: WorldOpenOptions,
     warning: Option<SharedWarning>,
+    layout: &'static WorldLayout,
     level: LevelData,
     dimensions: HashMap<String, Dimension>,
     closed: bool,
@@ -513,6 +526,8 @@ pub struct MinecraftWorld {
 
 impl MinecraftWorld {
     /// ワールドを開く
+    ///
+    /// `format_data_version`が1519未満なら`InvalidArgument`
     pub fn open(directory: impl AsRef<Path>, mut options: WorldOpenOptions) -> Result<MinecraftWorld> {
         let directory = directory.as_ref().to_path_buf();
 
@@ -533,6 +548,12 @@ impl MinecraftWorld {
         }
 
         let named = read_file(&level_path, &NbtReadOptions::default())?;
+        let layout = WorldLayout::detect(named.tag.get_compound("Data")?, options.format_data_version)?;
+
+        // ワールドで世代を指定されていれば、チャンクの読み込みにも同じ指定を使う
+        if options.format_data_version.is_some() {
+            options.chunk_read.format_data_version = options.format_data_version;
+        }
 
         // 警告の通知先は全次元で使うので、複製できる形にして持っておく
         let warning = options.chunk_read.on_warning.take().map(Rc::from);
@@ -541,7 +562,8 @@ impl MinecraftWorld {
             directory,
             options,
             warning,
-            level: LevelData { root_name: named.name, raw: named.tag },
+            layout,
+            level: LevelData { root_name: named.name, raw: named.tag, layout },
             dimensions: HashMap::new(),
             closed: false,
         })
@@ -560,13 +582,10 @@ impl MinecraftWorld {
     /// `data/minecraft/<name>.dat`を読む
     /// 存在しなければ`None`
     ///
-    /// 26.xでは`game_rules` / `weather` / `world_gen_settings`などがこの形で`level.dat`から分離されている
+    /// 26.1以降は`game_rules` / `weather` / `world_gen_settings`などがこの形で`level.dat`から分離されている
+    /// 26.1より前は`data/<name>.dat`を読む
     pub fn data_file(&self, name: &str) -> Result<Option<NbtCompound>> {
-        let path = self
-            .directory
-            .join("data")
-            .join("minecraft")
-            .join(format!("{name}.dat"));
+        let path = self.layout.data_file_path(&self.directory, name);
 
         if !path.exists() {
             return Ok(None);
@@ -576,37 +595,9 @@ impl MinecraftWorld {
     }
 
     /// 存在する次元のIDを返す
+    /// 26.1より前は標準の3次元を固定の順で先に並べ、データパックの次元を`dimensions/`から探す
     pub fn dimension_ids(&self) -> Result<Vec<String>> {
-        let root = self.directory.join("dimensions");
-        let mut found = Vec::new();
-
-        if !root.is_dir() {
-            return Ok(found);
-        }
-
-        // dimensions/<名前空間>/<パス>/の2段を辿る
-        for namespace in std::fs::read_dir(&root)?.flatten() {
-            if !namespace.path().is_dir() {
-                continue;
-            }
-
-            let namespace_name = namespace.file_name().to_string_lossy().into_owned();
-
-            // 2段目が次元のパス
-            for entry in std::fs::read_dir(namespace.path())?.flatten() {
-                // ディレクトリだけを次元として数える
-                if entry.path().is_dir() {
-                    found.push(format!(
-                        "{namespace_name}:{}",
-                        entry.file_name().to_string_lossy()
-                    ));
-                }
-            }
-        }
-
-        // 走査順がファイルシステム依存にならないよう並べる
-        found.sort();
-        Ok(found)
+        self.layout.dimension_ids(&self.directory)
     }
 
     /// 次元を得る
@@ -616,19 +607,19 @@ impl MinecraftWorld {
         let normalized = normalize_dimension_id(dimension_id);
 
         if !self.dimensions.contains_key(&normalized) {
-            let colon = normalized.find(':').unwrap_or(0);
-            let path = self
-                .directory
-                .join("dimensions")
-                .join(&normalized[..colon])
-                .join(&normalized[colon + 1..]);
-
-            if !path.is_dir() {
+            // 存在しない次元は`None`のまま
+            if !self.layout.has_dimension(&self.directory, &normalized) {
                 return Ok(None);
             }
 
-            let opened =
-                Dimension::new(normalized.clone(), path, &self.options, self.warning.clone());
+            let path = self.layout.dimension_directory(&self.directory, &normalized);
+            let opened = Dimension::new(
+                normalized.clone(),
+                path,
+                &self.options,
+                self.warning.clone(),
+                self.layout,
+            );
             self.dimensions.insert(normalized.clone(), opened);
         }
 
@@ -637,7 +628,7 @@ impl MinecraftWorld {
 
     /// プレイヤーのUUID一覧
     pub fn player_ids(&self) -> Result<Vec<String>> {
-        let path = self.directory.join("players").join("data");
+        let path = self.layout.player_directory(&self.directory);
         let mut found = Vec::new();
 
         if !path.is_dir() {
@@ -661,11 +652,7 @@ impl MinecraftWorld {
     /// プレイヤーデータを読む
     /// 存在しなければ`None`
     pub fn player(&self, uuid: &str) -> Result<Option<NbtCompound>> {
-        let path = self
-            .directory
-            .join("players")
-            .join("data")
-            .join(format!("{uuid}.dat"));
+        let path = self.layout.player_directory(&self.directory).join(format!("{uuid}.dat"));
 
         if !path.exists() {
             return Ok(None);

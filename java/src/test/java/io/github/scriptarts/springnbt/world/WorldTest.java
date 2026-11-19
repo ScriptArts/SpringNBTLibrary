@@ -17,7 +17,9 @@ import io.github.scriptarts.springnbt.anvil.RegionFileMode;
 import io.github.scriptarts.springnbt.nbt.Compression;
 import io.github.scriptarts.springnbt.nbt.NamedTag;
 import io.github.scriptarts.springnbt.nbt.NbtCompound;
+import io.github.scriptarts.springnbt.nbt.NbtByte;
 import io.github.scriptarts.springnbt.nbt.NbtInt;
+import io.github.scriptarts.springnbt.nbt.NbtIntArray;
 import io.github.scriptarts.springnbt.nbt.NbtList;
 import io.github.scriptarts.springnbt.nbt.NbtIo;
 import io.github.scriptarts.springnbt.nbt.NbtLongArray;
@@ -30,6 +32,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -1071,6 +1074,40 @@ class WorldTest {
         }
     }
 
+    /** {@code Data}に指定の項目だけを持つlevel.datを書く */
+    private static void writeLevel(Path directory, Map<String, NbtTag> entries) {
+        NbtCompound data = new NbtCompound();
+
+        for (Map.Entry<String, NbtTag> entry : entries.entrySet()) {
+            data.set(entry.getKey(), entry.getValue());
+        }
+
+        NbtCompound root = new NbtCompound();
+        root.set("Data", data);
+        NbtIo.writeFile(directory.resolve("level.dat"), new NamedTag("", root), null);
+    }
+
+    /** 指定の項目を持つ.datを、フォルダごと作って書く */
+    private static void writeDat(Path path, Map<String, NbtTag> entries) throws Exception {
+        Files.createDirectories(path.getParent());
+        NbtCompound root = new NbtCompound();
+
+        for (Map.Entry<String, NbtTag> entry : entries.entrySet()) {
+            root.set(entry.getKey(), entry.getValue());
+        }
+
+        NbtIo.writeFile(path, new NamedTag("", root), null);
+    }
+
+    /** L1の合成ワールドを作る */
+    private static void makeL1World(Path directory) throws Exception {
+        writeLevel(directory, Map.of("DataVersion", new NbtInt(3953)));
+
+        for (String folder : new String[] {"region", "DIM-1/region", "DIM1/region", "dimensions/mymap/arena/region"}) {
+            Files.createDirectories(directory.resolve(folder));
+        }
+    }
+
     @Nested
     class MinecraftWorldTest {
 
@@ -1098,9 +1135,7 @@ class WorldTest {
             Files.createDirectories(region);
 
             // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
-            NbtCompound level = new NbtCompound();
-            level.set("Data", new NbtCompound());
-            NbtIo.writeFile(work.resolve("level.dat"), new NamedTag("", level), null);
+            writeLevel(work, Map.of("DataVersion", new NbtInt(5023)));
 
             NbtCompound chunk = (NbtCompound) NbtIo.readFile(vectorPath("palette_1"), null).tag();
             chunk.set("DataVersion", new NbtInt(PRE_FLATTENING_DATA_VERSION));
@@ -1119,6 +1154,208 @@ class WorldTest {
 
             // ワールドを開くときに渡した通知先が、次元経由の読み込みでも呼ばれる
             assertEquals(1, warnings.size());
+        }
+    }
+
+    @Nested
+    class WorldLayoutTest {
+
+        @TempDir
+        Path work;
+
+        @Test
+        void world_l1_dimensions() throws Exception {
+            makeL1World(work);
+
+            try (MinecraftWorld world = MinecraftWorld.open(work)) {
+                assertEquals(
+                        List.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end", "mymap:arena"),
+                        world.dimensionIds());
+                assertEquals(work, world.dimension("minecraft:overworld").directory());
+                assertEquals(work.resolve("DIM-1"), world.dimension("minecraft:the_nether").directory());
+                assertEquals(work.resolve("DIM1"), world.dimension("minecraft:the_end").directory());
+                assertEquals(work.resolve("dimensions/mymap/arena"), world.dimension("mymap:arena").directory());
+
+                // 次元が無ければnull
+                assertNull(world.dimension("mymap:missing"));
+            }
+        }
+
+        @Test
+        void L1で存在しない標準の次元は並ばない() throws Exception {
+            writeLevel(work, Map.of("DataVersion", new NbtInt(3953)));
+            Files.createDirectories(work.resolve("region"));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work)) {
+                assertEquals(List.of("minecraft:overworld"), world.dimensionIds());
+                assertNull(world.dimension("minecraft:the_nether"));
+            }
+        }
+
+        @Test
+        void world_l1_players() throws Exception {
+            makeL1World(work);
+            writeDat(work.resolve("playerdata/b-uuid.dat"), Map.of("Health", new NbtInt(20)));
+            writeDat(work.resolve("playerdata/a-uuid.dat"), Map.of("Health", new NbtInt(7)));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work)) {
+                assertEquals(List.of("a-uuid", "b-uuid"), world.playerIds());
+                assertEquals(7, world.player("a-uuid").getInt("Health"));
+                assertNull(world.player("missing"));
+            }
+        }
+
+        @Test
+        void world_l1_data_file() throws Exception {
+            makeL1World(work);
+            writeDat(work.resolve("data/scoreboard.dat"), Map.of("Value", new NbtInt(1)));
+            writeDat(work.resolve("DIM-1/data/raids_nether.dat"), Map.of("Value", new NbtInt(2)));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work)) {
+                assertEquals(1, world.dataFile("scoreboard").getInt("Value"));
+                assertNull(world.dataFile("missing"));
+                assertEquals(2, world.dimension("minecraft:the_nether").dataFile("raids_nether").getInt("Value"));
+
+                // オーバーワールドの次元は、ワールドと同じdata/を読む
+                assertEquals(1, world.dimension("minecraft:overworld").dataFile("scoreboard").getInt("Value"));
+            }
+        }
+
+        @Test
+        void level_data_l1_getters() {
+            writeLevel(work, Map.of(
+                    "DataVersion", new NbtInt(3953),
+                    "SpawnX", new NbtInt(10),
+                    "SpawnY", new NbtInt(64),
+                    "SpawnZ", new NbtInt(-5),
+                    "Difficulty", new NbtByte((byte) 2),
+                    "hardcore", new NbtByte((byte) 1)));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work)) {
+                assertArrayEquals(new int[] {10, 64, -5}, world.level().spawnPos());
+                assertEquals("normal", world.level().difficulty());
+                assertTrue(world.level().isHardcore());
+
+                SpringNbtException error = assertThrows(SpringNbtException.class,
+                        () -> world.level().spawnDimension());
+                assertEquals(ErrorCode.UNSUPPORTED_FEATURE, error.code());
+            }
+        }
+
+        @ParameterizedTest
+        @CsvSource({"0,peaceful", "1,easy", "2,normal", "3,hard"})
+        void L1の難易度は数値を名前に直す(int number, String name) {
+            writeLevel(work, Map.of("DataVersion", new NbtInt(3953), "Difficulty", new NbtByte((byte) number)));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work)) {
+                assertEquals(name, world.level().difficulty());
+            }
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = {-1, 4})
+        void L1の難易度が範囲外ならMALFORMED_DATA(int number) {
+            writeLevel(work, Map.of("DataVersion", new NbtInt(3953), "Difficulty", new NbtByte((byte) number)));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work)) {
+                SpringNbtException error = assertThrows(SpringNbtException.class,
+                        () -> world.level().difficulty());
+                assertEquals(ErrorCode.MALFORMED_DATA, error.code());
+            }
+        }
+
+        @Test
+        void world_l2_unchanged() throws Exception {
+            NbtCompound spawn = new NbtCompound();
+            spawn.set("pos", new NbtIntArray(new int[] {1, 2, 3}));
+            spawn.set("dimension", new NbtString("minecraft:overworld"));
+            NbtCompound settings = new NbtCompound();
+            settings.set("difficulty", new NbtString("hard"));
+            settings.set("hardcore", new NbtByte((byte) 1));
+            writeLevel(work, Map.of(
+                    "DataVersion", new NbtInt(5023),
+                    "spawn", spawn,
+                    "difficulty_settings", settings));
+
+            Files.createDirectories(work.resolve("dimensions/minecraft/overworld"));
+            Files.createDirectories(work.resolve("dimensions/minecraft/the_end"));
+            writeDat(work.resolve("players/data/u.dat"), Map.of("Health", new NbtInt(3)));
+            writeDat(work.resolve("data/minecraft/weather.dat"), Map.of("Value", new NbtInt(4)));
+            writeDat(work.resolve("dimensions/minecraft/the_end/data/minecraft/raids.dat"),
+                    Map.of("Value", new NbtInt(5)));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work)) {
+                assertArrayEquals(new int[] {1, 2, 3}, world.level().spawnPos());
+                assertEquals("minecraft:overworld", world.level().spawnDimension());
+                assertEquals("hard", world.level().difficulty());
+                assertTrue(world.level().isHardcore());
+                assertEquals(List.of("minecraft:overworld", "minecraft:the_end"), world.dimensionIds());
+                assertEquals(List.of("u"), world.playerIds());
+                assertEquals(4, world.dataFile("weather").getInt("Value"));
+                assertEquals(5, world.dimension("the_end").dataFile("raids").getInt("Value"));
+            }
+        }
+
+        @Test
+        void DataVersionが無いlevelDatはL1として読む() throws Exception {
+            writeLevel(work, Map.of());
+            Files.createDirectories(work.resolve("DIM1"));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work)) {
+                assertEquals(List.of("minecraft:the_end"), world.dimensionIds());
+            }
+        }
+
+        @Test
+        void world_override_layout() throws Exception {
+            // level.datは26.3を名乗るが、構成はL1
+            writeLevel(work, Map.of(
+                    "DataVersion", new NbtInt(5023),
+                    "SpawnX", new NbtInt(1),
+                    "SpawnY", new NbtInt(2),
+                    "SpawnZ", new NbtInt(3)));
+            Files.createDirectories(work.resolve("region"));
+
+            try (MinecraftWorld plain = MinecraftWorld.open(work)) {
+                assertTrue(plain.dimensionIds().isEmpty());
+            }
+
+            WorldOpenOptions options = WorldOpenOptions.defaults().setFormatDataVersion(3953);
+
+            try (MinecraftWorld world = MinecraftWorld.open(work, options)) {
+                assertEquals(List.of("minecraft:overworld"), world.dimensionIds());
+                assertArrayEquals(new int[] {1, 2, 3}, world.level().spawnPos());
+            }
+
+            SpringNbtException error = assertThrows(SpringNbtException.class,
+                    () -> MinecraftWorld.open(work, WorldOpenOptions.defaults().setFormatDataVersion(1518)));
+            assertEquals(ErrorCode.INVALID_ARGUMENT, error.code());
+        }
+
+        @Test
+        void ワールドの指定は読むチャンクの世代にも効く() throws Exception {
+            writeLevel(work, Map.of("DataVersion", new NbtInt(5023)));
+            Path region = work.resolve("dimensions/minecraft/overworld/region");
+            Files.createDirectories(region);
+            NbtCompound chunk = (NbtCompound) NbtIo.readFile(vectorPath("palette_1"), null).tag();
+
+            try (RegionFile file = RegionFile.open(region.resolve("r.0.0.mca"), RegionFileMode.READ_WRITE)) {
+                file.writeChunk(0, 0, chunk);
+            }
+
+            // ワールドの指定がchunkReadの指定より優先される
+            ChunkReadOptions readOptions = ChunkReadOptions.defaults().setFormatDataVersion(5023);
+            WorldOpenOptions options = WorldOpenOptions.defaults()
+                    .setChunkRead(readOptions)
+                    .setFormatDataVersion(5006);
+
+            try (MinecraftWorld world = MinecraftWorld.open(work, options)) {
+                Chunk loaded = world.dimension("minecraft:overworld").chunk(0, 0);
+                assertEquals(5006, loaded.formatDataVersion());
+            }
+
+            // 渡したオプションは書き換えない
+            assertEquals(5023, readOptions.formatDataVersion());
         }
     }
 }

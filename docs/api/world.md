@@ -23,6 +23,7 @@
 | **WorldOpenOptions** | `WorldOpenOptions` | `WorldOpenOptions` | `WorldOpenOptions` | `WorldOpenOptions` | `WorldOpenOptions` | ワールドを開くときの動作 |
 | `chunk_read` | `ChunkRead` | `chunkRead()` | `chunkRead` | `chunk_read` | `chunk_read` | チャンク読み込みのオプション |
 | `chunk_write` | `ChunkWrite` | `chunkWrite()` | `chunkWrite` | `chunk_write` | `chunk_write` | チャンク書き込みのオプション |
+| `format_data_version` | `FormatDataVersion` | `formatDataVersion()` | `formatDataVersion` | `format_data_version` | `format_data_version` | ワールドの構成の世代を選ぶDataVersion |
 | `ignore_session_lock` | `IgnoreSessionLock` | `ignoreSessionLock()` | `ignoreSessionLock` | `ignore_session_lock` | `ignore_session_lock` | session.lockの確認を飛ばすか |
 | `writable` | `Writable` | `writable()` | `writable` | `writable` | `writable` |  |
 | **LevelData** | `LevelData` | `LevelData` | `LevelData` | `LevelData` | `LevelData` | level.datの内容 |

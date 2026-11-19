@@ -1184,6 +1184,62 @@ public class WorldTests
         }
     }
 
+    /// <summary><c>Data</c>に指定の項目だけを持つlevel.datを書く</summary>
+    private static void WriteLevel(string directory, Dictionary<string, NbtTag> entries)
+    {
+        NbtCompound data = new NbtCompound();
+
+        foreach (KeyValuePair<string, NbtTag> entry in entries)
+        {
+            data.Set(entry.Key, entry.Value);
+        }
+
+        NbtCompound root = new NbtCompound();
+        root.Set("Data", data);
+        NbtIo.WriteFile(Path.Combine(directory, "level.dat"), new NamedTag("", root));
+    }
+
+    /// <summary>指定の項目を持つ.datを、フォルダごと作って書く</summary>
+    private static void WriteDat(string path, Dictionary<string, NbtTag> entries)
+    {
+        System.IO.Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        NbtCompound root = new NbtCompound();
+
+        foreach (KeyValuePair<string, NbtTag> entry in entries)
+        {
+            root.Set(entry.Key, entry.Value);
+        }
+
+        NbtIo.WriteFile(path, new NamedTag("", root));
+    }
+
+    /// <summary>一時フォルダを作って渡し、終わったら消す</summary>
+    private static void WithTempWorld(Action<string> body)
+    {
+        string root = Path.Combine(Path.GetTempPath(), "springnbt-layout-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(root);
+
+        try
+        {
+            body(root);
+        }
+        finally
+        {
+            System.IO.Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>L1の合成ワールドを作る</summary>
+    private static void MakeL1World(string root)
+    {
+        WriteLevel(root, new Dictionary<string, NbtTag> { ["DataVersion"] = new NbtInt(3953) });
+
+        foreach (string folder in new[] { "region", "DIM-1/region", "DIM1/region", "dimensions/mymap/arena/region" })
+        {
+            System.IO.Directory.CreateDirectory(Path.Combine(root, folder));
+        }
+    }
+
     // ------------------------------------------------------------------
     // MinecraftWorld
     // ------------------------------------------------------------------
@@ -1225,9 +1281,7 @@ public class WorldTests
             try
             {
                 // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
-                NbtCompound level = new NbtCompound();
-                level.Set("Data", new NbtCompound());
-                NbtIo.WriteFile(Path.Combine(root, "level.dat"), new NamedTag("", level));
+                WriteLevel(root, new Dictionary<string, NbtTag> { ["DataVersion"] = new NbtInt(5023) });
 
                 NbtCompound chunk = (NbtCompound)NbtIo.ReadFile(VectorPath("palette_1")).Tag;
                 chunk.Set("DataVersion", new NbtInt(PreFlatteningDataVersion));
@@ -1255,6 +1309,261 @@ public class WorldTests
             {
                 System.IO.Directory.Delete(root, recursive: true);
             }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // ワールドの構成の世代（L1とL2）
+    // ------------------------------------------------------------------
+
+    public class WorldLayoutTests
+    {
+        [Fact]
+        public void World_l1_dimensions()
+        {
+            WithTempWorld(root =>
+            {
+                MakeL1World(root);
+
+                using MinecraftWorld world = MinecraftWorld.Open(root);
+                Assert.Equal(
+                    new[] { "minecraft:overworld", "minecraft:the_nether", "minecraft:the_end", "mymap:arena" },
+                    world.DimensionIds().ToArray());
+                Assert.Equal(root, world.Dimension("minecraft:overworld")!.Directory);
+                Assert.Equal(Path.Combine(root, "DIM-1"), world.Dimension("minecraft:the_nether")!.Directory);
+                Assert.Equal(Path.Combine(root, "DIM1"), world.Dimension("minecraft:the_end")!.Directory);
+                Assert.Equal(
+                    Path.Combine(root, "dimensions", "mymap", "arena"), world.Dimension("mymap:arena")!.Directory);
+
+                // 次元が無ければnull
+                Assert.Null(world.Dimension("mymap:missing"));
+            });
+        }
+
+        [Fact]
+        public void L1で存在しない標準の次元は並ばない()
+        {
+            WithTempWorld(root =>
+            {
+                WriteLevel(root, new Dictionary<string, NbtTag> { ["DataVersion"] = new NbtInt(3953) });
+                System.IO.Directory.CreateDirectory(Path.Combine(root, "region"));
+
+                using MinecraftWorld world = MinecraftWorld.Open(root);
+                Assert.Equal(new[] { "minecraft:overworld" }, world.DimensionIds().ToArray());
+                Assert.Null(world.Dimension("minecraft:the_nether"));
+            });
+        }
+
+        [Fact]
+        public void World_l1_players()
+        {
+            WithTempWorld(root =>
+            {
+                MakeL1World(root);
+                WriteDat(Path.Combine(root, "playerdata", "b-uuid.dat"), new Dictionary<string, NbtTag> { ["Health"] = new NbtInt(20) });
+                WriteDat(Path.Combine(root, "playerdata", "a-uuid.dat"), new Dictionary<string, NbtTag> { ["Health"] = new NbtInt(7) });
+
+                using MinecraftWorld world = MinecraftWorld.Open(root);
+                Assert.Equal(new[] { "a-uuid", "b-uuid" }, world.PlayerIds().ToArray());
+                Assert.Equal(7, world.Player("a-uuid")!.GetInt("Health"));
+                Assert.Null(world.Player("missing"));
+            });
+        }
+
+        [Fact]
+        public void World_l1_data_file()
+        {
+            WithTempWorld(root =>
+            {
+                MakeL1World(root);
+                WriteDat(Path.Combine(root, "data", "scoreboard.dat"), new Dictionary<string, NbtTag> { ["Value"] = new NbtInt(1) });
+                WriteDat(Path.Combine(root, "DIM-1", "data", "raids_nether.dat"), new Dictionary<string, NbtTag> { ["Value"] = new NbtInt(2) });
+
+                using MinecraftWorld world = MinecraftWorld.Open(root);
+                Assert.Equal(1, world.DataFile("scoreboard")!.GetInt("Value"));
+                Assert.Null(world.DataFile("missing"));
+                Assert.Equal(2, world.Dimension("minecraft:the_nether")!.DataFile("raids_nether")!.GetInt("Value"));
+
+                // オーバーワールドの次元は、ワールドと同じdata/を読む
+                Assert.Equal(1, world.Dimension("minecraft:overworld")!.DataFile("scoreboard")!.GetInt("Value"));
+            });
+        }
+
+        [Fact]
+        public void Level_data_l1_getters()
+        {
+            WithTempWorld(root =>
+            {
+                WriteLevel(root, new Dictionary<string, NbtTag>
+                {
+                    ["DataVersion"] = new NbtInt(3953),
+                    ["SpawnX"] = new NbtInt(10),
+                    ["SpawnY"] = new NbtInt(64),
+                    ["SpawnZ"] = new NbtInt(-5),
+                    ["Difficulty"] = new NbtByte(2),
+                    ["hardcore"] = new NbtByte(1),
+                });
+
+                using MinecraftWorld world = MinecraftWorld.Open(root);
+                Assert.Equal(new[] { 10, 64, -5 }, world.Level.SpawnPos);
+                Assert.Equal("normal", world.Level.Difficulty);
+                Assert.True(world.Level.IsHardcore);
+
+                SpringNbtException error = Assert.Throws<SpringNbtException>(() => world.Level.SpawnDimension);
+                Assert.Equal(ErrorCode.UnsupportedFeature, error.Code);
+            });
+        }
+
+        [Theory]
+        [InlineData(0, "peaceful")]
+        [InlineData(1, "easy")]
+        [InlineData(2, "normal")]
+        [InlineData(3, "hard")]
+        public void L1の難易度は数値を名前に直す(int number, string name)
+        {
+            WithTempWorld(root =>
+            {
+                WriteLevel(root, new Dictionary<string, NbtTag>
+                {
+                    ["DataVersion"] = new NbtInt(3953),
+                    ["Difficulty"] = new NbtByte((sbyte)number),
+                });
+
+                using MinecraftWorld world = MinecraftWorld.Open(root);
+                Assert.Equal(name, world.Level.Difficulty);
+            });
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(4)]
+        public void L1の難易度が範囲外ならMALFORMED_DATA(int number)
+        {
+            WithTempWorld(root =>
+            {
+                WriteLevel(root, new Dictionary<string, NbtTag>
+                {
+                    ["DataVersion"] = new NbtInt(3953),
+                    ["Difficulty"] = new NbtByte((sbyte)number),
+                });
+
+                using MinecraftWorld world = MinecraftWorld.Open(root);
+                SpringNbtException error = Assert.Throws<SpringNbtException>(() => world.Level.Difficulty);
+                Assert.Equal(ErrorCode.MalformedData, error.Code);
+            });
+        }
+
+        [Fact]
+        public void World_l2_unchanged()
+        {
+            WithTempWorld(root =>
+            {
+                NbtCompound spawn = new NbtCompound();
+                spawn.Set("pos", new NbtIntArray(new[] { 1, 2, 3 }));
+                spawn.Set("dimension", new NbtString("minecraft:overworld"));
+                NbtCompound settings = new NbtCompound();
+                settings.Set("difficulty", new NbtString("hard"));
+                settings.Set("hardcore", new NbtByte(1));
+                WriteLevel(root, new Dictionary<string, NbtTag>
+                {
+                    ["DataVersion"] = new NbtInt(5023),
+                    ["spawn"] = spawn,
+                    ["difficulty_settings"] = settings,
+                });
+
+                System.IO.Directory.CreateDirectory(Path.Combine(root, "dimensions", "minecraft", "overworld"));
+                System.IO.Directory.CreateDirectory(Path.Combine(root, "dimensions", "minecraft", "the_end"));
+                WriteDat(Path.Combine(root, "players", "data", "u.dat"), new Dictionary<string, NbtTag> { ["Health"] = new NbtInt(3) });
+                WriteDat(Path.Combine(root, "data", "minecraft", "weather.dat"), new Dictionary<string, NbtTag> { ["Value"] = new NbtInt(4) });
+                WriteDat(
+                    Path.Combine(root, "dimensions", "minecraft", "the_end", "data", "minecraft", "raids.dat"),
+                    new Dictionary<string, NbtTag> { ["Value"] = new NbtInt(5) });
+
+                using MinecraftWorld world = MinecraftWorld.Open(root);
+                Assert.Equal(new[] { 1, 2, 3 }, world.Level.SpawnPos);
+                Assert.Equal("minecraft:overworld", world.Level.SpawnDimension);
+                Assert.Equal("hard", world.Level.Difficulty);
+                Assert.True(world.Level.IsHardcore);
+                Assert.Equal(new[] { "minecraft:overworld", "minecraft:the_end" }, world.DimensionIds().ToArray());
+                Assert.Equal(new[] { "u" }, world.PlayerIds().ToArray());
+                Assert.Equal(4, world.DataFile("weather")!.GetInt("Value"));
+                Assert.Equal(5, world.Dimension("the_end")!.DataFile("raids")!.GetInt("Value"));
+            });
+        }
+
+        [Fact]
+        public void DataVersionが無いlevelDatはL1として読む()
+        {
+            WithTempWorld(root =>
+            {
+                WriteLevel(root, new Dictionary<string, NbtTag>());
+                System.IO.Directory.CreateDirectory(Path.Combine(root, "DIM1"));
+
+                using MinecraftWorld world = MinecraftWorld.Open(root);
+                Assert.Equal(new[] { "minecraft:the_end" }, world.DimensionIds().ToArray());
+            });
+        }
+
+        [Fact]
+        public void World_override_layout()
+        {
+            WithTempWorld(root =>
+            {
+                // level.datは26.3を名乗るが、構成はL1
+                WriteLevel(root, new Dictionary<string, NbtTag>
+                {
+                    ["DataVersion"] = new NbtInt(5023),
+                    ["SpawnX"] = new NbtInt(1),
+                    ["SpawnY"] = new NbtInt(2),
+                    ["SpawnZ"] = new NbtInt(3),
+                });
+                System.IO.Directory.CreateDirectory(Path.Combine(root, "region"));
+
+                using (MinecraftWorld plain = MinecraftWorld.Open(root))
+                {
+                    Assert.Empty(plain.DimensionIds());
+                }
+
+                using (MinecraftWorld world = MinecraftWorld.Open(root, new WorldOpenOptions { FormatDataVersion = 3953 }))
+                {
+                    Assert.Equal(new[] { "minecraft:overworld" }, world.DimensionIds().ToArray());
+                    Assert.Equal(new[] { 1, 2, 3 }, world.Level.SpawnPos);
+                }
+
+                SpringNbtException error = Assert.Throws<SpringNbtException>(
+                    () => MinecraftWorld.Open(root, new WorldOpenOptions { FormatDataVersion = 1518 }));
+                Assert.Equal(ErrorCode.InvalidArgument, error.Code);
+            });
+        }
+
+        [Fact]
+        public void ワールドの指定は読むチャンクの世代にも効く()
+        {
+            WithTempWorld(root =>
+            {
+                WriteLevel(root, new Dictionary<string, NbtTag> { ["DataVersion"] = new NbtInt(5023) });
+                string region = Path.Combine(root, "dimensions", "minecraft", "overworld", "region");
+                System.IO.Directory.CreateDirectory(region);
+                NbtCompound chunk = (NbtCompound)NbtIo.ReadFile(VectorPath("palette_1")).Tag;
+
+                using (RegionFile file = RegionFile.Open(Path.Combine(region, "r.0.0.mca"), RegionFileMode.ReadWrite))
+                {
+                    file.WriteChunk(0, 0, chunk);
+                }
+
+                // ワールドの指定がChunkReadの指定より優先される
+                ChunkReadOptions readOptions = new ChunkReadOptions { FormatDataVersion = 5023 };
+                WorldOpenOptions options = new WorldOpenOptions { ChunkRead = readOptions, FormatDataVersion = 5006 };
+
+                using (MinecraftWorld world = MinecraftWorld.Open(root, options))
+                {
+                    Chunk loaded = world.Dimension("minecraft:overworld")!.Chunk(0, 0)!;
+                    Assert.Equal(5006, loaded.FormatDataVersion);
+                }
+
+                // 渡したオプションは書き換えない
+                Assert.Equal(5023, readOptions.FormatDataVersion);
+            });
         }
     }
 }

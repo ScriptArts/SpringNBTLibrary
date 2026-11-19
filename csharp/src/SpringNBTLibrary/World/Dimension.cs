@@ -24,6 +24,7 @@ public sealed class Dimension : IDisposable
     public const string TheEnd = "minecraft:the_end";
 
     private readonly WorldOpenOptions options;
+    private readonly WorldLayout layout;
     private readonly Dictionary<long, Chunk> chunkCache = new Dictionary<long, Chunk>();
 
     private RegionFolder? regions;
@@ -31,11 +32,12 @@ public sealed class Dimension : IDisposable
     private RegionFolder? poi;
     private bool closed;
 
-    internal Dimension(string id, string directory, WorldOpenOptions options)
+    internal Dimension(string id, string directory, WorldOpenOptions options, WorldLayout layout)
     {
         Id = id;
         Directory = directory;
         this.options = options;
+        this.layout = layout;
     }
 
     /// <summary>次元ID（<c>minecraft:overworld</c>など）</summary>
@@ -62,11 +64,12 @@ public sealed class Dimension : IDisposable
     /// </summary>
     /// <remarks>
     /// 次元ごとの<c>world_border</c> / <c>raids</c> / <c>chunk_tickets</c>などが入る
+    /// 26.1より前は<c>data/&lt;name&gt;.dat</c>を読む
     /// </remarks>
     public NbtCompound? DataFile(string name)
     {
         EnsureOpen();
-        string path = Path.Combine(Directory, "data", "minecraft", name + ".dat");
+        string path = layout.DataFilePath(Directory, name);
 
         if (!File.Exists(path))
         {

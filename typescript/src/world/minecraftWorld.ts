@@ -1,7 +1,8 @@
 /**
  * Minecraft Java版のセーブデータ1つ分と、その中の次元
  *
- * 26.xでは構成が大きく変わっており、標準の3次元も`dimensions/<名前空間>/<パス>/`の下に並ぶ
+ * 26.1以降は構成が大きく変わっており、標準の3次元も`dimensions/<名前空間>/<パス>/`の下に並ぶ
+ * それより前の構成も、`level.dat`のDataVersionで見分けて読み書きできる
  */
 
 import {
@@ -22,6 +23,7 @@ import { ErrorCode, SpringNbtError } from "../errors.js";
 import { NamedTag, NbtCompound, readFile, writeBytes } from "../nbt/index.js";
 import { Chunk, ChunkReadOptions, ChunkWriteOptions } from "./chunk.js";
 import { BlockState } from "./blockState.js";
+import { WorldLayout } from "./worldLayout.js";
 
 /** ワールドを開くときの動作 */
 export interface WorldOpenOptions {
@@ -44,22 +46,35 @@ export interface WorldOpenOptions {
   chunkRead?: ChunkReadOptions;
   /** チャンク書き込みのオプション */
   chunkWrite?: ChunkWriteOptions;
+  /**
+   * ワールドの構成の世代を選ぶDataVersion
+   *
+   * 未指定なら、`level.dat`のDataVersionで選ぶ
+   * 1519以上でなければならない
+   * そのワールドから読むすべてのチャンクの世代にも効き、`chunkRead.formatDataVersion`より優先する
+   */
+  formatDataVersion?: number;
 }
 
 /**
  * `level.dat`の内容
  *
- * 26.xでは大幅に軽量化されており、ゲームルールやワールド生成設定は`data/minecraft/`配下の個別ファイルへ分離されている
+ * 26.1以降は大幅に軽量化されており、ゲームルールやワールド生成設定は`data/minecraft/`配下の個別ファイルへ分離されている
+ * それより前は、`level.dat`の中に入っている
+ *
+ * スポーン地点・難易度・ハードコアの取得子は、構成の世代ごとのキーを読む
  */
 export class LevelData {
   readonly raw: NbtCompound;
   readonly data: NbtCompound;
   readonly #rootName: string;
+  readonly #layout: WorldLayout;
 
-  constructor(named: NamedTag) {
+  constructor(named: NamedTag, formatDataVersion?: number) {
     this.#rootName = named.name;
     this.raw = named.tag;
     this.data = named.tag.getCompound("Data");
+    this.#layout = WorldLayout.detect(this.data, formatDataVersion);
   }
 
   /** チャンク構造のバージョン */
@@ -87,22 +102,30 @@ export class LevelData {
 
   /** スポーン地点の`[x, y, z]` */
   get spawnPos(): Int32Array {
-    return this.data.getCompound("spawn").getIntArray("pos");
+    return this.#layout.spawnPos(this.data);
   }
 
-  /** スポーン地点の次元ID */
+  /**
+   * スポーン地点の次元ID
+   *
+   * 26.1より前の`level.dat`には無いので、`UnsupportedFeature`になる
+   */
   get spawnDimension(): string {
-    return this.data.getCompound("spawn").getString("dimension");
+    return this.#layout.spawnDimension(this.data);
   }
 
-  /** 難易度（`normal`など） */
+  /**
+   * 難易度（`normal`など）
+   *
+   * 26.1より前の数値は、0 `peaceful` 1 `easy` 2 `normal` 3 `hard`に直す
+   */
   get difficulty(): string {
-    return this.data.getCompound("difficulty_settings").getString("difficulty");
+    return this.#layout.difficulty(this.data);
   }
 
   /** ハードコアか */
   get isHardcore(): boolean {
-    return this.data.getCompound("difficulty_settings").getBool("hardcore");
+    return this.#layout.isHardcore(this.data);
   }
 
   /** バージョン名（`26.3`など） */
@@ -136,6 +159,7 @@ export class Dimension {
   readonly #writable: boolean;
   readonly #chunkRead: ChunkReadOptions | undefined;
   readonly #chunkWrite: ChunkWriteOptions | undefined;
+  readonly #layout: WorldLayout;
 
   #regions: RegionFolder | undefined;
   #entities: RegionFolder | undefined;
@@ -146,10 +170,12 @@ export class Dimension {
     readonly id: string,
     readonly directory: string,
     options: WorldOpenOptions,
+    layout: WorldLayout,
   ) {
     this.#writable = options.writable === true;
     this.#chunkRead = options.chunkRead;
     this.#chunkWrite = options.chunkWrite;
+    this.#layout = layout;
   }
 
   /**
@@ -184,10 +210,11 @@ export class Dimension {
    * 存在しなければundefined
    *
    * 次元ごとの`world_border` / `raids` / `chunk_tickets`などが入る
+   * 26.1より前は`data/<name>.dat`を読む
    */
   dataFile(name: string): NbtCompound | undefined {
     this.#ensureOpen();
-    const path = join(this.directory, "data", "minecraft", `${name}.dat`);
+    const path = this.#layout.dataFilePath(this.directory, name);
 
     if (!existsSync(path)) {
       return undefined;
@@ -419,11 +446,13 @@ export class Dimension {
 /**
  * Minecraft Java版のセーブデータ1つ分
  *
- * 26.xでは構成が大きく変わっており、標準の3次元も`dimensions/<名前空間>/<パス>/`の下に並ぶ
+ * 26.1以降は構成が大きく変わっており、標準の3次元も`dimensions/<名前空間>/<パス>/`の下に並ぶ
+ * それより前の構成も、`level.dat`のDataVersionで見分けて読み書きできる
  */
 export class MinecraftWorld {
   readonly #dimensions = new Map<string, Dimension>();
   readonly #options: WorldOpenOptions;
+  readonly #layout: WorldLayout;
   #closed = false;
 
   private constructor(
@@ -431,10 +460,15 @@ export class MinecraftWorld {
     options: WorldOpenOptions,
     readonly level: LevelData,
   ) {
-    this.#options = options;
+    this.#layout = WorldLayout.detect(level.data, options.formatDataVersion);
+    this.#options = withFormatDataVersion(options);
   }
 
-  /** ワールドを開く */
+  /**
+   * ワールドを開く
+   *
+   * @throws SpringNbtError `formatDataVersion`が1519未満の場合など
+   */
   static open(directory: string, options: WorldOpenOptions = {}): MinecraftWorld {
     if (!existsSync(directory) || !statSync(directory).isDirectory()) {
       throw new SpringNbtError(ErrorCode.Io, `ワールドディレクトリが無い: ${directory}`);
@@ -451,18 +485,19 @@ export class MinecraftWorld {
       checkSessionLock(directory);
     }
 
-    return new MinecraftWorld(directory, options, new LevelData(readFile(levelPath)));
+    return new MinecraftWorld(directory, options, new LevelData(readFile(levelPath), options.formatDataVersion));
   }
 
   /**
    * `data/minecraft/<name>.dat`を読む
    * 存在しなければundefined
    *
-   * 26.xでは`game_rules` / `weather` / `world_gen_settings`などがこの形で`level.dat`から分離されている
+   * 26.1以降は`game_rules` / `weather` / `world_gen_settings`などがこの形で`level.dat`から分離されている
+   * 26.1より前は`data/<name>.dat`を読む
    */
   dataFile(name: string): NbtCompound | undefined {
     this.#ensureOpen();
-    const path = join(this.directory, "data", "minecraft", `${name}.dat`);
+    const path = this.#layout.dataFilePath(this.directory, name);
 
     if (!existsSync(path)) {
       return undefined;
@@ -471,37 +506,13 @@ export class MinecraftWorld {
     return readFile(path).tag;
   }
 
-  /** 存在する次元のIDを返す */
+  /**
+   * 存在する次元のIDを返す
+   * 26.1より前は標準の3次元を固定の順で先に並べ、データパックの次元を`dimensions/`から探す
+   */
   dimensionIds(): string[] {
     this.#ensureOpen();
-    const root = join(this.directory, "dimensions");
-
-    if (!existsSync(root)) {
-      return [];
-    }
-
-    const found: string[] = [];
-
-    // dimensions/<名前空間>/<パス>/の2段を辿る
-    for (const namespaceName of readdirSync(root)) {
-      const namespaceDir = join(root, namespaceName);
-
-      if (!statSync(namespaceDir).isDirectory()) {
-        continue;
-      }
-
-      // 2段目が次元のパス
-      for (const pathName of readdirSync(namespaceDir)) {
-        // ディレクトリだけを次元として数える
-        if (statSync(join(namespaceDir, pathName)).isDirectory()) {
-          found.push(`${namespaceName}:${pathName}`);
-        }
-      }
-    }
-
-    // 走査順がファイルシステム依存にならないよう並べる
-    found.sort();
-    return found;
+    return this.#layout.dimensionIds(this.directory);
   }
 
   /**
@@ -517,19 +528,13 @@ export class MinecraftWorld {
       return cached;
     }
 
-    const colon = normalized.indexOf(":");
-    const path = join(
-      this.directory,
-      "dimensions",
-      normalized.slice(0, colon),
-      normalized.slice(colon + 1),
-    );
-
-    if (!existsSync(path)) {
+    // 存在しない次元はundefinedのまま
+    if (!this.#layout.hasDimension(this.directory, normalized)) {
       return undefined;
     }
 
-    const opened = new Dimension(normalized, path, this.#options);
+    const path = this.#layout.dimensionDirectory(this.directory, normalized);
+    const opened = new Dimension(normalized, path, this.#options, this.#layout);
     this.#dimensions.set(normalized, opened);
     return opened;
   }
@@ -537,7 +542,7 @@ export class MinecraftWorld {
   /** プレイヤーのUUID一覧 */
   playerIds(): string[] {
     this.#ensureOpen();
-    const path = join(this.directory, "players", "data");
+    const path = this.#layout.playerDirectory(this.directory);
 
     if (!existsSync(path)) {
       return [];
@@ -563,7 +568,7 @@ export class MinecraftWorld {
    */
   player(uuid: string): NbtCompound | undefined {
     this.#ensureOpen();
-    const path = join(this.directory, "players", "data", `${uuid}.dat`);
+    const path = join(this.#layout.playerDirectory(this.directory), `${uuid}.dat`);
 
     if (!existsSync(path)) {
       return undefined;
@@ -646,6 +651,19 @@ export class MinecraftWorld {
  */
 function checkSessionLock(directory: string): void {
   void directory;
+}
+
+/**
+ * ワールドで世代を指定されていれば、チャンクの読み込みにも同じ指定を入れた複製を返す
+ * 渡されたオプションは書き換えない
+ */
+function withFormatDataVersion(options: WorldOpenOptions): WorldOpenOptions {
+  // 指定が無ければ、チャンクごとの指定やチャンク自身のDataVersionに任せる
+  if (options.formatDataVersion === undefined) {
+    return options;
+  }
+
+  return { ...options, chunkRead: { ...options.chunkRead, formatDataVersion: options.formatDataVersion } };
 }
 
 /** 名前空間が省略されていたら`minecraft:`を補う */

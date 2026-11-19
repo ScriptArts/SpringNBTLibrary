@@ -36,6 +36,7 @@ public final class Dimension implements AutoCloseable {
     private final String id;
     private final Path directory;
     private final WorldOpenOptions options;
+    private final WorldLayout layout;
     private final Map<Long, Chunk> chunkCache = new HashMap<>();
 
     private RegionFolder regions;
@@ -43,10 +44,11 @@ public final class Dimension implements AutoCloseable {
     private RegionFolder poi;
     private boolean closed;
 
-    Dimension(String id, Path directory, WorldOpenOptions options) {
+    Dimension(String id, Path directory, WorldOpenOptions options, WorldLayout layout) {
         this.id = id;
         this.directory = directory;
         this.options = options;
+        this.layout = layout;
     }
 
     /**
@@ -111,7 +113,7 @@ public final class Dimension implements AutoCloseable {
      */
     public NbtCompound dataFile(String name) {
         ensureOpen();
-        Path path = directory.resolve("data").resolve("minecraft").resolve(name + ".dat");
+        Path path = layout.dataFilePath(directory, name);
 
         if (!Files.exists(path)) {
             return null;

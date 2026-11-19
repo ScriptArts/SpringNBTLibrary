@@ -1277,10 +1277,7 @@ fn 次元経由で読んだチャンクの警告も通知先へ届く() {
     std::fs::create_dir_all(&region).unwrap();
 
     // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
-    let mut level = NbtCompound::new();
-    level.set("Data", NbtTag::Compound(NbtCompound::new()));
-    write_file(work.join("level.dat"), &NamedTag::new("", level), &NbtWriteOptions::default())
-        .unwrap();
+    write_level(&work, |data| data.set_int("DataVersion", 5023));
 
     {
         let mut file = RegionFile::open(region.join("r.0.0.mca"), RegionFileMode::ReadWrite).unwrap();
@@ -1316,6 +1313,317 @@ fn 次元経由で読んだチャンクの警告も通知先へ届く() {
     assert_eq!(1, warnings.borrow().len());
 }
 
+
+// ---------------------------------------------------------------------------
+// ワールドの構成の世代（L1とL2）
+// ---------------------------------------------------------------------------
+
+/// テストごとに別の一時フォルダを作る
+fn temp_world(name: &str) -> PathBuf {
+    let path = std::env::temp_dir().join(format!("springnbt-layout-{name}-{}", std::process::id()));
+
+    // 前回の残りがあれば消してから作る
+    let _ = std::fs::remove_dir_all(&path);
+    std::fs::create_dir_all(&path).unwrap();
+    path
+}
+
+/// `Data`に`fill`で項目を足したlevel.datを書く
+fn write_level(directory: &Path, fill: impl FnOnce(&mut NbtCompound)) {
+    let mut data = NbtCompound::new();
+    fill(&mut data);
+
+    let mut root = NbtCompound::new();
+    root.set("Data", NbtTag::Compound(data));
+    write_file(
+        directory.join("level.dat"),
+        &NamedTag::new("", root),
+        &NbtWriteOptions::default(),
+    )
+    .unwrap();
+}
+
+/// `fill`で項目を足した.datを、フォルダごと作って書く
+fn write_dat(path: &Path, fill: impl FnOnce(&mut NbtCompound)) {
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let mut root = NbtCompound::new();
+    fill(&mut root);
+    write_file(path, &NamedTag::new("", root), &NbtWriteOptions::default()).unwrap();
+}
+
+/// L1の合成ワールドを作る
+fn make_l1_world(name: &str) -> PathBuf {
+    let work = temp_world(name);
+    write_level(&work, |data| data.set_int("DataVersion", 3953));
+
+    // 標準の3次元と、データパックの次元のフォルダを作る
+    for folder in ["region", "DIM-1/region", "DIM1/region", "dimensions/mymap/arena/region"] {
+        std::fs::create_dir_all(work.join(folder)).unwrap();
+    }
+
+    work
+}
+
+#[test]
+fn world_l1_dimensions() {
+    let work = make_l1_world("dimensions");
+    let mut world = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+
+    assert_eq!(
+        vec!["minecraft:overworld", "minecraft:the_nether", "minecraft:the_end", "mymap:arena"],
+        world.dimension_ids().unwrap()
+    );
+    assert_eq!(work, world.dimension("minecraft:overworld").unwrap().unwrap().directory());
+    assert_eq!(
+        work.join("DIM-1"),
+        world.dimension("minecraft:the_nether").unwrap().unwrap().directory()
+    );
+    assert_eq!(
+        work.join("DIM1"),
+        world.dimension("minecraft:the_end").unwrap().unwrap().directory()
+    );
+    assert_eq!(
+        work.join("dimensions").join("mymap").join("arena"),
+        world.dimension("mymap:arena").unwrap().unwrap().directory()
+    );
+
+    // 次元が無ければNone
+    assert!(world.dimension("mymap:missing").unwrap().is_none());
+
+    world.close().unwrap();
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+#[test]
+fn l1で存在しない標準の次元は並ばない() {
+    let work = temp_world("missing-standard");
+    write_level(&work, |data| data.set_int("DataVersion", 3953));
+    std::fs::create_dir_all(work.join("region")).unwrap();
+
+    let mut world = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+    assert_eq!(vec!["minecraft:overworld"], world.dimension_ids().unwrap());
+    assert!(world.dimension("minecraft:the_nether").unwrap().is_none());
+
+    world.close().unwrap();
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+#[test]
+fn world_l1_players() {
+    let work = make_l1_world("players");
+    write_dat(&work.join("playerdata").join("b-uuid.dat"), |root| root.set_int("Health", 20));
+    write_dat(&work.join("playerdata").join("a-uuid.dat"), |root| root.set_int("Health", 7));
+
+    let world = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+    assert_eq!(vec!["a-uuid", "b-uuid"], world.player_ids().unwrap());
+    assert_eq!(7, world.player("a-uuid").unwrap().unwrap().get_int("Health").unwrap());
+    assert!(world.player("missing").unwrap().is_none());
+
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+#[test]
+fn world_l1_data_file() {
+    let work = make_l1_world("data-file");
+    write_dat(&work.join("data").join("scoreboard.dat"), |root| root.set_int("Value", 1));
+    write_dat(&work.join("DIM-1").join("data").join("raids_nether.dat"), |root| {
+        root.set_int("Value", 2)
+    });
+
+    let mut world = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+    assert_eq!(1, world.data_file("scoreboard").unwrap().unwrap().get_int("Value").unwrap());
+    assert!(world.data_file("missing").unwrap().is_none());
+
+    let nether = world.dimension("minecraft:the_nether").unwrap().unwrap();
+    assert_eq!(2, nether.data_file("raids_nether").unwrap().unwrap().get_int("Value").unwrap());
+
+    // オーバーワールドの次元は、ワールドと同じdata/を読む
+    let overworld = world.dimension("minecraft:overworld").unwrap().unwrap();
+    assert_eq!(1, overworld.data_file("scoreboard").unwrap().unwrap().get_int("Value").unwrap());
+
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+#[test]
+fn level_data_l1_getters() {
+    let work = temp_world("l1-getters");
+    write_level(&work, |data| {
+        data.set_int("DataVersion", 3953);
+        data.set_int("SpawnX", 10);
+        data.set_int("SpawnY", 64);
+        data.set_int("SpawnZ", -5);
+        data.set_byte("Difficulty", 2);
+        data.set_byte("hardcore", 1);
+    });
+
+    let world = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+    assert_eq!(vec![10, 64, -5], world.level().spawn_pos().unwrap());
+    assert_eq!("normal", world.level().difficulty().unwrap());
+    assert!(world.level().is_hardcore().unwrap());
+
+    match world.level().spawn_dimension() {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::UnsupportedFeature, error),
+    }
+
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+#[test]
+fn l1の難易度は数値を名前に直す() {
+    // 0〜3をそれぞれ名前に直せる
+    for (number, name) in [(0, "peaceful"), (1, "easy"), (2, "normal"), (3, "hard")] {
+        let work = temp_world(&format!("difficulty-{number}"));
+        write_level(&work, |data| {
+            data.set_int("DataVersion", 3953);
+            data.set_byte("Difficulty", number);
+        });
+
+        let world = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+        assert_eq!(name, world.level().difficulty().unwrap());
+
+        std::fs::remove_dir_all(&work).unwrap();
+    }
+}
+
+#[test]
+fn l1の難易度が範囲外ならmalformed_data() {
+    // 範囲の外側の両端を確かめる
+    for (index, number) in [-1i8, 4].into_iter().enumerate() {
+        let work = temp_world(&format!("difficulty-range-{index}"));
+        write_level(&work, |data| {
+            data.set_int("DataVersion", 3953);
+            data.set_byte("Difficulty", number);
+        });
+
+        let world = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+
+        match world.level().difficulty() {
+            Ok(_) => panic!("読めてしまった"),
+            Err(error) => assert_code(ErrorCode::MalformedData, error),
+        }
+
+        std::fs::remove_dir_all(&work).unwrap();
+    }
+}
+
+#[test]
+fn world_l2_unchanged() {
+    let work = temp_world("l2");
+    write_level(&work, |data| {
+        data.set_int("DataVersion", 5023);
+
+        let mut spawn = NbtCompound::new();
+        spawn.set_int_array("pos", vec![1, 2, 3]);
+        spawn.set_string("dimension", "minecraft:overworld");
+        data.set("spawn", NbtTag::Compound(spawn));
+
+        let mut settings = NbtCompound::new();
+        settings.set_string("difficulty", "hard");
+        settings.set_byte("hardcore", 1);
+        data.set("difficulty_settings", NbtTag::Compound(settings));
+    });
+
+    std::fs::create_dir_all(work.join("dimensions/minecraft/overworld")).unwrap();
+    std::fs::create_dir_all(work.join("dimensions/minecraft/the_end")).unwrap();
+    write_dat(&work.join("players/data/u.dat"), |root| root.set_int("Health", 3));
+    write_dat(&work.join("data/minecraft/weather.dat"), |root| root.set_int("Value", 4));
+    write_dat(&work.join("dimensions/minecraft/the_end/data/minecraft/raids.dat"), |root| {
+        root.set_int("Value", 5)
+    });
+
+    let mut world = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+    assert_eq!(vec![1, 2, 3], world.level().spawn_pos().unwrap());
+    assert_eq!("minecraft:overworld", world.level().spawn_dimension().unwrap());
+    assert_eq!("hard", world.level().difficulty().unwrap());
+    assert!(world.level().is_hardcore().unwrap());
+    assert_eq!(
+        vec!["minecraft:overworld", "minecraft:the_end"],
+        world.dimension_ids().unwrap()
+    );
+    assert_eq!(vec!["u"], world.player_ids().unwrap());
+    assert_eq!(4, world.data_file("weather").unwrap().unwrap().get_int("Value").unwrap());
+
+    let end = world.dimension("the_end").unwrap().unwrap();
+    assert_eq!(5, end.data_file("raids").unwrap().unwrap().get_int("Value").unwrap());
+
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+#[test]
+fn data_versionが無いlevel_datはl1として読む() {
+    let work = temp_world("no-data-version");
+    write_level(&work, |_| {});
+    std::fs::create_dir_all(work.join("DIM1")).unwrap();
+
+    let world = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+    assert_eq!(vec!["minecraft:the_end"], world.dimension_ids().unwrap());
+
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+#[test]
+fn world_override_layout() {
+    let work = temp_world("override");
+
+    // level.datは26.3を名乗るが、構成はL1
+    write_level(&work, |data| {
+        data.set_int("DataVersion", 5023);
+        data.set_int("SpawnX", 1);
+        data.set_int("SpawnY", 2);
+        data.set_int("SpawnZ", 3);
+    });
+    std::fs::create_dir_all(work.join("region")).unwrap();
+
+    let plain = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+    assert!(plain.dimension_ids().unwrap().is_empty());
+
+    let options = WorldOpenOptions { format_data_version: Some(3953), ..WorldOpenOptions::default() };
+    let world = MinecraftWorld::open(&work, options).unwrap();
+    assert_eq!(vec!["minecraft:overworld"], world.dimension_ids().unwrap());
+    assert_eq!(vec![1, 2, 3], world.level().spawn_pos().unwrap());
+
+    let invalid = WorldOpenOptions { format_data_version: Some(1518), ..WorldOpenOptions::default() };
+
+    match MinecraftWorld::open(&work, invalid) {
+        Ok(_) => panic!("開けてしまった"),
+        Err(error) => assert_code(ErrorCode::InvalidArgument, error),
+    }
+
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+#[test]
+fn ワールドの指定は読むチャンクの世代にも効く() {
+    let work = temp_world("override-chunk");
+    write_level(&work, |data| data.set_int("DataVersion", 5023));
+    let region = work.join("dimensions").join("minecraft").join("overworld").join("region");
+    std::fs::create_dir_all(&region).unwrap();
+
+    {
+        let mut file = RegionFile::open(region.join("r.0.0.mca"), RegionFileMode::ReadWrite).unwrap();
+        let named = read_file(vector_path("palette_1"), &NbtReadOptions::default()).unwrap();
+        file.write_chunk(0, 0, &named.tag, ChunkCompression::Zlib).unwrap();
+        file.close().unwrap();
+    }
+
+    // ワールドの指定がchunk_readの指定より優先される
+    let options = WorldOpenOptions {
+        chunk_read: ChunkReadOptions {
+            format_data_version: Some(5023),
+            ..ChunkReadOptions::default()
+        },
+        format_data_version: Some(5006),
+        ..WorldOpenOptions::default()
+    };
+
+    let mut world = MinecraftWorld::open(&work, options).unwrap();
+    let overworld = world.dimension("minecraft:overworld").unwrap().unwrap();
+    let loaded = overworld.chunk(0, 0).unwrap().unwrap();
+    assert_eq!(5006, loaded.format_data_version());
+
+    std::fs::remove_dir_all(&work).unwrap();
+}
 
 // ---------------------------------------------------------------------------
 // 文字列でのブロック指定と、変更の印

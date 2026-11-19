@@ -155,6 +155,9 @@ EXCLUDED_FILES = {
     # チャンクの形式の世代の表。ライブラリの内部だけで使う
     "chunkFormat",
     "chunk_format",
+    # ワールドの構成の世代の表。ライブラリの内部だけで使う
+    "worldLayout",
+    "world_layout",
 }
 
 #: 言語のキーワード。正規表現が制御構文を拾ってしまった場合に落とす。

@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -28,8 +28,10 @@ import type { NbtTag } from "../src/nbt/index.js";
 import {
   Compression,
   NamedTag,
+  NbtByte,
   NbtCompound,
   NbtInt,
+  NbtIntArray,
   NbtList,
   NbtLongArray,
   NbtString,
@@ -998,9 +1000,7 @@ test("MinecraftWorld: 次元経由で読んだチャンクの警告も通知先�
     mkdirSync(region, { recursive: true });
 
     // DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
-    const level = new NbtCompound();
-    level.set("Data", new NbtCompound());
-    writeFile(join(work, "level.dat"), new NamedTag("", level));
+    writeLevel(work, { DataVersion: new NbtInt(5023) });
 
     const file = RegionFile.open(join(region, "r.0.0.mca"), RegionFileMode.ReadWrite);
     file.writeChunk(0, 0, foreignChunk());
@@ -1019,4 +1019,281 @@ test("MinecraftWorld: 次元経由で読んだチャンクの警告も通知先�
     // テストごとに作った一時ディレクトリを片付ける
     rmSync(work, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// ワールドの構成の世代（L1とL2）
+// ---------------------------------------------------------------------------
+
+/** `Data`に指定の項目だけを持つlevel.datを書く */
+function writeLevel(directory: string, entries: Record<string, NbtTag>): void {
+  const data = new NbtCompound();
+
+  for (const [key, tag] of Object.entries(entries)) {
+    data.set(key, tag);
+  }
+
+  const root = new NbtCompound();
+  root.set("Data", data);
+  writeFile(join(directory, "level.dat"), new NamedTag("", root));
+}
+
+/** 指定の項目を持つ.datを、フォルダごと作って書く */
+function writeDat(path: string, entries: Record<string, NbtTag>): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const root = new NbtCompound();
+
+  for (const [key, tag] of Object.entries(entries)) {
+    root.set(key, tag);
+  }
+
+  writeFile(path, new NamedTag("", root));
+}
+
+/** 一時フォルダを作って渡し、終わったら消す */
+function withTempWorld(body: (directory: string) => void): void {
+  const work = mkdtempSync(join(tmpdir(), "springnbt-layout-"));
+
+  try {
+    body(work);
+  } finally {
+    // テストごとに作った一時ディレクトリを片付ける
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+/** L1の合成ワールドを作る */
+function makeL1World(directory: string): void {
+  writeLevel(directory, { DataVersion: new NbtInt(3953) });
+
+  for (const folder of ["region", "DIM-1/region", "DIM1/region", "dimensions/mymap/arena/region"]) {
+    mkdirSync(join(directory, folder), { recursive: true });
+  }
+}
+
+test("WorldLayout: world_l1_dimensions", () => {
+  withTempWorld((work) => {
+    makeL1World(work);
+    const world = MinecraftWorld.open(work);
+
+    try {
+      assert.deepEqual(world.dimensionIds(), [
+        "minecraft:overworld",
+        "minecraft:the_nether",
+        "minecraft:the_end",
+        "mymap:arena",
+      ]);
+      assert.equal(world.dimension("minecraft:overworld")!.directory, work);
+      assert.equal(world.dimension("minecraft:the_nether")!.directory, join(work, "DIM-1"));
+      assert.equal(world.dimension("minecraft:the_end")!.directory, join(work, "DIM1"));
+      assert.equal(world.dimension("mymap:arena")!.directory, join(work, "dimensions", "mymap", "arena"));
+
+      // 次元が無ければundefined
+      assert.equal(world.dimension("mymap:missing"), undefined);
+    } finally {
+      world.close();
+    }
+  });
+});
+
+test("WorldLayout: L1で存在しない標準の次元は並ばない", () => {
+  withTempWorld((work) => {
+    writeLevel(work, { DataVersion: new NbtInt(3953) });
+    mkdirSync(join(work, "region"));
+    const world = MinecraftWorld.open(work);
+
+    try {
+      assert.deepEqual(world.dimensionIds(), ["minecraft:overworld"]);
+      assert.equal(world.dimension("minecraft:the_nether"), undefined);
+    } finally {
+      world.close();
+    }
+  });
+});
+
+test("WorldLayout: world_l1_players", () => {
+  withTempWorld((work) => {
+    makeL1World(work);
+    writeDat(join(work, "playerdata", "b-uuid.dat"), { Health: new NbtInt(20) });
+    writeDat(join(work, "playerdata", "a-uuid.dat"), { Health: new NbtInt(7) });
+    const world = MinecraftWorld.open(work);
+
+    try {
+      assert.deepEqual(world.playerIds(), ["a-uuid", "b-uuid"]);
+      assert.equal(world.player("a-uuid")!.getInt("Health"), 7);
+      assert.equal(world.player("missing"), undefined);
+    } finally {
+      world.close();
+    }
+  });
+});
+
+test("WorldLayout: world_l1_data_file", () => {
+  withTempWorld((work) => {
+    makeL1World(work);
+    writeDat(join(work, "data", "scoreboard.dat"), { Value: new NbtInt(1) });
+    writeDat(join(work, "DIM-1", "data", "raids_nether.dat"), { Value: new NbtInt(2) });
+    const world = MinecraftWorld.open(work);
+
+    try {
+      assert.equal(world.dataFile("scoreboard")!.getInt("Value"), 1);
+      assert.equal(world.dataFile("missing"), undefined);
+      assert.equal(world.dimension("minecraft:the_nether")!.dataFile("raids_nether")!.getInt("Value"), 2);
+
+      // オーバーワールドの次元は、ワールドと同じdata/を読む
+      assert.equal(world.dimension("minecraft:overworld")!.dataFile("scoreboard")!.getInt("Value"), 1);
+    } finally {
+      world.close();
+    }
+  });
+});
+
+test("WorldLayout: level_data_l1_getters", () => {
+  withTempWorld((work) => {
+    writeLevel(work, {
+      DataVersion: new NbtInt(3953),
+      SpawnX: new NbtInt(10),
+      SpawnY: new NbtInt(64),
+      SpawnZ: new NbtInt(-5),
+      Difficulty: new NbtByte(2),
+      hardcore: new NbtByte(1),
+    });
+    const world = MinecraftWorld.open(work);
+
+    try {
+      assert.deepEqual(Array.from(world.level.spawnPos), [10, 64, -5]);
+      assert.equal(world.level.difficulty, "normal");
+      assert.equal(world.level.isHardcore, true);
+      assertErrorCode(ErrorCode.UnsupportedFeature, () => world.level.spawnDimension);
+    } finally {
+      world.close();
+    }
+  });
+});
+
+test("WorldLayout: L1の難易度は数値を名前に直す", () => {
+  const names = ["peaceful", "easy", "normal", "hard"];
+
+  // 0〜3をそれぞれ名前に直せる
+  for (const [number, name] of names.entries()) {
+    withTempWorld((work) => {
+      writeLevel(work, { DataVersion: new NbtInt(3953), Difficulty: new NbtByte(number) });
+      const world = MinecraftWorld.open(work);
+      assert.equal(world.level.difficulty, name);
+      world.close();
+    });
+  }
+});
+
+test("WorldLayout: L1の難易度が範囲外なら MalformedData", () => {
+  // 範囲の外側の両端を確かめる
+  for (const number of [-1, 4]) {
+    withTempWorld((work) => {
+      writeLevel(work, { DataVersion: new NbtInt(3953), Difficulty: new NbtByte(number) });
+      const world = MinecraftWorld.open(work);
+      assertErrorCode(ErrorCode.MalformedData, () => world.level.difficulty);
+      world.close();
+    });
+  }
+});
+
+test("WorldLayout: world_l2_unchanged", () => {
+  withTempWorld((work) => {
+    const spawn = new NbtCompound();
+    spawn.set("pos", new NbtIntArray(Int32Array.of(1, 2, 3)));
+    spawn.set("dimension", new NbtString("minecraft:overworld"));
+    const settings = new NbtCompound();
+    settings.set("difficulty", new NbtString("hard"));
+    settings.set("hardcore", new NbtByte(1));
+    writeLevel(work, { DataVersion: new NbtInt(5023), spawn, difficulty_settings: settings });
+
+    mkdirSync(join(work, "dimensions", "minecraft", "overworld"), { recursive: true });
+    mkdirSync(join(work, "dimensions", "minecraft", "the_end"), { recursive: true });
+    writeDat(join(work, "players", "data", "u.dat"), { Health: new NbtInt(3) });
+    writeDat(join(work, "data", "minecraft", "weather.dat"), { Value: new NbtInt(4) });
+    writeDat(join(work, "dimensions", "minecraft", "the_end", "data", "minecraft", "raids.dat"), {
+      Value: new NbtInt(5),
+    });
+    const world = MinecraftWorld.open(work);
+
+    try {
+      assert.deepEqual(Array.from(world.level.spawnPos), [1, 2, 3]);
+      assert.equal(world.level.spawnDimension, "minecraft:overworld");
+      assert.equal(world.level.difficulty, "hard");
+      assert.equal(world.level.isHardcore, true);
+      assert.deepEqual(world.dimensionIds(), ["minecraft:overworld", "minecraft:the_end"]);
+      assert.deepEqual(world.playerIds(), ["u"]);
+      assert.equal(world.dataFile("weather")!.getInt("Value"), 4);
+      assert.equal(world.dimension("the_end")!.dataFile("raids")!.getInt("Value"), 5);
+    } finally {
+      world.close();
+    }
+  });
+});
+
+test("WorldLayout: DataVersion が無い level.dat は L1 として読む", () => {
+  withTempWorld((work) => {
+    writeLevel(work, {});
+    mkdirSync(join(work, "DIM1"));
+    const world = MinecraftWorld.open(work);
+
+    try {
+      assert.deepEqual(world.dimensionIds(), ["minecraft:the_end"]);
+    } finally {
+      world.close();
+    }
+  });
+});
+
+test("WorldLayout: world_override_layout", () => {
+  withTempWorld((work) => {
+    // level.datは26.3を名乗るが、構成はL1
+    writeLevel(work, {
+      DataVersion: new NbtInt(5023),
+      SpawnX: new NbtInt(1),
+      SpawnY: new NbtInt(2),
+      SpawnZ: new NbtInt(3),
+    });
+    mkdirSync(join(work, "region"));
+
+    const plain = MinecraftWorld.open(work);
+    assert.deepEqual(plain.dimensionIds(), []);
+    plain.close();
+
+    const world = MinecraftWorld.open(work, { formatDataVersion: 3953 });
+
+    try {
+      assert.deepEqual(world.dimensionIds(), ["minecraft:overworld"]);
+      assert.deepEqual(Array.from(world.level.spawnPos), [1, 2, 3]);
+    } finally {
+      world.close();
+    }
+
+    assertErrorCode(ErrorCode.InvalidArgument, () => MinecraftWorld.open(work, { formatDataVersion: 1518 }));
+  });
+});
+
+test("WorldLayout: ワールドの指定は読むチャンクの世代にも効く", () => {
+  withTempWorld((work) => {
+    writeLevel(work, { DataVersion: new NbtInt(5023) });
+    const region = join(work, "dimensions", "minecraft", "overworld", "region");
+    mkdirSync(region, { recursive: true });
+    const file = RegionFile.open(join(region, "r.0.0.mca"), RegionFileMode.ReadWrite);
+    file.writeChunk(0, 0, readFile(vectorPath("palette_1")).tag);
+    file.close();
+
+    // ワールドの指定がchunkReadの指定より優先される
+    const readOptions: ChunkReadOptions = { formatDataVersion: 5023 };
+    const world = MinecraftWorld.open(work, { chunkRead: readOptions, formatDataVersion: 5006 });
+
+    try {
+      const loaded = world.dimension("minecraft:overworld")!.chunk(0, 0)!;
+      assert.equal(loaded.formatDataVersion, 5006);
+    } finally {
+      world.close();
+    }
+
+    // 渡したオプションは書き換えない
+    assert.equal(readOptions.formatDataVersion, 5023);
+  });
 });

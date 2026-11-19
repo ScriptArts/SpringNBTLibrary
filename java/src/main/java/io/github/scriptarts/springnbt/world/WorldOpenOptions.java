@@ -7,6 +7,7 @@ public final class WorldOpenOptions {
     private boolean ignoreSessionLock;
     private ChunkReadOptions chunkRead = ChunkReadOptions.defaults();
     private ChunkWriteOptions chunkWrite = ChunkWriteOptions.defaults();
+    private Integer formatDataVersion;
 
     /**
      * 既定のオプションを作る
@@ -99,6 +100,32 @@ public final class WorldOpenOptions {
      */
     public WorldOpenOptions setChunkWrite(ChunkWriteOptions value) {
         this.chunkWrite = value;
+        return this;
+    }
+
+    /**
+     * ワールドの構成の世代を選ぶDataVersion
+     *
+     * <p>nullなら、{@code level.dat}のDataVersionで選ぶ
+     * 1519以上でなければならない
+     * そのワールドから読むすべてのチャンクの世代にも効き、{@link #chunkRead()}の{@link ChunkReadOptions#formatDataVersion()}より優先する
+     *
+     * @return DataVersion
+     * 指定が無ければnull
+     */
+    public Integer formatDataVersion() {
+        return formatDataVersion;
+    }
+
+    /**
+     * ワールドの構成の世代を選ぶDataVersionを設定する
+     *
+     * @param value DataVersion
+     * nullなら{@code level.dat}のDataVersionで選ぶ
+     * @return このオブジェクト
+     */
+    public WorldOpenOptions setFormatDataVersion(Integer value) {
+        this.formatDataVersion = value;
         return this;
     }
 }

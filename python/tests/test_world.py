@@ -19,8 +19,10 @@ from spring_nbt_library import (
 from spring_nbt_library.nbt import (
     Compression,
     NamedTag,
+    NbtByte,
     NbtCompound,
     NbtInt,
+    NbtIntArray,
     NbtList,
     NbtLongArray,
     NbtString,
@@ -922,6 +924,37 @@ class TestChunkFormat:
         assert chunk.data_version == 4903
 
 
+def write_level(directory, entries):
+    """``Data``に指定の項目だけを持つlevel.datを書く"""
+    data = NbtCompound()
+
+    for key, tag in entries.items():
+        data.set(key, tag)
+
+    root = NbtCompound()
+    root.set("Data", data)
+    write_file(str(directory / "level.dat"), NamedTag("", root))
+
+
+def write_dat(path, entries):
+    """指定の項目を持つ.datを、フォルダごと作って書く"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    root = NbtCompound()
+
+    for key, tag in entries.items():
+        root.set(key, tag)
+
+    write_file(str(path), NamedTag("", root))
+
+
+def make_l1_world(directory):
+    """L1の合成ワールドを作る"""
+    write_level(directory, {"DataVersion": NbtInt(3953)})
+
+    for folder in ("region", "DIM-1/region", "DIM1/region", "dimensions/mymap/arena/region"):
+        (directory / folder).mkdir(parents=True)
+
+
 class TestMinecraftWorld:
     """ワールドを開く
     """
@@ -943,9 +976,7 @@ class TestMinecraftWorld:
         region.mkdir(parents=True)
 
         # DataVersionが扱える形式より古いチャンクを1つだけ持つワールドを作る
-        level = NbtCompound()
-        level.set("Data", NbtCompound())
-        write_file(str(tmp_path / "level.dat"), NamedTag("", level))
+        write_level(tmp_path, {"DataVersion": NbtInt(5023)})
 
         chunk = read_file(vector_path("palette_1")).tag
         chunk.set("DataVersion", NbtInt(PRE_FLATTENING_DATA_VERSION))
@@ -961,3 +992,173 @@ class TestMinecraftWorld:
 
         # ワールドを開くときに渡した通知先が、次元経由の読み込みでも呼ばれる
         assert len(warnings) == 1
+
+
+class TestWorldLayout:
+    """ワールドの構成の世代（L1とL2）
+    """
+
+    def test_world_l1_dimensions(self, tmp_path):
+        make_l1_world(tmp_path)
+
+        with MinecraftWorld.open(str(tmp_path)) as world:
+            assert world.dimension_ids() == [
+                "minecraft:overworld", "minecraft:the_nether",
+                "minecraft:the_end", "mymap:arena"]
+            assert world.dimension("minecraft:overworld").directory == str(tmp_path)
+            assert world.dimension("minecraft:the_nether").directory == str(tmp_path / "DIM-1")
+            assert world.dimension("minecraft:the_end").directory == str(tmp_path / "DIM1")
+            assert world.dimension("mymap:arena").directory == str(
+                tmp_path / "dimensions" / "mymap" / "arena")
+
+            # 次元が無ければNone
+            assert world.dimension("mymap:missing") is None
+
+    def test_L1で存在しない標準の次元は並ばない(self, tmp_path):
+        write_level(tmp_path, {"DataVersion": NbtInt(3953)})
+        (tmp_path / "region").mkdir()
+
+        with MinecraftWorld.open(str(tmp_path)) as world:
+            assert world.dimension_ids() == ["minecraft:overworld"]
+            assert world.dimension("minecraft:the_nether") is None
+
+    def test_world_l1_players(self, tmp_path):
+        make_l1_world(tmp_path)
+        write_dat(tmp_path / "playerdata" / "b-uuid.dat", {"Health": NbtInt(20)})
+        write_dat(tmp_path / "playerdata" / "a-uuid.dat", {"Health": NbtInt(7)})
+
+        with MinecraftWorld.open(str(tmp_path)) as world:
+            assert world.player_ids() == ["a-uuid", "b-uuid"]
+            assert world.player("a-uuid").get_int("Health") == 7
+            assert world.player("missing") is None
+
+    def test_world_l1_data_file(self, tmp_path):
+        make_l1_world(tmp_path)
+        write_dat(tmp_path / "data" / "scoreboard.dat", {"Value": NbtInt(1)})
+        write_dat(tmp_path / "DIM-1" / "data" / "raids_nether.dat", {"Value": NbtInt(2)})
+
+        with MinecraftWorld.open(str(tmp_path)) as world:
+            assert world.data_file("scoreboard").get_int("Value") == 1
+            assert world.data_file("missing") is None
+            assert world.dimension("minecraft:the_nether").data_file(
+                "raids_nether").get_int("Value") == 2
+
+            # オーバーワールドの次元は、ワールドと同じdata/を読む
+            assert world.dimension("minecraft:overworld").data_file(
+                "scoreboard").get_int("Value") == 1
+
+    def test_level_data_l1_getters(self, tmp_path):
+        write_level(tmp_path, {
+            "DataVersion": NbtInt(3953),
+            "SpawnX": NbtInt(10),
+            "SpawnY": NbtInt(64),
+            "SpawnZ": NbtInt(-5),
+            "Difficulty": NbtByte(2),
+            "hardcore": NbtByte(1),
+        })
+
+        with MinecraftWorld.open(str(tmp_path)) as world:
+            assert world.level.spawn_pos == [10, 64, -5]
+            assert world.level.difficulty == "normal"
+            assert world.level.is_hardcore is True
+
+            with pytest.raises(SpringNbtError) as error:
+                world.level.spawn_dimension
+
+            assert error.value.code == ErrorCode.UNSUPPORTED_FEATURE
+
+    @pytest.mark.parametrize("number,name", [(0, "peaceful"), (1, "easy"), (2, "normal"), (3, "hard")])
+    def test_L1の難易度は数値を名前に直す(self, tmp_path, number, name):
+        write_level(tmp_path, {"DataVersion": NbtInt(3953), "Difficulty": NbtByte(number)})
+
+        with MinecraftWorld.open(str(tmp_path)) as world:
+            assert world.level.difficulty == name
+
+    @pytest.mark.parametrize("number", [-1, 4])
+    def test_L1の難易度が範囲外ならMALFORMED_DATA(self, tmp_path, number):
+        write_level(tmp_path, {"DataVersion": NbtInt(3953), "Difficulty": NbtByte(number)})
+
+        with MinecraftWorld.open(str(tmp_path)) as world:
+            with pytest.raises(SpringNbtError) as error:
+                world.level.difficulty
+
+            assert error.value.code == ErrorCode.MALFORMED_DATA
+
+    def test_world_l2_unchanged(self, tmp_path):
+        data = NbtCompound()
+        data.set("DataVersion", NbtInt(5023))
+        spawn = NbtCompound()
+        spawn.set("pos", NbtIntArray([1, 2, 3]))
+        spawn.set("dimension", NbtString("minecraft:overworld"))
+        data.set("spawn", spawn)
+        settings = NbtCompound()
+        settings.set("difficulty", NbtString("hard"))
+        settings.set("hardcore", NbtByte(1))
+        data.set("difficulty_settings", settings)
+        root = NbtCompound()
+        root.set("Data", data)
+        write_file(str(tmp_path / "level.dat"), NamedTag("", root))
+
+        (tmp_path / "dimensions" / "minecraft" / "overworld").mkdir(parents=True)
+        (tmp_path / "dimensions" / "minecraft" / "the_end").mkdir(parents=True)
+        write_dat(tmp_path / "players" / "data" / "u.dat", {"Health": NbtInt(3)})
+        write_dat(tmp_path / "data" / "minecraft" / "weather.dat", {"Value": NbtInt(4)})
+        write_dat(tmp_path / "dimensions" / "minecraft" / "the_end" / "data" / "minecraft"
+                  / "raids.dat", {"Value": NbtInt(5)})
+
+        with MinecraftWorld.open(str(tmp_path)) as world:
+            assert world.level.spawn_pos == [1, 2, 3]
+            assert world.level.spawn_dimension == "minecraft:overworld"
+            assert world.level.difficulty == "hard"
+            assert world.level.is_hardcore is True
+            assert world.dimension_ids() == ["minecraft:overworld", "minecraft:the_end"]
+            assert world.player_ids() == ["u"]
+            assert world.data_file("weather").get_int("Value") == 4
+            assert world.dimension("the_end").data_file("raids").get_int("Value") == 5
+
+    def test_DataVersionが無いlevelDatはL1として読む(self, tmp_path):
+        write_level(tmp_path, {})
+        (tmp_path / "DIM1").mkdir()
+
+        with MinecraftWorld.open(str(tmp_path)) as world:
+            assert world.dimension_ids() == ["minecraft:the_end"]
+
+    def test_world_override_layout(self, tmp_path):
+        # level.datは26.3を名乗るが、構成はL1
+        write_level(tmp_path, {"DataVersion": NbtInt(5023), "SpawnX": NbtInt(1),
+                               "SpawnY": NbtInt(2), "SpawnZ": NbtInt(3)})
+        (tmp_path / "region").mkdir()
+
+        with MinecraftWorld.open(str(tmp_path)) as plain:
+            assert plain.dimension_ids() == []
+
+        options = WorldOpenOptions(format_data_version=3953)
+
+        with MinecraftWorld.open(str(tmp_path), options) as world:
+            assert world.dimension_ids() == ["minecraft:overworld"]
+            assert world.level.spawn_pos == [1, 2, 3]
+
+        with pytest.raises(SpringNbtError) as error:
+            MinecraftWorld.open(str(tmp_path), WorldOpenOptions(format_data_version=1518))
+
+        assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+    def test_ワールドの指定は読むチャンクの世代にも効く(self, tmp_path):
+        write_level(tmp_path, {"DataVersion": NbtInt(5023)})
+        region = tmp_path / "dimensions" / "minecraft" / "overworld" / "region"
+        region.mkdir(parents=True)
+        chunk = read_file(vector_path("palette_1")).tag
+
+        with RegionFile.open(str(region / "r.0.0.mca"), RegionFileMode.READ_WRITE) as file:
+            file.write_chunk(0, 0, chunk)
+
+        # ワールドの指定がchunk_readの指定より優先される
+        read_options = ChunkReadOptions(format_data_version=5023)
+        options = WorldOpenOptions(chunk_read=read_options, format_data_version=5006)
+
+        with MinecraftWorld.open(str(tmp_path), options) as world:
+            loaded = world.dimension("minecraft:overworld").chunk(0, 0)
+            assert loaded.format_data_version == 5006
+
+        # 渡したオプションは書き換えない
+        assert read_options.format_data_version == 5023

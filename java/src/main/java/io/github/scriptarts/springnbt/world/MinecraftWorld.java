@@ -25,20 +25,23 @@ import java.util.Objects;
 /**
  * Minecraft Java版のセーブデータ1つ分
  *
- * <p>26.xでは構成が大きく変わっており、標準の3次元も{@code dimensions/<名前空間>/<パス>/}の下に並ぶ
+ * <p>26.1以降は構成が大きく変わっており、標準の3次元も{@code dimensions/<名前空間>/<パス>/}の下に並ぶ
+ * それより前の構成も、{@code level.dat}のDataVersionで見分けて読み書きできる
  */
 public final class MinecraftWorld implements AutoCloseable {
 
     private final Path directory;
     private final WorldOpenOptions options;
     private final LevelData level;
+    private final WorldLayout layout;
     private final Map<String, Dimension> dimensions = new HashMap<>();
     private boolean closed;
 
     private MinecraftWorld(Path directory, WorldOpenOptions options, NamedTag level) {
         this.directory = directory;
-        this.options = options;
-        this.level = new LevelData(level);
+        this.level = new LevelData(level, options.formatDataVersion());
+        this.layout = this.level.layout();
+        this.options = withFormatDataVersion(options);
     }
 
     /**
@@ -67,7 +70,8 @@ public final class MinecraftWorld implements AutoCloseable {
      * nullなら既定値
      * @return ワールド
      * @throws SpringNbtException ディレクトリやlevel.datが無い場合、
-     *                            または書き込みモードでsession.lockを取得できない場合
+     *                            または書き込みモードでsession.lockを取得できない場合、
+     *                            またはformatDataVersionが1519未満の場合
      */
     public static MinecraftWorld open(Path directory, WorldOpenOptions options) {
         Objects.requireNonNull(directory, "directory");
@@ -135,7 +139,8 @@ public final class MinecraftWorld implements AutoCloseable {
     /**
      * {@code data/minecraft/<name>.dat}を読む
      *
-     * <p>26.xでは{@code game_rules} / {@code weather} / {@code world_gen_settings}などがこの形で{@code level.dat}から分離されている
+     * <p>26.1以降は{@code game_rules} / {@code weather} / {@code world_gen_settings}などがこの形で{@code level.dat}から分離されている
+     * 26.1より前は{@code data/<name>.dat}を読む
      *
      * @param name ファイル名（拡張子なし）
      * @return NBT
@@ -143,7 +148,7 @@ public final class MinecraftWorld implements AutoCloseable {
      */
     public NbtCompound dataFile(String name) {
         ensureOpen();
-        Path path = directory.resolve("data").resolve("minecraft").resolve(name + ".dat");
+        Path path = layout.dataFilePath(directory, name);
 
         if (!Files.exists(path)) {
             return null;
@@ -154,43 +159,13 @@ public final class MinecraftWorld implements AutoCloseable {
 
     /**
      * 存在する次元のIDを返す
+     * 26.1より前は標準の3次元を固定の順で先に並べ、データパックの次元を{@code dimensions/}から探す
      *
      * @return 次元IDの一覧
      */
     public List<String> dimensionIds() {
         ensureOpen();
-        Path root = directory.resolve("dimensions");
-        List<String> found = new ArrayList<>();
-
-        if (!Files.isDirectory(root)) {
-            return found;
-        }
-
-        // dimensions/<名前空間>/<パス>/の2段を辿る
-        try (DirectoryStream<Path> namespaces = Files.newDirectoryStream(root)) {
-            // 1段目が名前空間
-            for (Path namespaceDir : namespaces) {
-                if (!Files.isDirectory(namespaceDir)) {
-                    continue;
-                }
-
-                try (DirectoryStream<Path> paths = Files.newDirectoryStream(namespaceDir)) {
-                    // 2段目が次元のパス
-                    for (Path pathDir : paths) {
-                        // ディレクトリだけを次元として数える
-                        if (Files.isDirectory(pathDir)) {
-                            found.add(namespaceDir.getFileName() + ":" + pathDir.getFileName());
-                        }
-                    }
-                }
-            }
-        } catch (IOException error) {
-            throw new SpringNbtException(ErrorCode.IO, "dimensions を走査できない: " + root, error);
-        }
-
-        // 走査順がファイルシステム依存にならないよう並べる
-        Collections.sort(found);
-        return found;
+        return layout.dimensionIds(directory);
     }
 
     /**
@@ -212,16 +187,13 @@ public final class MinecraftWorld implements AutoCloseable {
             return cached;
         }
 
-        int colon = normalized.indexOf(':');
-        Path path = directory.resolve("dimensions")
-                .resolve(normalized.substring(0, colon))
-                .resolve(normalized.substring(colon + 1));
-
-        if (!Files.isDirectory(path)) {
+        // 存在しない次元はnullのまま
+        if (!layout.hasDimension(directory, normalized)) {
             return null;
         }
 
-        Dimension opened = new Dimension(normalized, path, options);
+        Path path = layout.dimensionDirectory(directory, normalized);
+        Dimension opened = new Dimension(normalized, path, options, layout);
         dimensions.put(normalized, opened);
         return opened;
     }
@@ -233,7 +205,7 @@ public final class MinecraftWorld implements AutoCloseable {
      */
     public List<String> playerIds() {
         ensureOpen();
-        Path path = directory.resolve("players").resolve("data");
+        Path path = layout.playerDirectory(directory);
         List<String> found = new ArrayList<>();
 
         if (!Files.isDirectory(path)) {
@@ -247,7 +219,7 @@ public final class MinecraftWorld implements AutoCloseable {
                 found.add(name.substring(0, name.length() - 4));
             }
         } catch (IOException error) {
-            throw new SpringNbtException(ErrorCode.IO, "players/data を走査できない: " + path, error);
+            throw new SpringNbtException(ErrorCode.IO, "プレイヤーのフォルダを走査できない: " + path, error);
         }
 
         Collections.sort(found);
@@ -264,7 +236,7 @@ public final class MinecraftWorld implements AutoCloseable {
     public NbtCompound player(String uuid) {
         ensureOpen();
         Objects.requireNonNull(uuid, "uuid");
-        Path path = directory.resolve("players").resolve("data").resolve(uuid + ".dat");
+        Path path = layout.playerDirectory(directory).resolve(uuid + ".dat");
 
         if (!Files.exists(path)) {
             return null;
@@ -337,6 +309,30 @@ public final class MinecraftWorld implements AutoCloseable {
         if (closed) {
             throw SpringNbtException.invalidArgument("既に閉じられたワールド");
         }
+    }
+
+    /**
+     * ワールドで世代を指定されていれば、チャンクの読み込みにも同じ指定を入れた複製を返す
+     * 渡されたオプションは書き換えない
+     */
+    private static WorldOpenOptions withFormatDataVersion(WorldOpenOptions source) {
+        // 指定が無ければ、チャンクごとの指定やチャンク自身のDataVersionに任せる
+        if (source.formatDataVersion() == null) {
+            return source;
+        }
+
+        ChunkReadOptions read = source.chunkRead();
+
+        return new WorldOpenOptions()
+                .setWritable(source.writable())
+                .setIgnoreSessionLock(source.ignoreSessionLock())
+                .setChunkRead(new ChunkReadOptions()
+                        .setOnVersionMismatch(read.onVersionMismatch())
+                        .setOnWarning(read.onWarning())
+                        .setLenientBitStorage(read.lenientBitStorage())
+                        .setFormatDataVersion(source.formatDataVersion()))
+                .setChunkWrite(source.chunkWrite())
+                .setFormatDataVersion(source.formatDataVersion());
     }
 
     /** 名前空間が省略されていたら{@code minecraft:}を補う */
