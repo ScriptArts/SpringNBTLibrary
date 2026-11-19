@@ -63,11 +63,54 @@ internal sealed class ChunkFormat
         new[] { "TileEntities", "TileTicks", "LiquidTicks" };
 
     /// <summary>
+    /// 生成済みとみなす<c>Status</c>の値（名前空間を外した形）
+    /// 世代を引けないチャンクもこれで判定する
+    /// </summary>
+    internal static readonly IReadOnlyList<string> DefaultFullStatuses = new[] { "full" };
+
+    /// <summary>
+    /// 1.14までの形式で生成済みとみなす<c>Status</c>の値
+    /// 1.13は生成を終えたチャンクを<c>fullchunk</c>や<c>postprocessed</c>で保存する
+    /// </summary>
+    private static readonly string[] FullStatuses1_13 = new[] { "full", "postprocessed", "fullchunk" };
+
+    /// <summary>
     /// 世代の表
     /// 境界のDataVersionの昇順に並べる
     /// </summary>
     private static readonly ChunkFormat[] Formats = new[]
     {
+        // C1: 1.13〜1.14.x
+        // C2と同じで、バイオームは列ごとの数値のID
+        // 1.13の生成済みのチャンクはStatusがfullchunkかpostprocessed
+        new ChunkFormat(
+            minDataVersion: OldestFormatDataVersion,
+            wrappedInLevel: true,
+            sectionsKey: "Sections",
+            paletteDataVersion: OldestFormatDataVersion,
+            spanningBitStorage: true,
+            blockStorage: BlockStorage.SectionPalette,
+            biomeStorage: BiomeStorage.Ids2D,
+            blockDataKeys: LevelBlockDataKeys,
+            hasYPos: false,
+            addsLightFlag: false,
+            fullStatuses: FullStatuses1_13),
+
+        // C2: 1.15〜1.15.2
+        // C3と同じで、ビット詰めが値を64bitの境目でまたぐ
+        new ChunkFormat(
+            minDataVersion: 2203,
+            wrappedInLevel: true,
+            sectionsKey: "Sections",
+            paletteDataVersion: 2203,
+            spanningBitStorage: true,
+            blockStorage: BlockStorage.SectionPalette,
+            biomeStorage: BiomeStorage.Ids3D,
+            blockDataKeys: LevelBlockDataKeys,
+            hasYPos: false,
+            addsLightFlag: false,
+            fullStatuses: DefaultFullStatuses),
+
         // C3: 1.16〜1.17.x
         // 本体はLevelの中で、ブロックはセクションの直下のPalette / BlockStates
         // バイオームは4×4×4ブロックごとの数値のID
@@ -81,7 +124,8 @@ internal sealed class ChunkFormat
             biomeStorage: BiomeStorage.Ids3D,
             blockDataKeys: LevelBlockDataKeys,
             hasYPos: false,
-            addsLightFlag: false),
+            addsLightFlag: false,
+            fullStatuses: DefaultFullStatuses),
 
         // C4: 1.18〜26.2
         // Levelが無くなり、パレットの要素はName / Properties
@@ -95,7 +139,8 @@ internal sealed class ChunkFormat
             biomeStorage: BiomeStorage.Paletted,
             blockDataKeys: RootBlockDataKeys,
             hasYPos: true,
-            addsLightFlag: true),
+            addsLightFlag: true,
+            fullStatuses: DefaultFullStatuses),
 
         // C5: 26.3以降
         // パレットの要素は文字列かid / properties
@@ -109,7 +154,8 @@ internal sealed class ChunkFormat
             biomeStorage: BiomeStorage.Paletted,
             blockDataKeys: RootBlockDataKeys,
             hasYPos: true,
-            addsLightFlag: true),
+            addsLightFlag: true,
+            fullStatuses: DefaultFullStatuses),
     };
 
     private ChunkFormat(
@@ -122,7 +168,8 @@ internal sealed class ChunkFormat
         BiomeStorage biomeStorage,
         IReadOnlyList<string> blockDataKeys,
         bool hasYPos,
-        bool addsLightFlag)
+        bool addsLightFlag,
+        IReadOnlyList<string> fullStatuses)
     {
         MinDataVersion = minDataVersion;
         WrappedInLevel = wrappedInLevel;
@@ -134,6 +181,7 @@ internal sealed class ChunkFormat
         BlockDataKeys = blockDataKeys;
         HasYPos = hasYPos;
         AddsLightFlag = addsLightFlag;
+        FullStatuses = fullStatuses;
     }
 
     /// <summary>この世代が始まるDataVersion</summary>
@@ -168,9 +216,13 @@ internal sealed class ChunkFormat
 
     /// <summary>
     /// <c>isLightOn</c>の無いチャンクで光源を無効化するとき、<c>isLightOn</c>を書き足すか
-    /// 1.17までは生成途中のチャンクに<c>isLightOn</c>が無く、書き足すと元に無いキーが増えるので足さない
+    /// 1.17までは生成途中のチャンクに<c>isLightOn</c>が無く（1.13はどのチャンクにも無い）、
+    /// 書き足すと元に無いキーが増えるので足さない
     /// </summary>
     internal bool AddsLightFlag { get; }
+
+    /// <summary>生成済みとみなす<c>Status</c>の値（名前空間を外した形）</summary>
+    internal IReadOnlyList<string> FullStatuses { get; }
 
     /// <summary>
     /// DataVersionから世代を引く

@@ -46,6 +46,18 @@ const ROOT_BLOCK_DATA_KEYS: readonly string[] = ["block_entities", "block_ticks"
 /** `Level`の中に置かれる、ブロックに紐づく付随データのキー（1.17まで） */
 const LEVEL_BLOCK_DATA_KEYS: readonly string[] = ["TileEntities", "TileTicks", "LiquidTicks"];
 
+/**
+ * 生成済みとみなす`Status`の値（名前空間を外した形）
+ * 世代を引けないチャンクもこれで判定する
+ */
+export const DEFAULT_FULL_STATUSES: readonly string[] = ["full"];
+
+/**
+ * 1.14までの形式で生成済みとみなす`Status`の値
+ * 1.13は生成を終えたチャンクを`fullchunk`や`postprocessed`で保存する
+ */
+const FULL_STATUSES_1_13: readonly string[] = ["full", "postprocessed", "fullchunk"];
+
 /** チャンクの形式の世代1つ分 */
 export class ChunkFormat {
   constructor(
@@ -72,9 +84,12 @@ export class ChunkFormat {
     readonly hasYPos: boolean,
     /**
      * `isLightOn`の無いチャンクで光源を無効化するとき、`isLightOn`を書き足すか
-     * 1.17までは生成途中のチャンクに`isLightOn`が無く、書き足すと元に無いキーが増えるので足さない
+     * 1.17までは生成途中のチャンクに`isLightOn`が無く（1.13はどのチャンクにも無い）、
+     * 書き足すと元に無いキーが増えるので足さない
      */
     readonly addsLightFlag: boolean,
+    /** 生成済みとみなす`Status`の値（名前空間を外した形） */
+    readonly fullStatuses: readonly string[],
   ) {}
 
   /**
@@ -101,6 +116,37 @@ export class ChunkFormat {
  * 境界のDataVersionの昇順に並べる
  */
 const FORMATS: readonly ChunkFormat[] = [
+  // C1: 1.13〜1.14.x
+  // C2と同じで、バイオームは列ごとの数値のID
+  // 1.13の生成済みのチャンクはStatusがfullchunkかpostprocessed
+  new ChunkFormat(
+    OLDEST_FORMAT_DATA_VERSION,
+    true,
+    "Sections",
+    OLDEST_FORMAT_DATA_VERSION,
+    true,
+    BlockStorage.SectionPalette,
+    BiomeStorage.Ids2D,
+    LEVEL_BLOCK_DATA_KEYS,
+    false,
+    false,
+    FULL_STATUSES_1_13,
+  ),
+  // C2: 1.15〜1.15.2
+  // C3と同じで、ビット詰めが値を64bitの境目でまたぐ
+  new ChunkFormat(
+    2203,
+    true,
+    "Sections",
+    2203,
+    true,
+    BlockStorage.SectionPalette,
+    BiomeStorage.Ids3D,
+    LEVEL_BLOCK_DATA_KEYS,
+    false,
+    false,
+    DEFAULT_FULL_STATUSES,
+  ),
   // C3: 1.16〜1.17.x
   // 本体はLevelの中で、ブロックはセクションの直下のPalette / BlockStates
   // バイオームは4×4×4ブロックごとの数値のID
@@ -115,6 +161,7 @@ const FORMATS: readonly ChunkFormat[] = [
     LEVEL_BLOCK_DATA_KEYS,
     false,
     false,
+    DEFAULT_FULL_STATUSES,
   ),
   // C4: 1.18〜26.2
   // Levelが無くなり、パレットの要素はName / Properties
@@ -129,6 +176,7 @@ const FORMATS: readonly ChunkFormat[] = [
     ROOT_BLOCK_DATA_KEYS,
     true,
     true,
+    DEFAULT_FULL_STATUSES,
   ),
   // C5: 26.3以降
   // パレットの要素は文字列かid / properties
@@ -143,5 +191,6 @@ const FORMATS: readonly ChunkFormat[] = [
     ROOT_BLOCK_DATA_KEYS,
     true,
     true,
+    DEFAULT_FULL_STATUSES,
   ),
 ];

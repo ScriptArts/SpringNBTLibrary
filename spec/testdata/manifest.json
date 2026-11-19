@@ -489,6 +489,36 @@
       "roundtrip": true
     },
     {
+      "id": "world/v2230_spanning",
+      "kind": "world",
+      "input": "world/v2230_spanning.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "1.15.2の形式のチャンク（DataVersion 2230）。ビット詰めが64bitの境目をまたぎ、パレット17種類でビット幅5",
+      "expect": "expect/world/v2230_spanning.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/v1976_biomes_2d",
+      "kind": "world",
+      "input": "world/v1976_biomes_2d.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "1.14.4の形式のチャンク（DataVersion 1976）。バイオームは列ごとのint[256]",
+      "expect": "expect/world/v1976_biomes_2d.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/v1343_numeric_ids",
+      "kind": "world",
+      "input": "world/v1343_numeric_ids.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "1.12.2の形式のチャンク（DataVersion 1343）。ブロックが数値のIDなので解釈せず、chunk-reportはUNSUPPORTED_DATA_VERSION",
+      "expect_error": "UNSUPPORTED_DATA_VERSION",
+      "roundtrip": false
+    },
+    {
       "id": "world/palette_index_out_of_range",
       "kind": "world",
       "input": "world/palette_index_out_of_range.nbt",

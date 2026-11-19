@@ -17,6 +17,14 @@ const ROOT_BLOCK_DATA_KEYS: [&str; 3] = ["block_entities", "block_ticks", "fluid
 /// `Level`の中に置かれる、ブロックに紐づく付随データのキー（1.17まで）
 const LEVEL_BLOCK_DATA_KEYS: [&str; 3] = ["TileEntities", "TileTicks", "LiquidTicks"];
 
+/// 生成済みとみなす`Status`の値（名前空間を外した形）
+/// 世代を引けないチャンクもこれで判定する
+pub(crate) const FULL_STATUSES: &[&str] = &["full"];
+
+/// 1.14までの形式で生成済みとみなす`Status`の値
+/// 1.13は生成を終えたチャンクを`fullchunk`や`postprocessed`で保存する
+const FULL_STATUSES_1_13: &[&str] = &["full", "postprocessed", "fullchunk"];
+
 /// セクションのブロックの持ち方
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BlockStorage {
@@ -34,8 +42,6 @@ pub(crate) enum BiomeStorage {
     /// セクションごとのパレット付きコンテナ
     Paletted,
     /// チャンクの列ごとの数値のバイオームID（`int[256]`）
-    // 1.14までの世代を表に足したときに使う
-    #[allow(dead_code)]
     Ids2D,
     /// 4×4×4ブロックごとの数値のバイオームID（`int[1024]`）
     Ids3D,
@@ -64,13 +70,47 @@ pub(crate) struct ChunkFormat {
     /// 無い世代では、セクションは0段目から始まる
     pub(crate) has_y_pos: bool,
     /// `isLightOn`の無いチャンクで光源を無効化するとき、`isLightOn`を書き足すか
-    /// 1.17までは生成途中のチャンクに`isLightOn`が無く、書き足すと元に無いキーが増えるので足さない
+    /// 1.17までは生成途中のチャンクに`isLightOn`が無く（1.13はどのチャンクにも無い）、
+    /// 書き足すと元に無いキーが増えるので足さない
     pub(crate) adds_light_flag: bool,
+    /// 生成済みとみなす`Status`の値（名前空間を外した形）
+    pub(crate) full_statuses: &'static [&'static str],
 }
 
 /// 世代の表
 /// 境界のDataVersionの昇順に並べる
-static FORMATS: [ChunkFormat; 3] = [
+static FORMATS: [ChunkFormat; 5] = [
+    // C1: 1.13〜1.14.x
+    // C2と同じで、バイオームは列ごとの数値のID
+    // 1.13の生成済みのチャンクはStatusがfullchunkかpostprocessed
+    ChunkFormat {
+        min_data_version: OLDEST_FORMAT_DATA_VERSION,
+        wrapped_in_level: true,
+        sections_key: "Sections",
+        palette_data_version: OLDEST_FORMAT_DATA_VERSION,
+        spanning_bit_storage: true,
+        block_storage: BlockStorage::SectionPalette,
+        biome_storage: BiomeStorage::Ids2D,
+        block_data_keys: LEVEL_BLOCK_DATA_KEYS,
+        has_y_pos: false,
+        adds_light_flag: false,
+        full_statuses: FULL_STATUSES_1_13,
+    },
+    // C2: 1.15〜1.15.2
+    // C3と同じで、ビット詰めが値を64bitの境目でまたぐ
+    ChunkFormat {
+        min_data_version: 2203,
+        wrapped_in_level: true,
+        sections_key: "Sections",
+        palette_data_version: 2203,
+        spanning_bit_storage: true,
+        block_storage: BlockStorage::SectionPalette,
+        biome_storage: BiomeStorage::Ids3D,
+        block_data_keys: LEVEL_BLOCK_DATA_KEYS,
+        has_y_pos: false,
+        adds_light_flag: false,
+        full_statuses: FULL_STATUSES,
+    },
     // C3: 1.16〜1.17.x
     // 本体はLevelの中で、ブロックはセクションの直下のPalette / BlockStates
     // バイオームは4×4×4ブロックごとの数値のID
@@ -85,6 +125,7 @@ static FORMATS: [ChunkFormat; 3] = [
         block_data_keys: LEVEL_BLOCK_DATA_KEYS,
         has_y_pos: false,
         adds_light_flag: false,
+        full_statuses: FULL_STATUSES,
     },
     // C4: 1.18〜26.2
     // Levelが無くなり、パレットの要素はName / Properties
@@ -99,6 +140,7 @@ static FORMATS: [ChunkFormat; 3] = [
         block_data_keys: ROOT_BLOCK_DATA_KEYS,
         has_y_pos: true,
         adds_light_flag: true,
+        full_statuses: FULL_STATUSES,
     },
     // C5: 26.3以降
     // パレットの要素は文字列かid / properties
@@ -113,6 +155,7 @@ static FORMATS: [ChunkFormat; 3] = [
         block_data_keys: ROOT_BLOCK_DATA_KEYS,
         has_y_pos: true,
         adds_light_flag: true,
+        full_statuses: FULL_STATUSES,
     },
 ];
 

@@ -56,10 +56,51 @@ final class ChunkFormat {
             List.of("TileEntities", "TileTicks", "LiquidTicks");
 
     /**
+     * 生成済みとみなす{@code Status}の値（名前空間を外した形）
+     * 世代を引けないチャンクもこれで判定する
+     */
+    static final List<String> DEFAULT_FULL_STATUSES = List.of("full");
+
+    /**
+     * 1.14までの形式で生成済みとみなす{@code Status}の値
+     * 1.13は生成を終えたチャンクを{@code fullchunk}や{@code postprocessed}で保存する
+     */
+    private static final List<String> FULL_STATUSES_1_13 = List.of("full", "postprocessed", "fullchunk");
+
+    /**
      * 世代の表
      * 境界のDataVersionの昇順に並べる
      */
     private static final List<ChunkFormat> FORMATS = List.of(
+            // C1: 1.13〜1.14.x
+            // C2と同じで、バイオームは列ごとの数値のID
+            // 1.13の生成済みのチャンクはStatusがfullchunkかpostprocessed
+            new ChunkFormat(
+                    OLDEST_FORMAT_DATA_VERSION,
+                    true,
+                    "Sections",
+                    OLDEST_FORMAT_DATA_VERSION,
+                    true,
+                    BlockStorage.SECTION_PALETTE,
+                    BiomeStorage.IDS_2D,
+                    LEVEL_BLOCK_DATA_KEYS,
+                    false,
+                    false,
+                    FULL_STATUSES_1_13),
+            // C2: 1.15〜1.15.2
+            // C3と同じで、ビット詰めが値を64bitの境目でまたぐ
+            new ChunkFormat(
+                    2203,
+                    true,
+                    "Sections",
+                    2203,
+                    true,
+                    BlockStorage.SECTION_PALETTE,
+                    BiomeStorage.IDS_3D,
+                    LEVEL_BLOCK_DATA_KEYS,
+                    false,
+                    false,
+                    DEFAULT_FULL_STATUSES),
             // C3: 1.16〜1.17.x
             // 本体はLevelの中で、ブロックはセクションの直下のPalette / BlockStates
             // バイオームは4×4×4ブロックごとの数値のID
@@ -73,7 +114,8 @@ final class ChunkFormat {
                     BiomeStorage.IDS_3D,
                     LEVEL_BLOCK_DATA_KEYS,
                     false,
-                    false),
+                    false,
+                    DEFAULT_FULL_STATUSES),
             // C4: 1.18〜26.2
             // Levelが無くなり、パレットの要素はName / Properties
             new ChunkFormat(
@@ -86,7 +128,8 @@ final class ChunkFormat {
                     BiomeStorage.PALETTED,
                     ROOT_BLOCK_DATA_KEYS,
                     true,
-                    true),
+                    true,
+                    DEFAULT_FULL_STATUSES),
             // C5: 26.3以降
             // パレットの要素は文字列かid / properties
             new ChunkFormat(
@@ -99,7 +142,8 @@ final class ChunkFormat {
                     BiomeStorage.PALETTED,
                     ROOT_BLOCK_DATA_KEYS,
                     true,
-                    true));
+                    true,
+                    DEFAULT_FULL_STATUSES));
 
     private final int minDataVersion;
     private final boolean wrappedInLevel;
@@ -111,6 +155,7 @@ final class ChunkFormat {
     private final List<String> blockDataKeys;
     private final boolean hasYPos;
     private final boolean addsLightFlag;
+    private final List<String> fullStatuses;
 
     private ChunkFormat(
             int minDataVersion,
@@ -122,7 +167,8 @@ final class ChunkFormat {
             BiomeStorage biomeStorage,
             List<String> blockDataKeys,
             boolean hasYPos,
-            boolean addsLightFlag) {
+            boolean addsLightFlag,
+            List<String> fullStatuses) {
         this.minDataVersion = minDataVersion;
         this.wrappedInLevel = wrappedInLevel;
         this.sectionsKey = sectionsKey;
@@ -133,6 +179,7 @@ final class ChunkFormat {
         this.blockDataKeys = blockDataKeys;
         this.hasYPos = hasYPos;
         this.addsLightFlag = addsLightFlag;
+        this.fullStatuses = fullStatuses;
     }
 
     /**
@@ -240,11 +287,21 @@ final class ChunkFormat {
 
     /**
      * {@code isLightOn}の無いチャンクで光源を無効化するとき、{@code isLightOn}を書き足すか
-     * 1.17までは生成途中のチャンクに{@code isLightOn}が無く、書き足すと元に無いキーが増えるので足さない
+     * 1.17までは生成途中のチャンクに{@code isLightOn}が無く（1.13はどのチャンクにも無い）、
+     * 書き足すと元に無いキーが増えるので足さない
      *
      * @return 書き足すならtrue
      */
     boolean addsLightFlag() {
         return addsLightFlag;
+    }
+
+    /**
+     * 生成済みとみなす{@code Status}の値（名前空間を外した形）
+     *
+     * @return 値の一覧
+     */
+    List<String> fullStatuses() {
+        return fullStatuses;
     }
 }

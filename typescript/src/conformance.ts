@@ -105,6 +105,7 @@ function jsonString(text: string): string {
     const unit = text.charCodeAt(index);
     const escaped = JSON_ESCAPES.get(unit);
 
+    // 決まった置き換えがある文字は、そのまま使う
     if (escaped !== undefined) {
       result += escaped;
       continue;
@@ -256,6 +257,7 @@ function regionList(region: RegionFile): string {
   for (const position of region.chunkPositions()) {
     const raw = region.readChunkRaw(position.x, position.z);
 
+    // 一覧にあっても中身の無いチャンクは数えない
     if (raw === undefined) {
       continue;
     }
@@ -300,6 +302,7 @@ function regionRewrite(source: RegionFile, outputPath: string): void {
   for (const position of source.chunkPositions()) {
     const chunk = source.readChunk(position.x, position.z);
 
+    // 中身の無いチャンクは詰め直す対象にしない
     if (chunk === undefined) {
       continue;
     }
@@ -387,6 +390,7 @@ function chunkDescribe(chunk: Chunk): string {
         for (let x = 0; x < 16; x++) {
           const block = chunk.getBlock(x, sectionY * 16 + y, z);
 
+          // ブロックを持たないセクションの位置は数えない
           if (block === undefined) {
             continue;
           }
@@ -405,6 +409,7 @@ function chunkDescribe(chunk: Chunk): string {
           if (numericBiomes) {
             const biomeId = chunk.getBiomeId(x, sectionY * 16 + y, z);
 
+            // Biomesを読めない位置は数えない
             if (biomeId === undefined) {
               continue;
             }
@@ -415,6 +420,7 @@ function chunkDescribe(chunk: Chunk): string {
 
           const biome = chunk.getBiome(x, sectionY * 16 + y, z);
 
+          // バイオームを持たないセクションの位置は数えない
           if (biome === undefined) {
             continue;
           }
@@ -538,9 +544,11 @@ function writeTextFile(path: string, content: string): void {
   for (let index = 0; index < content.length; index++) {
     const unit = content.charCodeAt(index);
 
+    // 上位サロゲートの後ろに続くコード単位を確かめる
     if (unit >= 0xd800 && unit <= 0xdbff && index + 1 < content.length) {
       const low = content.charCodeAt(index + 1);
 
+      // 下位サロゲートと対になれば、2つを1文字として4バイトで書く
       if (low >= 0xdc00 && low <= 0xdfff) {
         const codePoint = 0x10000 + ((unit - 0xd800) << 10) + (low - 0xdc00);
         bytes.push(0xf0 | (codePoint >> 18));

@@ -12,8 +12,14 @@ from typing import Callable, Dict, List, Optional, Union
 
 from .. import MIN_SUPPORTED_DATA_VERSION, TARGET_DATA_VERSION
 from ..errors import ErrorCode, SpringNbtError
-from ..nbt import NbtCompound, NbtInt, NbtIntArray, NbtList, NbtString, TagType
-from ._chunk_format import OLDEST_FORMAT_DATA_VERSION, BiomeStorage, BlockStorage, ChunkFormat
+from ..nbt import NbtCompound, NbtInt, NbtIntArray, NbtList, NbtString, NbtTag, TagType
+from ._chunk_format import (
+    FULL_STATUSES,
+    OLDEST_FORMAT_DATA_VERSION,
+    BiomeStorage,
+    BlockStorage,
+    ChunkFormat,
+)
 from .block_state import BlockState
 from .paletted_container import PalettedContainer
 
@@ -35,8 +41,14 @@ BLOCKS_PER_SECTION = 4096
 #: セクション1つに入るバイオームのエントリ数（4×4×4単位）
 BIOMES_PER_SECTION = 64
 
-#: 1.17までの形式で、チャンクの``Biomes``が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで）
+#: 1.15から1.17までの形式で、チャンクの``Biomes``が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで）
 _BIOME_IDS_3D_LENGTH = 1024
+
+#: 1.14までの形式で、チャンクの``Biomes``が持つ数値のバイオームIDの数（列ごと）
+_BIOME_IDS_2D_LENGTH = 256
+
+#: DataVersionの無いチャンクで、世代の指定も無いときの:attr:`Chunk.format_data_version`
+_MISSING_DATA_VERSION = -1
 
 #: 1.17までの形式で、バイオームIDを持つ最も高いY座標
 _BIOME_IDS_MAX_Y = 255
@@ -56,6 +68,31 @@ def _matches_position(entry: NbtCompound, x: int, y: int, z: int) -> bool:
         return False
 
     return entry_x == x and entry_y == y and entry_z == z
+
+
+def _describe_chunk(data_version: Optional[int]) -> str:
+    """エラーや警告の文で、チャンクをDataVersionで言い表す"""
+    # 1.9より前のチャンクはDataVersionを持たない
+    if data_version is None:
+        return "DataVersionの無いチャンク"
+
+    return "DataVersion %dのチャンク" % data_version
+
+
+def _palette_entry_for(container: PalettedContainer, state: BlockState,
+                       data_version: int) -> NbtTag:
+    """ブロック状態を置くときに使うパレット要素を決める
+
+    同じ状態の要素がパレットにあれば、キーやプロパティの並びが違ってもそれを使う
+    無ければ世代の形式で作る
+    """
+    # 実データの{Properties, Name}の並びの要素も、状態として比べて使い回す
+    for entry in container.palette:
+        # 状態が同じ要素が見つかれば、パレットを増やさずにそれを置く
+        if BlockState.from_nbt_for_data_version(entry, data_version) == state:
+            return entry
+
+    return state.to_nbt_for_data_version(data_version)
 
 
 class VersionMismatchAction(enum.Enum):
@@ -172,9 +209,11 @@ class ChunkSection:
         section = ChunkSection(nbt, nbt.get_byte("Y"))
         section._block_storage = chunk_format.block_storage
         palette = nbt.opt_list("Palette")
+        block_states = nbt.opt_long_array("BlockStates")
 
-        # Paletteの無いセクション（光源だけを持つものなど）はブロックを持たない
-        if palette is None:
+        # Minecraftも両方がそろったセクションだけを読むので、
+        # 片方しか無いセクション（光源だけを持つものなど）はブロックを持たない
+        if palette is None or block_states is None:
             return section
 
         # 書き戻すときにCompoundのリストとして書くので、要素の型をここで確かめる
@@ -186,7 +225,7 @@ class ChunkSection:
 
         # BlockStatesはパレットが1要素でも必ず書かれる
         section.block_states = PalettedContainer._from_parts(
-            list(palette), nbt.opt_long_array("BlockStates"), BLOCKS_PER_SECTION, 4,
+            list(palette), block_states, BLOCKS_PER_SECTION, 4,
             chunk_format.spanning_bit_storage, True, options.lenient_bit_storage)
         return section
 
@@ -246,7 +285,10 @@ class Chunk:
 
     @property
     def data_version(self) -> int:
-        """チャンク構造のバージョン"""
+        """チャンク構造のバージョン
+
+        :raises SpringNbtError: ``DataVersion``の無いチャンク（1.9より前）の場合
+        """
         return self.raw.get_int("DataVersion")
 
     @property
@@ -255,6 +297,7 @@ class Chunk:
 
         読み込みのオプションで指定していればその値、指定が無ければ:attr:`data_version`
         :attr:`data_version`が1519未満のチャンクでは、世代を選ばずに指定の値をそのまま返す
+        ``DataVersion``の無いチャンクで指定も無ければ-1
         """
         return self._format_data_version
 
@@ -273,11 +316,13 @@ class Chunk:
         """最下段セクションのY位置
         オーバーワールドは-4
         1.17までの形式では0
+
+        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
         """
-        chunk_format = self._format
+        chunk_format = self._require_format()
 
         # 1.17までの形式はyPosを持たず、セクションは0段目から始まる
-        if chunk_format is not None and not chunk_format.has_y_pos:
+        if not chunk_format.has_y_pos:
             return 0
 
         return self.raw.get_int("yPos")
@@ -293,6 +338,8 @@ class Chunk:
     def is_fully_generated(self) -> bool:
         """生成が完了しているか
         ブロック改変の対象にしてよいのはこれだけ
+
+        1.14までの形式では、1.13の``postprocessed``と``fullchunk``も生成済みとみなす
         """
         status = self.status
 
@@ -300,7 +347,13 @@ class Chunk:
         if status.startswith(_MINECRAFT_NAMESPACE):
             status = status[len(_MINECRAFT_NAMESPACE):]
 
-        return status == "full"
+        full_statuses = FULL_STATUSES
+
+        # 生成済みとみなす値は世代で違う
+        if self._format is not None:
+            full_statuses = self._format.full_statuses
+
+        return status in full_statuses
 
     @property
     def is_modified(self) -> bool:
@@ -351,15 +404,20 @@ class Chunk:
 
         chunk = Chunk(nbt)
         chunk._check_data_version(effective)
-        data_version = chunk.data_version
-        chunk._format_data_version = data_version
+        data_version = chunk._own_data_version()
+        chunk._format_data_version = _MISSING_DATA_VERSION
+
+        # DataVersionを持つチャンクは、指定が無ければそれで世代を選ぶ
+        if data_version is not None:
+            chunk._format_data_version = data_version
 
         # 指定があれば、チャンク自身のDataVersionの代わりにその値で世代を選ぶ
         if override is not None:
             chunk._format_data_version = override
 
         # 1.13より前のチャンクはブロックが数値IDで、どの世代で読んでも誤った値になる
-        if data_version < OLDEST_FORMAT_DATA_VERSION:
+        # DataVersionの無いチャンクは1.9より前のものなので、同じく解釈しない
+        if data_version is None or data_version < OLDEST_FORMAT_DATA_VERSION:
             return chunk
 
         chunk._format = ChunkFormat.for_data_version(chunk._format_data_version)
@@ -393,16 +451,22 @@ class Chunk:
 
         return chunk
 
+    def _own_data_version(self) -> Optional[int]:
+        """チャンク自身のDataVersion
+        無ければNone
+        """
+        return self.raw.opt_int("DataVersion")
+
     def _check_data_version(self, options: ChunkReadOptions) -> None:
         """DataVersionを検査し、オプションに従って警告またはエラーにする"""
-        version = self.data_version
+        version = self._own_data_version()
 
         # 形式が同じであれば、新しいバージョンでもそのまま読める
-        if version >= MIN_SUPPORTED_DATA_VERSION:
+        if version is not None and version >= MIN_SUPPORTED_DATA_VERSION:
             return
 
-        message = ("DataVersion %d はこのライブラリが扱う形式より古い（%d 以降が対象）"
-                   % (version, MIN_SUPPORTED_DATA_VERSION))
+        message = ("%sはこのライブラリが扱う形式より古い（%d以降が対象）"
+                   % (_describe_chunk(version), MIN_SUPPORTED_DATA_VERSION))
 
         if options.on_version_mismatch == VersionMismatchAction.ERROR:
             raise SpringNbtError(ErrorCode.UNSUPPORTED_DATA_VERSION, message)
@@ -423,15 +487,16 @@ class Chunk:
         else:
             effective = options
 
-        version = self.data_version
+        version = self._own_data_version()
+        supported = version is not None and version >= MIN_SUPPORTED_DATA_VERSION
 
         # 形式の違う古いチャンクは、書き戻すと使えなくなりかねない
-        if version < MIN_SUPPORTED_DATA_VERSION and not effective.allow_foreign_data_version:
+        if not supported and not effective.allow_foreign_data_version:
             raise SpringNbtError(
                 ErrorCode.UNSUPPORTED_DATA_VERSION,
-                "DataVersion %d のチャンクは書き戻せない（%d 以降が対象）。"
+                "%sは書き戻せない（%d以降が対象）。"
                 "許可するなら ChunkWriteOptions(allow_foreign_data_version=True)"
-                % (version, MIN_SUPPORTED_DATA_VERSION))
+                % (_describe_chunk(version), MIN_SUPPORTED_DATA_VERSION))
 
         # DataVersionは読んだ値のまま残す
         # 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
@@ -470,8 +535,8 @@ class Chunk:
         if self._format is None:
             raise SpringNbtError(
                 ErrorCode.UNSUPPORTED_DATA_VERSION,
-                "DataVersion %dのチャンクは形式を解釈せず元のNBTだけを持つので、この操作はできない"
-                % self.data_version)
+                "%sは形式を解釈せず元のNBTだけを持つので、この操作はできない"
+                % _describe_chunk(self._own_data_version()))
 
         return self._format
 
@@ -507,14 +572,15 @@ class Chunk:
 
         return chunk_format
 
-    def _biome_ids(self) -> Optional[NbtIntArray]:
+    def _biome_ids(self, chunk_format: ChunkFormat) -> Optional[NbtIntArray]:
         """本体の``Biomes``を返す
-        無い、IntArrayでない、長さが合わない場合はNone
+        無い、IntArrayでない、長さが世代と合わない場合はNone
         """
         biomes = self._body().opt("Biomes")
 
         # 生成途中のチャンクなどは、Biomesを持たないか別の形で持つ
-        if not isinstance(biomes, NbtIntArray) or len(biomes.value) != _BIOME_IDS_3D_LENGTH:
+        if not isinstance(biomes, NbtIntArray) \
+                or len(biomes.value) != _biome_ids_length(chunk_format):
             return None
 
         return biomes
@@ -581,9 +647,9 @@ class Chunk:
         if current is not None and current == state:
             return
 
-        # 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで変換する
-        section.block_states.set(
-            block_index(x, y, z), state.to_nbt_for_data_version(chunk_format.palette_data_version))
+        # 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで読み書きする
+        entry = _palette_entry_for(section.block_states, state, chunk_format.palette_data_version)
+        section.block_states.set(block_index(x, y, z), entry)
         self._remove_block_data(chunk_format, x, y, z)
         self._modified = True
 
@@ -657,7 +723,8 @@ class Chunk:
 
     def get_biome_id(self, x: int, y: int, z: int) -> Optional[int]:
         """数値のバイオームIDを取得する（1.17までの形式）
-        4×4×4の単位なので、座標は自動的に丸められる
+        1.15以降の形式は4×4×4の単位なので、座標は自動的に丸められる
+        1.14までの形式は列ごとに持つので、Yは見ない
 
         IDは名前に直さない
         1.16.2以降はデータパックで独自のバイオームを足せるので、固定の表では正しく引けないため
@@ -666,45 +733,60 @@ class Chunk:
         :param y: 絶対Y座標
         :param z: チャンク内相対Z座標 (0..15)
         :return: バイオームID
-        Yが0..255の外の場合と、``Biomes``が無いか形が違う場合はNone
+        1.15以降の形式でYが0..255の外の場合と、``Biomes``が無いか形が違う場合はNone
         :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
             バイオームを名前で持つ1.18以降の形式の場合（UNSUPPORTED_FEATURE）
         """
-        self._require_biome_ids()
+        chunk_format = self._require_biome_ids()
         _check_local_coordinates(x, z)
-        biomes = self._biome_ids()
+        biomes = self._biome_ids(chunk_format)
 
-        # 高さの範囲外と、Biomesを読めないチャンクは値を持たない
-        if biomes is None or y < 0 or y > _BIOME_IDS_MAX_Y:
+        # Biomesを読めないチャンクは値を持たない
+        if biomes is None:
+            return None
+
+        # 列ごとに持つ形式は高さを見ない
+        if chunk_format.biome_storage == BiomeStorage.IDS_2D:
+            return biomes.value[_biome_id_2d_index(x, z)]
+
+        # 高さの範囲外は値を持たない
+        if y < 0 or y > _BIOME_IDS_MAX_Y:
             return None
 
         return biomes.value[_biome_id_index(x, y, z)]
 
     def set_biome_id(self, x: int, y: int, z: int, biome_id: int) -> None:
         """数値のバイオームIDを設定する（1.17までの形式）
-        4×4×4の単位
+        1.15以降の形式は4×4×4の単位
+        1.14までの形式は列ごとに持つので、Yは見ない
 
-        :raises SpringNbtError: Yが0..255の外の場合、``Biomes``が無いか形が違う場合（INVALID_ARGUMENT）、
+        :raises SpringNbtError: 1.15以降の形式でYが0..255の外の場合、
+            ``Biomes``が無いか形が違う場合（INVALID_ARGUMENT）、
             元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
             バイオームを名前で持つ1.18以降の形式の場合（UNSUPPORTED_FEATURE）
         """
-        self._require_biome_ids()
+        chunk_format = self._require_biome_ids()
         _check_local_coordinates(x, z)
+        index = _biome_id_2d_index(x, z)
 
-        # 1.17までのバイオームIDは高さ0..255の分だけある
-        if y < 0 or y > _BIOME_IDS_MAX_Y:
-            raise SpringNbtError.invalid_argument(
-                "Y=%d はバイオームIDを持つ高さ（0..%d）の外" % (y, _BIOME_IDS_MAX_Y))
+        # 4×4×4ごとに持つ形式は、高さ0..255の分だけある
+        if chunk_format.biome_storage == BiomeStorage.IDS_3D:
+            # 範囲外の高さはどの値にも当たらない
+            if y < 0 or y > _BIOME_IDS_MAX_Y:
+                raise SpringNbtError.invalid_argument(
+                    "Y=%d はバイオームIDを持つ高さ（0..%d）の外" % (y, _BIOME_IDS_MAX_Y))
 
-        biomes = self._biome_ids()
+            index = _biome_id_index(x, y, z)
+
+        biomes = self._biome_ids(chunk_format)
 
         # 読めないBiomesを作り直すと元のデータを失うので、書き込まない
         if biomes is None:
             raise SpringNbtError.invalid_argument(
-                "Biomes が無いか、int[%d] でない" % _BIOME_IDS_3D_LENGTH)
+                "Biomes が無いか、int[%d] でない" % _biome_ids_length(chunk_format))
 
         # 配列へ直接入れると範囲の検査を通らないので、intの範囲を先に確かめる
-        biomes.value[_biome_id_index(x, y, z)] = NbtInt(biome_id).value
+        biomes.value[index] = NbtInt(biome_id).value
         self._modified = True
 
     def clear_heightmaps(self) -> None:
@@ -731,7 +813,7 @@ class Chunk:
         # 書き足さない世代では、isLightOnの無いチャンクは光源の印を持たない
         if not chunk_format.adds_light_flag and "isLightOn" not in body:
             raise SpringNbtError.unsupported_feature(
-                "DataVersion %dのチャンクは isLightOn を持たない" % self.data_version)
+                "DataVersion %dのチャンクは isLightOn を持たない" % self._format_data_version)
 
         body.set_byte("isLightOn", 0)
         self._modified = True
@@ -758,10 +840,26 @@ def biome_index(x: int, y: int, z: int) -> int:
 
 
 def _biome_id_index(x: int, y: int, z: int) -> int:
-    """1.17までの形式の``Biomes``の添字
+    """1.15から1.17までの形式の``Biomes``の添字
     1エントリが4×4×4ブロック
     """
     return (((y >> 2) & 63) * 16) + ((z >> 2) * 4) + (x >> 2)
+
+
+def _biome_id_2d_index(x: int, z: int) -> int:
+    """1.14までの形式の``Biomes``の添字
+    1エントリが1列
+    """
+    return (z * 16) + x
+
+
+def _biome_ids_length(chunk_format: ChunkFormat) -> int:
+    """世代の``Biomes``が持つ数値のバイオームIDの数"""
+    # 列ごとに持つ形式は256個
+    if chunk_format.biome_storage == BiomeStorage.IDS_2D:
+        return _BIOME_IDS_2D_LENGTH
+
+    return _BIOME_IDS_3D_LENGTH
 
 
 def _check_local_coordinates(x: int, z: int) -> None:

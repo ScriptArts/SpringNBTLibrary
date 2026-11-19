@@ -138,9 +138,11 @@ public final class ChunkSection {
         ChunkSection section = new ChunkSection(nbt, nbt.getByte("Y"));
         section.blockStorage = format.blockStorage();
         NbtList palette = nbt.optList("Palette");
+        long[] blockStatesData = nbt.optLongArray("BlockStates");
 
-        // Paletteの無いセクション（光源だけを持つものなど）はブロックを持たない
-        if (palette == null) {
+        // Minecraftも両方がそろったセクションだけを読むので、
+        // 片方しか無いセクション（光源だけを持つものなど）はブロックを持たない
+        if (palette == null || blockStatesData == null) {
             return section;
         }
 
@@ -159,7 +161,7 @@ public final class ChunkSection {
 
         // BlockStatesはパレットが1要素でも必ず書かれる
         section.blockStates = PalettedContainer.fromParts(
-                entries, nbt.optLongArray("BlockStates"), Chunk.BLOCKS_PER_SECTION, 4,
+                entries, blockStatesData, Chunk.BLOCKS_PER_SECTION, 4,
                 format.spanningBitStorage(), true, options.lenientBitStorage());
         return section;
     }

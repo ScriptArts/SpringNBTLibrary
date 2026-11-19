@@ -218,6 +218,7 @@ def region_list(region: RegionFile) -> str:
     for position in region.chunk_positions():
         raw = region.read_chunk_raw(position.x, position.z)
 
+        # 一覧にあっても中身の無いチャンクは数えない
         if raw is None:
             continue
 
@@ -255,6 +256,7 @@ def region_rewrite(source: RegionFile, output_path: str) -> None:
         for position in source.chunk_positions():
             chunk = source.read_chunk(position.x, position.z)
 
+            # 中身の無いチャンクは詰め直す対象にしない
             if chunk is None:
                 continue
 
@@ -333,6 +335,7 @@ def chunk_describe(chunk: Chunk) -> str:
                 for x in range(16):
                     block = chunk.get_block(x, (section_y * 16) + y, z)
 
+                    # ブロックを持たないセクションの位置は数えない
                     if block is None:
                         continue
 
@@ -347,6 +350,7 @@ def chunk_describe(chunk: Chunk) -> str:
                     if numeric_biomes:
                         biome_id = chunk.get_biome_id(x, (section_y * 16) + y, z)
 
+                        # Biomesを読めない位置は数えない
                         if biome_id is None:
                             continue
 
@@ -355,6 +359,7 @@ def chunk_describe(chunk: Chunk) -> str:
 
                     biome = chunk.get_biome(x, (section_y * 16) + y, z)
 
+                    # バイオームを持たないセクションの位置は数えない
                     if biome is None:
                         continue
 

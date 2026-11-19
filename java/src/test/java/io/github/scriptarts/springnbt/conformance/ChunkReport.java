@@ -89,6 +89,7 @@ final class ChunkReport {
                     for (int x = 0; x < 16; x++) {
                         BlockState block = chunk.getBlock(x, (sectionY * 16) + y, z);
 
+                        // ブロックを持たないセクションの位置は数えない
                         if (block == null) {
                             continue;
                         }
@@ -106,6 +107,7 @@ final class ChunkReport {
                         if (numericBiomes) {
                             Integer biomeId = chunk.getBiomeId(x, (sectionY * 16) + y, z);
 
+                            // Biomesを読めない位置は数えない
                             if (biomeId == null) {
                                 continue;
                             }
@@ -116,6 +118,7 @@ final class ChunkReport {
 
                         String biome = chunk.getBiome(x, (sectionY * 16) + y, z);
 
+                        // バイオームを持たないセクションの位置は数えない
                         if (biome == null) {
                             continue;
                         }

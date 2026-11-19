@@ -224,6 +224,7 @@ fn chunk_describe(chunk: &Chunk) -> Result<String> {
     }
 
     for section_y in section_ys {
+        // 一覧に出たY位置のセクションだけを集計する
         let section = match chunk.section(section_y) {
             Some(section) => section,
             None => continue,
@@ -252,6 +253,7 @@ fn chunk_describe(chunk: &Chunk) -> Result<String> {
         for y in 0..16 {
             for z in 0..16 {
                 for x in 0..16 {
+                    // ブロックを持たないセクションの位置は数えない
                     if let Some(block) = chunk.get_block(x, (section_y * 16) + y, z)? {
                         *blocks.entry(block.to_string()).or_insert(0) += 1;
                     }
@@ -265,7 +267,7 @@ fn chunk_describe(chunk: &Chunk) -> Result<String> {
                 for x in (0..16).step_by(4) {
                     // 数値のIDで持つチャンクは、IDごとに数える
                     if numeric_biomes {
-                        // Yが範囲外ならIDを持たない
+                        // Biomesを読めない位置は数えない
                         if let Some(biome_id) = chunk.get_biome_id(x, (section_y * 16) + y, z)? {
                             *biome_ids.entry(biome_id).or_insert(0) += 1;
                         }
@@ -273,6 +275,7 @@ fn chunk_describe(chunk: &Chunk) -> Result<String> {
                         continue;
                     }
 
+                    // バイオームを持たないセクションの位置は数えない
                     if let Some(biome) = chunk.get_biome(x, (section_y * 16) + y, z)? {
                         *biomes.entry(biome).or_insert(0) += 1;
                     }
@@ -354,6 +357,7 @@ fn region_list(region: &RegionFile) -> Result<String> {
     let mut total = 0usize;
 
     for position in region.chunk_positions()? {
+        // 一覧にあっても中身の無いチャンクは数えない
         let raw = match region.read_chunk_raw(position.x, position.z)? {
             Some(value) => value,
             None => continue,
@@ -399,6 +403,7 @@ fn region_rewrite(source: &RegionFile, output_path: &str) -> Result<()> {
     let mut destination = RegionFile::open(output_path, RegionFileMode::ReadWrite)?;
 
     for position in source.chunk_positions()? {
+        // 中身の無いチャンクは詰め直す対象にしない
         let chunk = match source.read_chunk(position.x, position.z)? {
             Some(value) => value,
             None => continue,

@@ -24,6 +24,14 @@ _ROOT_BLOCK_DATA_KEYS = ("block_entities", "block_ticks", "fluid_ticks")
 #: ``Level``の中に置かれる、ブロックに紐づく付随データのキー（1.17まで）
 _LEVEL_BLOCK_DATA_KEYS = ("TileEntities", "TileTicks", "LiquidTicks")
 
+#: 生成済みとみなす``Status``の値（名前空間を外した形）
+#: 世代を引けないチャンクもこれで判定する
+FULL_STATUSES = ("full",)
+
+#: 1.14までの形式で生成済みとみなす``Status``の値
+#: 1.13は生成を終えたチャンクを``fullchunk``や``postprocessed``で保存する
+_FULL_STATUSES_1_13 = ("full", "postprocessed", "fullchunk")
+
 
 class BlockStorage(enum.Enum):
     """セクションのブロックの持ち方"""
@@ -55,13 +63,14 @@ class ChunkFormat:
 
     __slots__ = ("min_data_version", "wrapped_in_level", "sections_key",
                  "palette_data_version", "spanning_bit_storage", "block_storage",
-                 "biome_storage", "block_data_keys", "has_y_pos", "adds_light_flag")
+                 "biome_storage", "block_data_keys", "has_y_pos", "adds_light_flag",
+                 "full_statuses")
 
     def __init__(self, min_data_version: int, wrapped_in_level: bool, sections_key: str,
                  palette_data_version: int, spanning_bit_storage: bool,
                  block_storage: BlockStorage, biome_storage: BiomeStorage,
                  block_data_keys: Tuple[str, str, str], has_y_pos: bool,
-                 adds_light_flag: bool) -> None:
+                 adds_light_flag: bool, full_statuses: Tuple[str, ...]) -> None:
         #: この世代が始まるDataVersion
         self.min_data_version = min_data_version
         #: チャンクの本体が``Level``の中にあるか
@@ -82,8 +91,11 @@ class ChunkFormat:
         #: 無い世代では、セクションは0段目から始まる
         self.has_y_pos = has_y_pos
         #: ``isLightOn``の無いチャンクで光源を無効化するとき、``isLightOn``を書き足すか
-        #: 1.17までは生成途中のチャンクに``isLightOn``が無く、書き足すと元に無いキーが増えるので足さない
+        #: 1.17までは生成途中のチャンクに``isLightOn``が無く（1.13はどのチャンクにも無い）、
+        #: 書き足すと元に無いキーが増えるので足さない
         self.adds_light_flag = adds_light_flag
+        #: 生成済みとみなす``Status``の値（名前空間を外した形）
+        self.full_statuses = full_statuses
 
     @staticmethod
     def for_data_version(data_version: int) -> Optional["ChunkFormat"]:
@@ -104,6 +116,35 @@ class ChunkFormat:
 #: 世代の表
 #: 境界のDataVersionの昇順に並べる
 _FORMATS = (
+    # C1: 1.13〜1.14.x
+    # C2と同じで、バイオームは列ごとの数値のID
+    # 1.13の生成済みのチャンクはStatusがfullchunkかpostprocessed
+    ChunkFormat(
+        min_data_version=OLDEST_FORMAT_DATA_VERSION,
+        wrapped_in_level=True,
+        sections_key="Sections",
+        palette_data_version=OLDEST_FORMAT_DATA_VERSION,
+        spanning_bit_storage=True,
+        block_storage=BlockStorage.SECTION_PALETTE,
+        biome_storage=BiomeStorage.IDS_2D,
+        block_data_keys=_LEVEL_BLOCK_DATA_KEYS,
+        has_y_pos=False,
+        adds_light_flag=False,
+        full_statuses=_FULL_STATUSES_1_13),
+    # C2: 1.15〜1.15.2
+    # C3と同じで、ビット詰めが値を64bitの境目でまたぐ
+    ChunkFormat(
+        min_data_version=2203,
+        wrapped_in_level=True,
+        sections_key="Sections",
+        palette_data_version=2203,
+        spanning_bit_storage=True,
+        block_storage=BlockStorage.SECTION_PALETTE,
+        biome_storage=BiomeStorage.IDS_3D,
+        block_data_keys=_LEVEL_BLOCK_DATA_KEYS,
+        has_y_pos=False,
+        adds_light_flag=False,
+        full_statuses=FULL_STATUSES),
     # C3: 1.16〜1.17.x
     # 本体はLevelの中で、ブロックはセクションの直下のPalette / BlockStates
     # バイオームは4×4×4ブロックごとの数値のID
@@ -117,7 +158,8 @@ _FORMATS = (
         biome_storage=BiomeStorage.IDS_3D,
         block_data_keys=_LEVEL_BLOCK_DATA_KEYS,
         has_y_pos=False,
-        adds_light_flag=False),
+        adds_light_flag=False,
+        full_statuses=FULL_STATUSES),
     # C4: 1.18〜26.2
     # Levelが無くなり、パレットの要素はName / Properties
     ChunkFormat(
@@ -130,7 +172,8 @@ _FORMATS = (
         biome_storage=BiomeStorage.PALETTED,
         block_data_keys=_ROOT_BLOCK_DATA_KEYS,
         has_y_pos=True,
-        adds_light_flag=True),
+        adds_light_flag=True,
+        full_statuses=FULL_STATUSES),
     # C5: 26.3以降
     # パレットの要素は文字列かid / properties
     ChunkFormat(
@@ -143,5 +186,6 @@ _FORMATS = (
         biome_storage=BiomeStorage.PALETTED,
         block_data_keys=_ROOT_BLOCK_DATA_KEYS,
         has_y_pos=True,
-        adds_light_flag=True),
+        adds_light_flag=True,
+        full_statuses=FULL_STATUSES),
 )

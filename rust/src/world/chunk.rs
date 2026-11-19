@@ -11,7 +11,9 @@ use crate::nbt::tag::{NbtCompound, NbtList, NbtString, NbtTag, TagType};
 use crate::MIN_SUPPORTED_DATA_VERSION;
 
 use super::block_state::{BlockState, IntoBlockState};
-use super::chunk_format::{BiomeStorage, BlockStorage, ChunkFormat, OLDEST_FORMAT_DATA_VERSION};
+use super::chunk_format::{
+    BiomeStorage, BlockStorage, ChunkFormat, FULL_STATUSES, OLDEST_FORMAT_DATA_VERSION,
+};
 use super::paletted_container::PalettedContainer;
 
 /// セクション1つに入るブロック数
@@ -20,8 +22,14 @@ pub const BLOCKS_PER_SECTION: usize = 4096;
 /// セクション1つに入るバイオームのエントリ数（4×4×4単位）
 pub const BIOMES_PER_SECTION: usize = 64;
 
-/// 1.17までの形式で、チャンクの`Biomes`が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで）
+/// 1.15から1.17までの形式で、チャンクの`Biomes`が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで）
 const BIOME_IDS_3D_LENGTH: usize = 1024;
+
+/// 1.14までの形式で、チャンクの`Biomes`が持つ数値のバイオームIDの数（列ごと）
+const BIOME_IDS_2D_LENGTH: usize = 256;
+
+/// DataVersionの無いチャンクで、世代の指定も無いときの[`Chunk::format_data_version`]
+const MISSING_DATA_VERSION: i32 = -1;
 
 /// 1.17までの形式で、バイオームIDを持つ最も高いY座標
 const BIOME_IDS_MAX_Y: i32 = 255;
@@ -46,6 +54,35 @@ fn matches_position(entry: &NbtCompound, x: i32, y: i32, z: i32) -> bool {
     };
 
     entry_x == x && entry_y == y && entry_z == z
+}
+
+/// エラーや警告の文で、チャンクをDataVersionで言い表す
+fn describe_chunk(data_version: Option<i32>) -> String {
+    // 1.9より前のチャンクはDataVersionを持たない
+    match data_version {
+        Some(version) => format!("DataVersion {version}のチャンク"),
+        None => "DataVersionの無いチャンク".to_string(),
+    }
+}
+
+/// ブロック状態を置くときに使うパレット要素を決める
+///
+/// 同じ状態の要素がパレットにあれば、キーやプロパティの並びが違ってもそれを使う
+/// 無ければ世代の形式で作る
+fn palette_entry_for(
+    container: &PalettedContainer,
+    state: &BlockState,
+    data_version: i32,
+) -> Result<NbtTag> {
+    // 実データの{Properties, Name}の並びの要素も、状態として比べて使い回す
+    for entry in container.palette() {
+        // 状態が同じ要素が見つかれば、パレットを増やさずにそれを置く
+        if &BlockState::from_nbt_for_data_version(entry, data_version)? == state {
+            return Ok(entry.clone());
+        }
+    }
+
+    state.to_nbt_for_data_version(data_version)
 }
 
 /// DataVersionが扱える形式より古いときの動作
@@ -222,10 +259,14 @@ impl ChunkSection {
             block_storage: format.block_storage,
         };
 
-        // Paletteの無いセクション（光源だけを持つものなど）はブロックを持たない
-        let palette = match nbt.opt_list("Palette")? {
-            Some(list) => list,
-            None => return Ok(section),
+        let palette = nbt.opt_list("Palette")?;
+        let block_states = nbt.opt_long_array("BlockStates")?;
+
+        // Minecraftも両方がそろったセクションだけを読むので、
+        // 片方しか無いセクション（光源だけを持つものなど）はブロックを持たない
+        let (palette, block_states) = match (palette, block_states) {
+            (Some(palette), Some(block_states)) => (palette, block_states),
+            _ => return Ok(section),
         };
 
         let mut entries = Vec::with_capacity(palette.len());
@@ -249,8 +290,7 @@ impl ChunkSection {
         // BlockStatesはパレットが1要素でも必ず書かれる
         section.block_states = Some(PalettedContainer::from_parts(
             entries,
-            nbt.opt_long_array("BlockStates")?
-                .map(|values| values.to_vec()),
+            Some(block_states.to_vec()),
             BLOCKS_PER_SECTION,
             4,
             format.spanning_bit_storage,
@@ -277,8 +317,20 @@ impl ChunkSection {
                     palette_tag.push(entry)?;
                 }
 
+                // dataが必ず書かれる持ち方なので、無ければ壊れた状態として扱う
+                // 空の配列を書くと、元に無い形のBlockStatesを作ってしまう
+                let data = match data {
+                    Some(data) => data,
+                    None => {
+                        return Err(Error::new(
+                            ErrorCode::MalformedData,
+                            "BlockStates を書くための data が無い",
+                        ))
+                    }
+                };
+
                 // 既存のキーへ書くので、キーの並びは読んだときのまま残る
-                result.set("BlockStates", NbtTag::LongArray(data.unwrap_or_default()));
+                result.set("BlockStates", NbtTag::LongArray(data));
                 result.set("Palette", NbtTag::List(palette_tag));
             }
 
@@ -346,14 +398,23 @@ pub struct Chunk {
 
 impl Chunk {
     /// チャンク構造のバージョン
+    ///
+    /// `DataVersion`の無いチャンク（1.9より前）ではエラーを返す
     pub fn data_version(&self) -> Result<i32> {
         self.raw.get_int("DataVersion")
+    }
+
+    /// チャンク自身のDataVersion
+    /// 無ければ`None`
+    fn own_data_version(&self) -> Result<Option<i32>> {
+        self.raw.opt_int("DataVersion")
     }
 
     /// チャンクの形式の世代を選ぶのに使ったDataVersion
     ///
     /// 読み込みのオプションで指定していればその値、指定が無ければ[`Chunk::data_version`]
     /// [`Chunk::data_version`]が1519未満のチャンクでは、世代を選ばずに指定の値をそのまま返す
+    /// `DataVersion`の無いチャンクで指定も無ければ-1
     pub fn format_data_version(&self) -> i32 {
         self.format_data_version
     }
@@ -371,13 +432,14 @@ impl Chunk {
     /// 最下段セクションのY位置
     /// オーバーワールドは-4
     /// 1.17までの形式では0
+    ///
+    /// 元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]を返す
     pub fn min_section_y(&self) -> Result<i32> {
+        let format = self.require_format()?;
+
         // 1.17までの形式はyPosを持たず、セクションは0段目から始まる
-        if let Some(format) = self.format {
-            // yPosの無い世代だけ0で決まる
-            if !format.has_y_pos {
-                return Ok(0);
-            }
+        if !format.has_y_pos {
+            return Ok(0);
         }
 
         self.raw.get_int("yPos")
@@ -391,6 +453,8 @@ impl Chunk {
 
     /// 生成が完了しているか
     /// ブロック改変の対象にしてよいのはこれだけ
+    ///
+    /// 1.14までの形式では、1.13の`postprocessed`と`fullchunk`も生成済みとみなす
     pub fn is_fully_generated(&self) -> bool {
         let status = match self.status() {
             Ok(status) => status,
@@ -403,7 +467,13 @@ impl Chunk {
             None => status,
         };
 
-        name == "full"
+        // 生成済みとみなす値は世代で違う
+        let full_statuses = match self.format {
+            Some(format) => format.full_statuses,
+            None => FULL_STATUSES,
+        };
+
+        full_statuses.contains(&name)
     }
 
     /// このチャンクに変更が加わったか
@@ -463,8 +533,13 @@ impl Chunk {
             format_data_version: 0,
         };
         chunk.check_data_version(options)?;
-        let data_version = chunk.data_version()?;
-        chunk.format_data_version = data_version;
+        let data_version = chunk.own_data_version()?;
+        chunk.format_data_version = MISSING_DATA_VERSION;
+
+        // DataVersionを持つチャンクは、指定が無ければそれで世代を選ぶ
+        if let Some(version) = data_version {
+            chunk.format_data_version = version;
+        }
 
         // 指定があれば、チャンク自身のDataVersionの代わりにその値で世代を選ぶ
         if let Some(requested) = options.format_data_version {
@@ -472,8 +547,10 @@ impl Chunk {
         }
 
         // 1.13より前のチャンクはブロックが数値IDで、どの世代で読んでも誤った値になる
-        if data_version < OLDEST_FORMAT_DATA_VERSION {
-            return Ok(chunk);
+        // DataVersionの無いチャンクは1.9より前のものなので、同じく解釈しない
+        match data_version {
+            Some(version) if version >= OLDEST_FORMAT_DATA_VERSION => {}
+            _ => return Ok(chunk),
         }
 
         // 表に無い世代のチャンクは、解釈せずに元のNBTだけを持つ
@@ -526,16 +603,19 @@ impl Chunk {
 
     /// DataVersionを検査し、オプションに従って警告またはエラーにする
     fn check_data_version(&self, options: &ChunkReadOptions) -> Result<()> {
-        let version = self.data_version()?;
+        let version = self.own_data_version()?;
 
         // 形式が同じであれば、新しいバージョンでもそのまま読める
-        if version >= MIN_SUPPORTED_DATA_VERSION {
-            return Ok(());
+        if let Some(found) = version {
+            // 下限に届いていれば何もしない
+            if found >= MIN_SUPPORTED_DATA_VERSION {
+                return Ok(());
+            }
         }
 
         let message = format!(
-            "DataVersion {version} はこのライブラリが扱う形式より古い\
-             （{MIN_SUPPORTED_DATA_VERSION} 以降が対象）"
+            "{}はこのライブラリが扱う形式より古い（{MIN_SUPPORTED_DATA_VERSION}以降が対象）",
+            describe_chunk(version)
         );
 
         if options.on_version_mismatch == VersionMismatchAction::Error {
@@ -556,16 +636,20 @@ impl Chunk {
     /// NBTへ書き戻す
     /// 全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
     pub fn to_nbt(&self, options: &ChunkWriteOptions) -> Result<NbtCompound> {
-        let version = self.data_version()?;
+        let version = self.own_data_version()?;
+        let supported = match version {
+            Some(found) => found >= MIN_SUPPORTED_DATA_VERSION,
+            None => false,
+        };
 
         // 形式の違う古いチャンクは、書き戻すと使えなくなりかねない
-        if version < MIN_SUPPORTED_DATA_VERSION && !options.allow_foreign_data_version {
+        if !supported && !options.allow_foreign_data_version {
             return Err(Error::new(
                 ErrorCode::UnsupportedDataVersion,
                 format!(
-                    "DataVersion {version} のチャンクは書き戻せない\
-                     （{MIN_SUPPORTED_DATA_VERSION} 以降が対象）。\
-                     許可するなら ChunkWriteOptions.allow_foreign_data_version を立てること"
+                    "{}は書き戻せない（{MIN_SUPPORTED_DATA_VERSION}以降が対象）。\
+                     許可するなら ChunkWriteOptions.allow_foreign_data_version を立てること",
+                    describe_chunk(version)
                 ),
             ));
         }
@@ -611,8 +695,8 @@ impl Chunk {
             None => Err(Error::new(
                 ErrorCode::UnsupportedDataVersion,
                 format!(
-                    "DataVersion {}のチャンクは形式を解釈せず元のNBTだけを持つので、この操作はできない",
-                    self.data_version()?
+                    "{}は形式を解釈せず元のNBTだけを持つので、この操作はできない",
+                    describe_chunk(self.own_data_version()?)
                 ),
             )),
         }
@@ -735,11 +819,10 @@ impl Chunk {
             }
         };
 
-        // 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで変換する
-        section.block_states_mut().unwrap().set(
-            index,
-            state.to_nbt_for_data_version(format.palette_data_version)?,
-        )?;
+        // 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで読み書きする
+        let container = section.block_states_mut().unwrap();
+        let entry = palette_entry_for(container, state, format.palette_data_version)?;
+        container.set(index, entry)?;
 
         self.remove_block_data(format, x, y, z)?;
         self.modified = true;
@@ -861,62 +944,78 @@ impl Chunk {
     }
 
     /// 数値のバイオームIDを取得する（1.17までの形式）
-    /// 4×4×4の単位なので、座標は自動的に丸められる
+    /// 1.15以降の形式は4×4×4の単位なので、座標は自動的に丸められる
+    /// 1.14までの形式は列ごとに持つので、Yは見ない
     ///
     /// IDは名前に直さない
     /// 1.16.2以降はデータパックで独自のバイオームを足せるので、固定の表では正しく引けないため
     ///
-    /// Yが0..255の外の場合と、`Biomes`が無いか形が違う場合は`None`を返す
+    /// 1.15以降の形式でYが0..255の外の場合と、`Biomes`が無いか形が違う場合は`None`を返す
     /// 元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]、
     /// バイオームを名前で持つ1.18以降の形式なら[`ErrorCode::UnsupportedFeature`]を返す
     pub fn get_biome_id(&self, x: i32, y: i32, z: i32) -> Result<Option<i32>> {
-        self.require_biome_ids()?;
+        let format = self.require_biome_ids()?;
         check_local_coordinates(x, z)?;
+        let length = biome_ids_length(format);
+
+        // 生成途中のチャンクなどは、Biomesを持たないか別の形で持つ
+        let values = match self.body()?.opt("Biomes") {
+            Some(NbtTag::IntArray(values)) if values.len() == length => values,
+            _ => return Ok(None),
+        };
+
+        // 列ごとに持つ形式は高さを見ない
+        if format.biome_storage == BiomeStorage::Ids2D {
+            return Ok(Some(values[biome_id_2d_index(x, z)]));
+        }
 
         // 高さの範囲外は値を持たない
         if !(0..=BIOME_IDS_MAX_Y).contains(&y) {
             return Ok(None);
         }
 
-        // 生成途中のチャンクなどは、Biomesを持たないか別の形で持つ
-        match self.body()?.opt("Biomes") {
-            Some(NbtTag::IntArray(values)) if values.len() == BIOME_IDS_3D_LENGTH => {
-                Ok(Some(values[biome_id_index(x, y, z)]))
-            }
-            _ => Ok(None),
-        }
+        Ok(Some(values[biome_id_index(x, y, z)]))
     }
 
     /// 数値のバイオームIDを設定する（1.17までの形式）
-    /// 4×4×4の単位
+    /// 1.15以降の形式は4×4×4の単位
+    /// 1.14までの形式は列ごとに持つので、Yは見ない
     ///
-    /// Yが0..255の外の場合と、`Biomes`が無いか形が違う場合は[`ErrorCode::InvalidArgument`]、
+    /// 1.15以降の形式でYが0..255の外の場合と、`Biomes`が無いか形が違う場合は
+    /// [`ErrorCode::InvalidArgument`]、
     /// 元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]、
     /// バイオームを名前で持つ1.18以降の形式なら[`ErrorCode::UnsupportedFeature`]を返す
     pub fn set_biome_id(&mut self, x: i32, y: i32, z: i32, biome_id: i32) -> Result<()> {
-        self.require_biome_ids()?;
+        let format = self.require_biome_ids()?;
         check_local_coordinates(x, z)?;
+        let length = biome_ids_length(format);
+        let mut index = biome_id_2d_index(x, z);
 
-        // 1.17までのバイオームIDは高さ0..255の分だけある
-        if !(0..=BIOME_IDS_MAX_Y).contains(&y) {
-            return Err(Error::new(
-                ErrorCode::InvalidArgument,
-                format!("Y={y} はバイオームIDを持つ高さ（0..{BIOME_IDS_MAX_Y}）の外"),
-            ));
+        // 4×4×4ごとに持つ形式は、高さ0..255の分だけある
+        if format.biome_storage == BiomeStorage::Ids3D {
+            // 範囲外の高さはどの値にも当たらない
+            if !(0..=BIOME_IDS_MAX_Y).contains(&y) {
+                return Err(Error::new(
+                    ErrorCode::InvalidArgument,
+                    format!("Y={y} はバイオームIDを持つ高さ（0..{BIOME_IDS_MAX_Y}）の外"),
+                ));
+            }
+
+            index = biome_id_index(x, y, z);
         }
 
         // 読めないBiomesを作り直すと元のデータを失うので、書き込まない
         let biomes = match body_mut(&mut self.raw)?.opt_mut("Biomes") {
-            Some(NbtTag::IntArray(values)) if values.len() == BIOME_IDS_3D_LENGTH => values,
+            Some(NbtTag::IntArray(values)) if values.len() == length => values,
             _ => {
                 return Err(Error::new(
                     ErrorCode::InvalidArgument,
-                    format!("Biomes が無いか、int[{BIOME_IDS_3D_LENGTH}] でない"),
+                    format!("Biomes が無いか、int[{length}] でない"),
                 ))
             }
         };
 
-        biomes[biome_id_index(x, y, z)] = biome_id;
+        biomes[index] = biome_id;
         self.modified = true;
         Ok(())
     }
@@ -947,7 +1046,7 @@ impl Chunk {
                 ErrorCode::UnsupportedFeature,
                 format!(
                     "DataVersion {}のチャンクは isLightOn を持たない",
-                    self.data_version()?
+                    self.format_data_version
                 ),
             ));
         }
@@ -981,10 +1080,26 @@ pub fn biome_index(x: i32, y: i32, z: i32) -> usize {
     ((((y & 15) / 4) * 16) + (((z & 15) / 4) * 4) + ((x & 15) / 4)) as usize
 }
 
-/// 1.17までの形式の`Biomes`の添字
+/// 1.15から1.17までの形式の`Biomes`の添字
 /// 1エントリが4×4×4ブロック
 fn biome_id_index(x: i32, y: i32, z: i32) -> usize {
     ((((y >> 2) & 63) * 16) + ((z >> 2) * 4) + (x >> 2)) as usize
+}
+
+/// 1.14までの形式の`Biomes`の添字
+/// 1エントリが1列
+fn biome_id_2d_index(x: i32, z: i32) -> usize {
+    ((z * 16) + x) as usize
+}
+
+/// 世代の`Biomes`が持つ数値のバイオームIDの数
+fn biome_ids_length(format: &ChunkFormat) -> usize {
+    // 列ごとに持つ形式は256個
+    if format.biome_storage == BiomeStorage::Ids2D {
+        return BIOME_IDS_2D_LENGTH;
+    }
+
+    BIOME_IDS_3D_LENGTH
 }
 
 fn check_local_coordinates(x: i32, z: i32) -> Result<()> {

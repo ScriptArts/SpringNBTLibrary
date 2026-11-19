@@ -92,9 +92,11 @@ public sealed class ChunkSection
         ChunkSection section = new ChunkSection(nbt, nbt.GetByte("Y"));
         section.blockStorage = format.BlockStorage;
         NbtList? palette = nbt.OptList("Palette");
+        long[]? blockStates = nbt.OptLongArray("BlockStates");
 
-        // Paletteの無いセクション（光源だけを持つものなど）はブロックを持たない
-        if (palette is null)
+        // Minecraftも両方がそろったセクションだけを読むので、
+        // 片方しか無いセクション（光源だけを持つものなど）はブロックを持たない
+        if (palette is null || blockStates is null)
         {
             return section;
         }
@@ -116,7 +118,7 @@ public sealed class ChunkSection
 
         // BlockStatesはパレットが1要素でも必ず書かれる
         section.BlockStates = PalettedContainer.FromParts(
-            entries, nbt.OptLongArray("BlockStates"), Chunk.BlocksPerSection, 4,
+            entries, blockStates, Chunk.BlocksPerSection, 4,
             format.SpanningBitStorage, true, options.LenientBitStorage);
         return section;
     }

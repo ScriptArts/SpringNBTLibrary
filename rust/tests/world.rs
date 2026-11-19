@@ -939,8 +939,28 @@ fn data_versionが26_2のチャンクは警告を出さずに読める() {
 }
 
 #[test]
-fn 扱える形式の下限は1_16() {
-    assert_eq!(2529, MIN_SUPPORTED_DATA_VERSION);
+fn 扱える形式の下限は1_13() {
+    assert_eq!(1519, MIN_SUPPORTED_DATA_VERSION);
+
+    let warnings: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&warnings);
+    let options = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Warn,
+        on_warning: Some(Box::new(move |message: &str| {
+            sink.borrow_mut().push(message.to_string());
+        })),
+        ..ChunkReadOptions::default()
+    };
+
+    // 1.13の正式版より1つ古いチャンクは、読み込みで警告になる
+    let mut root = pre_flattening_chunk();
+    root.set_int("DataVersion", 1518);
+    Chunk::from_nbt(root, &options).unwrap();
+    assert_eq!(1, warnings.borrow().len());
+
+    // 1.13の正式版のチャンクは警告を出さない
+    Chunk::from_nbt(level_chunk(1519), &options).unwrap();
+    assert_eq!(1, warnings.borrow().len());
 }
 
 #[test]
@@ -1209,6 +1229,7 @@ fn data_versionが1519未満のチャンクは元のnbtだけを持つ() {
         chunk.set_biome_id(0, 0, 0, 1),
         chunk.clear_heightmaps(),
         chunk.invalidate_lighting(),
+        chunk.min_section_y().map(|_| ()),
     ];
 
     // 操作ごとにUnsupportedDataVersionになることを確かめる
@@ -1552,15 +1573,45 @@ fn 生成途中のdata_version2586のチャンクは生成済みではない() {
 }
 
 #[test]
-fn paletteがありblock_statesの無いセクションはmalformed_data() {
-    let mut root = level_vector();
-    update_level_section(&mut root, 1, |section| {
-        section.remove("BlockStates");
-    });
+fn paletteとblock_statesの片方しか無いセクションはブロックを持たない() {
+    // BlockStatesだけが無い形と、Paletteだけが無い形の両方で確かめる
+    for key in ["BlockStates", "Palette"] {
+        let mut root = level_vector();
+        update_level_section(&mut root, 1, |section| {
+            section.remove(key);
+        });
+        let before = chunk_bytes(&root);
+        let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
 
-    assert_code(
-        ErrorCode::MalformedData,
-        Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap_err(),
+        // Minecraftも両方がそろったセクションだけを読むので、ブロックの無いセクションとして扱う
+        assert!(!chunk.section(1).unwrap().has_block_states());
+        assert!(chunk.get_block(0, 16, 0).unwrap().is_none());
+        assert_code(
+            ErrorCode::InvalidArgument,
+            chunk.set_block(0, 16, 0, "minecraft:stone").unwrap_err(),
+        );
+
+        // 元のNBTはそのまま残る
+        assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+    }
+}
+
+#[test]
+fn properties_nameの並びの要素と同じ状態を置いてもパレットは増えない() {
+    let root = level_vector();
+    let palette_before = level_section(&root, 0).get_list("Palette").unwrap().clone();
+    let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    // 実データと同じくProperties -> Nameの並びで入っている状態を、プロパティの並びを変えて置く
+    chunk.set_block(0, 0, 0, "minecraft:oak_stairs[half=bottom,facing=east]").unwrap();
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+
+    // 同じ状態の要素を使い回すので、パレットは元のまま
+    assert_eq!(&palette_before, level_section(&written, 0).get_list("Palette").unwrap());
+    let reread = Chunk::from_nbt(written, &ChunkReadOptions::default()).unwrap();
+    assert_eq!(
+        "minecraft:oak_stairs[facing=east,half=bottom]",
+        reread.get_block(0, 0, 0).unwrap().unwrap().to_string()
     );
 }
 
@@ -1577,6 +1628,396 @@ fn paletteの要素がcompoundでなければunexpected_tag_type() {
         ErrorCode::UnexpectedTagType,
         Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap_err(),
     );
+}
+
+// ---------------------------------------------------------------------------
+// 1.13〜1.15の形式（ビット詰めが64bitの境目をまたぐ）のチャンク
+// ---------------------------------------------------------------------------
+
+/// 1.15.2の形式のテストベクタの0段目のパレットを、ブロック状態の文字列表現で並べたもの
+fn spanning_states() -> Vec<String> {
+    let mut states = vec!["minecraft:air".to_string(), "minecraft:stone".to_string()];
+
+    // 階段は下半分の4方向、上半分の4方向の順に並ぶ
+    for half in ["bottom", "top"] {
+        // 向きは名前の順に並ぶ
+        for facing in ["east", "north", "south", "west"] {
+            states.push(format!("minecraft:oak_stairs[facing={facing},half={half}]"));
+        }
+    }
+
+    // プロパティの無いブロックを後ろに並べる
+    for name in ["dirt", "gravel", "sand", "bedrock", "cobblestone", "oak_planks", "glass"] {
+        states.push(format!("minecraft:{name}"));
+    }
+
+    states
+}
+
+/// 1.15.2の形式のテストベクタのLevel.Biomesの値
+fn spanning_biome(index: usize) -> i32 {
+    ((index * 5) % 13 + 1) as i32
+}
+
+/// 1.14.4の形式のテストベクタのLevel.Biomesの値
+fn biome_2d(index: usize) -> i32 {
+    ((index * 7) % 61 + 1) as i32
+}
+
+/// 1.16.5と1.14.4の形式のテストベクタの0段目のパレットを、ブロック状態の文字列表現で並べたもの
+fn level_states() -> [&'static str; 5] {
+    [
+        "minecraft:air",
+        "minecraft:stone",
+        "minecraft:dirt",
+        "minecraft:oak_stairs[facing=east,half=bottom]",
+        "minecraft:oak_stairs[facing=west,half=top]",
+    ]
+}
+
+/// 1.15.2の形式のテストベクタをNBTのまま読む
+fn spanning_vector() -> NbtCompound {
+    read_file(vector_path("v2230_spanning"), &NbtReadOptions::default()).unwrap().tag
+}
+
+/// 1.14.4の形式のテストベクタをNBTのまま読む
+fn biomes_2d_vector() -> NbtCompound {
+    read_file(vector_path("v1976_biomes_2d"), &NbtReadOptions::default()).unwrap().tag
+}
+
+#[test]
+fn data_version2230のまたぐ詰め方のチャンクを読み無変更で書き戻すと元と同じになる() {
+    let root = spanning_vector();
+    let before = chunk_bytes(&root);
+    let chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+    let states = spanning_states();
+
+    assert_eq!(2230, chunk.data_version().unwrap());
+    assert_eq!(-3, chunk.x().unwrap());
+    assert_eq!(5, chunk.z().unwrap());
+    assert_eq!(0, chunk.min_section_y().unwrap());
+    assert!(chunk.is_fully_generated());
+    assert_eq!(vec![-1, 0, 1], chunk.section_ys());
+    let container = chunk.section(0).unwrap().block_states().unwrap();
+    assert_eq!(17, container.palette().len());
+    assert_eq!(5, container.bits_per_entry());
+
+    // ベクタの添字は (位置 * 7) % 17
+    // ビット幅5なので、位置12や25の値は64bitの境目をまたぐ
+    let block = |x, y, z| chunk.get_block(x, y, z).unwrap().unwrap().to_string();
+    assert_eq!(states[(12 * 7) % 17], block(12, 0, 0));
+    assert_eq!(states[(25 * 7) % 17], block(9, 0, 1));
+
+    // 全ブロックが元の添字どおりに読める
+    for position in 0..4096 {
+        let actual = block(position & 15, position >> 8, (position >> 4) & 15);
+        assert_eq!(states[(position as usize * 7) % 17], actual);
+    }
+
+    assert_eq!("minecraft:air", block(15, 31, 15));
+    assert!(chunk.get_block(0, -1, 0).unwrap().is_none());
+
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+}
+
+#[test]
+fn data_version2230のチャンクでパレットが育ってもまたぐ詰め方で書き戻す() {
+    let mut chunk = Chunk::from_nbt(spanning_vector(), &ChunkReadOptions::default()).unwrap();
+    let states = spanning_states();
+
+    // 20種類を足してパレットを37要素にし、ビット幅を5から6へ広げる
+    for index in 0..20 {
+        let state = format!("minecraft:edited_{index}");
+        chunk.set_block(index % 16, index / 16, 0, state.as_str()).unwrap();
+    }
+
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    let section = level_section(&written, 0);
+
+    // またぐ詰め方なので、長さは ceil(4096 * 6 / 64) = 384
+    assert_eq!(37, section.get_list("Palette").unwrap().len());
+    assert_eq!(384, section.get_long_array("BlockStates").unwrap().len());
+    assert_eq!(2230, written.get_int("DataVersion").unwrap());
+
+    let reread = Chunk::from_nbt(written, &ChunkReadOptions::default()).unwrap();
+
+    // 置いたブロックと、触っていないブロックの両方が読み直せる
+    for position in 0..4096 {
+        let x = position & 15;
+        let y = position >> 8;
+        let z = (position >> 4) & 15;
+        let index = (y * 16) + x;
+        let block = reread.get_block(x, y, z).unwrap().unwrap().to_string();
+
+        // 置いた位置だけ新しい状態になる
+        if z == 0 && index < 20 {
+            assert_eq!(format!("minecraft:edited_{index}"), block);
+        } else {
+            assert_eq!(states[(position as usize * 7) % 17], block);
+        }
+    }
+}
+
+#[test]
+fn data_version2230のチャンクのバイオームidは4ブロック単位で読める() {
+    let chunk = Chunk::from_nbt(spanning_vector(), &ChunkReadOptions::default()).unwrap();
+
+    assert_eq!(
+        Some(spanning_biome(17 * 16 + 2 * 4 + 1)),
+        chunk.get_biome_id(5, 70, 9).unwrap()
+    );
+    assert_eq!(None, chunk.get_biome_id(0, 256, 0).unwrap());
+}
+
+#[test]
+fn data_version1976のチャンクを読み無変更で書き戻すと元と同じになる() {
+    let root = biomes_2d_vector();
+    let before = chunk_bytes(&root);
+    let chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    assert_eq!(1976, chunk.data_version().unwrap());
+    assert_eq!(4, chunk.x().unwrap());
+    assert_eq!(-2, chunk.z().unwrap());
+    assert_eq!(0, chunk.min_section_y().unwrap());
+    assert_eq!(vec![0, 1], chunk.section_ys());
+
+    // ベクタの添字は (位置 * 7) % 5
+    let block = |x, y, z| chunk.get_block(x, y, z).unwrap().unwrap().to_string();
+    assert_eq!("minecraft:air", block(0, 0, 0));
+    assert_eq!("minecraft:dirt", block(1, 0, 0));
+    assert_eq!("minecraft:oak_stairs[facing=west,half=top]", block(2, 0, 0));
+    assert_eq!("minecraft:stone", block(3, 0, 0));
+    assert_eq!("minecraft:oak_stairs[facing=east,half=bottom]", block(4, 0, 0));
+    assert_eq!("minecraft:air", block(15, 31, 15));
+
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+}
+
+#[test]
+fn data_version1976のチャンクでパレットが育ってもまたぐ詰め方で書き戻す() {
+    let mut chunk = Chunk::from_nbt(biomes_2d_vector(), &ChunkReadOptions::default()).unwrap();
+    let states = level_states();
+
+    // 12種類を足してパレットを17要素にし、ビット幅を4から5へ広げる
+    for index in 0..12 {
+        let state = format!("minecraft:edited_{index}");
+        chunk.set_block(index, 0, 0, state.as_str()).unwrap();
+    }
+
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    let section = level_section(&written, 0);
+
+    // またぐ詰め方なので、長さは ceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
+    assert_eq!(17, section.get_list("Palette").unwrap().len());
+    assert_eq!(320, section.get_long_array("BlockStates").unwrap().len());
+
+    let reread = Chunk::from_nbt(written, &ChunkReadOptions::default()).unwrap();
+
+    // 置いたブロックと、触っていないブロックの両方が読み直せる
+    for position in 0..4096 {
+        let block = reread
+            .get_block(position & 15, position >> 8, (position >> 4) & 15)
+            .unwrap()
+            .unwrap()
+            .to_string();
+
+        // 置いた位置だけ新しい状態になる
+        if position < 12 {
+            assert_eq!(format!("minecraft:edited_{position}"), block);
+        } else {
+            assert_eq!(states[(position as usize * 7) % 5], block);
+        }
+    }
+}
+
+#[test]
+fn data_version1976のバイオームidは高さに関係なく列ごとに読み書きできる() {
+    let mut chunk = Chunk::from_nbt(biomes_2d_vector(), &ChunkReadOptions::default()).unwrap();
+
+    // 添字は z * 16 + x で、yは見ない
+    assert_eq!(Some(biome_2d(7 * 16 + 3)), chunk.get_biome_id(3, 0, 7).unwrap());
+    assert_eq!(Some(biome_2d(7 * 16 + 3)), chunk.get_biome_id(3, 200, 7).unwrap());
+    assert_eq!(Some(biome_2d(7 * 16 + 3)), chunk.get_biome_id(3, -10, 7).unwrap());
+    assert_eq!(Some(biome_2d(7 * 16 + 3)), chunk.get_biome_id(3, 300, 7).unwrap());
+    assert_eq!(Some(biome_2d(3 * 16 + 7)), chunk.get_biome_id(7, 0, 3).unwrap());
+
+    chunk.set_biome_id(3, 1000, 7, 42).unwrap();
+    assert!(chunk.is_modified());
+    assert_eq!(Some(42), chunk.get_biome_id(3, 0, 7).unwrap());
+
+    // 同じ列の値だけが変わる
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    let biomes = written.get_compound("Level").unwrap().get_int_array("Biomes").unwrap();
+    assert_eq!(42, biomes[7 * 16 + 3]);
+    assert_eq!(biome_2d(3 * 16 + 7), biomes[3 * 16 + 7]);
+}
+
+#[test]
+fn data_version1976のbiomesを読めないチャンクのバイオームidはnoneで書き込めない() {
+    let cases = [
+        None,
+        Some(NbtTag::IntArray(vec![])),
+        Some(NbtTag::IntArray(vec![1; 1024])),
+        Some(NbtTag::ByteArray(vec![1; 256])),
+    ];
+
+    // Biomesを持たない形と、読めない形のそれぞれで確かめる
+    for biomes in cases {
+        let mut root = biomes_2d_vector();
+        update_level(&mut root, |level| {
+            level.remove("Biomes");
+
+            // Noneなら Biomes を持たないチャンクにする
+            if let Some(tag) = biomes {
+                level.set("Biomes", tag);
+            }
+        });
+
+        let before = chunk_bytes(&root);
+        let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+        assert_eq!(None, chunk.get_biome_id(0, 0, 0).unwrap());
+        assert_code(ErrorCode::InvalidArgument, chunk.set_biome_id(0, 0, 0, 1).unwrap_err());
+
+        // 元のNBTはそのまま残る
+        assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+    }
+}
+
+#[test]
+fn data_version1976のチャンクではバイオーム名のapiはunsupported_feature() {
+    let chunk = Chunk::from_nbt(biomes_2d_vector(), &ChunkReadOptions::default()).unwrap();
+
+    assert_code(ErrorCode::UnsupportedFeature, chunk.get_biome(0, 0, 0).unwrap_err());
+}
+
+#[test]
+fn is_light_onの無い1_13の形式のチャンクは光源を無効化できない() {
+    let mut root = biomes_2d_vector();
+    root.set_int("DataVersion", 1519);
+    update_level(&mut root, |level| {
+        level.remove("isLightOn");
+    });
+    let before = chunk_bytes(&root);
+    let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    assert_code(ErrorCode::UnsupportedFeature, chunk.invalidate_lighting().unwrap_err());
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+}
+
+#[test]
+fn 形式が1_14までならpostprocessedとfullchunkも生成済みとみなす() {
+    let cases = [
+        ("full", true),
+        ("postprocessed", true),
+        ("fullchunk", true),
+        ("mobs_spawned", false),
+        ("decorated", false),
+    ];
+
+    // 生成段階ごとに確かめる
+    for (status, expected) in cases {
+        let mut root = biomes_2d_vector();
+        update_level(&mut root, |level| level.set_string("Status", status));
+
+        let chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+        assert_eq!(expected, chunk.is_fully_generated(), "Status {status}");
+    }
+}
+
+#[test]
+fn 形式が1_15ならpostprocessedを生成済みとみなさない() {
+    let mut root = spanning_vector();
+    update_level(&mut root, |level| level.set_string("Status", "postprocessed"));
+
+    assert!(!Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap().is_fully_generated());
+}
+
+#[test]
+fn data_versionの無いチャンクは元のnbtだけを持つ() {
+    let mut root = pre_flattening_chunk();
+    root.remove("DataVersion");
+    let before = chunk_bytes(&root);
+    let warnings: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&warnings);
+    let options = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Warn,
+        on_warning: Some(Box::new(move |message: &str| {
+            sink.borrow_mut().push(message.to_string());
+        })),
+        ..ChunkReadOptions::default()
+    };
+    let mut chunk = Chunk::from_nbt(root, &options).unwrap();
+
+    // 1.13より前と同じく、読み込みで警告になる
+    assert_eq!(1, warnings.borrow().len());
+
+    // 座標はLevelの中から読み、セクションは解釈しない
+    assert_eq!(3, chunk.x().unwrap());
+    assert_eq!(-2, chunk.z().unwrap());
+    assert!(chunk.section_ys().is_empty());
+    assert_eq!(-1, chunk.format_data_version());
+
+    // DataVersionの取得子は、いまと同じく無ければエラー
+    assert!(chunk.data_version().is_err());
+
+    // ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない
+    let results = vec![
+        chunk.get_block(0, 0, 0).map(|_| ()),
+        chunk.get_biome(0, 0, 0).map(|_| ()),
+        chunk.get_biome_id(0, 0, 0).map(|_| ()),
+        chunk.min_section_y().map(|_| ()),
+        chunk.to_nbt(&ChunkWriteOptions::default()).map(|_| ()),
+        chunk.set_block(0, 0, 0, "minecraft:stone"),
+        chunk.set_biome(0, 0, 0, "minecraft:plains"),
+        chunk.set_biome_id(0, 0, 0, 1),
+        chunk.clear_heightmaps(),
+        chunk.invalidate_lighting(),
+    ];
+
+    // 操作ごとにUnsupportedDataVersionになることを確かめる
+    for result in results {
+        match result {
+            Ok(()) => panic!("操作できてしまった"),
+            Err(error) => assert_code(ErrorCode::UnsupportedDataVersion, error),
+        }
+    }
+
+    // 許可すれば、読んだNBTがそのまま返る
+    let write = ChunkWriteOptions {
+        allow_foreign_data_version: true,
+    };
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&write).unwrap()));
+}
+
+#[test]
+fn data_versionの無いチャンクはerrorなら読み込みで弾く() {
+    let mut root = pre_flattening_chunk();
+    root.remove("DataVersion");
+    let options = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Error,
+        ..ChunkReadOptions::default()
+    };
+
+    match Chunk::from_nbt(root, &options) {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::UnsupportedDataVersion, error),
+    }
+}
+
+#[test]
+fn data_versionの無いチャンクも世代を指定すればその値を返す() {
+    let mut root = pre_flattening_chunk();
+    root.remove("DataVersion");
+    let options = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Ignore,
+        format_data_version: Some(2230),
+        ..ChunkReadOptions::default()
+    };
+    let chunk = Chunk::from_nbt(root, &options).unwrap();
+
+    // 指定しても世代は選ばず、元のNBTだけを持つ
+    assert_eq!(2230, chunk.format_data_version());
+    assert_code(ErrorCode::UnsupportedDataVersion, chunk.get_block(0, 0, 0).unwrap_err());
 }
 
 // ---------------------------------------------------------------------------

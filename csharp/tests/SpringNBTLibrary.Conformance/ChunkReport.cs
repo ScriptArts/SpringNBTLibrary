@@ -90,6 +90,7 @@ internal static class ChunkReport
                     {
                         BlockState? block = chunk.GetBlock(x, (sectionY * 16) + y, z);
 
+                        // ブロックを持たないセクションの位置は数えない
                         if (block is null)
                         {
                             continue;
@@ -114,6 +115,7 @@ internal static class ChunkReport
                         {
                             int? biomeId = chunk.GetBiomeId(x, (sectionY * 16) + y, z);
 
+                            // Biomesを読めない位置は数えない
                             if (biomeId is null)
                             {
                                 continue;
@@ -126,6 +128,7 @@ internal static class ChunkReport
 
                         string? biome = chunk.GetBiome(x, (sectionY * 16) + y, z);
 
+                        // バイオームを持たないセクションの位置は数えない
                         if (biome is null)
                         {
                             continue;

@@ -939,8 +939,23 @@ class WorldTest {
         }
 
         @Test
-        void 扱える形式の下限は1_16() {
-            assertEquals(2529, SpringNbt.MIN_SUPPORTED_DATA_VERSION);
+        void 扱える形式の下限は1_13() {
+            assertEquals(1519, SpringNbt.MIN_SUPPORTED_DATA_VERSION);
+
+            List<String> warnings = new ArrayList<>();
+            ChunkReadOptions options = new ChunkReadOptions()
+                    .setOnVersionMismatch(VersionMismatchAction.WARN)
+                    .setOnWarning(warnings::add);
+
+            // 1.13の正式版より1つ古いチャンクは、読み込みで警告になる
+            NbtCompound root = preFlatteningChunk();
+            root.setInt("DataVersion", 1518);
+            Chunk.fromNbt(root, options);
+            assertEquals(1, warnings.size());
+
+            // 1.13の正式版のチャンクは警告を出さない
+            Chunk.fromNbt(levelChunk(1519), options);
+            assertEquals(1, warnings.size());
         }
 
         @Test
@@ -1150,7 +1165,8 @@ class WorldTest {
                     () -> chunk.getBiomeId(0, 0, 0),
                     () -> chunk.setBiomeId(0, 0, 0, 1),
                     chunk::clearHeightmaps,
-                    chunk::invalidateLighting);
+                    chunk::invalidateLighting,
+                    chunk::minSectionY);
 
             // 操作ごとにUNSUPPORTED_DATA_VERSIONになることを確かめる
             for (Executable operation : operations) {
@@ -1431,14 +1447,40 @@ class WorldTest {
             assertFalse(Chunk.fromNbt(root, ChunkReadOptions.defaults()).isFullyGenerated());
         }
 
-        @Test
-        void PaletteがありBlockStatesの無いセクションはMALFORMED_DATA() {
+        @ParameterizedTest
+        @ValueSource(strings = {"BlockStates", "Palette"})
+        void PaletteとBlockStatesの片方しか無いセクションはブロックを持たない(String key) {
             NbtCompound root = levelVector();
-            levelSection(root, 1).remove("BlockStates");
+            levelSection(root, 1).remove(key);
+            byte[] before = chunkBytes(root);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+
+            // Minecraftも両方がそろったセクションだけを読むので、ブロックの無いセクションとして扱う
+            assertFalse(chunk.section(1).hasBlockStates());
+            assertNull(chunk.getBlock(0, 16, 0));
 
             SpringNbtException error = assertThrows(SpringNbtException.class,
-                    () -> Chunk.fromNbt(root, ChunkReadOptions.defaults()));
-            assertEquals(ErrorCode.MALFORMED_DATA, error.code());
+                    () -> chunk.setBlock(0, 16, 0, "minecraft:stone"));
+            assertEquals(ErrorCode.INVALID_ARGUMENT, error.code());
+
+            // 元のNBTはそのまま残る
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(null)));
+        }
+
+        @Test
+        void Properties_Nameの並びの要素と同じ状態を置いてもパレットは増えない() {
+            NbtCompound root = levelVector();
+            NbtTag paletteBefore = levelSection(root, 0).getList("Palette").copy();
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+
+            // 実データと同じくProperties -> Nameの並びで入っている状態を、プロパティの並びを変えて置く
+            chunk.setBlock(0, 0, 0, "minecraft:oak_stairs[half=bottom,facing=east]");
+            NbtCompound written = chunk.toNbt(null);
+
+            // 同じ状態の要素を使い回すので、パレットは元のまま
+            assertEquals(paletteBefore, levelSection(written, 0).getList("Palette"));
+            Chunk reread = Chunk.fromNbt(written, ChunkReadOptions.defaults());
+            assertEquals("minecraft:oak_stairs[facing=east,half=bottom]", reread.getBlock(0, 0, 0).toString());
         }
 
         @Test
@@ -1451,6 +1493,362 @@ class WorldTest {
             SpringNbtException error = assertThrows(SpringNbtException.class,
                     () -> Chunk.fromNbt(root, ChunkReadOptions.defaults()));
             assertEquals(ErrorCode.UNEXPECTED_TAG_TYPE, error.code());
+        }
+    }
+
+    /** 1.15.2の形式のテストベクタの0段目のパレットを、ブロック状態の文字列表現で並べたもの */
+    private static List<String> spanningStates() {
+        List<String> states = new ArrayList<>(List.of("minecraft:air", "minecraft:stone"));
+
+        // 階段は下半分の4方向、上半分の4方向の順に並ぶ
+        for (String half : List.of("bottom", "top")) {
+            // 向きは名前の順に並ぶ
+            for (String facing : List.of("east", "north", "south", "west")) {
+                states.add("minecraft:oak_stairs[facing=" + facing + ",half=" + half + "]");
+            }
+        }
+
+        // プロパティの無いブロックを後ろに並べる
+        for (String name : List.of("dirt", "gravel", "sand", "bedrock", "cobblestone", "oak_planks", "glass")) {
+            states.add("minecraft:" + name);
+        }
+
+        return states;
+    }
+
+    /** 1.15.2の形式のテストベクタのLevel.Biomesの値 */
+    private static int spanningBiome(int index) {
+        return ((index * 5) % 13) + 1;
+    }
+
+    /** 1.14.4の形式のテストベクタのLevel.Biomesの値 */
+    private static int biome2D(int index) {
+        return ((index * 7) % 61) + 1;
+    }
+
+    /** 1.16.5と1.14.4の形式のテストベクタの0段目のパレットを、ブロック状態の文字列表現で並べたもの */
+    private static final List<String> LEVEL_STATES = List.of(
+            "minecraft:air",
+            "minecraft:stone",
+            "minecraft:dirt",
+            "minecraft:oak_stairs[facing=east,half=bottom]",
+            "minecraft:oak_stairs[facing=west,half=top]");
+
+    /** 1.15.2の形式のテストベクタをNBTのまま読む */
+    private static NbtCompound spanningVector() {
+        return (NbtCompound) NbtIo.readFile(vectorPath("v2230_spanning"), null).tag();
+    }
+
+    /** 1.14.4の形式のテストベクタをNBTのまま読む */
+    private static NbtCompound biomes2DVector() {
+        return (NbtCompound) NbtIo.readFile(vectorPath("v1976_biomes_2d"), null).tag();
+    }
+
+    /** DataVersionを持たないチャンクを作る */
+    private static NbtCompound chunkWithoutDataVersion() {
+        NbtCompound root = preFlatteningChunk();
+        root.remove("DataVersion");
+        return root;
+    }
+
+    @Nested
+    class LegacyChunkTest {
+
+        @Test
+        void DataVersion2230のまたぐ詰め方のチャンクを読み無変更で書き戻すと元と同じになる() {
+            NbtCompound root = spanningVector();
+            byte[] before = chunkBytes(root);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+            List<String> states = spanningStates();
+
+            assertEquals(2230, chunk.dataVersion());
+            assertEquals(-3, chunk.x());
+            assertEquals(5, chunk.z());
+            assertEquals(0, chunk.minSectionY());
+            assertTrue(chunk.isFullyGenerated());
+            assertEquals(List.of(-1, 0, 1), new ArrayList<>(chunk.sectionYs()));
+            assertEquals(17, chunk.section(0).blockStates().palette().size());
+            assertEquals(5, chunk.section(0).blockStates().bitsPerEntry());
+
+            // ベクタの添字は (位置 * 7) % 17
+            // ビット幅5なので、位置12や25の値は64bitの境目をまたぐ
+            assertEquals(states.get((12 * 7) % 17), chunk.getBlock(12, 0, 0).toString());
+            assertEquals(states.get((25 * 7) % 17), chunk.getBlock(9, 0, 1).toString());
+
+            // 全ブロックが元の添字どおりに読める
+            for (int position = 0; position < 4096; position++) {
+                BlockState block = chunk.getBlock(position & 15, position >> 8, (position >> 4) & 15);
+                assertEquals(states.get((position * 7) % 17), block.toString());
+            }
+
+            assertEquals("minecraft:air", chunk.getBlock(15, 31, 15).toString());
+            assertNull(chunk.getBlock(0, -1, 0));
+
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(null)));
+        }
+
+        @Test
+        void DataVersion2230のチャンクでパレットが育ってもまたぐ詰め方で書き戻す() {
+            Chunk chunk = Chunk.fromNbt(spanningVector(), ChunkReadOptions.defaults());
+            List<String> states = spanningStates();
+
+            // 20種類を足してパレットを37要素にし、ビット幅を5から6へ広げる
+            for (int index = 0; index < 20; index++) {
+                chunk.setBlock(index % 16, index / 16, 0, "minecraft:edited_" + index);
+            }
+
+            NbtCompound written = chunk.toNbt(null);
+            NbtCompound section = levelSection(written, 0);
+
+            // またぐ詰め方なので、長さは ceil(4096 * 6 / 64) = 384
+            assertEquals(37, section.getList("Palette").size());
+            assertEquals(384, section.getLongArray("BlockStates").length);
+            assertEquals(2230, written.getInt("DataVersion"));
+
+            Chunk reread = Chunk.fromNbt(written, ChunkReadOptions.defaults());
+
+            // 置いたブロックと、触っていないブロックの両方が読み直せる
+            for (int position = 0; position < 4096; position++) {
+                int x = position & 15;
+                int y = position >> 8;
+                int z = (position >> 4) & 15;
+                int index = (y * 16) + x;
+                String block = reread.getBlock(x, y, z).toString();
+
+                // 置いた位置だけ新しい状態になる
+                if (z == 0 && index < 20) {
+                    assertEquals("minecraft:edited_" + index, block);
+                } else {
+                    assertEquals(states.get((position * 7) % 17), block);
+                }
+            }
+        }
+
+        @Test
+        void DataVersion2230のチャンクのバイオームIDは4ブロック単位で読める() {
+            Chunk chunk = Chunk.fromNbt(spanningVector(), ChunkReadOptions.defaults());
+
+            assertEquals(spanningBiome((17 * 16) + (2 * 4) + 1), chunk.getBiomeId(5, 70, 9));
+            assertNull(chunk.getBiomeId(0, 256, 0));
+        }
+
+        @Test
+        void DataVersion1976のチャンクを読み無変更で書き戻すと元と同じになる() {
+            NbtCompound root = biomes2DVector();
+            byte[] before = chunkBytes(root);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+
+            assertEquals(1976, chunk.dataVersion());
+            assertEquals(4, chunk.x());
+            assertEquals(-2, chunk.z());
+            assertEquals(0, chunk.minSectionY());
+            assertEquals(List.of(0, 1), new ArrayList<>(chunk.sectionYs()));
+
+            // ベクタの添字は (位置 * 7) % 5
+            assertEquals("minecraft:air", chunk.getBlock(0, 0, 0).toString());
+            assertEquals("minecraft:dirt", chunk.getBlock(1, 0, 0).toString());
+            assertEquals("minecraft:oak_stairs[facing=west,half=top]", chunk.getBlock(2, 0, 0).toString());
+            assertEquals("minecraft:stone", chunk.getBlock(3, 0, 0).toString());
+            assertEquals("minecraft:oak_stairs[facing=east,half=bottom]", chunk.getBlock(4, 0, 0).toString());
+            assertEquals("minecraft:air", chunk.getBlock(15, 31, 15).toString());
+
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(null)));
+        }
+
+        @Test
+        void DataVersion1976のチャンクでパレットが育ってもまたぐ詰め方で書き戻す() {
+            Chunk chunk = Chunk.fromNbt(biomes2DVector(), ChunkReadOptions.defaults());
+
+            // 12種類を足してパレットを17要素にし、ビット幅を4から5へ広げる
+            for (int index = 0; index < 12; index++) {
+                chunk.setBlock(index, 0, 0, "minecraft:edited_" + index);
+            }
+
+            NbtCompound written = chunk.toNbt(null);
+            NbtCompound section = levelSection(written, 0);
+
+            // またぐ詰め方なので、長さは ceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
+            assertEquals(17, section.getList("Palette").size());
+            assertEquals(320, section.getLongArray("BlockStates").length);
+
+            Chunk reread = Chunk.fromNbt(written, ChunkReadOptions.defaults());
+
+            // 置いたブロックと、触っていないブロックの両方が読み直せる
+            for (int position = 0; position < 4096; position++) {
+                String block = reread.getBlock(position & 15, position >> 8, (position >> 4) & 15).toString();
+
+                // 置いた位置だけ新しい状態になる
+                if (position < 12) {
+                    assertEquals("minecraft:edited_" + position, block);
+                } else {
+                    assertEquals(LEVEL_STATES.get((position * 7) % 5), block);
+                }
+            }
+        }
+
+        @Test
+        void DataVersion1976のバイオームIDは高さに関係なく列ごとに読み書きできる() {
+            Chunk chunk = Chunk.fromNbt(biomes2DVector(), ChunkReadOptions.defaults());
+
+            // 添字は z * 16 + x で、yは見ない
+            assertEquals(biome2D((7 * 16) + 3), chunk.getBiomeId(3, 0, 7));
+            assertEquals(biome2D((7 * 16) + 3), chunk.getBiomeId(3, 200, 7));
+            assertEquals(biome2D((7 * 16) + 3), chunk.getBiomeId(3, -10, 7));
+            assertEquals(biome2D((7 * 16) + 3), chunk.getBiomeId(3, 300, 7));
+            assertEquals(biome2D((3 * 16) + 7), chunk.getBiomeId(7, 0, 3));
+
+            chunk.setBiomeId(3, 1000, 7, 42);
+            assertTrue(chunk.isModified());
+            assertEquals(42, chunk.getBiomeId(3, 0, 7));
+
+            // 同じ列の値だけが変わる
+            int[] biomes = chunk.toNbt(null).getCompound("Level").getIntArray("Biomes");
+            assertEquals(42, biomes[(7 * 16) + 3]);
+            assertEquals(biome2D((3 * 16) + 7), biomes[(3 * 16) + 7]);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"absent", "int0", "int1024", "byte256"})
+        void DataVersion1976のBiomesを読めないチャンクのバイオームIDはnullで書き込めない(String kind) {
+            NbtCompound root = biomes2DVector();
+            NbtCompound level = root.getCompound("Level");
+            level.remove("Biomes");
+
+            // 種類ごとに、読めない形のBiomesを置く
+            if (kind.equals("int0")) {
+                level.set("Biomes", new NbtIntArray(new int[0]));
+            } else if (kind.equals("int1024")) {
+                int[] values = new int[1024];
+                Arrays.fill(values, 1);
+                level.set("Biomes", new NbtIntArray(values));
+            } else if (kind.equals("byte256")) {
+                byte[] values = new byte[256];
+                Arrays.fill(values, (byte) 1);
+                level.set("Biomes", new NbtByteArray(values));
+            }
+
+            byte[] before = chunkBytes(root);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+            assertNull(chunk.getBiomeId(0, 0, 0));
+
+            SpringNbtException error = assertThrows(SpringNbtException.class, () -> chunk.setBiomeId(0, 0, 0, 1));
+            assertEquals(ErrorCode.INVALID_ARGUMENT, error.code());
+
+            // 元のNBTはそのまま残る
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(null)));
+        }
+
+        @Test
+        void DataVersion1976のチャンクではバイオーム名のAPIはUNSUPPORTED_FEATURE() {
+            Chunk chunk = Chunk.fromNbt(biomes2DVector(), ChunkReadOptions.defaults());
+
+            SpringNbtException error = assertThrows(SpringNbtException.class, () -> chunk.getBiome(0, 0, 0));
+            assertEquals(ErrorCode.UNSUPPORTED_FEATURE, error.code());
+        }
+
+        @Test
+        void isLightOnの無い1_13の形式のチャンクは光源を無効化できない() {
+            NbtCompound root = biomes2DVector();
+            root.setInt("DataVersion", 1519);
+            root.getCompound("Level").remove("isLightOn");
+            byte[] before = chunkBytes(root);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+
+            SpringNbtException error = assertThrows(SpringNbtException.class, chunk::invalidateLighting);
+            assertEquals(ErrorCode.UNSUPPORTED_FEATURE, error.code());
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(null)));
+        }
+
+        @ParameterizedTest
+        @CsvSource({
+            "full, true",
+            "postprocessed, true",
+            "fullchunk, true",
+            "mobs_spawned, false",
+            "decorated, false",
+        })
+        void 形式が1_14までならpostprocessedとfullchunkも生成済みとみなす(String status, boolean expected) {
+            NbtCompound root = biomes2DVector();
+            root.getCompound("Level").setString("Status", status);
+
+            assertEquals(expected, Chunk.fromNbt(root, ChunkReadOptions.defaults()).isFullyGenerated());
+        }
+
+        @Test
+        void 形式が1_15ならpostprocessedを生成済みとみなさない() {
+            NbtCompound root = spanningVector();
+            root.getCompound("Level").setString("Status", "postprocessed");
+
+            assertFalse(Chunk.fromNbt(root, ChunkReadOptions.defaults()).isFullyGenerated());
+        }
+
+        @Test
+        void DataVersionの無いチャンクは元のNBTだけを持つ() {
+            NbtCompound root = chunkWithoutDataVersion();
+            byte[] before = chunkBytes(root);
+            List<String> warnings = new ArrayList<>();
+            ChunkReadOptions options = new ChunkReadOptions()
+                    .setOnVersionMismatch(VersionMismatchAction.WARN)
+                    .setOnWarning(warnings::add);
+            Chunk chunk = Chunk.fromNbt(root, options);
+
+            // 1.13より前と同じく、読み込みで警告になる
+            assertEquals(1, warnings.size());
+
+            // 座標はLevelの中から読み、セクションは解釈しない
+            assertEquals(3, chunk.x());
+            assertEquals(-2, chunk.z());
+            assertTrue(chunk.sectionYs().isEmpty());
+            assertEquals(-1, chunk.formatDataVersion());
+
+            // DataVersionの取得子は、いまと同じく無ければエラー
+            assertThrows(SpringNbtException.class, chunk::dataVersion);
+
+            // ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない
+            List<Executable> operations = List.of(
+                    () -> chunk.getBlock(0, 0, 0),
+                    () -> chunk.setBlock(0, 0, 0, "minecraft:stone"),
+                    () -> chunk.getBiome(0, 0, 0),
+                    () -> chunk.setBiome(0, 0, 0, "minecraft:plains"),
+                    () -> chunk.getBiomeId(0, 0, 0),
+                    () -> chunk.setBiomeId(0, 0, 0, 1),
+                    chunk::clearHeightmaps,
+                    chunk::invalidateLighting,
+                    chunk::minSectionY,
+                    () -> chunk.toNbt(null));
+
+            // 操作ごとにUNSUPPORTED_DATA_VERSIONになることを確かめる
+            for (Executable operation : operations) {
+                SpringNbtException error = assertThrows(SpringNbtException.class, operation);
+                assertEquals(ErrorCode.UNSUPPORTED_DATA_VERSION, error.code());
+            }
+
+            // 許可すれば、読んだNBTがそのまま返る
+            ChunkWriteOptions write = new ChunkWriteOptions().setAllowForeignDataVersion(true);
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(write)));
+        }
+
+        @Test
+        void DataVersionの無いチャンクはERRORなら読み込みで弾く() {
+            ChunkReadOptions options = new ChunkReadOptions().setOnVersionMismatch(VersionMismatchAction.ERROR);
+
+            SpringNbtException error = assertThrows(SpringNbtException.class,
+                    () -> Chunk.fromNbt(chunkWithoutDataVersion(), options));
+            assertEquals(ErrorCode.UNSUPPORTED_DATA_VERSION, error.code());
+        }
+
+        @Test
+        void DataVersionの無いチャンクも世代を指定すればその値を返す() {
+            ChunkReadOptions options = new ChunkReadOptions()
+                    .setOnVersionMismatch(VersionMismatchAction.IGNORE)
+                    .setFormatDataVersion(2230);
+            Chunk chunk = Chunk.fromNbt(chunkWithoutDataVersion(), options);
+
+            // 指定しても世代は選ばず、元のNBTだけを持つ
+            assertEquals(2230, chunk.formatDataVersion());
+
+            SpringNbtException error = assertThrows(SpringNbtException.class, () -> chunk.getBlock(0, 0, 0));
+            assertEquals(ErrorCode.UNSUPPORTED_DATA_VERSION, error.code());
         }
     }
 

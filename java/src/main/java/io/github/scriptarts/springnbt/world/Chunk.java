@@ -12,6 +12,7 @@ import io.github.scriptarts.springnbt.nbt.NbtString;
 import io.github.scriptarts.springnbt.nbt.NbtTag;
 import io.github.scriptarts.springnbt.nbt.TagType;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
@@ -32,8 +33,14 @@ public final class Chunk {
     /** セクション1つに入るバイオームのエントリ数（4×4×4単位） */
     public static final int BIOMES_PER_SECTION = 64;
 
-    /** 1.17までの形式で、チャンクの{@code Biomes}が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで） */
+    /** 1.15から1.17までの形式で、チャンクの{@code Biomes}が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで） */
     private static final int BIOME_IDS_3D_LENGTH = 1024;
+
+    /** 1.14までの形式で、チャンクの{@code Biomes}が持つ数値のバイオームIDの数（列ごと） */
+    private static final int BIOME_IDS_2D_LENGTH = 256;
+
+    /** DataVersionの無いチャンクで、世代の指定も無いときの{@link #formatDataVersion()} */
+    private static final int MISSING_DATA_VERSION = -1;
 
     /** 1.17までの形式で、バイオームIDを持つ最も高いY座標 */
     private static final int BIOME_IDS_MAX_Y = 255;
@@ -65,9 +72,36 @@ public final class Chunk {
      * チャンク構造のバージョン
      *
      * @return バージョン
+     * @throws SpringNbtException {@code DataVersion}の無いチャンク（1.9より前）の場合
      */
     public int dataVersion() {
         return root.getInt("DataVersion");
+    }
+
+    /**
+     * チャンク自身のDataVersion
+     *
+     * @return DataVersion
+     * 無ければnull
+     */
+    private Integer ownDataVersion() {
+        return root.optInt("DataVersion");
+    }
+
+    /**
+     * エラーや警告の文で、チャンクをDataVersionで言い表す
+     *
+     * @param dataVersion チャンク自身のDataVersion
+     * 無ければnull
+     * @return チャンクを言い表す文
+     */
+    private static String describeChunk(Integer dataVersion) {
+        // 1.9より前のチャンクはDataVersionを持たない
+        if (dataVersion == null) {
+            return "DataVersionの無いチャンク";
+        }
+
+        return "DataVersion " + dataVersion + "のチャンク";
     }
 
     /**
@@ -75,6 +109,7 @@ public final class Chunk {
      *
      * <p>読み込みのオプションで指定していればその値、指定が無ければ{@link #dataVersion()}
      * {@link #dataVersion()}が1519未満のチャンクでは、世代を選ばずに指定の値をそのまま返す
+     * {@code DataVersion}の無いチャンクで指定も無ければ-1
      *
      * @return DataVersion
      */
@@ -106,10 +141,13 @@ public final class Chunk {
      * 1.17までの形式では0
      *
      * @return Y位置
+     * @throws SpringNbtException 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
      */
     public int minSectionY() {
+        ChunkFormat chunkFormat = requireFormat();
+
         // 1.17までの形式はyPosを持たず、セクションは0段目から始まる
-        if (format != null && !format.hasYPos()) {
+        if (!chunkFormat.hasYPos()) {
             return 0;
         }
 
@@ -130,6 +168,8 @@ public final class Chunk {
      * 生成が完了しているか
      * ブロック改変の対象にしてよいのはこれだけ
      *
+     * <p>1.14までの形式では、1.13の{@code postprocessed}と{@code fullchunk}も生成済みとみなす
+     *
      * @return 完了していればtrue
      */
     public boolean isFullyGenerated() {
@@ -140,7 +180,14 @@ public final class Chunk {
             status = status.substring(MINECRAFT_NAMESPACE.length());
         }
 
-        return "full".equals(status);
+        List<String> fullStatuses = ChunkFormat.DEFAULT_FULL_STATUSES;
+
+        // 生成済みとみなす値は世代で違う
+        if (format != null) {
+            fullStatuses = format.fullStatuses();
+        }
+
+        return fullStatuses.contains(status);
     }
 
     /**
@@ -220,8 +267,13 @@ public final class Chunk {
 
         Chunk chunk = new Chunk(nbt);
         chunk.checkDataVersion(effective);
-        int dataVersion = chunk.dataVersion();
-        chunk.formatDataVersion = dataVersion;
+        Integer dataVersion = chunk.ownDataVersion();
+        chunk.formatDataVersion = MISSING_DATA_VERSION;
+
+        // DataVersionを持つチャンクは、指定が無ければそれで世代を選ぶ
+        if (dataVersion != null) {
+            chunk.formatDataVersion = dataVersion;
+        }
 
         // 指定があれば、チャンク自身のDataVersionの代わりにその値で世代を選ぶ
         if (requested != null) {
@@ -229,7 +281,8 @@ public final class Chunk {
         }
 
         // 1.13より前のチャンクはブロックが数値IDで、どの世代で読んでも誤った値になる
-        if (dataVersion < ChunkFormat.OLDEST_FORMAT_DATA_VERSION) {
+        // DataVersionの無いチャンクは1.9より前のものなので、同じく解釈しない
+        if (dataVersion == null || dataVersion < ChunkFormat.OLDEST_FORMAT_DATA_VERSION) {
             return chunk;
         }
 
@@ -272,15 +325,15 @@ public final class Chunk {
 
     /** DataVersionを検査し、オプションに従って警告またはエラーにする */
     private void checkDataVersion(ChunkReadOptions options) {
-        int version = dataVersion();
+        Integer version = ownDataVersion();
 
         // 形式が同じであれば、新しいバージョンでもそのまま読める
-        if (version >= SpringNbt.MIN_SUPPORTED_DATA_VERSION) {
+        if (version != null && version >= SpringNbt.MIN_SUPPORTED_DATA_VERSION) {
             return;
         }
 
-        String message = "DataVersion " + version + " はこのライブラリが扱う形式より古い（"
-                + SpringNbt.MIN_SUPPORTED_DATA_VERSION + " 以降が対象）";
+        String message = describeChunk(version) + "はこのライブラリが扱う形式より古い（"
+                + SpringNbt.MIN_SUPPORTED_DATA_VERSION + "以降が対象）";
 
         if (options.onVersionMismatch() == VersionMismatchAction.ERROR) {
             throw new SpringNbtException(ErrorCode.UNSUPPORTED_DATA_VERSION, message);
@@ -310,14 +363,15 @@ public final class Chunk {
             effective = options;
         }
 
-        int version = dataVersion();
+        Integer version = ownDataVersion();
+        boolean supported = version != null && version >= SpringNbt.MIN_SUPPORTED_DATA_VERSION;
 
         // 形式の違う古いチャンクは、書き戻すと使えなくなりかねない
-        if (version < SpringNbt.MIN_SUPPORTED_DATA_VERSION && !effective.allowForeignDataVersion()) {
+        if (!supported && !effective.allowForeignDataVersion()) {
             throw new SpringNbtException(ErrorCode.UNSUPPORTED_DATA_VERSION,
-                    "DataVersion " + version + " のチャンクは書き戻せない（"
+                    describeChunk(version) + "は書き戻せない（"
                             + SpringNbt.MIN_SUPPORTED_DATA_VERSION
-                            + " 以降が対象）。許可するなら"
+                            + "以降が対象）。許可するなら"
                             + " ChunkWriteOptions.setAllowForeignDataVersion(true)");
         }
 
@@ -364,7 +418,7 @@ public final class Chunk {
         // 世代を引けなかったチャンクは、ブロックなどの場所が分からない
         if (format == null) {
             throw new SpringNbtException(ErrorCode.UNSUPPORTED_DATA_VERSION,
-                    "DataVersion " + dataVersion() + "のチャンクは形式を解釈せず元のNBTだけを持つので、この操作はできない");
+                    describeChunk(ownDataVersion()) + "は形式を解釈せず元のNBTだけを持つので、この操作はできない");
         }
 
         return format;
@@ -408,16 +462,26 @@ public final class Chunk {
 
     /**
      * 本体の{@code Biomes}を返す
-     * 無い、IntArrayでない、長さが合わない場合はnull
+     * 無い、IntArrayでない、長さが世代と合わない場合はnull
      */
-    private int[] biomeIds() {
+    private int[] biomeIds(ChunkFormat chunkFormat) {
         // 生成途中のチャンクなどは、Biomesを持たないか別の形で持つ
         if (!(body().opt("Biomes") instanceof NbtIntArray biomes)
-                || biomes.value().length != BIOME_IDS_3D_LENGTH) {
+                || biomes.value().length != biomeIdsLength(chunkFormat)) {
             return null;
         }
 
         return biomes.value();
+    }
+
+    /** 世代の{@code Biomes}が持つ数値のバイオームIDの数 */
+    private static int biomeIdsLength(ChunkFormat chunkFormat) {
+        // 列ごとに持つ形式は256個
+        if (chunkFormat.biomeStorage() == ChunkFormat.BiomeStorage.IDS_2D) {
+            return BIOME_IDS_2D_LENGTH;
+        }
+
+        return BIOME_IDS_3D_LENGTH;
     }
 
     /**
@@ -506,11 +570,29 @@ public final class Chunk {
             return;
         }
 
-        // 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで変換する
-        section.blockStates().set(
-                blockIndex(x, y, z), state.toNbtForDataVersion(chunkFormat.paletteDataVersion()));
+        // 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで読み書きする
+        NbtTag entry = paletteEntryFor(section.blockStates(), state, chunkFormat.paletteDataVersion());
+        section.blockStates().set(blockIndex(x, y, z), entry);
         removeBlockData(chunkFormat, x, y, z);
         modified = true;
+    }
+
+    /**
+     * ブロック状態を置くときに使うパレット要素を決める
+     *
+     * <p>同じ状態の要素がパレットにあれば、キーやプロパティの並びが違ってもそれを使う
+     * 無ければ世代の形式で作る
+     */
+    private static NbtTag paletteEntryFor(PalettedContainer container, BlockState state, int dataVersion) {
+        // 実データの{Properties, Name}の並びの要素も、状態として比べて使い回す
+        for (NbtTag entry : container.palette()) {
+            // 状態が同じ要素が見つかれば、パレットを増やさずにそれを置く
+            if (BlockState.fromNbtForDataVersion(entry, dataVersion).equals(state)) {
+                return entry;
+            }
+        }
+
+        return state.toNbtForDataVersion(dataVersion);
     }
 
     /**
@@ -621,7 +703,8 @@ public final class Chunk {
 
     /**
      * 数値のバイオームIDを取得する（1.17までの形式）
-     * 4×4×4の単位なので、座標は自動的に丸められる
+     * 1.15以降の形式は4×4×4の単位なので、座標は自動的に丸められる
+     * 1.14までの形式は列ごとに持つので、Yは見ない
      *
      * <p>IDは名前に直さない
      * 1.16.2以降はデータパックで独自のバイオームを足せるので、固定の表では正しく引けないため
@@ -630,17 +713,27 @@ public final class Chunk {
      * @param y 絶対Y座標
      * @param z チャンク内相対Z座標 (0..15)
      * @return バイオームID
-     * Yが0..255の外の場合と、{@code Biomes}が無いか形が違う場合はnull
+     * 1.15以降の形式でYが0..255の外の場合と、{@code Biomes}が無いか形が違う場合はnull
      * @throws SpringNbtException 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
      * バイオームを名前で持つ1.18以降の形式の場合（UNSUPPORTED_FEATURE）
      */
     public Integer getBiomeId(int x, int y, int z) {
-        requireBiomeIds();
+        ChunkFormat chunkFormat = requireBiomeIds();
         checkLocalCoordinates(x, z);
-        int[] biomes = biomeIds();
+        int[] biomes = biomeIds(chunkFormat);
 
-        // 高さの範囲外と、Biomesを読めないチャンクは値を持たない
-        if (biomes == null || y < 0 || y > BIOME_IDS_MAX_Y) {
+        // Biomesを読めないチャンクは値を持たない
+        if (biomes == null) {
+            return null;
+        }
+
+        // 列ごとに持つ形式は高さを見ない
+        if (chunkFormat.biomeStorage() == ChunkFormat.BiomeStorage.IDS_2D) {
+            return biomes[biomeId2DIndex(x, z)];
+        }
+
+        // 高さの範囲外は値を持たない
+        if (y < 0 || y > BIOME_IDS_MAX_Y) {
             return null;
         }
 
@@ -649,35 +742,43 @@ public final class Chunk {
 
     /**
      * 数値のバイオームIDを設定する（1.17までの形式）
-     * 4×4×4の単位
+     * 1.15以降の形式は4×4×4の単位
+     * 1.14までの形式は列ごとに持つので、Yは見ない
      *
      * @param x       チャンク内相対X座標 (0..15)
      * @param y       絶対Y座標
      * @param z       チャンク内相対Z座標 (0..15)
      * @param biomeId バイオームID
-     * @throws SpringNbtException Yが0..255の外の場合、{@code Biomes}が無いか形が違う場合（INVALID_ARGUMENT）、
+     * @throws SpringNbtException 1.15以降の形式でYが0..255の外の場合、
+     * {@code Biomes}が無いか形が違う場合（INVALID_ARGUMENT）、
      * 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
      * バイオームを名前で持つ1.18以降の形式の場合（UNSUPPORTED_FEATURE）
      */
     public void setBiomeId(int x, int y, int z, int biomeId) {
-        requireBiomeIds();
+        ChunkFormat chunkFormat = requireBiomeIds();
         checkLocalCoordinates(x, z);
+        int index = biomeId2DIndex(x, z);
 
-        // 1.17までのバイオームIDは高さ0..255の分だけある
-        if (y < 0 || y > BIOME_IDS_MAX_Y) {
-            throw SpringNbtException.invalidArgument(
-                    "Y=" + y + " はバイオームIDを持つ高さ（0.." + BIOME_IDS_MAX_Y + "）の外");
+        // 4×4×4ごとに持つ形式は、高さ0..255の分だけある
+        if (chunkFormat.biomeStorage() == ChunkFormat.BiomeStorage.IDS_3D) {
+            // 範囲外の高さはどの値にも当たらない
+            if (y < 0 || y > BIOME_IDS_MAX_Y) {
+                throw SpringNbtException.invalidArgument(
+                        "Y=" + y + " はバイオームIDを持つ高さ（0.." + BIOME_IDS_MAX_Y + "）の外");
+            }
+
+            index = biomeIdIndex(x, y, z);
         }
 
-        int[] biomes = biomeIds();
+        int[] biomes = biomeIds(chunkFormat);
 
         // 読めないBiomesを作り直すと元のデータを失うので、書き込まない
         if (biomes == null) {
             throw SpringNbtException.invalidArgument(
-                    "Biomes が無いか、int[" + BIOME_IDS_3D_LENGTH + "] でない");
+                    "Biomes が無いか、int[" + biomeIdsLength(chunkFormat) + "] でない");
         }
 
-        biomes[biomeIdIndex(x, y, z)] = biomeId;
+        biomes[index] = biomeId;
         modified = true;
     }
 
@@ -708,7 +809,7 @@ public final class Chunk {
         // 書き足さない世代では、isLightOnの無いチャンクは光源の印を持たない
         if (!chunkFormat.addsLightFlag() && !body.containsKey("isLightOn")) {
             throw SpringNbtException.unsupportedFeature(
-                    "DataVersion " + dataVersion() + "のチャンクは isLightOn を持たない");
+                    "DataVersion " + formatDataVersion + "のチャンクは isLightOn を持たない");
         }
 
         body.setByte("isLightOn", (byte) 0);
@@ -753,11 +854,19 @@ public final class Chunk {
     }
 
     /**
-     * 1.17までの形式の{@code Biomes}の添字
+     * 1.15から1.17までの形式の{@code Biomes}の添字
      * 1エントリが4×4×4ブロック
      */
     private static int biomeIdIndex(int x, int y, int z) {
         return (((y >> 2) & 63) * 16) + ((z >> 2) * 4) + (x >> 2);
+    }
+
+    /**
+     * 1.14までの形式の{@code Biomes}の添字
+     * 1エントリが1列
+     */
+    private static int biomeId2DIndex(int x, int z) {
+        return (z * 16) + x;
     }
 
     private static void checkLocalCoordinates(int x, int z) {

@@ -30,6 +30,7 @@ internal static class RegionReport
         {
             RawChunk? raw = region.ReadChunkRaw(position.X, position.Z);
 
+            // 一覧にあっても中身の無いチャンクは数えない
             if (raw is null)
             {
                 continue;
@@ -84,6 +85,7 @@ internal static class RegionReport
         {
             NbtCompound? chunk = source.ReadChunk(position.X, position.Z);
 
+            // 中身の無いチャンクは詰め直す対象にしない
             if (chunk is null)
             {
                 continue;

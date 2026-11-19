@@ -17,12 +17,14 @@ import {
   NbtString,
   NbtTag,
   TagType,
+  tagTypeAsString,
 } from "../nbt/index.js";
 import { BlockState } from "./blockState.js";
 import {
   BiomeStorage,
   BlockStorage,
   ChunkFormat,
+  DEFAULT_FULL_STATUSES,
   OLDEST_FORMAT_DATA_VERSION,
 } from "./chunkFormat.js";
 import { PalettedContainer } from "./palettedContainer.js";
@@ -33,8 +35,14 @@ export const BLOCKS_PER_SECTION = 4096;
 /** セクション1つに入るバイオームのエントリ数（4×4×4単位） */
 export const BIOMES_PER_SECTION = 64;
 
-/** 1.17までの形式で、チャンクの`Biomes`が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで） */
+/** 1.15から1.17までの形式で、チャンクの`Biomes`が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで） */
 const BIOME_IDS_3D_LENGTH = 1024;
+
+/** 1.14までの形式で、チャンクの`Biomes`が持つ数値のバイオームIDの数（列ごと） */
+const BIOME_IDS_2D_LENGTH = 256;
+
+/** DataVersionの無いチャンクで、世代の指定も無いときの`Chunk.formatDataVersion` */
+const MISSING_DATA_VERSION = -1;
 
 /** 1.17までの形式で、バイオームIDを持つ最も高いY座標 */
 const BIOME_IDS_MAX_Y = 255;
@@ -54,6 +62,34 @@ function matchesPosition(entry: NbtCompound, x: number, y: number, z: number): b
   }
 
   return entryX === x && entryY === y && entryZ === z;
+}
+
+/** エラーや警告の文で、チャンクをDataVersionで言い表す */
+function describeChunk(dataVersion: number | undefined): string {
+  // 1.9より前のチャンクはDataVersionを持たない
+  if (dataVersion === undefined) {
+    return "DataVersionの無いチャンク";
+  }
+
+  return `DataVersion ${dataVersion}のチャンク`;
+}
+
+/**
+ * ブロック状態を置くときに使うパレット要素を決める
+ *
+ * 同じ状態の要素がパレットにあれば、キーやプロパティの並びが違ってもそれを使う
+ * 無ければ世代の形式で作る
+ */
+function paletteEntryFor(container: PalettedContainer, state: BlockState, dataVersion: number): NbtTag {
+  // 実データの{Properties, Name}の並びの要素も、状態として比べて使い回す
+  for (const entry of container.palette) {
+    // 状態が同じ要素が見つかれば、パレットを増やさずにそれを置く
+    if (BlockState.fromNbtForDataVersion(entry, dataVersion).equals(state)) {
+      return entry;
+    }
+  }
+
+  return state.toNbtForDataVersion(dataVersion);
 }
 
 /** DataVersionが扱える形式より古いときの動作 */
@@ -194,9 +230,11 @@ export class ChunkSection {
     const section = new ChunkSection(nbt, nbt.getByte("Y"));
     section.#blockStorage = format.blockStorage;
     const palette = nbt.optList("Palette");
+    const blockStates = nbt.optLongArray("BlockStates");
 
-    // Paletteの無いセクション（光源だけを持つものなど）はブロックを持たない
-    if (palette === undefined) {
+    // Minecraftも両方がそろったセクションだけを読むので、
+    // 片方しか無いセクション（光源だけを持つものなど）はブロックを持たない
+    if (palette === undefined || blockStates === undefined) {
       return section;
     }
 
@@ -206,7 +244,9 @@ export class ChunkSection {
     for (const entry of palette) {
       // Compound以外の要素は1.17までの形式に無い
       if (entry.type !== TagType.Compound) {
-        throw SpringNbtError.unexpectedTagType("Palette の要素が compound でない");
+        throw SpringNbtError.unexpectedTagType(
+          `Palette の要素が compound でない: ${tagTypeAsString(entry.type)}`,
+        );
       }
 
       entries.push(entry);
@@ -215,7 +255,7 @@ export class ChunkSection {
     // BlockStatesはパレットが1要素でも必ず書かれる
     section.#blockStates = PalettedContainer.fromParts(
       entries,
-      nbt.optLongArray("BlockStates"),
+      blockStates,
       BLOCKS_PER_SECTION,
       4,
       format.spanningBitStorage,
@@ -294,7 +334,11 @@ export class Chunk {
 
   private constructor(readonly raw: NbtCompound) {}
 
-  /** チャンク構造のバージョン */
+  /**
+   * チャンク構造のバージョン
+   *
+   * @throws SpringNbtError `DataVersion`の無いチャンク（1.9より前）の場合
+   */
   get dataVersion(): number {
     return this.raw.getInt("DataVersion");
   }
@@ -304,6 +348,7 @@ export class Chunk {
    *
    * 読み込みのオプションで指定していればその値、指定が無ければ`dataVersion`
    * `dataVersion`が1519未満のチャンクでは、世代を選ばずに指定の値をそのまま返す
+   * `DataVersion`の無いチャンクで指定も無ければ-1
    */
   get formatDataVersion(): number {
     return this.#formatDataVersion;
@@ -323,10 +368,14 @@ export class Chunk {
    * 最下段セクションのY位置
    * オーバーワールドは-4
    * 1.17までの形式では0
+   *
+   * @throws SpringNbtError 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
    */
   get minSectionY(): number {
+    const format = this.#requireFormat();
+
     // 1.17までの形式はyPosを持たず、セクションは0段目から始まる
-    if (this.#format !== undefined && !this.#format.hasYPos) {
+    if (!format.hasYPos) {
       return 0;
     }
 
@@ -344,6 +393,8 @@ export class Chunk {
   /**
    * 生成が完了しているか
    * ブロック改変の対象にしてよいのはこれだけ
+   *
+   * 1.14までの形式では、1.13の`postprocessed`と`fullchunk`も生成済みとみなす
    */
   get isFullyGenerated(): boolean {
     let status = this.status;
@@ -353,7 +404,14 @@ export class Chunk {
       status = status.substring(MINECRAFT_NAMESPACE.length);
     }
 
-    return status === "full";
+    let fullStatuses = DEFAULT_FULL_STATUSES;
+
+    // 生成済みとみなす値は世代で違う
+    if (this.#format !== undefined) {
+      fullStatuses = this.#format.fullStatuses;
+    }
+
+    return fullStatuses.includes(status);
   }
 
   /**
@@ -408,8 +466,13 @@ export class Chunk {
 
     const chunk = new Chunk(nbt);
     chunk.#checkDataVersion(options);
-    const dataVersion = chunk.dataVersion;
-    chunk.#formatDataVersion = dataVersion;
+    const dataVersion = chunk.#ownDataVersion();
+    chunk.#formatDataVersion = MISSING_DATA_VERSION;
+
+    // DataVersionを持つチャンクは、指定が無ければそれで世代を選ぶ
+    if (dataVersion !== undefined) {
+      chunk.#formatDataVersion = dataVersion;
+    }
 
     // 指定があれば、チャンク自身のDataVersionの代わりにその値で世代を選ぶ
     if (requested !== undefined) {
@@ -417,7 +480,8 @@ export class Chunk {
     }
 
     // 1.13より前のチャンクはブロックが数値IDで、どの世代で読んでも誤った値になる
-    if (dataVersion < OLDEST_FORMAT_DATA_VERSION) {
+    // DataVersionの無いチャンクは1.9より前のものなので、同じく解釈しない
+    if (dataVersion === undefined || dataVersion < OLDEST_FORMAT_DATA_VERSION) {
       return chunk;
     }
 
@@ -464,12 +528,20 @@ export class Chunk {
     return chunk;
   }
 
+  /**
+   * チャンク自身のDataVersion
+   * 無ければundefined
+   */
+  #ownDataVersion(): number | undefined {
+    return this.raw.optInt("DataVersion");
+  }
+
   /** DataVersionを検査し、オプションに従って警告またはエラーにする */
   #checkDataVersion(options?: ChunkReadOptions): void {
-    const version = this.dataVersion;
+    const version = this.#ownDataVersion();
 
     // 形式が同じであれば、新しいバージョンでもそのまま読める
-    if (version >= MIN_SUPPORTED_DATA_VERSION) {
+    if (version !== undefined && version >= MIN_SUPPORTED_DATA_VERSION) {
       return;
     }
 
@@ -480,8 +552,8 @@ export class Chunk {
     }
 
     const message =
-      `DataVersion ${version} はこのライブラリが扱う形式より古い` +
-      `（${MIN_SUPPORTED_DATA_VERSION} 以降が対象）`;
+      `${describeChunk(version)}はこのライブラリが扱う形式より古い` +
+      `（${MIN_SUPPORTED_DATA_VERSION}以降が対象）`;
 
     if (action === VersionMismatchAction.Error) {
       throw new SpringNbtError(ErrorCode.UnsupportedDataVersion, message);
@@ -499,7 +571,8 @@ export class Chunk {
    * 全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
    */
   toNbt(options?: ChunkWriteOptions): NbtCompound {
-    const version = this.dataVersion;
+    const version = this.#ownDataVersion();
+    const supported = version !== undefined && version >= MIN_SUPPORTED_DATA_VERSION;
     let allowForeign = false;
 
     if (options !== undefined && options.allowForeignDataVersion === true) {
@@ -507,11 +580,11 @@ export class Chunk {
     }
 
     // 形式の違う古いチャンクは、書き戻すと使えなくなりかねない
-    if (version < MIN_SUPPORTED_DATA_VERSION && !allowForeign) {
+    if (!supported && !allowForeign) {
       throw new SpringNbtError(
         ErrorCode.UnsupportedDataVersion,
-        `DataVersion ${version} のチャンクは書き戻せない` +
-          `（${MIN_SUPPORTED_DATA_VERSION} 以降が対象）。` +
+        `${describeChunk(version)}は書き戻せない` +
+          `（${MIN_SUPPORTED_DATA_VERSION}以降が対象）。` +
           "許可するなら allowForeignDataVersion を立てること",
       );
     }
@@ -560,7 +633,7 @@ export class Chunk {
     if (this.#format === undefined) {
       throw new SpringNbtError(
         ErrorCode.UnsupportedDataVersion,
-        `DataVersion ${this.dataVersion}のチャンクは形式を解釈せず元のNBTだけを持つので、この操作はできない`,
+        `${describeChunk(this.#ownDataVersion())}は形式を解釈せず元のNBTだけを持つので、この操作はできない`,
       );
     }
 
@@ -609,13 +682,13 @@ export class Chunk {
 
   /**
    * 本体の`Biomes`を返す
-   * 無い、IntArrayでない、長さが合わない場合はundefined
+   * 無い、IntArrayでない、長さが世代と合わない場合はundefined
    */
-  #biomeIds(): Int32Array | undefined {
+  #biomeIds(format: ChunkFormat): Int32Array | undefined {
     const biomes = this.#body().opt("Biomes");
 
     // 生成途中のチャンクなどは、Biomesを持たないか別の形で持つ
-    if (!(biomes instanceof NbtIntArray) || biomes.value.length !== BIOME_IDS_3D_LENGTH) {
+    if (!(biomes instanceof NbtIntArray) || biomes.value.length !== biomeIdsLength(format)) {
       return undefined;
     }
 
@@ -695,11 +768,9 @@ export class Chunk {
       return;
     }
 
-    // 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで変換する
-    section.blockStates!.set(
-      blockIndex(x, y, z),
-      state.toNbtForDataVersion(format.paletteDataVersion),
-    );
+    // 書き戻すときに読んだときと同じ形式になるよう、世代ごとに決めたDataVersionで読み書きする
+    const entry = paletteEntryFor(section.blockStates!, state, format.paletteDataVersion);
+    section.blockStates!.set(blockIndex(x, y, z), entry);
     this.#removeBlockData(format, x, y, z);
     this.#modified = true;
   }
@@ -787,7 +858,8 @@ export class Chunk {
 
   /**
    * 数値のバイオームIDを取得する（1.17までの形式）
-   * 4×4×4の単位なので、座標は自動的に丸められる
+   * 1.15以降の形式は4×4×4の単位なので、座標は自動的に丸められる
+   * 1.14までの形式は列ごとに持つので、Yは見ない
    *
    * IDは名前に直さない
    * 1.16.2以降はデータパックで独自のバイオームを足せるので、固定の表では正しく引けないため
@@ -796,17 +868,27 @@ export class Chunk {
    * @param y 絶対Y座標
    * @param z チャンク内相対Z座標 (0..15)
    * @returns バイオームID
-   * Yが0..255の外の場合と、`Biomes`が無いか形が違う場合はundefined
+   * 1.15以降の形式でYが0..255の外の場合と、`Biomes`が無いか形が違う場合はundefined
    * @throws SpringNbtError 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
    * バイオームを名前で持つ1.18以降の形式の場合（UNSUPPORTED_FEATURE）
    */
   getBiomeId(x: number, y: number, z: number): number | undefined {
-    this.#requireBiomeIds();
+    const format = this.#requireBiomeIds();
     checkLocalCoordinates(x, z);
-    const biomes = this.#biomeIds();
+    const biomes = this.#biomeIds(format);
 
-    // 高さの範囲外と、Biomesを読めないチャンクは値を持たない
-    if (biomes === undefined || y < 0 || y > BIOME_IDS_MAX_Y) {
+    // Biomesを読めないチャンクは値を持たない
+    if (biomes === undefined) {
+      return undefined;
+    }
+
+    // 列ごとに持つ形式は高さを見ない
+    if (format.biomeStorage === BiomeStorage.Ids2D) {
+      return biomes[biomeId2DIndex(x, z)];
+    }
+
+    // 高さの範囲外は値を持たない
+    if (y < 0 || y > BIOME_IDS_MAX_Y) {
       return undefined;
     }
 
@@ -815,33 +897,42 @@ export class Chunk {
 
   /**
    * 数値のバイオームIDを設定する（1.17までの形式）
-   * 4×4×4の単位
+   * 1.15以降の形式は4×4×4の単位
+   * 1.14までの形式は列ごとに持つので、Yは見ない
    *
-   * @throws SpringNbtError Yが0..255の外の場合、`Biomes`が無いか形が違う場合、
+   * @throws SpringNbtError 1.15以降の形式でYが0..255の外の場合、`Biomes`が無いか形が違う場合、
    * IDがintの範囲に収まらない場合（INVALID_ARGUMENT）、
    * 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
    * バイオームを名前で持つ1.18以降の形式の場合（UNSUPPORTED_FEATURE）
    */
   setBiomeId(x: number, y: number, z: number, biomeId: number): void {
-    this.#requireBiomeIds();
+    const format = this.#requireBiomeIds();
     checkLocalCoordinates(x, z);
+    let index = biomeId2DIndex(x, z);
 
-    // 1.17までのバイオームIDは高さ0..255の分だけある
-    if (y < 0 || y > BIOME_IDS_MAX_Y) {
-      throw SpringNbtError.invalidArgument(
-        `Y=${y} はバイオームIDを持つ高さ（0..${BIOME_IDS_MAX_Y}）の外`,
-      );
+    // 4×4×4ごとに持つ形式は、高さ0..255の分だけある
+    if (format.biomeStorage === BiomeStorage.Ids3D) {
+      // 範囲外の高さはどの値にも当たらない
+      if (y < 0 || y > BIOME_IDS_MAX_Y) {
+        throw SpringNbtError.invalidArgument(
+          `Y=${y} はバイオームIDを持つ高さ（0..${BIOME_IDS_MAX_Y}）の外`,
+        );
+      }
+
+      index = biomeIdIndex(x, y, z);
     }
 
-    const biomes = this.#biomeIds();
+    const biomes = this.#biomeIds(format);
 
     // 読めないBiomesを作り直すと元のデータを失うので、書き込まない
     if (biomes === undefined) {
-      throw SpringNbtError.invalidArgument(`Biomes が無いか、int[${BIOME_IDS_3D_LENGTH}] でない`);
+      throw SpringNbtError.invalidArgument(
+        `Biomes が無いか、int[${biomeIdsLength(format)}] でない`,
+      );
     }
 
     // Int32Arrayへ入れると範囲外の値が黙って丸められるので、intの範囲の検査を先に通す
-    biomes[biomeIdIndex(x, y, z)] = new NbtInt(biomeId).value;
+    biomes[index] = new NbtInt(biomeId).value;
     this.#modified = true;
   }
 
@@ -872,7 +963,7 @@ export class Chunk {
     // 書き足さない世代では、isLightOnの無いチャンクは光源の印を持たない
     if (!format.addsLightFlag && !body.containsKey("isLightOn")) {
       throw SpringNbtError.unsupportedFeature(
-        `DataVersion ${this.dataVersion}のチャンクは isLightOn を持たない`,
+        `DataVersion ${this.#formatDataVersion}のチャンクは isLightOn を持たない`,
       );
     }
 
@@ -907,11 +998,29 @@ export function biomeIndex(x: number, y: number, z: number): number {
 }
 
 /**
- * 1.17までの形式の`Biomes`の添字
+ * 1.15から1.17までの形式の`Biomes`の添字
  * 1エントリが4×4×4ブロック
  */
 function biomeIdIndex(x: number, y: number, z: number): number {
   return ((y >> 2) & 63) * 16 + (z >> 2) * 4 + (x >> 2);
+}
+
+/**
+ * 1.14までの形式の`Biomes`の添字
+ * 1エントリが1列
+ */
+function biomeId2DIndex(x: number, z: number): number {
+  return z * 16 + x;
+}
+
+/** 世代の`Biomes`が持つ数値のバイオームIDの数 */
+function biomeIdsLength(format: ChunkFormat): number {
+  // 列ごとに持つ形式は256個
+  if (format.biomeStorage === BiomeStorage.Ids2D) {
+    return BIOME_IDS_2D_LENGTH;
+  }
+
+  return BIOME_IDS_3D_LENGTH;
 }
 
 function checkLocalCoordinates(x: number, z: number): void {

@@ -1028,9 +1028,26 @@ public class WorldTests
         }
 
         [Fact]
-        public void 扱える形式の下限は1_16()
+        public void 扱える形式の下限は1_13()
         {
-            Assert.Equal(2529, SpringNbt.MinSupportedDataVersion);
+            Assert.Equal(1519, SpringNbt.MinSupportedDataVersion);
+
+            List<string> warnings = new List<string>();
+            ChunkReadOptions options = new ChunkReadOptions
+            {
+                OnVersionMismatch = VersionMismatchAction.Warn,
+                OnWarning = message => warnings.Add(message),
+            };
+
+            // 1.13の正式版より1つ古いチャンクは、読み込みで警告になる
+            NbtCompound root = PreFlatteningChunk();
+            root.SetInt("DataVersion", 1518);
+            Chunk.FromNbt(root, options);
+            Assert.Single(warnings);
+
+            // 1.13の正式版のチャンクは警告を出さない
+            Chunk.FromNbt(LevelChunk(1519), options);
+            Assert.Single(warnings);
         }
 
         [Fact]
@@ -1272,6 +1289,7 @@ public class WorldTests
                 () => chunk.SetBiomeId(0, 0, 0, 1),
                 () => chunk.ClearHeightmaps(),
                 () => chunk.InvalidateLighting(),
+                () => _ = chunk.MinSectionY,
             };
 
             // 操作ごとにUnsupportedDataVersionになることを確かめる
@@ -1580,14 +1598,43 @@ public class WorldTests
             Assert.False(Chunk.FromNbt(root).IsFullyGenerated);
         }
 
-        [Fact]
-        public void PaletteがありBlockStatesの無いセクションはMALFORMED_DATA()
+        [Theory]
+        [InlineData("BlockStates")]
+        [InlineData("Palette")]
+        public void PaletteとBlockStatesの片方しか無いセクションはブロックを持たない(string key)
         {
             NbtCompound root = LevelVector();
-            LevelSection(root, 1).Remove("BlockStates");
+            LevelSection(root, 1).Remove(key);
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
 
-            SpringNbtException error = Assert.Throws<SpringNbtException>(() => Chunk.FromNbt(root));
-            Assert.Equal(ErrorCode.MalformedData, error.Code);
+            // Minecraftも両方がそろったセクションだけを読むので、ブロックの無いセクションとして扱う
+            Assert.False(chunk.Section(1)!.HasBlockStates);
+            Assert.Null(chunk.GetBlock(0, 16, 0));
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(
+                () => chunk.SetBlock(0, 16, 0, "minecraft:stone"));
+            Assert.Equal(ErrorCode.InvalidArgument, error.Code);
+
+            // 元のNBTはそのまま残る
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+        }
+
+        [Fact]
+        public void Properties_Nameの並びの要素と同じ状態を置いてもパレットは増えない()
+        {
+            NbtCompound root = LevelVector();
+            List<NbtTag> paletteBefore = LevelSection(root, 0).GetList("Palette").Select(entry => entry.Copy()).ToList();
+            Chunk chunk = Chunk.FromNbt(root);
+
+            // 実データと同じくProperties -> Nameの並びで入っている状態を、プロパティの並びを変えて置く
+            chunk.SetBlock(0, 0, 0, "minecraft:oak_stairs[half=bottom,facing=east]");
+            NbtCompound written = chunk.ToNbt();
+
+            // 同じ状態の要素を使い回すので、パレットは元のまま
+            Assert.Equal(paletteBefore, LevelSection(written, 0).GetList("Palette").ToList());
+            Chunk reread = Chunk.FromNbt(written);
+            Assert.Equal("minecraft:oak_stairs[facing=east,half=bottom]", reread.GetBlock(0, 0, 0)!.ToString());
         }
 
         [Fact]
@@ -1600,6 +1647,398 @@ public class WorldTests
 
             SpringNbtException error = Assert.Throws<SpringNbtException>(() => Chunk.FromNbt(root));
             Assert.Equal(ErrorCode.UnexpectedTagType, error.Code);
+        }
+    }
+
+    /// <summary>1.15.2の形式のテストベクタの0段目のパレットを、ブロック状態の文字列表現で並べたもの</summary>
+    private static List<string> SpanningStates()
+    {
+        List<string> states = new List<string> { "minecraft:air", "minecraft:stone" };
+
+        // 階段は下半分の4方向、上半分の4方向の順に並ぶ
+        foreach (string half in new[] { "bottom", "top" })
+        {
+            // 向きは名前の順に並ぶ
+            foreach (string facing in new[] { "east", "north", "south", "west" })
+            {
+                states.Add($"minecraft:oak_stairs[facing={facing},half={half}]");
+            }
+        }
+
+        // プロパティの無いブロックを後ろに並べる
+        foreach (string name in new[] { "dirt", "gravel", "sand", "bedrock", "cobblestone", "oak_planks", "glass" })
+        {
+            states.Add("minecraft:" + name);
+        }
+
+        return states;
+    }
+
+    /// <summary>1.15.2の形式のテストベクタのLevel.Biomesの値</summary>
+    private static int SpanningBiome(int index) => ((index * 5) % 13) + 1;
+
+    /// <summary>1.14.4の形式のテストベクタのLevel.Biomesの値</summary>
+    private static int Biome2D(int index) => ((index * 7) % 61) + 1;
+
+    /// <summary>1.16.5と1.14.4の形式のテストベクタの0段目のパレットを、ブロック状態の文字列表現で並べたもの</summary>
+    private static readonly string[] LevelStates =
+    {
+        "minecraft:air",
+        "minecraft:stone",
+        "minecraft:dirt",
+        "minecraft:oak_stairs[facing=east,half=bottom]",
+        "minecraft:oak_stairs[facing=west,half=top]",
+    };
+
+    /// <summary>1.15.2の形式のテストベクタをNBTのまま読む</summary>
+    private static NbtCompound SpanningVector() => (NbtCompound)NbtIo.ReadFile(VectorPath("v2230_spanning")).Tag;
+
+    /// <summary>1.14.4の形式のテストベクタをNBTのまま読む</summary>
+    private static NbtCompound Biomes2DVector() => (NbtCompound)NbtIo.ReadFile(VectorPath("v1976_biomes_2d")).Tag;
+
+    /// <summary>DataVersionを持たないチャンクを作る</summary>
+    private static NbtCompound ChunkWithoutDataVersion()
+    {
+        NbtCompound root = PreFlatteningChunk();
+        root.Remove("DataVersion");
+        return root;
+    }
+
+    // ------------------------------------------------------------------
+    // 1.13〜1.15の形式（ビット詰めが64bitの境目をまたぐ）のチャンク
+    // ------------------------------------------------------------------
+
+    public class LegacyChunkTests
+    {
+        [Fact]
+        public void DataVersion2230のまたぐ詰め方のチャンクを読み無変更で書き戻すと元と同じになる()
+        {
+            NbtCompound root = SpanningVector();
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+            List<string> states = SpanningStates();
+
+            Assert.Equal(2230, chunk.DataVersion);
+            Assert.Equal(-3, chunk.X);
+            Assert.Equal(5, chunk.Z);
+            Assert.Equal(0, chunk.MinSectionY);
+            Assert.True(chunk.IsFullyGenerated);
+            Assert.Equal(new[] { -1, 0, 1 }, chunk.SectionYs);
+            Assert.Equal(17, chunk.Section(0)!.BlockStates!.Palette.Count);
+            Assert.Equal(5, chunk.Section(0)!.BlockStates!.BitsPerEntry);
+
+            // ベクタの添字は (位置 * 7) % 17
+            // ビット幅5なので、位置12や25の値は64bitの境目をまたぐ
+            Assert.Equal(states[(12 * 7) % 17], chunk.GetBlock(12, 0, 0)!.ToString());
+            Assert.Equal(states[(25 * 7) % 17], chunk.GetBlock(9, 0, 1)!.ToString());
+
+            // 全ブロックが元の添字どおりに読める
+            for (int position = 0; position < 4096; position++)
+            {
+                BlockState? block = chunk.GetBlock(position & 15, position >> 8, (position >> 4) & 15);
+                Assert.Equal(states[(position * 7) % 17], block!.ToString());
+            }
+
+            Assert.Equal("minecraft:air", chunk.GetBlock(15, 31, 15)!.ToString());
+            Assert.Null(chunk.GetBlock(0, -1, 0));
+
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+        }
+
+        [Fact]
+        public void DataVersion2230のチャンクでパレットが育ってもまたぐ詰め方で書き戻す()
+        {
+            Chunk chunk = Chunk.FromNbt(SpanningVector());
+            List<string> states = SpanningStates();
+
+            // 20種類を足してパレットを37要素にし、ビット幅を5から6へ広げる
+            for (int index = 0; index < 20; index++)
+            {
+                chunk.SetBlock(index % 16, index / 16, 0, $"minecraft:edited_{index}");
+            }
+
+            NbtCompound written = chunk.ToNbt();
+            NbtCompound section = LevelSection(written, 0);
+
+            // またぐ詰め方なので、長さは ceil(4096 * 6 / 64) = 384
+            Assert.Equal(37, section.GetList("Palette").Count);
+            Assert.Equal(384, section.GetLongArray("BlockStates").Length);
+            Assert.Equal(2230, written.GetInt("DataVersion"));
+
+            Chunk reread = Chunk.FromNbt(written);
+
+            // 置いたブロックと、触っていないブロックの両方が読み直せる
+            for (int position = 0; position < 4096; position++)
+            {
+                int x = position & 15;
+                int y = position >> 8;
+                int z = (position >> 4) & 15;
+                int index = (y * 16) + x;
+                string block = reread.GetBlock(x, y, z)!.ToString();
+
+                // 置いた位置だけ新しい状態になる
+                if (z == 0 && index < 20)
+                {
+                    Assert.Equal($"minecraft:edited_{index}", block);
+                }
+                else
+                {
+                    Assert.Equal(states[(position * 7) % 17], block);
+                }
+            }
+        }
+
+        [Fact]
+        public void DataVersion2230のチャンクのバイオームIDは4ブロック単位で読める()
+        {
+            Chunk chunk = Chunk.FromNbt(SpanningVector());
+
+            Assert.Equal(SpanningBiome((17 * 16) + (2 * 4) + 1), chunk.GetBiomeId(5, 70, 9));
+            Assert.Null(chunk.GetBiomeId(0, 256, 0));
+        }
+
+        [Fact]
+        public void DataVersion1976のチャンクを読み無変更で書き戻すと元と同じになる()
+        {
+            NbtCompound root = Biomes2DVector();
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+
+            Assert.Equal(1976, chunk.DataVersion);
+            Assert.Equal(4, chunk.X);
+            Assert.Equal(-2, chunk.Z);
+            Assert.Equal(0, chunk.MinSectionY);
+            Assert.Equal(new[] { 0, 1 }, chunk.SectionYs);
+
+            // ベクタの添字は (位置 * 7) % 5
+            Assert.Equal("minecraft:air", chunk.GetBlock(0, 0, 0)!.ToString());
+            Assert.Equal("minecraft:dirt", chunk.GetBlock(1, 0, 0)!.ToString());
+            Assert.Equal("minecraft:oak_stairs[facing=west,half=top]", chunk.GetBlock(2, 0, 0)!.ToString());
+            Assert.Equal("minecraft:stone", chunk.GetBlock(3, 0, 0)!.ToString());
+            Assert.Equal("minecraft:oak_stairs[facing=east,half=bottom]", chunk.GetBlock(4, 0, 0)!.ToString());
+            Assert.Equal("minecraft:air", chunk.GetBlock(15, 31, 15)!.ToString());
+
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+        }
+
+        [Fact]
+        public void DataVersion1976のチャンクでパレットが育ってもまたぐ詰め方で書き戻す()
+        {
+            Chunk chunk = Chunk.FromNbt(Biomes2DVector());
+
+            // 12種類を足してパレットを17要素にし、ビット幅を4から5へ広げる
+            for (int index = 0; index < 12; index++)
+            {
+                chunk.SetBlock(index, 0, 0, $"minecraft:edited_{index}");
+            }
+
+            NbtCompound written = chunk.ToNbt();
+            NbtCompound section = LevelSection(written, 0);
+
+            // またぐ詰め方なので、長さは ceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
+            Assert.Equal(17, section.GetList("Palette").Count);
+            Assert.Equal(320, section.GetLongArray("BlockStates").Length);
+
+            Chunk reread = Chunk.FromNbt(written);
+
+            // 置いたブロックと、触っていないブロックの両方が読み直せる
+            for (int position = 0; position < 4096; position++)
+            {
+                string block = reread.GetBlock(position & 15, position >> 8, (position >> 4) & 15)!.ToString();
+
+                // 置いた位置だけ新しい状態になる
+                if (position < 12)
+                {
+                    Assert.Equal($"minecraft:edited_{position}", block);
+                }
+                else
+                {
+                    Assert.Equal(LevelStates[(position * 7) % 5], block);
+                }
+            }
+        }
+
+        [Fact]
+        public void DataVersion1976のバイオームIDは高さに関係なく列ごとに読み書きできる()
+        {
+            Chunk chunk = Chunk.FromNbt(Biomes2DVector());
+
+            // 添字は z * 16 + x で、yは見ない
+            Assert.Equal(Biome2D((7 * 16) + 3), chunk.GetBiomeId(3, 0, 7));
+            Assert.Equal(Biome2D((7 * 16) + 3), chunk.GetBiomeId(3, 200, 7));
+            Assert.Equal(Biome2D((7 * 16) + 3), chunk.GetBiomeId(3, -10, 7));
+            Assert.Equal(Biome2D((7 * 16) + 3), chunk.GetBiomeId(3, 300, 7));
+            Assert.Equal(Biome2D((3 * 16) + 7), chunk.GetBiomeId(7, 0, 3));
+
+            chunk.SetBiomeId(3, 1000, 7, 42);
+            Assert.True(chunk.IsModified);
+            Assert.Equal(42, chunk.GetBiomeId(3, 0, 7));
+
+            // 同じ列の値だけが変わる
+            int[] biomes = chunk.ToNbt().GetCompound("Level").GetIntArray("Biomes");
+            Assert.Equal(42, biomes[(7 * 16) + 3]);
+            Assert.Equal(Biome2D((3 * 16) + 7), biomes[(3 * 16) + 7]);
+        }
+
+        [Theory]
+        [InlineData("absent")]
+        [InlineData("int0")]
+        [InlineData("int1024")]
+        [InlineData("byte256")]
+        public void DataVersion1976のBiomesを読めないチャンクのバイオームIDはnullで書き込めない(string kind)
+        {
+            NbtCompound root = Biomes2DVector();
+            NbtCompound level = root.GetCompound("Level");
+            level.Remove("Biomes");
+
+            // 種類ごとに、読めない形のBiomesを置く
+            if (kind == "int0")
+            {
+                level.Set("Biomes", new NbtIntArray(new int[0]));
+            }
+            else if (kind == "int1024")
+            {
+                level.Set("Biomes", new NbtIntArray(Enumerable.Repeat(1, 1024).ToArray()));
+            }
+            else if (kind == "byte256")
+            {
+                level.Set("Biomes", new NbtByteArray(Enumerable.Repeat((sbyte)1, 256).ToArray()));
+            }
+
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+            Assert.Null(chunk.GetBiomeId(0, 0, 0));
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.SetBiomeId(0, 0, 0, 1));
+            Assert.Equal(ErrorCode.InvalidArgument, error.Code);
+
+            // 元のNBTはそのまま残る
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+        }
+
+        [Fact]
+        public void DataVersion1976のチャンクではバイオーム名のAPIはUNSUPPORTED_FEATURE()
+        {
+            Chunk chunk = Chunk.FromNbt(Biomes2DVector());
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.GetBiome(0, 0, 0));
+            Assert.Equal(ErrorCode.UnsupportedFeature, error.Code);
+        }
+
+        [Fact]
+        public void isLightOnの無い1_13の形式のチャンクは光源を無効化できない()
+        {
+            NbtCompound root = Biomes2DVector();
+            root.SetInt("DataVersion", 1519);
+            root.GetCompound("Level").Remove("isLightOn");
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.InvalidateLighting());
+            Assert.Equal(ErrorCode.UnsupportedFeature, error.Code);
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+        }
+
+        [Theory]
+        [InlineData("full", true)]
+        [InlineData("postprocessed", true)]
+        [InlineData("fullchunk", true)]
+        [InlineData("mobs_spawned", false)]
+        [InlineData("decorated", false)]
+        public void 形式が1_14までならpostprocessedとfullchunkも生成済みとみなす(string status, bool expected)
+        {
+            NbtCompound root = Biomes2DVector();
+            root.GetCompound("Level").SetString("Status", status);
+
+            Assert.Equal(expected, Chunk.FromNbt(root).IsFullyGenerated);
+        }
+
+        [Fact]
+        public void 形式が1_15ならpostprocessedを生成済みとみなさない()
+        {
+            NbtCompound root = SpanningVector();
+            root.GetCompound("Level").SetString("Status", "postprocessed");
+
+            Assert.False(Chunk.FromNbt(root).IsFullyGenerated);
+        }
+
+        [Fact]
+        public void DataVersionの無いチャンクは元のNBTだけを持つ()
+        {
+            NbtCompound root = ChunkWithoutDataVersion();
+            byte[] before = ChunkBytes(root);
+            List<string> warnings = new List<string>();
+            ChunkReadOptions options = new ChunkReadOptions
+            {
+                OnVersionMismatch = VersionMismatchAction.Warn,
+                OnWarning = message => warnings.Add(message),
+            };
+            Chunk chunk = Chunk.FromNbt(root, options);
+
+            // 1.13より前と同じく、読み込みで警告になる
+            Assert.Single(warnings);
+
+            // 座標はLevelの中から読み、セクションは解釈しない
+            Assert.Equal(3, chunk.X);
+            Assert.Equal(-2, chunk.Z);
+            Assert.Empty(chunk.SectionYs);
+            Assert.Equal(-1, chunk.FormatDataVersion);
+
+            // DataVersionの取得子は、いまと同じく無ければエラー
+            Assert.Throws<SpringNbtException>(() => chunk.DataVersion);
+
+            // ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない
+            Action[] operations =
+            {
+                () => chunk.GetBlock(0, 0, 0),
+                () => chunk.SetBlock(0, 0, 0, "minecraft:stone"),
+                () => chunk.GetBiome(0, 0, 0),
+                () => chunk.SetBiome(0, 0, 0, "minecraft:plains"),
+                () => chunk.GetBiomeId(0, 0, 0),
+                () => chunk.SetBiomeId(0, 0, 0, 1),
+                () => chunk.ClearHeightmaps(),
+                () => chunk.InvalidateLighting(),
+                () => _ = chunk.MinSectionY,
+                () => chunk.ToNbt(),
+            };
+
+            // 操作ごとにUnsupportedDataVersionになることを確かめる
+            foreach (Action operation in operations)
+            {
+                SpringNbtException error = Assert.Throws<SpringNbtException>(operation);
+                Assert.Equal(ErrorCode.UnsupportedDataVersion, error.Code);
+            }
+
+            // 許可すれば、読んだNBTがそのまま返る
+            ChunkWriteOptions write = new ChunkWriteOptions { AllowForeignDataVersion = true };
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt(write)));
+        }
+
+        [Fact]
+        public void DataVersionの無いチャンクはErrorなら読み込みで弾く()
+        {
+            ChunkReadOptions options = new ChunkReadOptions { OnVersionMismatch = VersionMismatchAction.Error };
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(
+                () => Chunk.FromNbt(ChunkWithoutDataVersion(), options));
+            Assert.Equal(ErrorCode.UnsupportedDataVersion, error.Code);
+        }
+
+        [Fact]
+        public void DataVersionの無いチャンクも世代を指定すればその値を返す()
+        {
+            ChunkReadOptions options = new ChunkReadOptions
+            {
+                OnVersionMismatch = VersionMismatchAction.Ignore,
+                FormatDataVersion = 2230,
+            };
+            Chunk chunk = Chunk.FromNbt(ChunkWithoutDataVersion(), options);
+
+            // 指定しても世代は選ばず、元のNBTだけを持つ
+            Assert.Equal(2230, chunk.FormatDataVersion);
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.GetBlock(0, 0, 0));
+            Assert.Equal(ErrorCode.UnsupportedDataVersion, error.Code);
         }
     }
 

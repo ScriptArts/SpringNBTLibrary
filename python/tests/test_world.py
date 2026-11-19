@@ -796,8 +796,23 @@ class TestDataVersion:
         load_chunk("palette_old_format", options)
         assert warnings == []
 
-    def test_扱える形式の下限は1_16(self):
-        assert MIN_SUPPORTED_DATA_VERSION == 2529
+    def test_扱える形式の下限は1_13(self):
+        assert MIN_SUPPORTED_DATA_VERSION == 1519
+
+        warnings = []
+        options = ChunkReadOptions(
+            on_version_mismatch=VersionMismatchAction.WARN,
+            on_warning=warnings.append)
+
+        # 1.13の正式版より1つ古いチャンクは、読み込みで警告になる
+        root = pre_flattening_chunk()
+        root.set_int("DataVersion", 1518)
+        Chunk.from_nbt(root, options)
+        assert len(warnings) == 1
+
+        # 1.13の正式版のチャンクは警告を出さない
+        Chunk.from_nbt(level_chunk(1519), options)
+        assert len(warnings) == 1
 
     def test_ERRORを指定すると読み込みで弾く(self):
         options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.ERROR)
@@ -980,6 +995,7 @@ class TestChunkFormat:
             lambda: chunk.set_biome_id(0, 0, 0, 1),
             lambda: chunk.clear_heightmaps(),
             lambda: chunk.invalidate_lighting(),
+            lambda: chunk.min_section_y,
         ]
 
         # 操作ごとにUNSUPPORTED_DATA_VERSIONになることを確かめる
@@ -1241,14 +1257,38 @@ class TestLevelChunk:
 
         assert not chunk.is_fully_generated
 
-    def test_PaletteがありBlockStatesの無いセクションはMALFORMED_DATA(self):
+    @pytest.mark.parametrize("key", ["BlockStates", "Palette"])
+    def test_PaletteとBlockStatesの片方しか無いセクションはブロックを持たない(self, key):
         root = level_vector()
-        level_section(root, 1).remove("BlockStates")
+        level_section(root, 1).remove(key)
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+
+        # Minecraftも両方がそろったセクションだけを読むので、ブロックの無いセクションとして扱う
+        assert not chunk.section(1).has_block_states
+        assert chunk.get_block(0, 16, 0) is None
 
         with pytest.raises(SpringNbtError) as error:
-            Chunk.from_nbt(root)
+            chunk.set_block(0, 16, 0, "minecraft:stone")
 
-        assert error.value.code == ErrorCode.MALFORMED_DATA
+        assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+        # 元のNBTはそのまま残る
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+    def test_Properties_Nameの並びの要素と同じ状態を置いてもパレットは増えない(self):
+        root = level_vector()
+        palette_before = list(level_section(root, 0).get_list("Palette"))
+        chunk = Chunk.from_nbt(root)
+
+        # 実データと同じくProperties -> Nameの並びで入っている状態を、プロパティの並びを変えて置く
+        chunk.set_block(0, 0, 0, "minecraft:oak_stairs[half=bottom,facing=east]")
+        written = chunk.to_nbt()
+
+        # 同じ状態の要素を使い回すので、パレットは元のまま
+        assert list(level_section(written, 0).get_list("Palette")) == palette_before
+        reread = Chunk.from_nbt(written)
+        assert str(reread.get_block(0, 0, 0)) == "minecraft:oak_stairs[facing=east,half=bottom]"
 
     def test_Paletteの要素がCompoundでなければUNEXPECTED_TAG_TYPE(self):
         root = level_vector()
@@ -1260,6 +1300,316 @@ class TestLevelChunk:
             Chunk.from_nbt(root)
 
         assert error.value.code == ErrorCode.UNEXPECTED_TAG_TYPE
+
+
+#: 1.15.2の形式のテストベクタの0段目のパレットを、ブロック状態の文字列表現で並べたもの
+SPANNING_STATES = (
+    ["minecraft:air", "minecraft:stone"]
+    + ["minecraft:oak_stairs[facing=%s,half=%s]" % (facing, half)
+       for half in ("bottom", "top")
+       for facing in ("east", "north", "south", "west")]
+    + ["minecraft:" + name
+       for name in ("dirt", "gravel", "sand", "bedrock", "cobblestone", "oak_planks", "glass")]
+)
+
+#: 1.15.2の形式のテストベクタのLevel.Biomes
+SPANNING_BIOMES = [(index * 5) % 13 + 1 for index in range(1024)]
+
+#: 1.14.4の形式のテストベクタのLevel.Biomes
+BIOMES_2D = [(index * 7) % 61 + 1 for index in range(256)]
+
+#: 1.16.5と1.14.4の形式のテストベクタの0段目のパレットを、ブロック状態の文字列表現で並べたもの
+LEVEL_STATES = [
+    "minecraft:air",
+    "minecraft:stone",
+    "minecraft:dirt",
+    "minecraft:oak_stairs[facing=east,half=bottom]",
+    "minecraft:oak_stairs[facing=west,half=top]",
+]
+
+
+def spanning_vector() -> NbtCompound:
+    """1.15.2の形式のテストベクタをNBTのまま読む"""
+    return read_file(vector_path("v2230_spanning")).tag
+
+
+def biomes_2d_vector() -> NbtCompound:
+    """1.14.4の形式のテストベクタをNBTのまま読む"""
+    return read_file(vector_path("v1976_biomes_2d")).tag
+
+
+class TestLegacyChunk:
+    """1.13〜1.15の形式（ビット詰めが64bitの境目をまたぐ）のチャンク
+    """
+
+    def test_DataVersion2230のまたぐ詰め方のチャンクを読み無変更で書き戻すと元と同じになる(self):
+        root = spanning_vector()
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+
+        assert chunk.data_version == 2230
+        assert chunk.x == -3
+        assert chunk.z == 5
+        assert chunk.min_section_y == 0
+        assert chunk.is_fully_generated
+        assert chunk.section_ys == [-1, 0, 1]
+        assert len(chunk.section(0).block_states.palette) == 17
+        assert chunk.section(0).block_states.bits_per_entry == 5
+
+        # ベクタの添字は (位置 * 7) % 17
+        # ビット幅5なので、位置12や25の値は64bitの境目をまたぐ
+        assert str(chunk.get_block(12, 0, 0)) == SPANNING_STATES[(12 * 7) % 17]
+        assert str(chunk.get_block(9, 0, 1)) == SPANNING_STATES[(25 * 7) % 17]
+
+        # 全ブロックが元の添字どおりに読める
+        for position in range(4096):
+            block = chunk.get_block(position & 15, position >> 8, (position >> 4) & 15)
+            assert str(block) == SPANNING_STATES[(position * 7) % 17]
+
+        assert str(chunk.get_block(15, 31, 15)) == "minecraft:air"
+        assert chunk.get_block(0, -1, 0) is None
+
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+    def test_DataVersion2230のチャンクでパレットが育ってもまたぐ詰め方で書き戻す(self):
+        chunk = Chunk.from_nbt(spanning_vector())
+
+        # 20種類を足してパレットを37要素にし、ビット幅を5から6へ広げる
+        for index in range(20):
+            chunk.set_block(index % 16, index // 16, 0, "minecraft:edited_%d" % index)
+
+        written = chunk.to_nbt()
+        section = level_section(written, 0)
+
+        # またぐ詰め方なので、長さは ceil(4096 * 6 / 64) = 384
+        assert len(section.get_list("Palette")) == 37
+        assert len(section.get_long_array("BlockStates")) == 384
+        assert written.get_int("DataVersion") == 2230
+
+        reread = Chunk.from_nbt(written)
+
+        # 置いたブロックと、触っていないブロックの両方が読み直せる
+        for position in range(4096):
+            x = position & 15
+            y = position >> 8
+            z = (position >> 4) & 15
+            index = (y * 16) + x
+            block = reread.get_block(x, y, z)
+
+            # 置いた位置だけ新しい状態になる
+            if z == 0 and index < 20:
+                assert str(block) == "minecraft:edited_%d" % index
+            else:
+                assert str(block) == SPANNING_STATES[(position * 7) % 17]
+
+    def test_DataVersion2230のチャンクのバイオームIDは4ブロック単位で読める(self):
+        chunk = Chunk.from_nbt(spanning_vector())
+
+        assert chunk.get_biome_id(5, 70, 9) == SPANNING_BIOMES[17 * 16 + 2 * 4 + 1]
+        assert chunk.get_biome_id(0, 256, 0) is None
+
+    def test_DataVersion1976のチャンクを読み無変更で書き戻すと元と同じになる(self):
+        root = biomes_2d_vector()
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+
+        assert chunk.data_version == 1976
+        assert chunk.x == 4
+        assert chunk.z == -2
+        assert chunk.min_section_y == 0
+        assert chunk.section_ys == [0, 1]
+
+        # ベクタの添字は (位置 * 7) % 5
+        assert str(chunk.get_block(0, 0, 0)) == "minecraft:air"
+        assert str(chunk.get_block(1, 0, 0)) == "minecraft:dirt"
+        assert str(chunk.get_block(2, 0, 0)) == "minecraft:oak_stairs[facing=west,half=top]"
+        assert str(chunk.get_block(3, 0, 0)) == "minecraft:stone"
+        assert str(chunk.get_block(4, 0, 0)) == "minecraft:oak_stairs[facing=east,half=bottom]"
+        assert str(chunk.get_block(15, 31, 15)) == "minecraft:air"
+
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+    def test_DataVersion1976のチャンクでパレットが育ってもまたぐ詰め方で書き戻す(self):
+        chunk = Chunk.from_nbt(biomes_2d_vector())
+
+        # 12種類を足してパレットを17要素にし、ビット幅を4から5へ広げる
+        for index in range(12):
+            chunk.set_block(index, 0, 0, "minecraft:edited_%d" % index)
+
+        written = chunk.to_nbt()
+        section = level_section(written, 0)
+
+        # またぐ詰め方なので、長さは ceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
+        assert len(section.get_list("Palette")) == 17
+        assert len(section.get_long_array("BlockStates")) == 320
+
+        reread = Chunk.from_nbt(written)
+
+        # 置いたブロックと、触っていないブロックの両方が読み直せる
+        for position in range(4096):
+            block = reread.get_block(position & 15, position >> 8, (position >> 4) & 15)
+
+            # 置いた位置だけ新しい状態になる
+            if position < 12:
+                assert str(block) == "minecraft:edited_%d" % position
+            else:
+                assert str(block) == LEVEL_STATES[(position * 7) % 5]
+
+    def test_DataVersion1976のバイオームIDは高さに関係なく列ごとに読み書きできる(self):
+        chunk = Chunk.from_nbt(biomes_2d_vector())
+
+        # 添字は z * 16 + x で、yは見ない
+        assert chunk.get_biome_id(3, 0, 7) == BIOMES_2D[7 * 16 + 3]
+        assert chunk.get_biome_id(3, 200, 7) == BIOMES_2D[7 * 16 + 3]
+        assert chunk.get_biome_id(3, -10, 7) == BIOMES_2D[7 * 16 + 3]
+        assert chunk.get_biome_id(3, 300, 7) == BIOMES_2D[7 * 16 + 3]
+        assert chunk.get_biome_id(7, 0, 3) == BIOMES_2D[3 * 16 + 7]
+
+        chunk.set_biome_id(3, 1000, 7, 42)
+        assert chunk.is_modified
+        assert chunk.get_biome_id(3, 0, 7) == 42
+
+        # 同じ列の値だけが変わる
+        biomes = chunk.to_nbt().get_compound("Level").get_int_array("Biomes")
+        assert biomes[7 * 16 + 3] == 42
+        assert biomes[3 * 16 + 7] == BIOMES_2D[3 * 16 + 7]
+
+    @pytest.mark.parametrize("biomes", [None, NbtIntArray([]), NbtIntArray([1] * 1024),
+                                        NbtByteArray([1] * 256)])
+    def test_DataVersion1976のBiomesを読めないチャンクのバイオームIDはNoneで書き込めない(
+            self, biomes):
+        root = biomes_2d_vector()
+        level = root.get_compound("Level")
+        level.remove("Biomes")
+
+        # Noneなら Biomes を持たないチャンクにする
+        if biomes is not None:
+            level.set("Biomes", biomes)
+
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+        assert chunk.get_biome_id(0, 0, 0) is None
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.set_biome_id(0, 0, 0, 1)
+
+        assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+        # 元のNBTはそのまま残る
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+    def test_DataVersion1976のチャンクではバイオーム名のAPIはUNSUPPORTED_FEATURE(self):
+        chunk = Chunk.from_nbt(biomes_2d_vector())
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.get_biome(0, 0, 0)
+
+        assert error.value.code == ErrorCode.UNSUPPORTED_FEATURE
+
+    def test_isLightOnの無い1_13の形式のチャンクは光源を無効化できない(self):
+        root = biomes_2d_vector()
+        root.set_int("DataVersion", 1519)
+        root.get_compound("Level").remove("isLightOn")
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.invalidate_lighting()
+
+        assert error.value.code == ErrorCode.UNSUPPORTED_FEATURE
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+    @pytest.mark.parametrize("status, expected", [
+        ("full", True),
+        ("postprocessed", True),
+        ("fullchunk", True),
+        ("mobs_spawned", False),
+        ("decorated", False),
+    ])
+    def test_形式が1_14までならpostprocessedとfullchunkも生成済みとみなす(self, status, expected):
+        root = biomes_2d_vector()
+        root.get_compound("Level").set_string("Status", status)
+
+        assert Chunk.from_nbt(root).is_fully_generated == expected
+
+    def test_形式が1_15ならpostprocessedを生成済みとみなさない(self):
+        root = spanning_vector()
+        root.get_compound("Level").set_string("Status", "postprocessed")
+
+        assert not Chunk.from_nbt(root).is_fully_generated
+
+    def test_DataVersionの無いチャンクは元のNBTだけを持つ(self):
+        root = pre_flattening_chunk()
+        root.remove("DataVersion")
+        before = chunk_bytes(root)
+        warnings = []
+        options = ChunkReadOptions(
+            on_version_mismatch=VersionMismatchAction.WARN,
+            on_warning=warnings.append)
+        chunk = Chunk.from_nbt(root, options)
+
+        # 1.13より前と同じく、読み込みで警告になる
+        assert len(warnings) == 1
+
+        # 座標はLevelの中から読み、セクションは解釈しない
+        assert chunk.x == 3
+        assert chunk.z == -2
+        assert chunk.section_ys == []
+        assert chunk.format_data_version == -1
+
+        # DataVersionの取得子は、いまと同じく無ければエラー
+        with pytest.raises(SpringNbtError):
+            chunk.data_version
+
+        # ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない
+        operations = [
+            lambda: chunk.get_block(0, 0, 0),
+            lambda: chunk.set_block(0, 0, 0, "minecraft:stone"),
+            lambda: chunk.get_biome(0, 0, 0),
+            lambda: chunk.set_biome(0, 0, 0, "minecraft:plains"),
+            lambda: chunk.get_biome_id(0, 0, 0),
+            lambda: chunk.set_biome_id(0, 0, 0, 1),
+            lambda: chunk.clear_heightmaps(),
+            lambda: chunk.invalidate_lighting(),
+            lambda: chunk.min_section_y,
+            lambda: chunk.to_nbt(),
+        ]
+
+        # 操作ごとにUNSUPPORTED_DATA_VERSIONになることを確かめる
+        for operation in operations:
+            with pytest.raises(SpringNbtError) as error:
+                operation()
+
+            assert error.value.code == ErrorCode.UNSUPPORTED_DATA_VERSION
+
+        # 許可すれば、読んだNBTがそのまま返る
+        written = chunk.to_nbt(ChunkWriteOptions(allow_foreign_data_version=True))
+        assert chunk_bytes(written) == before
+
+    def test_DataVersionの無いチャンクはERRORなら読み込みで弾く(self):
+        root = pre_flattening_chunk()
+        root.remove("DataVersion")
+        options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.ERROR)
+
+        with pytest.raises(SpringNbtError) as error:
+            Chunk.from_nbt(root, options)
+
+        assert error.value.code == ErrorCode.UNSUPPORTED_DATA_VERSION
+
+    def test_DataVersionの無いチャンクも世代を指定すればその値を返す(self):
+        root = pre_flattening_chunk()
+        root.remove("DataVersion")
+        options = ChunkReadOptions(
+            on_version_mismatch=VersionMismatchAction.IGNORE, format_data_version=2230)
+        chunk = Chunk.from_nbt(root, options)
+
+        # 指定しても世代は選ばず、元のNBTだけを持つ
+        assert chunk.format_data_version == 2230
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.get_block(0, 0, 0)
+
+        assert error.value.code == ErrorCode.UNSUPPORTED_DATA_VERSION
 
 
 def write_level(directory, entries):

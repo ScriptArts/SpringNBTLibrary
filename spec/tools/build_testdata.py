@@ -44,6 +44,15 @@ OLD_PALETTE_DATA_VERSION = 4903
 #: 1.17までの形式（本体がLevelの中にある）のベクタに入れるDataVersion。1.16.5の値
 LEVEL_DATA_VERSION = 2586
 
+#: ビット詰めが64bitの境目をまたぎ、バイオームがint[1024]の形式のベクタに入れるDataVersion。1.15.2の値
+SPANNING_DATA_VERSION = 2230
+
+#: バイオームが列ごとのint[256]の形式のベクタに入れるDataVersion。1.14.4の値
+BIOMES_2D_DATA_VERSION = 1976
+
+#: ブロックを数値のIDで持つ形式のベクタに入れるDataVersion。1.12.2の値
+NUMERIC_IDS_DATA_VERSION = 1343
+
 
 def mutf8_encode(text: str) -> bytes:
     """文字列をMUTF-8へ符号化する。
@@ -907,6 +916,30 @@ def pack_indices(indices, bits):
     return [value - (1 << 64) if value >= (1 << 63) else value for value in longs]
 
 
+def pack_indices_spanning(indices, bits):
+    """添字の並びを、64bitの境目をまたぐ詰め方で64bit整数の配列へ詰める（1.13〜1.15）。
+
+    値を隙間なく並べ、64bitの境目に掛かった値は下位の側を前のi64へ、残りを次のi64へ入れる。
+    長さは ceil(要素数 * ビット幅 / 64)。
+    """
+    long_count = (len(indices) * bits + 63) // 64
+    longs = [0] * long_count
+
+    # 全体を1本のビット列とみなし、値をbit_offsetから順に置く
+    for position, value in enumerate(indices):
+        bit_offset = position * bits
+        long_index = bit_offset // 64
+        shift = bit_offset % 64
+        longs[long_index] |= (value << shift) & ((1 << 64) - 1)
+
+        # 境目をまたいだ分は、次のi64の最下位ビットから続ける
+        if shift + bits > 64:
+            longs[long_index + 1] |= value >> (64 - shift)
+
+    # 符号付き64bitとして書き出す
+    return [value - (1 << 64) if value >= (1 << 63) else value for value in longs]
+
+
 def block_palette_entry(name, properties=None):
     """ブロックのパレット要素。26.3の形式で作る。
 
@@ -1059,15 +1092,23 @@ def properties_name_entry(name, properties=None):
     return t_compound(entries)
 
 
-def make_level_section(y, block_palette, block_indices):
+def make_level_section(y, block_palette, block_indices, spanning=False):
     """1.17までの形式のセクションを1つ組み立てる。
 
     `Palette`と`BlockStates`をセクションの直下に置く。`BlockStates`はパレットが1要素でも書く。
     キーは実データと同じく`BlockStates` -> `Palette` -> `Y`の順に置く。
+    spanningなら、1.13〜1.15と同じく値が64bitの境目をまたぐ詰め方にする。
     """
     bits = max(4, ceil_log2(len(block_palette)))
+
+    # 1.15までは境目をまたいで詰める
+    if spanning:
+        block_states = pack_indices_spanning(block_indices, bits)
+    else:
+        block_states = pack_indices(block_indices, bits)
+
     return t_compound([
-        ("BlockStates", t_long_array(pack_indices(block_indices, bits))),
+        ("BlockStates", t_long_array(block_states)),
         ("Palette", t_list(TAG_COMPOUND, block_palette)),
         ("Y", t_byte(y)),
     ])
@@ -1300,6 +1341,102 @@ def build_world():
                 block_tick("minecraft:water", 40, 5, -10),
             ]),
         "1.16.5の形式のチャンク（DataVersion 2586）。本体はLevelの中で、バイオームは数値のID")
+
+    # 1.15.2の形式のチャンク。ビット詰めは値が64bitの境目をまたぐ。
+    # パレット17種類でビット幅5になり、添字12、25、38などの値が境目をまたぐ。
+    # チャンク (-3,5) なので、絶対座標はx = -48 + 相対x、z = 80 + 相対z
+    spanning_palette17 = [
+        properties_name_entry("minecraft:air"),
+        properties_name_entry("minecraft:stone"),
+    ] + [
+        properties_name_entry("minecraft:oak_stairs", [("facing", facing), ("half", half)])
+        for half in ("bottom", "top")
+        for facing in ("east", "north", "south", "west")
+    ] + [
+        properties_name_entry("minecraft:" + name)
+        for name in ("dirt", "gravel", "sand", "bedrock", "cobblestone", "oak_planks", "glass")
+    ]
+    add_vector(
+        "world/v2230_spanning", "world/v2230_spanning.nbt",
+        make_level_chunk(
+            -3, 5,
+            [
+                # 光源だけを持つセクション
+                t_compound([("SkyLight", t_byte_array([0] * 2048)), ("Y", t_byte(-1))]),
+                make_level_section(
+                    0, spanning_palette17, [(position * 7) % 17 for position in range(4096)],
+                    spanning=True),
+                # パレット1要素でもBlockStatesを持つ
+                make_level_section(1, [properties_name_entry("minecraft:air")], [0] * 4096,
+                                   spanning=True),
+            ],
+            [(index * 5) % 13 + 1 for index in range(1024)],
+            tile_entities=[
+                # chunk_editが置き換える座標にあるもの（消えるはず）
+                block_entity("minecraft:chest", -48, 0, 80),
+                # 触らない座標にあるもの（残るはず）
+                block_entity("minecraft:barrel", -33, 20, 95),
+            ],
+            tile_ticks=[
+                block_tick("minecraft:water", -47, 0, 81),
+            ],
+            liquid_ticks=[
+                block_tick("minecraft:lava", -46, 2, 82),
+                block_tick("minecraft:water", -40, 5, 90),
+            ],
+            data_version=SPANNING_DATA_VERSION),
+        "1.15.2の形式のチャンク（DataVersion 2230）。ビット詰めが64bitの境目をまたぎ、パレット17種類でビット幅5")
+
+    # 1.14.4の形式のチャンク。バイオームは列ごとのint[256]で、添字はz * 16 + x。
+    # xとzを取り違えると値が変わるよう、添字ごとに違う値を入れる。
+    # チャンク (4,-2) なので、絶対座標はx = 64 + 相対x、z = -32 + 相対z
+    add_vector(
+        "world/v1976_biomes_2d", "world/v1976_biomes_2d.nbt",
+        make_level_chunk(
+            4, -2,
+            [
+                make_level_section(0, level_palette5, indices5, spanning=True),
+                make_level_section(1, [properties_name_entry("minecraft:air")], [0] * 4096,
+                                   spanning=True),
+            ],
+            [(index * 7) % 61 + 1 for index in range(256)],
+            tile_entities=[
+                # chunk_editが置き換える座標にあるもの（消えるはず）
+                block_entity("minecraft:chest", 65, 0, -31),
+                # 触らない座標にあるもの（残るはず）
+                block_entity("minecraft:barrel", 79, 20, -17),
+            ],
+            data_version=BIOMES_2D_DATA_VERSION),
+        "1.14.4の形式のチャンク（DataVersion 1976）。バイオームは列ごとのint[256]")
+
+    # 1.12.2の形式のチャンク。ブロックは数値のIDで、どの世代でも解釈しない。
+    # キーの並びは実データをなぞる
+    add_vector(
+        "world/v1343_numeric_ids", "world/v1343_numeric_ids.nbt",
+        to_java_file("", t_compound([
+            ("Level", t_compound([
+                ("LightPopulated", t_byte(1)),
+                ("zPos", t_int(0)),
+                ("HeightMap", t_int_array([64] * 256)),
+                ("Sections", t_list(TAG_COMPOUND, [t_compound([
+                    ("Blocks", t_byte_array([1] * 4096)),
+                    ("SkyLight", t_byte_array([0] * 2048)),
+                    ("Y", t_byte(0)),
+                    ("BlockLight", t_byte_array([0] * 2048)),
+                    ("Data", t_byte_array([0] * 2048)),
+                ])])),
+                ("LastUpdate", t_long(449)),
+                ("Biomes", t_byte_array([1] * 256)),
+                ("InhabitedTime", t_long(0)),
+                ("xPos", t_int(0)),
+                ("TileEntities", t_list(TAG_END, [])),
+                ("TerrainPopulated", t_byte(1)),
+                ("Entities", t_list(TAG_END, [])),
+            ])),
+            ("DataVersion", t_int(NUMERIC_IDS_DATA_VERSION)),
+        ])),
+        "1.12.2の形式のチャンク（DataVersion 1343）。ブロックが数値のIDなので解釈せず、chunk-reportはUNSUPPORTED_DATA_VERSION",
+        expect_error="UNSUPPORTED_DATA_VERSION")
 
     # 異常系: 添字がパレットの範囲外
     broken = t_compound([
