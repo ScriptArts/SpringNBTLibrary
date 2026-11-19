@@ -20,6 +20,7 @@ from spring_nbt_library.nbt import (
     Compression,
     NamedTag,
     NbtByte,
+    NbtByteArray,
     NbtCompound,
     NbtInt,
     NbtIntArray,
@@ -468,11 +469,19 @@ class TestPalettedContainer:
     @pytest.mark.parametrize("spanning", [False, True])
     def test_dataが必ず書かれる形式なら1要素のパレットでもビット幅4のdataを返す(self, spanning):
         container = PalettedContainer._from_parts(
-            [block_entry("minecraft:air")], None, 4096, 4, spanning, True, False)
+            [block_entry("minecraft:air")], [0] * 256, 4096, 4, spanning, True, False)
 
         palette, data = container._to_parts()
         assert len(palette) == 1
-        assert len(data) == 256
+        assert data == [0] * 256
+
+    @pytest.mark.parametrize("spanning", [False, True])
+    def test_dataが必ず書かれる形式でdataが無ければMALFORMED_DATA(self, spanning):
+        with pytest.raises(SpringNbtError) as error:
+            PalettedContainer._from_parts(
+                [block_entry("minecraft:air")], None, 4096, 4, spanning, True, False)
+
+        assert error.value.code == ErrorCode.MALFORMED_DATA
 
     def test_単一値のコンテナはdataを持たない(self):
         container = PalettedContainer.filled(block_entry("minecraft:air"), 4096, 4)
@@ -787,8 +796,8 @@ class TestDataVersion:
         load_chunk("palette_old_format", options)
         assert warnings == []
 
-    def test_扱える形式の下限は1_18(self):
-        assert MIN_SUPPORTED_DATA_VERSION == 2844
+    def test_扱える形式の下限は1_16(self):
+        assert MIN_SUPPORTED_DATA_VERSION == 2529
 
     def test_ERRORを指定すると読み込みで弾く(self):
         options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.ERROR)
@@ -967,6 +976,8 @@ class TestChunkFormat:
             lambda: chunk.set_block(0, 0, 0, "minecraft:stone"),
             lambda: chunk.get_biome(0, 0, 0),
             lambda: chunk.set_biome(0, 0, 0, "minecraft:plains"),
+            lambda: chunk.get_biome_id(0, 0, 0),
+            lambda: chunk.set_biome_id(0, 0, 0, 1),
             lambda: chunk.clear_heightmaps(),
             lambda: chunk.invalidate_lighting(),
         ]
@@ -990,6 +1001,265 @@ class TestChunkFormat:
         chunk = Chunk.from_nbt(tag, ChunkReadOptions(format_data_version=5023))
         assert chunk.format_data_version == 5023
         assert chunk.data_version == 4903
+
+    def test_C5の世代で26_2のチャンクを読むとブロックの取得でMALFORMED_DATA(self):
+        options = ChunkReadOptions(format_data_version=5023)
+        chunk = load_chunk("v4903_edit", options)
+
+        # パレットの要素がName / Propertiesなので、26.3の形式としては読めない
+        with pytest.raises(SpringNbtError) as error:
+            chunk.get_block(0, -64, 0)
+
+        assert error.value.code == ErrorCode.MALFORMED_DATA
+
+    def test_ルートの直下にsectionsがあるチャンクを1_16の世代で読むとMALFORMED_DATA(self):
+        options = ChunkReadOptions(format_data_version=2586)
+
+        # Levelの無いチャンクを、Levelに本体を包む世代で読ませる
+        with pytest.raises(SpringNbtError) as error:
+            load_chunk("palette_1", options)
+
+        assert error.value.code == ErrorCode.MALFORMED_DATA
+
+    def test_名前空間の無いfullも生成済みとみなす(self):
+        root = read_file(vector_path("v4903_edit")).tag
+        root.set_string("Status", "full")
+        chunk = Chunk.from_nbt(root)
+
+        assert chunk.status == "full"
+        assert chunk.is_fully_generated
+
+
+#: 1.16.5の形式のテストベクタのLevel.Biomes
+LEVEL_BIOMES = [(index * 3) % 11 + 1 for index in range(1024)]
+
+
+def level_vector() -> NbtCompound:
+    """1.16.5の形式のテストベクタをNBTのまま読む"""
+    return read_file(vector_path("v2586_level")).tag
+
+
+def level_section(root: NbtCompound, section_y: int) -> NbtCompound:
+    """Level.SectionsからY位置の合うセクションを探す"""
+    # Yが一致する要素を返す
+    for section in root.get_compound("Level").get_list("Sections"):
+        # Yの合うセクションだけを対象にする
+        if section.get_byte("Y") == section_y:
+            return section
+
+    raise AssertionError("Y=%d のセクションが無い" % section_y)
+
+
+def positions(values: NbtList) -> list:
+    """付随データの要素の座標を並べる"""
+    return [(entry.get_int("x"), entry.get_int("y"), entry.get_int("z")) for entry in values]
+
+
+class TestLevelChunk:
+    """1.16〜1.17の形式（本体がLevelの中）のチャンク
+    """
+
+    def test_DataVersion2586のチャンクを読み無変更で書き戻すと元と同じになる(self):
+        root = level_vector()
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+
+        assert chunk.data_version == 2586
+        assert chunk.x == 2
+        assert chunk.z == -1
+        assert chunk.min_section_y == 0
+        assert chunk.status == "full"
+        assert chunk.is_fully_generated
+        assert chunk.section_ys == [-1, 0, 1]
+
+        # ベクタの添字は (位置 * 7) % 5
+        assert str(chunk.get_block(0, 0, 0)) == "minecraft:air"
+        assert str(chunk.get_block(1, 0, 0)) == "minecraft:dirt"
+        assert str(chunk.get_block(2, 0, 0)) == "minecraft:oak_stairs[facing=west,half=top]"
+        assert str(chunk.get_block(3, 0, 0)) == "minecraft:stone"
+        assert str(chunk.get_block(4, 0, 0)) == "minecraft:oak_stairs[facing=east,half=bottom]"
+        assert str(chunk.get_block(15, 31, 15)) == "minecraft:air"
+
+        # Paletteの無いセクションと、セクションの無い高さはブロックを持たない
+        assert not chunk.section(-1).has_block_states
+        assert chunk.get_block(0, -1, 0) is None
+        assert chunk.get_block(0, 32, 0) is None
+
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+    def test_DataVersion2586のチャンクでブロックを置くとLevelの付随データが消える(self):
+        chunk = Chunk.from_nbt(level_vector())
+
+        # 絶対座標はx = 32 + 相対x、z = -16 + 相対z
+        chunk.set_block(0, 0, 0, "minecraft:stone")
+        chunk.set_block(1, 0, 1, "minecraft:stone")
+        chunk.set_block(2, 2, 2, "minecraft:oak_stairs[facing=north]")
+        written = chunk.to_nbt()
+        level = written.get_compound("Level")
+
+        assert positions(level.get_list("TileEntities")) == [(47, 20, -1)]
+        assert len(level.get_list("TileTicks")) == 0
+        assert positions(level.get_list("LiquidTicks")) == [(40, 5, -10)]
+
+        # ルートには付随データのキーを作らない
+        assert "block_entities" not in written
+        assert "TileEntities" not in written
+
+        # パレットの末尾にName / Propertiesの形式で足され、BlockStatesも書き直される
+        section = level_section(written, 0)
+        palette = section.get_list("Palette")
+        assert palette[len(palette) - 1] == name_properties(
+            "minecraft:oak_stairs", [("facing", "north")])
+        assert len(section.get_long_array("BlockStates")) == 256
+        assert written.get_int("DataVersion") == 2586
+
+        # 読み直しても同じ状態が返る
+        reread = Chunk.from_nbt(written)
+        assert str(reread.get_block(2, 2, 2)) == "minecraft:oak_stairs[facing=north]"
+        assert str(reread.get_block(0, 0, 0)) == "minecraft:stone"
+
+    def test_DataVersion2586のチャンクのバイオームIDを読み書きできる(self):
+        chunk = Chunk.from_nbt(level_vector())
+
+        assert chunk.get_biome_id(0, 0, 0) == LEVEL_BIOMES[0]
+        assert chunk.get_biome_id(5, 70, 9) == LEVEL_BIOMES[17 * 16 + 2 * 4 + 1]
+        assert chunk.get_biome_id(15, 255, 15) == LEVEL_BIOMES[1023]
+
+        # 高さ0..255の外は値を持たない
+        assert chunk.get_biome_id(0, -1, 0) is None
+        assert chunk.get_biome_id(0, 256, 0) is None
+
+        chunk.set_biome_id(5, 70, 9, 42)
+        assert chunk.is_modified
+        assert chunk.get_biome_id(4, 68, 8) == 42
+
+        written = chunk.to_nbt()
+        assert written.get_compound("Level").get_int_array("Biomes")[17 * 16 + 2 * 4 + 1] == 42
+
+    @pytest.mark.parametrize("y", [-1, 256])
+    def test_高さ0から255の外へバイオームIDを書くとINVALID_ARGUMENT(self, y):
+        chunk = Chunk.from_nbt(level_vector())
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.set_biome_id(0, y, 0, 1)
+
+        assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+    @pytest.mark.parametrize("biome_id", [2 ** 31, -(2 ** 31) - 1])
+    def test_intの範囲に収まらないバイオームIDはINVALID_ARGUMENT(self, biome_id):
+        chunk = Chunk.from_nbt(level_vector())
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.set_biome_id(0, 0, 0, biome_id)
+
+        assert error.value.code == ErrorCode.INVALID_ARGUMENT
+        assert chunk.get_biome_id(0, 0, 0) == LEVEL_BIOMES[0]
+
+    @pytest.mark.parametrize("biomes", [None, NbtIntArray([]), NbtIntArray([1] * 256),
+                                        NbtByteArray([1] * 256)])
+    def test_Biomesを読めないチャンクのバイオームIDはNoneで書き込めない(self, biomes):
+        root = level_vector()
+        level = root.get_compound("Level")
+        level.remove("Biomes")
+
+        # Noneなら Biomes を持たないチャンクにする
+        if biomes is not None:
+            level.set("Biomes", biomes)
+
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+        assert chunk.get_biome_id(0, 0, 0) is None
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.set_biome_id(0, 0, 0, 1)
+
+        assert error.value.code == ErrorCode.INVALID_ARGUMENT
+
+        # 元のNBTはそのまま残る
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+    def test_DataVersion2586のチャンクではバイオーム名のAPIはUNSUPPORTED_FEATURE(self):
+        chunk = Chunk.from_nbt(level_vector())
+
+        # セクションの無い高さでも、形式で決まるので同じエラーになる
+        operations = [
+            lambda: chunk.get_biome(0, 0, 0),
+            lambda: chunk.get_biome(0, 200, 0),
+            lambda: chunk.set_biome(0, 0, 0, "minecraft:plains"),
+        ]
+
+        # 操作ごとにUNSUPPORTED_FEATUREになることを確かめる
+        for operation in operations:
+            with pytest.raises(SpringNbtError) as error:
+                operation()
+
+            assert error.value.code == ErrorCode.UNSUPPORTED_FEATURE
+
+    @pytest.mark.parametrize("name", ["palette_1", "v4903_edit"])
+    def test_バイオームIDのAPIは1_18以降のチャンクではUNSUPPORTED_FEATURE(self, name):
+        chunk = load_chunk(name)
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.get_biome_id(0, 0, 0)
+
+        assert error.value.code == ErrorCode.UNSUPPORTED_FEATURE
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.set_biome_id(0, 0, 0, 1)
+
+        assert error.value.code == ErrorCode.UNSUPPORTED_FEATURE
+
+    def test_DataVersion2586のチャンクの高さマップと光源を無効化できる(self):
+        chunk = Chunk.from_nbt(level_vector())
+        chunk.clear_heightmaps()
+        chunk.invalidate_lighting()
+        written = chunk.to_nbt()
+        level = written.get_compound("Level")
+
+        assert level.opt_compound("Heightmaps") is None
+        assert level.get_byte("isLightOn") == 0
+
+        # ルートには作らない
+        assert "isLightOn" not in written
+
+    def test_isLightOnの無いDataVersion2586のチャンクは光源を無効化できない(self):
+        root = level_vector()
+        root.get_compound("Level").remove("isLightOn")
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.invalidate_lighting()
+
+        assert error.value.code == ErrorCode.UNSUPPORTED_FEATURE
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+    def test_生成途中のDataVersion2586のチャンクは生成済みではない(self):
+        root = level_vector()
+        root.get_compound("Level").set_string("Status", "structure_starts")
+        chunk = Chunk.from_nbt(root)
+
+        assert not chunk.is_fully_generated
+
+    def test_PaletteがありBlockStatesの無いセクションはMALFORMED_DATA(self):
+        root = level_vector()
+        level_section(root, 1).remove("BlockStates")
+
+        with pytest.raises(SpringNbtError) as error:
+            Chunk.from_nbt(root)
+
+        assert error.value.code == ErrorCode.MALFORMED_DATA
+
+    def test_Paletteの要素がCompoundでなければUNEXPECTED_TAG_TYPE(self):
+        root = level_vector()
+        palette = NbtList(TagType.STRING)
+        palette.append(NbtString("minecraft:air"))
+        level_section(root, 1).set("Palette", palette)
+
+        with pytest.raises(SpringNbtError) as error:
+            Chunk.from_nbt(root)
+
+        assert error.value.code == ErrorCode.UNEXPECTED_TAG_TYPE
 
 
 def write_level(directory, entries):

@@ -585,12 +585,23 @@ public class WorldTests
         public void dataが必ず書かれる形式なら1要素のパレットでもビット幅4のdataを返す(bool spanning)
         {
             PalettedContainer container = PalettedContainer.FromParts(
-                new List<NbtTag> { BlockEntry("minecraft:air") }, null, 4096, 4, spanning, true, false);
+                new List<NbtTag> { BlockEntry("minecraft:air") }, new long[256], 4096, 4, spanning, true, false);
 
             (List<NbtTag> palette, long[]? data) = container.ToParts();
             Assert.Single(palette);
             Assert.NotNull(data);
-            Assert.Equal(256, data!.Length);
+            Assert.Equal(new long[256], data);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void dataが必ず書かれる形式でdataが無ければMALFORMED_DATA(bool spanning)
+        {
+            SpringNbtException error = Assert.Throws<SpringNbtException>(
+                () => PalettedContainer.FromParts(
+                    new List<NbtTag> { BlockEntry("minecraft:air") }, null, 4096, 4, spanning, true, false));
+            Assert.Equal(ErrorCode.MalformedData, error.Code);
         }
 
         [Fact]
@@ -1017,9 +1028,9 @@ public class WorldTests
         }
 
         [Fact]
-        public void 扱える形式の下限は1_18()
+        public void 扱える形式の下限は1_16()
         {
-            Assert.Equal(2844, SpringNbt.MinSupportedDataVersion);
+            Assert.Equal(2529, SpringNbt.MinSupportedDataVersion);
         }
 
         [Fact]
@@ -1257,6 +1268,8 @@ public class WorldTests
                 () => chunk.SetBlock(0, 0, 0, "minecraft:stone"),
                 () => chunk.GetBiome(0, 0, 0),
                 () => chunk.SetBiome(0, 0, 0, "minecraft:plains"),
+                () => chunk.GetBiomeId(0, 0, 0),
+                () => chunk.SetBiomeId(0, 0, 0, 1),
                 () => chunk.ClearHeightmaps(),
                 () => chunk.InvalidateLighting(),
             };
@@ -1283,6 +1296,310 @@ public class WorldTests
             Chunk chunk = Chunk.FromNbt(tag, new ChunkReadOptions { FormatDataVersion = 5023 });
             Assert.Equal(5023, chunk.FormatDataVersion);
             Assert.Equal(4903, chunk.DataVersion);
+        }
+
+        [Fact]
+        public void C5の世代で26_2のチャンクを読むとブロックの取得でMALFORMED_DATA()
+        {
+            Chunk chunk = LoadChunk("v4903_edit", new ChunkReadOptions { FormatDataVersion = 5023 });
+
+            // パレットの要素がName / Propertiesなので、26.3の形式としては読めない
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.GetBlock(0, -64, 0));
+            Assert.Equal(ErrorCode.MalformedData, error.Code);
+        }
+
+        [Fact]
+        public void ルートの直下にsectionsがあるチャンクを1_16の世代で読むとMALFORMED_DATA()
+        {
+            ChunkReadOptions options = new ChunkReadOptions { FormatDataVersion = 2586 };
+
+            // Levelの無いチャンクを、Levelに本体を包む世代で読ませる
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => LoadChunk("palette_1", options));
+            Assert.Equal(ErrorCode.MalformedData, error.Code);
+        }
+
+        [Fact]
+        public void 名前空間の無いfullも生成済みとみなす()
+        {
+            NbtCompound root = (NbtCompound)NbtIo.ReadFile(VectorPath("v4903_edit")).Tag;
+            root.SetString("Status", "full");
+            Chunk chunk = Chunk.FromNbt(root);
+
+            Assert.Equal("full", chunk.Status);
+            Assert.True(chunk.IsFullyGenerated);
+        }
+    }
+
+    /// <summary>1.16.5の形式のテストベクタのLevel.Biomesの値</summary>
+    private static int LevelBiome(int index) => ((index * 3) % 11) + 1;
+
+    /// <summary>1.16.5の形式のテストベクタをNBTのまま読む</summary>
+    private static NbtCompound LevelVector() => (NbtCompound)NbtIo.ReadFile(VectorPath("v2586_level")).Tag;
+
+    /// <summary>Level.SectionsからY位置の合うセクションを探す</summary>
+    private static NbtCompound LevelSection(NbtCompound root, int sectionY)
+    {
+        // Yが一致する要素を返す
+        foreach (NbtTag entry in root.GetCompound("Level").GetList("Sections"))
+        {
+            NbtCompound section = (NbtCompound)entry;
+
+            // Yの合うセクションだけを対象にする
+            if (section.GetByte("Y") == sectionY)
+            {
+                return section;
+            }
+        }
+
+        throw new InvalidOperationException("Y=" + sectionY + " のセクションが無い");
+    }
+
+    /// <summary>付随データの要素の座標を並べる</summary>
+    private static List<(int X, int Y, int Z)> Positions(NbtList values)
+    {
+        List<(int X, int Y, int Z)> result = new List<(int X, int Y, int Z)>();
+
+        // 要素ごとに絶対座標を取り出す
+        foreach (NbtTag entry in values)
+        {
+            NbtCompound compound = (NbtCompound)entry;
+            result.Add((compound.GetInt("x"), compound.GetInt("y"), compound.GetInt("z")));
+        }
+
+        return result;
+    }
+
+    // ------------------------------------------------------------------
+    // 1.16〜1.17の形式（本体がLevelの中）のチャンク
+    // ------------------------------------------------------------------
+
+    public class LevelChunkTests
+    {
+        [Fact]
+        public void DataVersion2586のチャンクを読み無変更で書き戻すと元と同じになる()
+        {
+            NbtCompound root = LevelVector();
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+
+            Assert.Equal(2586, chunk.DataVersion);
+            Assert.Equal(2, chunk.X);
+            Assert.Equal(-1, chunk.Z);
+            Assert.Equal(0, chunk.MinSectionY);
+            Assert.Equal("full", chunk.Status);
+            Assert.True(chunk.IsFullyGenerated);
+            Assert.Equal(new[] { -1, 0, 1 }, chunk.SectionYs);
+
+            // ベクタの添字は (位置 * 7) % 5
+            Assert.Equal("minecraft:air", chunk.GetBlock(0, 0, 0)!.ToString());
+            Assert.Equal("minecraft:dirt", chunk.GetBlock(1, 0, 0)!.ToString());
+            Assert.Equal("minecraft:oak_stairs[facing=west,half=top]", chunk.GetBlock(2, 0, 0)!.ToString());
+            Assert.Equal("minecraft:stone", chunk.GetBlock(3, 0, 0)!.ToString());
+            Assert.Equal("minecraft:oak_stairs[facing=east,half=bottom]", chunk.GetBlock(4, 0, 0)!.ToString());
+            Assert.Equal("minecraft:air", chunk.GetBlock(15, 31, 15)!.ToString());
+
+            // Paletteの無いセクションと、セクションの無い高さはブロックを持たない
+            Assert.False(chunk.Section(-1)!.HasBlockStates);
+            Assert.Null(chunk.GetBlock(0, -1, 0));
+            Assert.Null(chunk.GetBlock(0, 32, 0));
+
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+        }
+
+        [Fact]
+        public void DataVersion2586のチャンクでブロックを置くとLevelの付随データが消える()
+        {
+            Chunk chunk = Chunk.FromNbt(LevelVector());
+
+            // 絶対座標はx = 32 + 相対x、z = -16 + 相対z
+            chunk.SetBlock(0, 0, 0, "minecraft:stone");
+            chunk.SetBlock(1, 0, 1, "minecraft:stone");
+            chunk.SetBlock(2, 2, 2, "minecraft:oak_stairs[facing=north]");
+            NbtCompound written = chunk.ToNbt();
+            NbtCompound level = written.GetCompound("Level");
+
+            Assert.Equal(new[] { (47, 20, -1) }, Positions(level.GetList("TileEntities")));
+            Assert.Empty(level.GetList("TileTicks"));
+            Assert.Equal(new[] { (40, 5, -10) }, Positions(level.GetList("LiquidTicks")));
+
+            // ルートには付随データのキーを作らない
+            Assert.False(written.ContainsKey("block_entities"));
+            Assert.False(written.ContainsKey("TileEntities"));
+
+            // パレットの末尾にName / Propertiesの形式で足され、BlockStatesも書き直される
+            NbtCompound section = LevelSection(written, 0);
+            NbtList palette = section.GetList("Palette");
+            Assert.Equal(NameProperties("minecraft:oak_stairs", ("facing", "north")), palette[palette.Count - 1]);
+            Assert.Equal(256, section.GetLongArray("BlockStates").Length);
+            Assert.Equal(2586, written.GetInt("DataVersion"));
+
+            // 読み直しても同じ状態が返る
+            Chunk reread = Chunk.FromNbt(written);
+            Assert.Equal("minecraft:oak_stairs[facing=north]", reread.GetBlock(2, 2, 2)!.ToString());
+            Assert.Equal("minecraft:stone", reread.GetBlock(0, 0, 0)!.ToString());
+        }
+
+        [Fact]
+        public void DataVersion2586のチャンクのバイオームIDを読み書きできる()
+        {
+            Chunk chunk = Chunk.FromNbt(LevelVector());
+
+            Assert.Equal(LevelBiome(0), chunk.GetBiomeId(0, 0, 0));
+            Assert.Equal(LevelBiome((17 * 16) + (2 * 4) + 1), chunk.GetBiomeId(5, 70, 9));
+            Assert.Equal(LevelBiome(1023), chunk.GetBiomeId(15, 255, 15));
+
+            // 高さ0..255の外は値を持たない
+            Assert.Null(chunk.GetBiomeId(0, -1, 0));
+            Assert.Null(chunk.GetBiomeId(0, 256, 0));
+
+            chunk.SetBiomeId(5, 70, 9, 42);
+            Assert.True(chunk.IsModified);
+            Assert.Equal(42, chunk.GetBiomeId(4, 68, 8));
+
+            NbtCompound written = chunk.ToNbt();
+            Assert.Equal(42, written.GetCompound("Level").GetIntArray("Biomes")[(17 * 16) + (2 * 4) + 1]);
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(256)]
+        public void 高さ0から255の外へバイオームIDを書くとINVALID_ARGUMENT(int y)
+        {
+            Chunk chunk = Chunk.FromNbt(LevelVector());
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.SetBiomeId(0, y, 0, 1));
+            Assert.Equal(ErrorCode.InvalidArgument, error.Code);
+        }
+
+        [Theory]
+        [InlineData("absent")]
+        [InlineData("int0")]
+        [InlineData("int256")]
+        [InlineData("byte256")]
+        public void Biomesを読めないチャンクのバイオームIDはnullで書き込めない(string kind)
+        {
+            NbtCompound root = LevelVector();
+            NbtCompound level = root.GetCompound("Level");
+            level.Remove("Biomes");
+
+            // 種類ごとに、読めない形のBiomesを置く
+            if (kind == "int0")
+            {
+                level.Set("Biomes", new NbtIntArray(new int[0]));
+            }
+            else if (kind == "int256")
+            {
+                level.Set("Biomes", new NbtIntArray(Enumerable.Repeat(1, 256).ToArray()));
+            }
+            else if (kind == "byte256")
+            {
+                level.Set("Biomes", new NbtByteArray(Enumerable.Repeat((sbyte)1, 256).ToArray()));
+            }
+
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+            Assert.Null(chunk.GetBiomeId(0, 0, 0));
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.SetBiomeId(0, 0, 0, 1));
+            Assert.Equal(ErrorCode.InvalidArgument, error.Code);
+
+            // 元のNBTはそのまま残る
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+        }
+
+        [Fact]
+        public void DataVersion2586のチャンクではバイオーム名のAPIはUNSUPPORTED_FEATURE()
+        {
+            Chunk chunk = Chunk.FromNbt(LevelVector());
+
+            // セクションの無い高さでも、形式で決まるので同じエラーになる
+            Action[] operations =
+            {
+                () => chunk.GetBiome(0, 0, 0),
+                () => chunk.GetBiome(0, 200, 0),
+                () => chunk.SetBiome(0, 0, 0, "minecraft:plains"),
+            };
+
+            // 操作ごとにUnsupportedFeatureになることを確かめる
+            foreach (Action operation in operations)
+            {
+                SpringNbtException error = Assert.Throws<SpringNbtException>(operation);
+                Assert.Equal(ErrorCode.UnsupportedFeature, error.Code);
+            }
+        }
+
+        [Theory]
+        [InlineData("palette_1")]
+        [InlineData("v4903_edit")]
+        public void バイオームIDのAPIは1_18以降のチャンクではUNSUPPORTED_FEATURE(string name)
+        {
+            Chunk chunk = LoadChunk(name);
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.GetBiomeId(0, 0, 0));
+            Assert.Equal(ErrorCode.UnsupportedFeature, error.Code);
+
+            error = Assert.Throws<SpringNbtException>(() => chunk.SetBiomeId(0, 0, 0, 1));
+            Assert.Equal(ErrorCode.UnsupportedFeature, error.Code);
+        }
+
+        [Fact]
+        public void DataVersion2586のチャンクの高さマップと光源を無効化できる()
+        {
+            Chunk chunk = Chunk.FromNbt(LevelVector());
+            chunk.ClearHeightmaps();
+            chunk.InvalidateLighting();
+            NbtCompound written = chunk.ToNbt();
+            NbtCompound level = written.GetCompound("Level");
+
+            Assert.Null(level.OptCompound("Heightmaps"));
+            Assert.Equal(0, level.GetByte("isLightOn"));
+
+            // ルートには作らない
+            Assert.False(written.ContainsKey("isLightOn"));
+        }
+
+        [Fact]
+        public void isLightOnの無いDataVersion2586のチャンクは光源を無効化できない()
+        {
+            NbtCompound root = LevelVector();
+            root.GetCompound("Level").Remove("isLightOn");
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.InvalidateLighting());
+            Assert.Equal(ErrorCode.UnsupportedFeature, error.Code);
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+        }
+
+        [Fact]
+        public void 生成途中のDataVersion2586のチャンクは生成済みではない()
+        {
+            NbtCompound root = LevelVector();
+            root.GetCompound("Level").SetString("Status", "structure_starts");
+
+            Assert.False(Chunk.FromNbt(root).IsFullyGenerated);
+        }
+
+        [Fact]
+        public void PaletteがありBlockStatesの無いセクションはMALFORMED_DATA()
+        {
+            NbtCompound root = LevelVector();
+            LevelSection(root, 1).Remove("BlockStates");
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => Chunk.FromNbt(root));
+            Assert.Equal(ErrorCode.MalformedData, error.Code);
+        }
+
+        [Fact]
+        public void Paletteの要素がCompoundでなければUNEXPECTED_TAG_TYPE()
+        {
+            NbtCompound root = LevelVector();
+            NbtList palette = new NbtList(TagType.String);
+            palette.Add(new NbtString("minecraft:air"));
+            LevelSection(root, 1).Set("Palette", palette);
+
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => Chunk.FromNbt(root));
+            Assert.Equal(ErrorCode.UnexpectedTagType, error.Code);
         }
     }
 

@@ -29,6 +29,7 @@ import {
   Compression,
   NamedTag,
   NbtByte,
+  NbtByteArray,
   NbtCompound,
   NbtInt,
   NbtIntArray,
@@ -508,7 +509,7 @@ for (const spanning of [false, true]) {
   test(`PalettedContainer: dataが必ず書かれる形式なら1要素のパレットでもビット幅4のdataを返す（spanning=${spanning}）`, () => {
     const container = PalettedContainer.fromParts(
       [blockEntry("minecraft:air")],
-      undefined,
+      new BigInt64Array(256),
       4096,
       4,
       spanning,
@@ -518,8 +519,12 @@ for (const spanning of [false, true]) {
 
     const parts = container.toParts();
     assert.equal(parts.palette.length, 1);
-    assert.ok(parts.data !== undefined);
-    assert.equal(parts.data.length, 256);
+    assert.deepEqual(parts.data, new BigInt64Array(256));
+  });
+
+  test(`PalettedContainer: dataが必ず書かれる形式でdataが無ければMALFORMED_DATA（spanning=${spanning}）`, () => {
+    assertErrorCode(ErrorCode.MalformedData, () =>
+      PalettedContainer.fromParts([blockEntry("minecraft:air")], undefined, 4096, 4, spanning, true, false));
   });
 }
 
@@ -856,8 +861,8 @@ test("DataVersion: 26.2 のチャンクは警告を出さずに読める", () =>
   assert.equal(warnings.length, 0);
 });
 
-test("DataVersion: 扱える形式の下限は 1.18", () => {
-  assert.equal(MIN_SUPPORTED_DATA_VERSION, 2844);
+test("DataVersion: 扱える形式の下限は 1.16", () => {
+  assert.equal(MIN_SUPPORTED_DATA_VERSION, 2529);
 });
 
 test("DataVersion: Error を指定すると読み込みで弾く", () => {
@@ -1050,6 +1055,8 @@ test("ChunkFormat: DataVersion が 1519 未満のチャンクは元の NBT だ�
     () => chunk.setBlock(0, 0, 0, "minecraft:stone"),
     () => chunk.getBiome(0, 0, 0),
     () => chunk.setBiome(0, 0, 0, "minecraft:plains"),
+    () => chunk.getBiomeId(0, 0, 0),
+    () => chunk.setBiomeId(0, 0, 0, 1),
     () => chunk.clearHeightmaps(),
     () => chunk.invalidateLighting(),
   ];
@@ -1071,6 +1078,255 @@ test("ChunkFormat: 世代を選んだ DataVersion を返す", () => {
   const chunk = Chunk.fromNbt(tag, { formatDataVersion: 5023 });
   assert.equal(chunk.formatDataVersion, 5023);
   assert.equal(chunk.dataVersion, 4903);
+});
+
+test("ChunkFormat: C5 の世代で 26.2 のチャンクを読むとブロックの取得で MALFORMED_DATA", () => {
+  const chunk = loadChunk("v4903_edit", { formatDataVersion: 5023 });
+
+  // パレットの要素がName / Propertiesなので、26.3の形式としては読めない
+  assertErrorCode(ErrorCode.MalformedData, () => chunk.getBlock(0, -64, 0));
+});
+
+test("ChunkFormat: ルートの直下に sections があるチャンクを 1.16 の世代で読むと MALFORMED_DATA", () => {
+  // Levelの無いチャンクを、Levelに本体を包む世代で読ませる
+  assertErrorCode(ErrorCode.MalformedData, () => loadChunk("palette_1", { formatDataVersion: 2586 }));
+});
+
+test("ChunkFormat: 名前空間の無い full も生成済みとみなす", () => {
+  const root = readFile(vectorPath("v4903_edit")).tag;
+  root.setString("Status", "full");
+  const chunk = Chunk.fromNbt(root);
+
+  assert.equal(chunk.status, "full");
+  assert.equal(chunk.isFullyGenerated, true);
+});
+
+// ---------------------------------------------------------------------------
+// 1.16〜1.17の形式（本体がLevelの中）のチャンク
+// ---------------------------------------------------------------------------
+
+/** 1.16.5の形式のテストベクタのLevel.Biomesの値 */
+function levelBiome(index: number): number {
+  return ((index * 3) % 11) + 1;
+}
+
+/** 1.16.5の形式のテストベクタをNBTのまま読む */
+function levelVector(): NbtCompound {
+  return readFile(vectorPath("v2586_level")).tag;
+}
+
+/** Level.SectionsからY位置の合うセクションを探す */
+function levelSection(root: NbtCompound, sectionY: number): NbtCompound {
+  // Yが一致する要素を返す
+  for (const entry of root.getCompound("Level").getList("Sections")) {
+    const section = entry as NbtCompound;
+
+    // Yの合うセクションだけを対象にする
+    if (section.getByte("Y") === sectionY) {
+      return section;
+    }
+  }
+
+  throw new Error(`Y=${sectionY} のセクションが無い`);
+}
+
+/** 付随データの要素の座標を並べる */
+function positions(values: NbtList): number[][] {
+  const result: number[][] = [];
+
+  // 要素ごとに絶対座標を取り出す
+  for (const entry of values) {
+    const compound = entry as NbtCompound;
+    result.push([compound.getInt("x"), compound.getInt("y"), compound.getInt("z")]);
+  }
+
+  return result;
+}
+
+test("LevelChunk: DataVersion 2586 のチャンクを読み無変更で書き戻すと元と同じになる", () => {
+  const root = levelVector();
+  const before = chunkBytes(root);
+  const chunk = Chunk.fromNbt(root);
+
+  assert.equal(chunk.dataVersion, 2586);
+  assert.equal(chunk.x, 2);
+  assert.equal(chunk.z, -1);
+  assert.equal(chunk.minSectionY, 0);
+  assert.equal(chunk.status, "full");
+  assert.equal(chunk.isFullyGenerated, true);
+  assert.deepEqual(chunk.sectionYs, [-1, 0, 1]);
+
+  // ベクタの添字は (位置 * 7) % 5
+  assert.equal(String(chunk.getBlock(0, 0, 0)), "minecraft:air");
+  assert.equal(String(chunk.getBlock(1, 0, 0)), "minecraft:dirt");
+  assert.equal(String(chunk.getBlock(2, 0, 0)), "minecraft:oak_stairs[facing=west,half=top]");
+  assert.equal(String(chunk.getBlock(3, 0, 0)), "minecraft:stone");
+  assert.equal(String(chunk.getBlock(4, 0, 0)), "minecraft:oak_stairs[facing=east,half=bottom]");
+  assert.equal(String(chunk.getBlock(15, 31, 15)), "minecraft:air");
+
+  // Paletteの無いセクションと、セクションの無い高さはブロックを持たない
+  const lightOnly = chunk.section(-1);
+  assert.ok(lightOnly !== undefined);
+  assert.equal(lightOnly.hasBlockStates, false);
+  assert.equal(chunk.getBlock(0, -1, 0), undefined);
+  assert.equal(chunk.getBlock(0, 32, 0), undefined);
+
+  assert.deepEqual(chunkBytes(chunk.toNbt()), before);
+});
+
+test("LevelChunk: DataVersion 2586 のチャンクでブロックを置くと Level の付随データが消える", () => {
+  const chunk = Chunk.fromNbt(levelVector());
+
+  // 絶対座標はx = 32 + 相対x、z = -16 + 相対z
+  chunk.setBlock(0, 0, 0, "minecraft:stone");
+  chunk.setBlock(1, 0, 1, "minecraft:stone");
+  chunk.setBlock(2, 2, 2, "minecraft:oak_stairs[facing=north]");
+  const written = chunk.toNbt();
+  const level = written.getCompound("Level");
+
+  assert.deepEqual(positions(level.getList("TileEntities")), [[47, 20, -1]]);
+  assert.equal(level.getList("TileTicks").size, 0);
+  assert.deepEqual(positions(level.getList("LiquidTicks")), [[40, 5, -10]]);
+
+  // ルートには付随データのキーを作らない
+  assert.equal(written.containsKey("block_entities"), false);
+  assert.equal(written.containsKey("TileEntities"), false);
+
+  // パレットの末尾にName / Propertiesの形式で足され、BlockStatesも書き直される
+  const section = levelSection(written, 0);
+  const palette = section.getList("Palette");
+  assert.ok(palette.get(palette.size - 1).equals(nameProperties("minecraft:oak_stairs", [["facing", "north"]])));
+  assert.equal(section.getLongArray("BlockStates").length, 256);
+  assert.equal(written.getInt("DataVersion"), 2586);
+
+  // 読み直しても同じ状態が返る
+  const reread = Chunk.fromNbt(written);
+  assert.equal(String(reread.getBlock(2, 2, 2)), "minecraft:oak_stairs[facing=north]");
+  assert.equal(String(reread.getBlock(0, 0, 0)), "minecraft:stone");
+});
+
+test("LevelChunk: DataVersion 2586 のチャンクのバイオーム ID を読み書きできる", () => {
+  const chunk = Chunk.fromNbt(levelVector());
+
+  assert.equal(chunk.getBiomeId(0, 0, 0), levelBiome(0));
+  assert.equal(chunk.getBiomeId(5, 70, 9), levelBiome(17 * 16 + 2 * 4 + 1));
+  assert.equal(chunk.getBiomeId(15, 255, 15), levelBiome(1023));
+
+  // 高さ0..255の外は値を持たない
+  assert.equal(chunk.getBiomeId(0, -1, 0), undefined);
+  assert.equal(chunk.getBiomeId(0, 256, 0), undefined);
+
+  chunk.setBiomeId(5, 70, 9, 42);
+  assert.equal(chunk.isModified, true);
+  assert.equal(chunk.getBiomeId(4, 68, 8), 42);
+
+  const written = chunk.toNbt();
+  assert.equal(written.getCompound("Level").getIntArray("Biomes")[17 * 16 + 2 * 4 + 1], 42);
+});
+
+for (const y of [-1, 256]) {
+  test(`LevelChunk: 高さ 0 から 255 の外へバイオーム ID を書くと INVALID_ARGUMENT（y=${y}）`, () => {
+    const chunk = Chunk.fromNbt(levelVector());
+    assertErrorCode(ErrorCode.InvalidArgument, () => chunk.setBiomeId(0, y, 0, 1));
+  });
+}
+
+test("LevelChunk: int の範囲に収まらないバイオーム ID は INVALID_ARGUMENT", () => {
+  const chunk = Chunk.fromNbt(levelVector());
+  assertErrorCode(ErrorCode.InvalidArgument, () => chunk.setBiomeId(0, 0, 0, 2147483648));
+  assertErrorCode(ErrorCode.InvalidArgument, () => chunk.setBiomeId(0, 0, 0, 1.5));
+});
+
+const unreadableBiomes: [string, NbtTag | undefined][] = [
+  ["absent", undefined],
+  ["int0", new NbtIntArray(new Int32Array(0))],
+  ["int256", new NbtIntArray(new Int32Array(256).fill(1))],
+  ["byte256", new NbtByteArray(new Int8Array(256).fill(1))],
+];
+
+for (const [kind, biomes] of unreadableBiomes) {
+  test(`LevelChunk: Biomes を読めないチャンクのバイオーム ID は undefined で書き込めない（${kind}）`, () => {
+    const root = levelVector();
+    const level = root.getCompound("Level");
+    level.remove("Biomes");
+
+    // undefinedならBiomesを持たないチャンクにする
+    if (biomes !== undefined) {
+      level.set("Biomes", biomes);
+    }
+
+    const before = chunkBytes(root);
+    const chunk = Chunk.fromNbt(root);
+    assert.equal(chunk.getBiomeId(0, 0, 0), undefined);
+    assertErrorCode(ErrorCode.InvalidArgument, () => chunk.setBiomeId(0, 0, 0, 1));
+
+    // 元のNBTはそのまま残る
+    assert.deepEqual(chunkBytes(chunk.toNbt()), before);
+  });
+}
+
+test("LevelChunk: DataVersion 2586 のチャンクではバイオーム名の API は UNSUPPORTED_FEATURE", () => {
+  const chunk = Chunk.fromNbt(levelVector());
+
+  // セクションの無い高さでも、形式で決まるので同じエラーになる
+  assertErrorCode(ErrorCode.UnsupportedFeature, () => chunk.getBiome(0, 0, 0));
+  assertErrorCode(ErrorCode.UnsupportedFeature, () => chunk.getBiome(0, 200, 0));
+  assertErrorCode(ErrorCode.UnsupportedFeature, () => chunk.setBiome(0, 0, 0, "minecraft:plains"));
+});
+
+for (const name of ["palette_1", "v4903_edit"]) {
+  test(`LevelChunk: バイオーム ID の API は 1.18 以降のチャンクでは UNSUPPORTED_FEATURE（${name}）`, () => {
+    const chunk = loadChunk(name);
+    assertErrorCode(ErrorCode.UnsupportedFeature, () => chunk.getBiomeId(0, 0, 0));
+    assertErrorCode(ErrorCode.UnsupportedFeature, () => chunk.setBiomeId(0, 0, 0, 1));
+  });
+}
+
+test("LevelChunk: DataVersion 2586 のチャンクの高さマップと光源を無効化できる", () => {
+  const chunk = Chunk.fromNbt(levelVector());
+  chunk.clearHeightmaps();
+  chunk.invalidateLighting();
+  const written = chunk.toNbt();
+  const level = written.getCompound("Level");
+
+  assert.equal(level.optCompound("Heightmaps"), undefined);
+  assert.equal(level.getByte("isLightOn"), 0);
+
+  // ルートには作らない
+  assert.equal(written.containsKey("isLightOn"), false);
+});
+
+test("LevelChunk: isLightOn の無い DataVersion 2586 のチャンクは光源を無効化できない", () => {
+  const root = levelVector();
+  root.getCompound("Level").remove("isLightOn");
+  const before = chunkBytes(root);
+  const chunk = Chunk.fromNbt(root);
+
+  assertErrorCode(ErrorCode.UnsupportedFeature, () => chunk.invalidateLighting());
+  assert.deepEqual(chunkBytes(chunk.toNbt()), before);
+});
+
+test("LevelChunk: 生成途中の DataVersion 2586 のチャンクは生成済みではない", () => {
+  const root = levelVector();
+  root.getCompound("Level").setString("Status", "structure_starts");
+
+  assert.equal(Chunk.fromNbt(root).isFullyGenerated, false);
+});
+
+test("LevelChunk: Palette があり BlockStates の無いセクションは MALFORMED_DATA", () => {
+  const root = levelVector();
+  levelSection(root, 1).remove("BlockStates");
+
+  assertErrorCode(ErrorCode.MalformedData, () => Chunk.fromNbt(root));
+});
+
+test("LevelChunk: Palette の要素が Compound でなければ UNEXPECTED_TAG_TYPE", () => {
+  const root = levelVector();
+  const palette = new NbtList(TagType.String);
+  palette.add(new NbtString("minecraft:air"));
+  levelSection(root, 1).set("Palette", palette);
+
+  assertErrorCode(ErrorCode.UnexpectedTagType, () => Chunk.fromNbt(root));
 });
 
 // ---------------------------------------------------------------------------

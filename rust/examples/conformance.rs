@@ -7,7 +7,7 @@
 use std::process::ExitCode;
 
 use spring_nbt_library::anvil::{ChunkCompression, RegionFile, RegionFileMode};
-use spring_nbt_library::error::Result;
+use spring_nbt_library::error::{ErrorCode, Result};
 use spring_nbt_library::world::{
     BlockState, Chunk, ChunkReadOptions, ChunkWriteOptions, VersionMismatchAction,
 };
@@ -182,6 +182,23 @@ fn read_chunk_file(path: &str) -> Result<Chunk> {
     Chunk::from_nbt(named.tag, &options)
 }
 
+/// バイオームを数値のIDで持つチャンクか
+///
+/// `get_biome`が`UNSUPPORTED_FEATURE`になれば、数値のIDで持つ1.17までの形式
+fn uses_biome_ids(chunk: &Chunk, y: i32) -> Result<bool> {
+    match chunk.get_biome(0, y, 0) {
+        Ok(_) => Ok(false),
+        Err(error) => {
+            // ほかのエラーは検証の失敗としてそのまま伝える
+            if error.code() != ErrorCode::UnsupportedFeature {
+                return Err(error);
+            }
+
+            Ok(true)
+        }
+    }
+}
+
 /// チャンクの全ブロック・全バイオームを走査して集計する
 ///
 /// パレットとビットストレージを端から端まで通すので、
@@ -197,8 +214,16 @@ fn chunk_describe(chunk: &Chunk) -> Result<String> {
 
     let mut blocks: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     let mut biomes: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    let mut biome_ids: std::collections::BTreeMap<i32, usize> = std::collections::BTreeMap::new();
+    let mut numeric_biomes = false;
+    let section_ys = chunk.section_ys();
 
-    for section_y in chunk.section_ys() {
+    // 最初に読む位置で、バイオームを名前とIDのどちらで持つかを決める
+    if let Some(first) = section_ys.first() {
+        numeric_biomes = uses_biome_ids(chunk, first * 16)?;
+    }
+
+    for section_y in section_ys {
         let section = match chunk.section(section_y) {
             Some(section) => section,
             None => continue,
@@ -238,6 +263,16 @@ fn chunk_describe(chunk: &Chunk) -> Result<String> {
         for y in (0..16).step_by(4) {
             for z in (0..16).step_by(4) {
                 for x in (0..16).step_by(4) {
+                    // 数値のIDで持つチャンクは、IDごとに数える
+                    if numeric_biomes {
+                        // Yが範囲外ならIDを持たない
+                        if let Some(biome_id) = chunk.get_biome_id(x, (section_y * 16) + y, z)? {
+                            *biome_ids.entry(biome_id).or_insert(0) += 1;
+                        }
+
+                        continue;
+                    }
+
                     if let Some(biome) = chunk.get_biome(x, (section_y * 16) + y, z)? {
                         *biomes.entry(biome).or_insert(0) += 1;
                     }
@@ -253,6 +288,11 @@ fn chunk_describe(chunk: &Chunk) -> Result<String> {
 
     for (key, count) in &biomes {
         out.push_str(&format!("biome {key} {count}\n"));
+    }
+
+    // IDの数値の昇順で出す
+    for (key, count) in &biome_ids {
+        out.push_str(&format!("biome-id {key} {count}\n"));
     }
 
     Ok(out)
@@ -282,8 +322,14 @@ fn chunk_edit(chunk: &mut Chunk) -> Result<()> {
     chunk.set_block(4, base_y + 2, 4, &BlockState::parse("minecraft:edited_plain")?)?;
 
     // バイオームも書き換える
-    chunk.set_biome(0, base_y, 0, "minecraft:desert")?;
-    chunk.set_biome(8, base_y + 8, 8, "minecraft:jungle")?;
+    // 数値のIDで持つチャンクは、名前の代わりにID（2は砂漠、21はジャングル）で書く
+    if uses_biome_ids(chunk, base_y)? {
+        chunk.set_biome_id(0, base_y, 0, 2)?;
+        chunk.set_biome_id(8, base_y + 8, 8, 21)?;
+    } else {
+        chunk.set_biome(0, base_y, 0, "minecraft:desert")?;
+        chunk.set_biome(8, base_y + 8, 8, "minecraft:jungle")?;
+    }
 
     // 使われなくなったパレット要素を掃除する
     chunk.compact()?;

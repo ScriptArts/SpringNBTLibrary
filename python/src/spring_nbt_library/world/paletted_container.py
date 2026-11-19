@@ -150,7 +150,8 @@ class PalettedContainer:
         """パレットとdataから作る（内部用）
         1.13から1.15までの詰め方や、dataが必ず書かれる形式を読むための入口
 
-        :raises SpringNbtError: パレットが空、dataの長さが合わない、添字がパレット範囲外のいずれか
+        :raises SpringNbtError: パレットが空、dataの長さが合わない、添字がパレット範囲外、
+            dataが必ず書かれる形式なのにdataが無い、のいずれか
         """
         if len(palette) == 0:
             raise SpringNbtError.malformed("palette が無いか空")
@@ -161,6 +162,11 @@ class PalettedContainer:
         result._palette.extend(palette)
 
         if data is None:
+            # dataが必ず書かれる形式で無いなら、壊れたデータとして扱う
+            # 書き戻しで元に無いdataを作ってしまわないため
+            if always_has_data:
+                raise SpringNbtError.malformed("data が必ず書かれる形式なのに data が無い")
+
             # パレットが1要素ならdataは無くてよい
             if len(result._palette) != 1:
                 raise SpringNbtError.malformed(

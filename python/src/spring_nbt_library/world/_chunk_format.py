@@ -21,6 +21,21 @@ OLDEST_FORMAT_DATA_VERSION = 1519
 #: ルートの直下に置かれる、ブロックに紐づく付随データのキー（1.18以降）
 _ROOT_BLOCK_DATA_KEYS = ("block_entities", "block_ticks", "fluid_ticks")
 
+#: ``Level``の中に置かれる、ブロックに紐づく付随データのキー（1.17まで）
+_LEVEL_BLOCK_DATA_KEYS = ("TileEntities", "TileTicks", "LiquidTicks")
+
+
+class BlockStorage(enum.Enum):
+    """セクションのブロックの持ち方"""
+
+    #: セクションの``block_states``にあるパレット付きコンテナ（``palette`` / ``data``）
+    #: パレットが1要素なら``data``を持たない
+    CONTAINER = "container"
+
+    #: セクションの直下の``Palette``と``BlockStates``
+    #: ``BlockStates``はパレットが1要素でも必ずある
+    SECTION_PALETTE = "section_palette"
+
 
 class BiomeStorage(enum.Enum):
     """バイオームの持ち方"""
@@ -39,12 +54,14 @@ class ChunkFormat:
     """チャンクの形式の世代1つ分"""
 
     __slots__ = ("min_data_version", "wrapped_in_level", "sections_key",
-                 "palette_data_version", "spanning_bit_storage", "biome_storage",
-                 "block_data_keys")
+                 "palette_data_version", "spanning_bit_storage", "block_storage",
+                 "biome_storage", "block_data_keys", "has_y_pos", "adds_light_flag")
 
     def __init__(self, min_data_version: int, wrapped_in_level: bool, sections_key: str,
                  palette_data_version: int, spanning_bit_storage: bool,
-                 biome_storage: BiomeStorage, block_data_keys: Tuple[str, str, str]) -> None:
+                 block_storage: BlockStorage, biome_storage: BiomeStorage,
+                 block_data_keys: Tuple[str, str, str], has_y_pos: bool,
+                 adds_light_flag: bool) -> None:
         #: この世代が始まるDataVersion
         self.min_data_version = min_data_version
         #: チャンクの本体が``Level``の中にあるか
@@ -55,10 +72,18 @@ class ChunkFormat:
         self.palette_data_version = palette_data_version
         #: ビット詰めで値が64bitの境目をまたぐか
         self.spanning_bit_storage = spanning_bit_storage
+        #: セクションのブロックの持ち方
+        self.block_storage = block_storage
         #: バイオームの持ち方
         self.biome_storage = biome_storage
         #: ブロックを置き換えたときに取り除く付随データのキー
         self.block_data_keys = block_data_keys
+        #: ルートに最下段セクションのY位置（``yPos``）があるか
+        #: 無い世代では、セクションは0段目から始まる
+        self.has_y_pos = has_y_pos
+        #: ``isLightOn``の無いチャンクで光源を無効化するとき、``isLightOn``を書き足すか
+        #: 1.17までは生成途中のチャンクに``isLightOn``が無く、書き足すと元に無いキーが増えるので足さない
+        self.adds_light_flag = adds_light_flag
 
     @staticmethod
     def for_data_version(data_version: int) -> Optional["ChunkFormat"]:
@@ -79,6 +104,20 @@ class ChunkFormat:
 #: 世代の表
 #: 境界のDataVersionの昇順に並べる
 _FORMATS = (
+    # C3: 1.16〜1.17.x
+    # 本体はLevelの中で、ブロックはセクションの直下のPalette / BlockStates
+    # バイオームは4×4×4ブロックごとの数値のID
+    ChunkFormat(
+        min_data_version=2529,
+        wrapped_in_level=True,
+        sections_key="Sections",
+        palette_data_version=2529,
+        spanning_bit_storage=False,
+        block_storage=BlockStorage.SECTION_PALETTE,
+        biome_storage=BiomeStorage.IDS_3D,
+        block_data_keys=_LEVEL_BLOCK_DATA_KEYS,
+        has_y_pos=False,
+        adds_light_flag=False),
     # C4: 1.18〜26.2
     # Levelが無くなり、パレットの要素はName / Properties
     ChunkFormat(
@@ -87,8 +126,11 @@ _FORMATS = (
         sections_key="sections",
         palette_data_version=2844,
         spanning_bit_storage=False,
+        block_storage=BlockStorage.CONTAINER,
         biome_storage=BiomeStorage.PALETTED,
-        block_data_keys=_ROOT_BLOCK_DATA_KEYS),
+        block_data_keys=_ROOT_BLOCK_DATA_KEYS,
+        has_y_pos=True,
+        adds_light_flag=True),
     # C5: 26.3以降
     # パレットの要素は文字列かid / properties
     ChunkFormat(
@@ -97,6 +139,9 @@ _FORMATS = (
         sections_key="sections",
         palette_data_version=PALETTE_ID_FORMAT_DATA_VERSION,
         spanning_bit_storage=False,
+        block_storage=BlockStorage.CONTAINER,
         biome_storage=BiomeStorage.PALETTED,
-        block_data_keys=_ROOT_BLOCK_DATA_KEYS),
+        block_data_keys=_ROOT_BLOCK_DATA_KEYS,
+        has_y_pos=True,
+        adds_light_flag=True),
 )

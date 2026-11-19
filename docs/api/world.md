@@ -71,16 +71,18 @@
 | `format_data_version` | `FormatDataVersion` | `formatDataVersion()` | `formatDataVersion()` | `format_data_version` | `format_data_version()` | チャンクの形式の世代を選ぶのに使ったDataVersion |
 | `from_nbt` | `FromNbt()` | `fromNbt()` | `fromNbt()` | `from_nbt()` | `from_nbt()` | NBTからチャンクを読む |
 | `get_biome` | `GetBiome()` | `getBiome()` | `getBiome()` | `get_biome()` | `get_biome()` | バイオームを取得する |
+| `get_biome_id` | `GetBiomeId()` | `getBiomeId()` | `getBiomeId()` | `get_biome_id()` | `get_biome_id()` | 数値のバイオームIDを取得する（1.17までの形式） |
 | `get_block` | `GetBlock()` | `getBlock()` | `getBlock()` | `get_block()` | `get_block()` | ブロックを取得する |
 | `invalidate_lighting` | `InvalidateLighting()` | `invalidateLighting()` | `invalidateLighting()` | `invalidate_lighting()` | `invalidate_lighting()` | isLightOnを0にし、光源の再計算を促す |
 | `is_fully_generated` | `IsFullyGenerated` | `isFullyGenerated()` | `isFullyGenerated()` | `is_fully_generated` | `is_fully_generated()` |  |
 | `is_modified` | `IsModified` | `isModified()` | `isModified()` | `is_modified` | `is_modified()` | このチャンクに変更が加わったか |
-| `min_section_y` | `MinSectionY` | `minSectionY()` | `minSectionY()` | `min_section_y` | `min_section_y()` |  |
+| `min_section_y` | `MinSectionY` | `minSectionY()` | `minSectionY()` | `min_section_y` | `min_section_y()` | 最下段セクションのY位置 |
 | `raw` | `Raw` | `raw()` | `raw` | `raw` | `raw()` |  |
 | `section` | `Section` | `section()` | `section()` | `section()` | `section()` |  |
 | `section_mut` | — | — | — | — | `section_mut()` |  |
 | `section_ys` | `SectionYs` | `sectionYs()` | `sectionYs()` | `section_ys` | `section_ys()` |  |
 | `set_biome` | `SetBiome()` | `setBiome()` | `setBiome()` | `set_biome()` | `set_biome()` |  |
+| `set_biome_id` | `SetBiomeId()` | `setBiomeId()` | `setBiomeId()` | `set_biome_id()` | `set_biome_id()` | 数値のバイオームIDを設定する（1.17までの形式） |
 | `set_block` | `SetBlock()` | `setBlock()` | `setBlock()` | `set_block()` | `set_block()` | ブロックを設定する |
 | `status` | `Status` | `status()` | `status()` | `status` | `status()` | 生成段階（minecraft:fullなど） |
 | `to_nbt` | `ToNbt()` | `toNbt()` | `toNbt()` | `to_nbt()` | `to_nbt()` | NBTへ書き戻す |

@@ -479,6 +479,16 @@
       "roundtrip": true
     },
     {
+      "id": "world/v2586_level",
+      "kind": "world",
+      "input": "world/v2586_level.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "1.16.5の形式のチャンク（DataVersion 2586）。本体はLevelの中で、バイオームは数値のID",
+      "expect": "expect/world/v2586_level.json",
+      "roundtrip": true
+    },
+    {
       "id": "world/palette_index_out_of_range",
       "kind": "world",
       "input": "world/palette_index_out_of_range.nbt",

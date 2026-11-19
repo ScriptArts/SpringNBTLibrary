@@ -1,6 +1,12 @@
 package io.github.scriptarts.springnbt.world;
 
+import io.github.scriptarts.springnbt.SpringNbtException;
 import io.github.scriptarts.springnbt.nbt.NbtCompound;
+import io.github.scriptarts.springnbt.nbt.NbtList;
+import io.github.scriptarts.springnbt.nbt.NbtTag;
+import io.github.scriptarts.springnbt.nbt.TagType;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -16,6 +22,12 @@ public final class ChunkSection {
 
     private PalettedContainer blockStates;
     private PalettedContainer biomes;
+
+    /**
+     * ブロックの持ち方
+     * 書き戻すときに読んだときと同じキーへ書くため、覚えておく
+     */
+    private ChunkFormat.BlockStorage blockStorage = ChunkFormat.BlockStorage.CONTAINER;
 
     private ChunkSection(NbtCompound raw, int y) {
         this.raw = raw;
@@ -82,6 +94,7 @@ public final class ChunkSection {
 
     /**
      * NBTからセクションを読む
+     * 1.18以降の形式（{@code block_states} / {@code biomes}）として読む
      *
      * @param nbt     セクションのNBT
      * @param options 読み込みオプション
@@ -109,12 +122,71 @@ public final class ChunkSection {
     }
 
     /**
+     * 世代の持ち方に従ってNBTからセクションを読む
+     *
+     * @param nbt     セクションのNBT
+     * @param options 読み込みオプション
+     * @param format  チャンクの形式の世代
+     * @return セクション
+     */
+    static ChunkSection fromNbtForFormat(NbtCompound nbt, ChunkReadOptions options, ChunkFormat format) {
+        // 1.18以降の形式は公開の読み込みと同じ
+        if (format.blockStorage() == ChunkFormat.BlockStorage.CONTAINER) {
+            return fromNbt(nbt, options);
+        }
+
+        ChunkSection section = new ChunkSection(nbt, nbt.getByte("Y"));
+        section.blockStorage = format.blockStorage();
+        NbtList palette = nbt.optList("Palette");
+
+        // Paletteの無いセクション（光源だけを持つものなど）はブロックを持たない
+        if (palette == null) {
+            return section;
+        }
+
+        List<NbtTag> entries = new ArrayList<>(palette.size());
+
+        // 書き戻すときにCompoundのリストとして書くので、要素の型をここで確かめる
+        for (NbtTag entry : palette) {
+            // Compound以外の要素は1.17までの形式に無い
+            if (!(entry instanceof NbtCompound)) {
+                throw SpringNbtException.unexpectedTagType(
+                        "Palette の要素が compound でない: " + entry.type().asString());
+            }
+
+            entries.add(entry);
+        }
+
+        // BlockStatesはパレットが1要素でも必ず書かれる
+        section.blockStates = PalettedContainer.fromParts(
+                entries, nbt.optLongArray("BlockStates"), Chunk.BLOCKS_PER_SECTION, 4,
+                format.spanningBitStorage(), true, options.lenientBitStorage());
+        return section;
+    }
+
+    /**
      * NBTへ書き戻す
      * 解釈していないキーはそのまま残る
      *
      * @return NBT
      */
     public NbtCompound toNbt() {
+        // 1.17までの形式は、セクションの直下のPaletteとBlockStatesへ書き戻す
+        if (blockStates != null && blockStorage == ChunkFormat.BlockStorage.SECTION_PALETTE) {
+            PalettedContainer.Parts parts = blockStates.toParts();
+            NbtList paletteTag = new NbtList(TagType.COMPOUND);
+
+            // 要素は読んだときのまま並べる
+            for (NbtTag entry : parts.palette()) {
+                paletteTag.add(entry);
+            }
+
+            // 既存のキーへ書くので、キーの並びは読んだときのまま残る
+            raw.setLongArray("BlockStates", parts.data());
+            raw.set("Palette", paletteTag);
+            return raw;
+        }
+
         if (blockStates != null) {
             raw.set("block_states", blockStates.toNbt());
         }

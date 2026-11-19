@@ -939,8 +939,8 @@ fn data_versionが26_2のチャンクは警告を出さずに読める() {
 }
 
 #[test]
-fn 扱える形式の下限は1_18() {
-    assert_eq!(2844, MIN_SUPPORTED_DATA_VERSION);
+fn 扱える形式の下限は1_16() {
+    assert_eq!(2529, MIN_SUPPORTED_DATA_VERSION);
 }
 
 #[test]
@@ -1203,8 +1203,10 @@ fn data_versionが1519未満のチャンクは元のnbtだけを持つ() {
     let results = vec![
         chunk.get_block(0, 0, 0).map(|_| ()),
         chunk.get_biome(0, 0, 0).map(|_| ()),
+        chunk.get_biome_id(0, 0, 0).map(|_| ()),
         chunk.set_block(0, 0, 0, "minecraft:stone"),
         chunk.set_biome(0, 0, 0, "minecraft:plains"),
+        chunk.set_biome_id(0, 0, 0, 1),
         chunk.clear_heightmaps(),
         chunk.invalidate_lighting(),
     ];
@@ -1238,6 +1240,343 @@ fn 世代を選んだdata_versionを返す() {
     let chunk = Chunk::from_nbt(tag, &options).unwrap();
     assert_eq!(5023, chunk.format_data_version());
     assert_eq!(4903, chunk.data_version().unwrap());
+}
+
+#[test]
+fn c5の世代で26_2のチャンクを読むとブロックの取得でmalformed_data() {
+    let tag = read_file(vector_path("v4903_edit"), &NbtReadOptions::default()).unwrap().tag;
+    let options = ChunkReadOptions {
+        format_data_version: Some(5023),
+        ..ChunkReadOptions::default()
+    };
+    let chunk = Chunk::from_nbt(tag, &options).unwrap();
+
+    // パレットの要素がName / Propertiesなので、26.3の形式としては読めない
+    assert_code(ErrorCode::MalformedData, chunk.get_block(0, -64, 0).unwrap_err());
+}
+
+#[test]
+fn ルートの直下にsectionsがあるチャンクを1_16の世代で読むとmalformed_data() {
+    let tag = read_file(vector_path("palette_1"), &NbtReadOptions::default()).unwrap().tag;
+    let options = ChunkReadOptions {
+        format_data_version: Some(2586),
+        ..ChunkReadOptions::default()
+    };
+
+    // Levelの無いチャンクを、Levelに本体を包む世代で読ませる
+    assert_code(ErrorCode::MalformedData, Chunk::from_nbt(tag, &options).unwrap_err());
+}
+
+#[test]
+fn 名前空間の無いfullも生成済みとみなす() {
+    let mut root = read_file(vector_path("v4903_edit"), &NbtReadOptions::default()).unwrap().tag;
+    root.set_string("Status", "full");
+    let chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    assert_eq!("full", chunk.status().unwrap());
+    assert!(chunk.is_fully_generated());
+}
+
+// ---------------------------------------------------------------------------
+// 1.16〜1.17の形式（本体がLevelの中）のチャンク
+// ---------------------------------------------------------------------------
+
+/// 1.16.5の形式のテストベクタのLevel.Biomesの値
+fn level_biome(index: usize) -> i32 {
+    ((index * 3) % 11 + 1) as i32
+}
+
+/// 1.16.5の形式のテストベクタをNBTのまま読む
+fn level_vector() -> NbtCompound {
+    read_file(vector_path("v2586_level"), &NbtReadOptions::default()).unwrap().tag
+}
+
+/// Levelの中身を書き換える
+fn update_level(root: &mut NbtCompound, update: impl FnOnce(&mut NbtCompound)) {
+    let mut level = root.get_compound("Level").unwrap().clone();
+    update(&mut level);
+    root.set("Level", NbtTag::Compound(level));
+}
+
+/// Level.SectionsからY位置の合うセクションを探す
+fn level_section(root: &NbtCompound, section_y: i8) -> NbtCompound {
+    let sections = root.get_compound("Level").unwrap().get_list("Sections").unwrap();
+
+    // Yが一致する要素を返す
+    for entry in sections.iter() {
+        // Yの合うセクションだけを対象にする
+        if let NbtTag::Compound(section) = entry {
+            // Yが一致すれば、それが探しているセクション
+            if section.get_byte("Y").unwrap() == section_y {
+                return section.clone();
+            }
+        }
+    }
+
+    panic!("Y={section_y} のセクションが無い");
+}
+
+/// Level.SectionsのうちY位置の合うセクションを書き換える
+fn update_level_section(root: &mut NbtCompound, section_y: i8, update: impl Fn(&mut NbtCompound)) {
+    update_level(root, |level| {
+        let mut sections = NbtList::with_element_type(TagType::Compound);
+
+        // 対象のセクションだけを書き換え、ほかはそのまま並べ直す
+        for entry in level.get_list("Sections").unwrap().iter() {
+            let mut section = match entry {
+                NbtTag::Compound(section) => section.clone(),
+                _ => panic!("Sections の要素が compound でない"),
+            };
+
+            // Yの合うセクションだけを書き換える
+            if section.get_byte("Y").unwrap() == section_y {
+                update(&mut section);
+            }
+
+            sections.push(NbtTag::Compound(section)).unwrap();
+        }
+
+        level.set("Sections", NbtTag::List(sections));
+    });
+}
+
+/// 付随データの要素の座標を並べる
+fn positions(values: &NbtList) -> Vec<(i32, i32, i32)> {
+    let mut result = Vec::new();
+
+    // 要素ごとに絶対座標を取り出す
+    for entry in values.iter() {
+        // 座標を持つのはCompoundの要素だけ
+        if let NbtTag::Compound(compound) = entry {
+            result.push((
+                compound.get_int("x").unwrap(),
+                compound.get_int("y").unwrap(),
+                compound.get_int("z").unwrap(),
+            ));
+        }
+    }
+
+    result
+}
+
+#[test]
+fn data_version2586のチャンクを読み無変更で書き戻すと元と同じになる() {
+    let root = level_vector();
+    let before = chunk_bytes(&root);
+    let chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    assert_eq!(2586, chunk.data_version().unwrap());
+    assert_eq!(2, chunk.x().unwrap());
+    assert_eq!(-1, chunk.z().unwrap());
+    assert_eq!(0, chunk.min_section_y().unwrap());
+    assert_eq!("full", chunk.status().unwrap());
+    assert!(chunk.is_fully_generated());
+    assert_eq!(vec![-1, 0, 1], chunk.section_ys());
+
+    // ベクタの添字は (位置 * 7) % 5
+    let block = |x, y, z| chunk.get_block(x, y, z).unwrap().unwrap().to_string();
+    assert_eq!("minecraft:air", block(0, 0, 0));
+    assert_eq!("minecraft:dirt", block(1, 0, 0));
+    assert_eq!("minecraft:oak_stairs[facing=west,half=top]", block(2, 0, 0));
+    assert_eq!("minecraft:stone", block(3, 0, 0));
+    assert_eq!("minecraft:oak_stairs[facing=east,half=bottom]", block(4, 0, 0));
+    assert_eq!("minecraft:air", block(15, 31, 15));
+
+    // Paletteの無いセクションと、セクションの無い高さはブロックを持たない
+    assert!(!chunk.section(-1).unwrap().has_block_states());
+    assert!(chunk.get_block(0, -1, 0).unwrap().is_none());
+    assert!(chunk.get_block(0, 32, 0).unwrap().is_none());
+
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+}
+
+#[test]
+fn data_version2586のチャンクでブロックを置くとlevelの付随データが消える() {
+    let mut chunk = Chunk::from_nbt(level_vector(), &ChunkReadOptions::default()).unwrap();
+
+    // 絶対座標はx = 32 + 相対x、z = -16 + 相対z
+    chunk.set_block(0, 0, 0, "minecraft:stone").unwrap();
+    chunk.set_block(1, 0, 1, "minecraft:stone").unwrap();
+    chunk.set_block(2, 2, 2, "minecraft:oak_stairs[facing=north]").unwrap();
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    let level = written.get_compound("Level").unwrap();
+
+    assert_eq!(vec![(47, 20, -1)], positions(level.get_list("TileEntities").unwrap()));
+    assert!(level.get_list("TileTicks").unwrap().is_empty());
+    assert_eq!(vec![(40, 5, -10)], positions(level.get_list("LiquidTicks").unwrap()));
+
+    // ルートには付随データのキーを作らない
+    assert!(!written.contains_key("block_entities"));
+    assert!(!written.contains_key("TileEntities"));
+
+    // パレットの末尾にName / Propertiesの形式で足され、BlockStatesも書き直される
+    let section = level_section(&written, 0);
+    let palette = section.get_list("Palette").unwrap();
+    assert_eq!(
+        Some(&name_properties("minecraft:oak_stairs", &[("facing", "north")])),
+        palette.get(palette.len() - 1)
+    );
+    assert_eq!(256, section.get_long_array("BlockStates").unwrap().len());
+    assert_eq!(2586, written.get_int("DataVersion").unwrap());
+
+    // 読み直しても同じ状態が返る
+    let reread = Chunk::from_nbt(written, &ChunkReadOptions::default()).unwrap();
+    assert_eq!(
+        "minecraft:oak_stairs[facing=north]",
+        reread.get_block(2, 2, 2).unwrap().unwrap().to_string()
+    );
+    assert_eq!("minecraft:stone", reread.get_block(0, 0, 0).unwrap().unwrap().to_string());
+}
+
+#[test]
+fn data_version2586のチャンクのバイオームidを読み書きできる() {
+    let mut chunk = Chunk::from_nbt(level_vector(), &ChunkReadOptions::default()).unwrap();
+
+    assert_eq!(Some(level_biome(0)), chunk.get_biome_id(0, 0, 0).unwrap());
+    assert_eq!(
+        Some(level_biome(17 * 16 + 2 * 4 + 1)),
+        chunk.get_biome_id(5, 70, 9).unwrap()
+    );
+    assert_eq!(Some(level_biome(1023)), chunk.get_biome_id(15, 255, 15).unwrap());
+
+    // 高さ0..255の外は値を持たない
+    assert_eq!(None, chunk.get_biome_id(0, -1, 0).unwrap());
+    assert_eq!(None, chunk.get_biome_id(0, 256, 0).unwrap());
+
+    chunk.set_biome_id(5, 70, 9, 42).unwrap();
+    assert!(chunk.is_modified());
+    assert_eq!(Some(42), chunk.get_biome_id(4, 68, 8).unwrap());
+
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    let biomes = written.get_compound("Level").unwrap().get_int_array("Biomes").unwrap();
+    assert_eq!(42, biomes[17 * 16 + 2 * 4 + 1]);
+}
+
+#[test]
+fn 高さ0から255の外へバイオームidを書くとinvalid_argument() {
+    // 下端と上端の外を両方確かめる
+    for y in [-1, 256] {
+        let mut chunk = Chunk::from_nbt(level_vector(), &ChunkReadOptions::default()).unwrap();
+        assert_code(ErrorCode::InvalidArgument, chunk.set_biome_id(0, y, 0, 1).unwrap_err());
+    }
+}
+
+#[test]
+fn biomesを読めないチャンクのバイオームidはnoneで書き込めない() {
+    let cases = [
+        None,
+        Some(NbtTag::IntArray(vec![])),
+        Some(NbtTag::IntArray(vec![1; 256])),
+        Some(NbtTag::ByteArray(vec![1; 256])),
+    ];
+
+    // Biomesを持たない形と、読めない形のそれぞれで確かめる
+    for biomes in cases {
+        let mut root = level_vector();
+        update_level(&mut root, |level| {
+            level.remove("Biomes");
+
+            // Noneなら Biomes を持たないチャンクにする
+            if let Some(tag) = biomes {
+                level.set("Biomes", tag);
+            }
+        });
+
+        let before = chunk_bytes(&root);
+        let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+        assert_eq!(None, chunk.get_biome_id(0, 0, 0).unwrap());
+        assert_code(ErrorCode::InvalidArgument, chunk.set_biome_id(0, 0, 0, 1).unwrap_err());
+
+        // 元のNBTはそのまま残る
+        assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+    }
+}
+
+#[test]
+fn data_version2586のチャンクではバイオーム名のapiはunsupported_feature() {
+    let mut chunk = Chunk::from_nbt(level_vector(), &ChunkReadOptions::default()).unwrap();
+
+    // セクションの無い高さでも、形式で決まるので同じエラーになる
+    assert_code(ErrorCode::UnsupportedFeature, chunk.get_biome(0, 0, 0).unwrap_err());
+    assert_code(ErrorCode::UnsupportedFeature, chunk.get_biome(0, 200, 0).unwrap_err());
+    assert_code(
+        ErrorCode::UnsupportedFeature,
+        chunk.set_biome(0, 0, 0, "minecraft:plains").unwrap_err(),
+    );
+}
+
+#[test]
+fn バイオームidのapiは1_18以降のチャンクではunsupported_feature() {
+    // 26.3の形式と26.2の形式の両方で確かめる
+    for name in ["palette_1", "v4903_edit"] {
+        let mut chunk = load_chunk(name);
+        assert_code(ErrorCode::UnsupportedFeature, chunk.get_biome_id(0, 0, 0).unwrap_err());
+        assert_code(ErrorCode::UnsupportedFeature, chunk.set_biome_id(0, 0, 0, 1).unwrap_err());
+    }
+}
+
+#[test]
+fn data_version2586のチャンクの高さマップと光源を無効化できる() {
+    let mut chunk = Chunk::from_nbt(level_vector(), &ChunkReadOptions::default()).unwrap();
+    chunk.clear_heightmaps().unwrap();
+    chunk.invalidate_lighting().unwrap();
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    let level = written.get_compound("Level").unwrap();
+
+    assert!(level.opt_compound("Heightmaps").unwrap().is_none());
+    assert_eq!(0, level.get_byte("isLightOn").unwrap());
+
+    // ルートには作らない
+    assert!(!written.contains_key("isLightOn"));
+}
+
+#[test]
+fn is_light_onの無いdata_version2586のチャンクは光源を無効化できない() {
+    let mut root = level_vector();
+    update_level(&mut root, |level| {
+        level.remove("isLightOn");
+    });
+    let before = chunk_bytes(&root);
+    let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    assert_code(ErrorCode::UnsupportedFeature, chunk.invalidate_lighting().unwrap_err());
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+}
+
+#[test]
+fn 生成途中のdata_version2586のチャンクは生成済みではない() {
+    let mut root = level_vector();
+    update_level(&mut root, |level| level.set_string("Status", "structure_starts"));
+
+    assert!(!Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap().is_fully_generated());
+}
+
+#[test]
+fn paletteがありblock_statesの無いセクションはmalformed_data() {
+    let mut root = level_vector();
+    update_level_section(&mut root, 1, |section| {
+        section.remove("BlockStates");
+    });
+
+    assert_code(
+        ErrorCode::MalformedData,
+        Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap_err(),
+    );
+}
+
+#[test]
+fn paletteの要素がcompoundでなければunexpected_tag_type() {
+    let mut root = level_vector();
+    update_level_section(&mut root, 1, |section| {
+        let mut palette = NbtList::with_element_type(TagType::String);
+        palette.push(NbtTag::String(NbtString::new("minecraft:air"))).unwrap();
+        section.set("Palette", NbtTag::List(palette));
+    });
+
+    assert_code(
+        ErrorCode::UnexpectedTagType,
+        Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap_err(),
+    );
 }
 
 // ---------------------------------------------------------------------------

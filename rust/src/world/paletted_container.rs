@@ -165,7 +165,6 @@ impl PalettedContainer {
     /// 1.13から1.15までの詰め方や、dataが必ず書かれる形式を読むための入口
     ///
     /// `palette`は異種リストの包みを外したものを渡す
-    #[allow(dead_code)] // 読み込み側から使われるまでは、テストだけが呼ぶ
     pub(crate) fn from_parts(
         palette: Vec<NbtTag>,
         data: Option<Vec<i64>>,
@@ -182,6 +181,15 @@ impl PalettedContainer {
         let data = match data {
             Some(values) => values,
             None => {
+                // dataが必ず書かれる形式で無いなら、壊れたデータとして扱う
+                // 書き戻しで元に無いdataを作ってしまわないため
+                if always_has_data {
+                    return Err(Error::new(
+                        ErrorCode::MalformedData,
+                        "data が必ず書かれる形式なのに data が無い",
+                    ));
+                }
+
                 // パレットが1要素ならdataは無くてよい
                 if palette.len() != 1 {
                     return Err(Error::new(
@@ -234,7 +242,6 @@ impl PalettedContainer {
     /// パレットとdataに分けて返す
     /// パレットの要素は異種リストの包みを掛けないまま返す
     /// dataは、パレットが1要素なら（`always_has_data`でない限り）`None`
-    #[allow(dead_code)] // 書き込み側から使われるまでは、テストだけが呼ぶ
     pub(crate) fn to_parts(&self) -> Result<(Vec<NbtTag>, Option<Vec<i64>>)> {
         let entries = self.palette.clone();
 
@@ -462,7 +469,7 @@ mod tests {
         for spanning in [false, true] {
             let container = PalettedContainer::from_parts(
                 vec![block_entry("minecraft:air")],
-                None,
+                Some(vec![0; 256]),
                 4096,
                 4,
                 spanning,
@@ -473,7 +480,28 @@ mod tests {
 
             let (palette, data) = container.to_parts().unwrap();
             assert_eq!(1, palette.len());
-            assert_eq!(256, data.unwrap().len());
+            assert_eq!(Some(vec![0; 256]), data);
+        }
+    }
+
+    #[test]
+    fn dataが必ず書かれる形式でdataが無ければmalformed_data() {
+        // またがない詰め方とまたぐ詰め方の両方で弾く
+        for spanning in [false, true] {
+            let result = PalettedContainer::from_parts(
+                vec![block_entry("minecraft:air")],
+                None,
+                4096,
+                4,
+                spanning,
+                true,
+                false,
+            );
+
+            match result {
+                Err(error) => assert_eq!(ErrorCode::MalformedData, error.code()),
+                Ok(_) => panic!("dataが無いのに読めてしまった"),
+            }
         }
     }
 }

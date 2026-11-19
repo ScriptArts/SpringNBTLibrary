@@ -82,6 +82,15 @@ public sealed class Chunk
     /// <summary>セクション1つに入るバイオームのエントリ数（4×4×4単位）</summary>
     public const int BiomesPerSection = 64;
 
+    /// <summary>1.17までの形式で、チャンクの<c>Biomes</c>が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで）</summary>
+    private const int BiomeIds3DLength = 1024;
+
+    /// <summary>1.17までの形式で、バイオームIDを持つ最も高いY座標</summary>
+    private const int BiomeIdsMaxY = 255;
+
+    /// <summary>生成段階の名前空間</summary>
+    private const string MinecraftNamespace = "minecraft:";
+
     private readonly NbtCompound root;
     private readonly SortedDictionary<int, ChunkSection> sections =
         new SortedDictionary<int, ChunkSection>();
@@ -105,6 +114,7 @@ public sealed class Chunk
     /// </summary>
     /// <remarks>
     /// 読み込みのオプションで指定していればその値、指定が無ければ<see cref="DataVersion"/>
+    /// <see cref="DataVersion"/>が1519未満のチャンクでは、世代を選ばずに指定の値をそのまま返す
     /// </remarks>
     public int FormatDataVersion { get; private set; }
 
@@ -114,16 +124,48 @@ public sealed class Chunk
     /// <summary>絶対チャンクZ座標</summary>
     public int Z => Body().GetInt("zPos");
 
-    /// <summary>最下段セクションのY位置
-    /// オーバーワールドは-4</summary>
-    public int MinSectionY => root.GetInt("yPos");
+    /// <summary>
+    /// 最下段セクションのY位置
+    /// オーバーワールドは-4
+    /// 1.17までの形式では0
+    /// </summary>
+    public int MinSectionY
+    {
+        get
+        {
+            // 1.17までの形式はyPosを持たず、セクションは0段目から始まる
+            if (format is not null && !format.HasYPos)
+            {
+                return 0;
+            }
 
-    /// <summary>生成段階（<c>minecraft:full</c>など）</summary>
+            return root.GetInt("yPos");
+        }
+    }
+
+    /// <summary>
+    /// 生成段階（<c>minecraft:full</c>など）
+    /// 1.19までは名前空間の無い<c>full</c>などで入る
+    /// </summary>
     public string Status => Body().GetString("Status");
 
     /// <summary>生成が完了しているか
     /// ブロック改変の対象にしてよいのはこれだけ</summary>
-    public bool IsFullyGenerated => Status == "minecraft:full";
+    public bool IsFullyGenerated
+    {
+        get
+        {
+            string status = Status;
+
+            // 名前空間の有無はバージョンで違うので、外してから比べる
+            if (status.StartsWith(MinecraftNamespace, StringComparison.Ordinal))
+            {
+                status = status.Substring(MinecraftNamespace.Length);
+            }
+
+            return status == "full";
+        }
+    }
 
     /// <summary>
     /// このチャンクに変更が加わったか
@@ -236,7 +278,8 @@ public sealed class Chunk
                     $"sections の要素が compound でない: {entry.Type.AsString()}");
             }
 
-            ChunkSection section = ChunkSection.FromNbt(sectionTag, effective);
+            // セクションのブロックの持ち方は世代で違う
+            ChunkSection section = ChunkSection.FromNbtForFormat(sectionTag, effective, format);
             chunk.sections[section.Y] = section;
         }
 
@@ -355,6 +398,7 @@ public sealed class Chunk
     /// </exception>
     private ChunkFormat RequireFormat()
     {
+        // 世代を引けなかったチャンクは、ブロックなどの場所が分からない
         if (format is null)
         {
             throw new SpringNbtException(
@@ -365,6 +409,65 @@ public sealed class Chunk
         }
 
         return format;
+    }
+
+    /// <summary>
+    /// バイオームを名前で読み書きできる世代を返す
+    /// </summary>
+    /// <exception cref="SpringNbtException">
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）、
+    /// バイオームを数値のIDで持つ世代の場合（<see cref="ErrorCode.UnsupportedFeature"/>）
+    /// </exception>
+    private ChunkFormat RequireNamedBiomes()
+    {
+        ChunkFormat chunkFormat = RequireFormat();
+
+        // 1.17まではバイオームを数値のIDで持ち、名前では読み書きできない
+        if (chunkFormat.BiomeStorage != BiomeStorage.Paletted)
+        {
+            throw SpringNbtException.UnsupportedFeature(string.Create(
+                CultureInfo.InvariantCulture,
+                $"DataVersion {FormatDataVersion}のチャンクはバイオームを数値のIDで持つ。GetBiomeId / SetBiomeIdを使うこと"));
+        }
+
+        return chunkFormat;
+    }
+
+    /// <summary>
+    /// バイオームを数値のIDで読み書きできる世代を返す
+    /// </summary>
+    /// <exception cref="SpringNbtException">
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）、
+    /// バイオームを名前で持つ世代の場合（<see cref="ErrorCode.UnsupportedFeature"/>）
+    /// </exception>
+    private ChunkFormat RequireBiomeIds()
+    {
+        ChunkFormat chunkFormat = RequireFormat();
+
+        // 1.18以降はバイオームを名前で持ち、数値のIDでは読み書きできない
+        if (chunkFormat.BiomeStorage == BiomeStorage.Paletted)
+        {
+            throw SpringNbtException.UnsupportedFeature(string.Create(
+                CultureInfo.InvariantCulture,
+                $"DataVersion {FormatDataVersion}のチャンクはバイオームを名前で持つ。GetBiome / SetBiomeを使うこと"));
+        }
+
+        return chunkFormat;
+    }
+
+    /// <summary>
+    /// 本体の<c>Biomes</c>を返す
+    /// 無い、IntArrayでない、長さが合わない場合はnull
+    /// </summary>
+    private int[]? BiomeIds()
+    {
+        // 生成途中のチャンクなどは、Biomesを持たないか別の形で持つ
+        if (Body().Opt("Biomes") is not NbtIntArray biomes || biomes.Value.Length != BiomeIds3DLength)
+        {
+            return null;
+        }
+
+        return biomes.Value;
     }
 
     /// <summary>Y位置からセクションを得る
@@ -531,11 +634,12 @@ public sealed class Chunk
     /// <returns>バイオームID
     /// セクションが無い場合はnull</returns>
     /// <exception cref="SpringNbtException">
-    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）、
+    /// バイオームを数値のIDで持つ1.17までの形式の場合（<see cref="ErrorCode.UnsupportedFeature"/>）
     /// </exception>
     public string? GetBiome(int x, int y, int z)
     {
-        RequireFormat();
+        RequireNamedBiomes();
         CheckLocalCoordinates(x, z);
         ChunkSection? section = Section(y >> 4);
 
@@ -559,12 +663,13 @@ public sealed class Chunk
     /// 4×4×4の単位</summary>
     /// <exception cref="SpringNbtException">
     /// 対象のセクションが無い、またはバイオームを持たない場合（<see cref="ErrorCode.InvalidArgument"/>）、
-    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）、
+    /// バイオームを数値のIDで持つ1.17までの形式の場合（<see cref="ErrorCode.UnsupportedFeature"/>）
     /// </exception>
     public void SetBiome(int x, int y, int z, string biome)
     {
         ArgumentNullException.ThrowIfNull(biome);
-        RequireFormat();
+        RequireNamedBiomes();
         CheckLocalCoordinates(x, z);
 
         int sectionY = y >> 4;
@@ -578,6 +683,74 @@ public sealed class Chunk
         }
 
         section.Biomes!.Set(BiomeIndex(x, y, z), new NbtString(biome));
+        IsModified = true;
+    }
+
+    /// <summary>
+    /// 数値のバイオームIDを取得する（1.17までの形式）
+    /// 4×4×4の単位なので、座標は自動的に丸められる
+    /// </summary>
+    /// <remarks>
+    /// IDは名前に直さない
+    /// 1.16.2以降はデータパックで独自のバイオームを足せるので、固定の表では正しく引けないため
+    /// </remarks>
+    /// <param name="x">チャンク内相対X座標 (0..15)</param>
+    /// <param name="y">絶対Y座標</param>
+    /// <param name="z">チャンク内相対Z座標 (0..15)</param>
+    /// <returns>バイオームID
+    /// Yが0..255の外の場合と、<c>Biomes</c>が無いか形が違う場合はnull</returns>
+    /// <exception cref="SpringNbtException">
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）、
+    /// バイオームを名前で持つ1.18以降の形式の場合（<see cref="ErrorCode.UnsupportedFeature"/>）
+    /// </exception>
+    public int? GetBiomeId(int x, int y, int z)
+    {
+        RequireBiomeIds();
+        CheckLocalCoordinates(x, z);
+        int[]? biomes = BiomeIds();
+
+        // 高さの範囲外と、Biomesを読めないチャンクは値を持たない
+        if (biomes is null || y < 0 || y > BiomeIdsMaxY)
+        {
+            return null;
+        }
+
+        return biomes[BiomeIdIndex(x, y, z)];
+    }
+
+    /// <summary>
+    /// 数値のバイオームIDを設定する（1.17までの形式）
+    /// 4×4×4の単位
+    /// </summary>
+    /// <exception cref="SpringNbtException">
+    /// Yが0..255の外の場合、<c>Biomes</c>が無いか形が違う場合（<see cref="ErrorCode.InvalidArgument"/>）、
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）、
+    /// バイオームを名前で持つ1.18以降の形式の場合（<see cref="ErrorCode.UnsupportedFeature"/>）
+    /// </exception>
+    public void SetBiomeId(int x, int y, int z, int biomeId)
+    {
+        RequireBiomeIds();
+        CheckLocalCoordinates(x, z);
+
+        // 1.17までのバイオームIDは高さ0..255の分だけある
+        if (y < 0 || y > BiomeIdsMaxY)
+        {
+            throw SpringNbtException.InvalidArgument(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Y={y} はバイオームIDを持つ高さ（0..{BiomeIdsMaxY}）の外"));
+        }
+
+        int[]? biomes = BiomeIds();
+
+        // 読めないBiomesを作り直すと元のデータを失うので、書き込まない
+        if (biomes is null)
+        {
+            throw SpringNbtException.InvalidArgument(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Biomes が無いか、int[{BiomeIds3DLength}] でない"));
+        }
+
+        biomes[BiomeIdIndex(x, y, z)] = biomeId;
         IsModified = true;
     }
 
@@ -602,12 +775,23 @@ public sealed class Chunk
     /// <c>isLightOn</c>を0にし、光源の再計算を促す
     /// </summary>
     /// <exception cref="SpringNbtException">
-    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）
+    /// 元のNBTだけを持つチャンクの場合（<see cref="ErrorCode.UnsupportedDataVersion"/>）、
+    /// <c>isLightOn</c>の無い1.17までの形式のチャンクの場合（<see cref="ErrorCode.UnsupportedFeature"/>）
     /// </exception>
     public void InvalidateLighting()
     {
-        RequireFormat();
-        Body().SetByte("isLightOn", 0);
+        ChunkFormat chunkFormat = RequireFormat();
+        NbtCompound body = Body();
+
+        // 書き足さない世代では、isLightOnの無いチャンクは光源の印を持たない
+        if (!chunkFormat.AddsLightFlag && !body.ContainsKey("isLightOn"))
+        {
+            throw SpringNbtException.UnsupportedFeature(string.Create(
+                CultureInfo.InvariantCulture,
+                $"DataVersion {DataVersion}のチャンクは isLightOn を持たない"));
+        }
+
+        body.SetByte("isLightOn", 0);
         IsModified = true;
     }
 
@@ -630,6 +814,11 @@ public sealed class Chunk
     /// 1エントリが4×4×4ブロック</summary>
     public static int BiomeIndex(int x, int y, int z) =>
         (((y & 15) / 4) * 16) + (((z & 15) / 4) * 4) + ((x & 15) / 4);
+
+    /// <summary>1.17までの形式の<c>Biomes</c>の添字
+    /// 1エントリが4×4×4ブロック</summary>
+    private static int BiomeIdIndex(int x, int y, int z) =>
+        (((y >> 2) & 63) * 16) + ((z >> 2) * 4) + (x >> 2);
 
     private static void CheckLocalCoordinates(int x, int z)
     {

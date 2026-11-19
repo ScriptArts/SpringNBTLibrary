@@ -17,7 +17,7 @@ import {
 } from "./anvil/index.js";
 import { BlockState, Chunk, VersionMismatchAction } from "./world/index.js";
 import { TARGET_DATA_VERSION } from "./index.js";
-import { SpringNbtError } from "./errors.js";
+import { ErrorCode, SpringNbtError } from "./errors.js";
 import * as mutf8 from "./nbt/mutf8.js";
 import * as snbt from "./nbt/snbt.js";
 import {
@@ -319,6 +319,26 @@ function regionRewrite(source: RegionFile, outputPath: string): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * バイオームを数値のIDで持つチャンクか
+ *
+ * `getBiome`が`UNSUPPORTED_FEATURE`になれば、数値のIDで持つ1.17までの形式
+ */
+function usesBiomeIds(chunk: Chunk, y: number): boolean {
+  try {
+    chunk.getBiome(0, y, 0);
+  } catch (error) {
+    // ほかのエラーは検証の失敗としてそのまま伝える
+    if (!(error instanceof SpringNbtError) || error.code !== ErrorCode.UnsupportedFeature) {
+      throw error;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * チャンクの全ブロック・全バイオームを走査して集計する
  *
  * パレットとビットストレージを端から端まで通すので、
@@ -330,9 +350,17 @@ function chunkDescribe(chunk: Chunk): string {
   ];
   const blocks = new Map<string, number>();
   const biomes = new Map<string, number>();
+  const biomeIds = new Map<number, number>();
+  let numericBiomes = false;
+  const sectionYs = chunk.sectionYs;
+
+  // 最初に読む位置で、バイオームを名前とIDのどちらで持つかを決める
+  if (sectionYs.length > 0) {
+    numericBiomes = usesBiomeIds(chunk, sectionYs[0] * 16);
+  }
 
   // セクションごとにブロックとバイオームを数え上げる
-  for (const sectionY of chunk.sectionYs) {
+  for (const sectionY of sectionYs) {
     const section = chunk.section(sectionY)!;
     let blockPalette = 0;
     let biomePalette = 0;
@@ -373,6 +401,18 @@ function chunkDescribe(chunk: Chunk): string {
     for (let y = 0; y < 16; y += 4) {
       for (let z = 0; z < 16; z += 4) {
         for (let x = 0; x < 16; x += 4) {
+          // 数値のIDで持つチャンクは、IDごとに数える
+          if (numericBiomes) {
+            const biomeId = chunk.getBiomeId(x, sectionY * 16 + y, z);
+
+            if (biomeId === undefined) {
+              continue;
+            }
+
+            biomeIds.set(biomeId, countOf(biomeIds, biomeId) + 1);
+            continue;
+          }
+
           const biome = chunk.getBiome(x, sectionY * 16 + y, z);
 
           if (biome === undefined) {
@@ -393,6 +433,12 @@ function chunkDescribe(chunk: Chunk): string {
   // 名前の昇順で出すので、内部の並びに関係なく同じ出力になる
   for (const key of [...biomes.keys()].sort()) {
     lines.push(`biome ${key} ${biomes.get(key)}`);
+  }
+
+  // IDの数値の昇順で出す
+  // 既定のsortは文字列として比べるので、比べ方を渡す
+  for (const key of [...biomeIds.keys()].sort((left, right) => left - right)) {
+    lines.push(`biome-id ${key} ${biomeIds.get(key)}`);
   }
 
   return `${lines.join("\n")}\n`;
@@ -424,8 +470,14 @@ function chunkEdit(chunk: Chunk): void {
   chunk.setBlock(4, baseY + 2, 4, BlockState.parse("minecraft:edited_plain"));
 
   // バイオームも書き換える
-  chunk.setBiome(0, baseY, 0, "minecraft:desert");
-  chunk.setBiome(8, baseY + 8, 8, "minecraft:jungle");
+  // 数値のIDで持つチャンクは、名前の代わりにID（2は砂漠、21はジャングル）で書く
+  if (usesBiomeIds(chunk, baseY)) {
+    chunk.setBiomeId(0, baseY, 0, 2);
+    chunk.setBiomeId(8, baseY + 8, 8, 21);
+  } else {
+    chunk.setBiome(0, baseY, 0, "minecraft:desert");
+    chunk.setBiome(8, baseY + 8, 8, "minecraft:jungle");
+  }
 
   // 使われなくなったパレット要素を掃除する
   chunk.compact();
@@ -439,7 +491,7 @@ function chunkEdit(chunk: Chunk): void {
  * 集計表から現在の件数を取り出す
  * まだ無ければ0
  */
-function countOf(counts: Map<string, number>, key: string): number {
+function countOf<K>(counts: Map<K, number>, key: K): number {
   const current = counts.get(key);
 
   if (current === undefined) {

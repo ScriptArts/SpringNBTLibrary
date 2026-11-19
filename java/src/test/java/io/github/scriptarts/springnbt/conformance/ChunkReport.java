@@ -1,8 +1,12 @@
 package io.github.scriptarts.springnbt.conformance;
 
+import io.github.scriptarts.springnbt.ErrorCode;
+import io.github.scriptarts.springnbt.SpringNbtException;
 import io.github.scriptarts.springnbt.world.BlockState;
 import io.github.scriptarts.springnbt.world.Chunk;
 import io.github.scriptarts.springnbt.world.ChunkSection;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -14,6 +18,26 @@ final class ChunkReport {
 
     private ChunkReport() {
         // ユーティリティクラス
+    }
+
+    /**
+     * バイオームを数値のIDで持つチャンクか
+     *
+     * <p>{@link Chunk#getBiome}が{@code UNSUPPORTED_FEATURE}になれば、数値のIDで持つ1.17までの形式
+     */
+    static boolean usesBiomeIds(Chunk chunk, int y) {
+        try {
+            chunk.getBiome(0, y, 0);
+        } catch (SpringNbtException error) {
+            // ほかのエラーは検証の失敗としてそのまま伝える
+            if (error.code() != ErrorCode.UNSUPPORTED_FEATURE) {
+                throw error;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -29,8 +53,16 @@ final class ChunkReport {
 
         SortedMap<String, Integer> blocks = new TreeMap<>();
         SortedMap<String, Integer> biomes = new TreeMap<>();
+        SortedMap<Integer, Integer> biomeIds = new TreeMap<>();
+        boolean numericBiomes = false;
+        List<Integer> sectionYs = new ArrayList<>(chunk.sectionYs());
 
-        for (int sectionY : chunk.sectionYs()) {
+        // 最初に読む位置で、バイオームを名前とIDのどちらで持つかを決める
+        if (!sectionYs.isEmpty()) {
+            numericBiomes = usesBiomeIds(chunk, sectionYs.get(0) * 16);
+        }
+
+        for (int sectionY : sectionYs) {
             ChunkSection section = chunk.section(sectionY);
             int blockPalette = 0;
             int biomePalette = 0;
@@ -70,6 +102,18 @@ final class ChunkReport {
             for (int y = 0; y < 16; y += 4) {
                 for (int z = 0; z < 16; z += 4) {
                     for (int x = 0; x < 16; x += 4) {
+                        // 数値のIDで持つチャンクは、IDごとに数える
+                        if (numericBiomes) {
+                            Integer biomeId = chunk.getBiomeId(x, (sectionY * 16) + y, z);
+
+                            if (biomeId == null) {
+                                continue;
+                            }
+
+                            biomeIds.merge(biomeId, 1, Integer::sum);
+                            continue;
+                        }
+
                         String biome = chunk.getBiome(x, (sectionY * 16) + y, z);
 
                         if (biome == null) {
@@ -90,6 +134,12 @@ final class ChunkReport {
 
         for (Map.Entry<String, Integer> entry : biomes.entrySet()) {
             builder.append("biome ").append(entry.getKey()).append(' ')
+                    .append(entry.getValue()).append('\n');
+        }
+
+        // IDの数値の昇順で出す
+        for (Map.Entry<Integer, Integer> entry : biomeIds.entrySet()) {
+            builder.append("biome-id ").append(entry.getKey()).append(' ')
                     .append(entry.getValue()).append('\n');
         }
 
@@ -123,8 +173,14 @@ final class ChunkReport {
         chunk.setBlock(4, baseY + 2, 4, BlockState.parse("minecraft:edited_plain"));
 
         // バイオームも書き換える
-        chunk.setBiome(0, baseY, 0, "minecraft:desert");
-        chunk.setBiome(8, baseY + 8, 8, "minecraft:jungle");
+        // 数値のIDで持つチャンクは、名前の代わりにID（2は砂漠、21はジャングル）で書く
+        if (usesBiomeIds(chunk, baseY)) {
+            chunk.setBiomeId(0, baseY, 0, 2);
+            chunk.setBiomeId(8, baseY + 8, 8, 21);
+        } else {
+            chunk.setBiome(0, baseY, 0, "minecraft:desert");
+            chunk.setBiome(8, baseY + 8, 8, "minecraft:jungle");
+        }
 
         // 使われなくなったパレット要素を掃除する
         chunk.compact();

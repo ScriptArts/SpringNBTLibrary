@@ -12,8 +12,8 @@ from typing import Callable, Dict, List, Optional, Union
 
 from .. import MIN_SUPPORTED_DATA_VERSION, TARGET_DATA_VERSION
 from ..errors import ErrorCode, SpringNbtError
-from ..nbt import NbtByte, NbtCompound, NbtInt, NbtList, NbtString, TagType
-from ._chunk_format import OLDEST_FORMAT_DATA_VERSION, ChunkFormat
+from ..nbt import NbtCompound, NbtInt, NbtIntArray, NbtList, NbtString, TagType
+from ._chunk_format import OLDEST_FORMAT_DATA_VERSION, BiomeStorage, BlockStorage, ChunkFormat
 from .block_state import BlockState
 from .paletted_container import PalettedContainer
 
@@ -34,6 +34,15 @@ BLOCKS_PER_SECTION = 4096
 
 #: セクション1つに入るバイオームのエントリ数（4×4×4単位）
 BIOMES_PER_SECTION = 64
+
+#: 1.17までの形式で、チャンクの``Biomes``が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで）
+_BIOME_IDS_3D_LENGTH = 1024
+
+#: 1.17までの形式で、バイオームIDを持つ最も高いY座標
+_BIOME_IDS_MAX_Y = 255
+
+#: 生成段階の名前空間
+_MINECRAFT_NAMESPACE = "minecraft:"
 
 
 def _matches_position(entry: NbtCompound, x: int, y: int, z: int) -> bool:
@@ -110,13 +119,15 @@ class ChunkSection:
     書き戻しでそのまま出力される
     """
 
-    __slots__ = ("raw", "y", "block_states", "biomes")
+    __slots__ = ("raw", "y", "block_states", "biomes", "_block_storage")
 
     def __init__(self, raw: NbtCompound, y: int) -> None:
         self.raw = raw
         self.y = y
         self.block_states: Optional[PalettedContainer] = None
         self.biomes: Optional[PalettedContainer] = None
+        # 書き戻すときに読んだときと同じキーへ書くため、ブロックの持ち方を覚えておく
+        self._block_storage = BlockStorage.CONTAINER
 
     @property
     def has_block_states(self) -> bool:
@@ -130,7 +141,9 @@ class ChunkSection:
 
     @staticmethod
     def from_nbt(nbt: NbtCompound, options: ChunkReadOptions) -> "ChunkSection":
-        """NBTからセクションを読む"""
+        """NBTからセクションを読む
+        1.18以降の形式（``block_states`` / ``biomes``）として読む
+        """
         section = ChunkSection(nbt, nbt.get_byte("Y"))
         block_states = nbt.opt_compound("block_states")
 
@@ -148,10 +161,56 @@ class ChunkSection:
 
         return section
 
+    @staticmethod
+    def _from_nbt_for_format(nbt: NbtCompound, options: ChunkReadOptions,
+                             chunk_format: ChunkFormat) -> "ChunkSection":
+        """世代の持ち方に従ってNBTからセクションを読む（内部用）"""
+        # 1.18以降の形式は公開の読み込みと同じ
+        if chunk_format.block_storage == BlockStorage.CONTAINER:
+            return ChunkSection.from_nbt(nbt, options)
+
+        section = ChunkSection(nbt, nbt.get_byte("Y"))
+        section._block_storage = chunk_format.block_storage
+        palette = nbt.opt_list("Palette")
+
+        # Paletteの無いセクション（光源だけを持つものなど）はブロックを持たない
+        if palette is None:
+            return section
+
+        # 書き戻すときにCompoundのリストとして書くので、要素の型をここで確かめる
+        for entry in palette:
+            # Compound以外の要素は1.17までの形式に無い
+            if not isinstance(entry, NbtCompound):
+                raise SpringNbtError.unexpected_tag_type(
+                    "Palette の要素が compound でない: %s" % entry.type.as_string())
+
+        # BlockStatesはパレットが1要素でも必ず書かれる
+        section.block_states = PalettedContainer._from_parts(
+            list(palette), nbt.opt_long_array("BlockStates"), BLOCKS_PER_SECTION, 4,
+            chunk_format.spanning_bit_storage, True, options.lenient_bit_storage)
+        return section
+
     def to_nbt(self) -> NbtCompound:
         """NBTへ書き戻す
         解釈していないキーはそのまま残る
         """
+        # 1.17までの形式は、セクションの直下のPaletteとBlockStatesへ書き戻す
+        if self.block_states is not None \
+                and self._block_storage == BlockStorage.SECTION_PALETTE:
+            palette, data = self.block_states._to_parts()
+            palette_tag = NbtList(TagType.COMPOUND)
+
+            # 要素は読んだときのまま並べる
+            for entry in palette:
+                palette_tag.append(entry)
+
+            # 既存のキーへ書くので、キーの並びは読んだときのまま残る
+            self.raw.set_long_array("BlockStates", data)
+            self.raw.set("Palette", palette_tag)
+            return self.raw
+
+        # 解釈したコンテナだけを書き戻す
+        # 持たないキーは元のまま残す
         if self.block_states is not None:
             self.raw.set("block_states", self.block_states.to_nbt())
 
@@ -195,6 +254,7 @@ class Chunk:
         """チャンクの形式の世代を選ぶのに使ったDataVersion
 
         読み込みのオプションで指定していればその値、指定が無ければ:attr:`data_version`
+        :attr:`data_version`が1519未満のチャンクでは、世代を選ばずに指定の値をそのまま返す
         """
         return self._format_data_version
 
@@ -212,12 +272,21 @@ class Chunk:
     def min_section_y(self) -> int:
         """最下段セクションのY位置
         オーバーワールドは-4
+        1.17までの形式では0
         """
+        chunk_format = self._format
+
+        # 1.17までの形式はyPosを持たず、セクションは0段目から始まる
+        if chunk_format is not None and not chunk_format.has_y_pos:
+            return 0
+
         return self.raw.get_int("yPos")
 
     @property
     def status(self) -> str:
-        """生成段階（``minecraft:full``など）"""
+        """生成段階（``minecraft:full``など）
+        1.19までは名前空間の無い``full``などで入る
+        """
         return self._body().get_string("Status")
 
     @property
@@ -225,7 +294,13 @@ class Chunk:
         """生成が完了しているか
         ブロック改変の対象にしてよいのはこれだけ
         """
-        return self.status == "minecraft:full"
+        status = self.status
+
+        # 名前空間の有無はバージョンで違うので、外してから比べる
+        if status.startswith(_MINECRAFT_NAMESPACE):
+            status = status[len(_MINECRAFT_NAMESPACE):]
+
+        return status == "full"
 
     @property
     def is_modified(self) -> bool:
@@ -312,7 +387,8 @@ class Chunk:
                 raise SpringNbtError.unexpected_tag_type(
                     "sections の要素が compound でない: %s" % entry.type.as_string())
 
-            section = ChunkSection.from_nbt(entry, effective)
+            # セクションのブロックの持ち方は世代で違う
+            section = ChunkSection._from_nbt_for_format(entry, effective, chunk._format)
             chunk._sections[section.y] = section
 
         return chunk
@@ -390,6 +466,7 @@ class Chunk:
 
         :raises SpringNbtError: 世代を引けず、元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
         """
+        # 世代を引けなかったチャンクは、ブロックなどの場所が分からない
         if self._format is None:
             raise SpringNbtError(
                 ErrorCode.UNSUPPORTED_DATA_VERSION,
@@ -397,6 +474,50 @@ class Chunk:
                 % self.data_version)
 
         return self._format
+
+    def _require_named_biomes(self) -> ChunkFormat:
+        """バイオームを名前で読み書きできる世代を返す
+
+        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+            バイオームを数値のIDで持つ世代の場合（UNSUPPORTED_FEATURE）
+        """
+        chunk_format = self._require_format()
+
+        # 1.17まではバイオームを数値のIDで持ち、名前では読み書きできない
+        if chunk_format.biome_storage != BiomeStorage.PALETTED:
+            raise SpringNbtError.unsupported_feature(
+                "DataVersion %dのチャンクはバイオームを数値のIDで持つ。"
+                "get_biome_id / set_biome_idを使うこと" % self._format_data_version)
+
+        return chunk_format
+
+    def _require_biome_ids(self) -> ChunkFormat:
+        """バイオームを数値のIDで読み書きできる世代を返す
+
+        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+            バイオームを名前で持つ世代の場合（UNSUPPORTED_FEATURE）
+        """
+        chunk_format = self._require_format()
+
+        # 1.18以降はバイオームを名前で持ち、数値のIDでは読み書きできない
+        if chunk_format.biome_storage == BiomeStorage.PALETTED:
+            raise SpringNbtError.unsupported_feature(
+                "DataVersion %dのチャンクはバイオームを名前で持つ。"
+                "get_biome / set_biomeを使うこと" % self._format_data_version)
+
+        return chunk_format
+
+    def _biome_ids(self) -> Optional[NbtIntArray]:
+        """本体の``Biomes``を返す
+        無い、IntArrayでない、長さが合わない場合はNone
+        """
+        biomes = self._body().opt("Biomes")
+
+        # 生成途中のチャンクなどは、Biomesを持たないか別の形で持つ
+        if not isinstance(biomes, NbtIntArray) or len(biomes.value) != _BIOME_IDS_3D_LENGTH:
+            return None
+
+        return biomes
 
     def section(self, section_y: int) -> Optional[ChunkSection]:
         """Y位置からセクションを得る
@@ -496,9 +617,10 @@ class Chunk:
         """バイオームを取得する
         4×4×4の単位なので、座標は自動的に丸められる
 
-        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
+        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+            バイオームを数値のIDで持つ1.17までの形式の場合（UNSUPPORTED_FEATURE）
         """
-        self._require_format()
+        self._require_named_biomes()
         _check_local_coordinates(x, z)
         section = self.section(y >> 4)
 
@@ -518,9 +640,10 @@ class Chunk:
         4×4×4の単位
 
         :raises SpringNbtError: 対象のセクションが無い、またはバイオームを持たない場合、
-            元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
+            元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+            バイオームを数値のIDで持つ1.17までの形式の場合（UNSUPPORTED_FEATURE）
         """
-        self._require_format()
+        self._require_named_biomes()
         _check_local_coordinates(x, z)
         section_y = y >> 4
         section = self.section(section_y)
@@ -530,6 +653,58 @@ class Chunk:
                 "Y=%d を含むセクション（Y=%d）が無いか、バイオームを持たない" % (y, section_y))
 
         section.biomes.set(biome_index(x, y, z), NbtString(biome))
+        self._modified = True
+
+    def get_biome_id(self, x: int, y: int, z: int) -> Optional[int]:
+        """数値のバイオームIDを取得する（1.17までの形式）
+        4×4×4の単位なので、座標は自動的に丸められる
+
+        IDは名前に直さない
+        1.16.2以降はデータパックで独自のバイオームを足せるので、固定の表では正しく引けないため
+
+        :param x: チャンク内相対X座標 (0..15)
+        :param y: 絶対Y座標
+        :param z: チャンク内相対Z座標 (0..15)
+        :return: バイオームID
+        Yが0..255の外の場合と、``Biomes``が無いか形が違う場合はNone
+        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+            バイオームを名前で持つ1.18以降の形式の場合（UNSUPPORTED_FEATURE）
+        """
+        self._require_biome_ids()
+        _check_local_coordinates(x, z)
+        biomes = self._biome_ids()
+
+        # 高さの範囲外と、Biomesを読めないチャンクは値を持たない
+        if biomes is None or y < 0 or y > _BIOME_IDS_MAX_Y:
+            return None
+
+        return biomes.value[_biome_id_index(x, y, z)]
+
+    def set_biome_id(self, x: int, y: int, z: int, biome_id: int) -> None:
+        """数値のバイオームIDを設定する（1.17までの形式）
+        4×4×4の単位
+
+        :raises SpringNbtError: Yが0..255の外の場合、``Biomes``が無いか形が違う場合（INVALID_ARGUMENT）、
+            元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+            バイオームを名前で持つ1.18以降の形式の場合（UNSUPPORTED_FEATURE）
+        """
+        self._require_biome_ids()
+        _check_local_coordinates(x, z)
+
+        # 1.17までのバイオームIDは高さ0..255の分だけある
+        if y < 0 or y > _BIOME_IDS_MAX_Y:
+            raise SpringNbtError.invalid_argument(
+                "Y=%d はバイオームIDを持つ高さ（0..%d）の外" % (y, _BIOME_IDS_MAX_Y))
+
+        biomes = self._biome_ids()
+
+        # 読めないBiomesを作り直すと元のデータを失うので、書き込まない
+        if biomes is None:
+            raise SpringNbtError.invalid_argument(
+                "Biomes が無いか、int[%d] でない" % _BIOME_IDS_3D_LENGTH)
+
+        # 配列へ直接入れると範囲の検査を通らないので、intの範囲を先に確かめる
+        biomes.value[_biome_id_index(x, y, z)] = NbtInt(biome_id).value
         self._modified = True
 
     def clear_heightmaps(self) -> None:
@@ -547,10 +722,18 @@ class Chunk:
     def invalidate_lighting(self) -> None:
         """``isLightOn``を0にし、光源の再計算を促す
 
-        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
+        :raises SpringNbtError: 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+            ``isLightOn``の無い1.17までの形式のチャンクの場合（UNSUPPORTED_FEATURE）
         """
-        self._require_format()
-        self._body().set_byte("isLightOn", 0)
+        chunk_format = self._require_format()
+        body = self._body()
+
+        # 書き足さない世代では、isLightOnの無いチャンクは光源の印を持たない
+        if not chunk_format.adds_light_flag and "isLightOn" not in body:
+            raise SpringNbtError.unsupported_feature(
+                "DataVersion %dのチャンクは isLightOn を持たない" % self.data_version)
+
+        body.set_byte("isLightOn", 0)
         self._modified = True
 
     def compact(self) -> None:
@@ -572,6 +755,13 @@ def biome_index(x: int, y: int, z: int) -> int:
     1エントリが4×4×4ブロック
     """
     return (((y & 15) // 4) * 16) + (((z & 15) // 4) * 4) + ((x & 15) // 4)
+
+
+def _biome_id_index(x: int, y: int, z: int) -> int:
+    """1.17までの形式の``Biomes``の添字
+    1エントリが4×4×4ブロック
+    """
+    return (((y >> 2) & 63) * 16) + ((z >> 2) * 4) + (x >> 2)
 
 
 def _check_local_coordinates(x: int, z: int) -> None:

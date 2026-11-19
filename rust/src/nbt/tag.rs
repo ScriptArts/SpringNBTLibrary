@@ -680,6 +680,31 @@ impl NbtCompound {
     }
 }
 
+/// 可変参照の取得子
+///
+/// ライブラリの内部だけで使う
+/// チャンクの本体（`Level`）のように深い位置のタグを、複製せずにその場で書き換えるため
+impl NbtCompound {
+    /// キーに対応するタグへの可変参照を返す
+    /// 存在しなければ`None`
+    pub(crate) fn opt_mut(&mut self, key: &str) -> Option<&mut NbtTag> {
+        match self.index.get(key) {
+            Some(&position) => Some(&mut self.entries[position].1),
+            None => None,
+        }
+    }
+
+    /// TAG_Compoundへの可変参照を返す
+    /// キーが無ければエラー
+    pub(crate) fn get_compound_mut(&mut self, key: &str) -> Result<&mut NbtCompound> {
+        match self.opt_mut(key) {
+            Some(NbtTag::Compound(value)) => Ok(value),
+            Some(other) => Err(NbtCompound::wrong_type(key, other.tag_type(), "Compound")),
+            None => Err(NbtCompound::missing(key)),
+        }
+    }
+}
+
 impl NbtCompound {
     /// TAG_StringをUTF-8文字列として取得する
     /// キーが無ければ`None`

@@ -149,6 +149,12 @@ export class PalettedContainer {
     result.#palette.push(...palette);
 
     if (data === undefined) {
+      // dataが必ず書かれる形式で無いなら、壊れたデータとして扱う
+      // 書き戻しで元に無いdataを作ってしまわないため
+      if (alwaysHasData) {
+        throw SpringNbtError.malformed("data が必ず書かれる形式なのに data が無い");
+      }
+
       // パレットが1要素ならdataは無くてよい
       if (result.#palette.length !== 1) {
         throw SpringNbtError.malformed(

@@ -153,7 +153,8 @@ public final class PalettedContainer {
      * @param alwaysHasData     パレットが1要素でもdataを書く形式か
      * @param lenientBitStorage dataの長さが合わないとき、長さから逆算するか
      * @return コンテナ
-     * @throws SpringNbtException パレットが空、dataの長さが合わない、添字がパレット範囲外のいずれか
+     * @throws SpringNbtException パレットが空、dataの長さが合わない、添字がパレット範囲外、
+     *                            dataが必ず書かれる形式なのにdataが無い、のいずれか
      */
     static PalettedContainer fromParts(List<NbtTag> palette, long[] data, int entryCount, int minBits,
             boolean spanning, boolean alwaysHasData, boolean lenientBitStorage) {
@@ -167,6 +168,12 @@ public final class PalettedContainer {
         result.palette.addAll(palette);
 
         if (data == null) {
+            // dataが必ず書かれる形式で無いなら、壊れたデータとして扱う
+            // 書き戻しで元に無いdataを作ってしまわないため
+            if (alwaysHasData) {
+                throw SpringNbtException.malformed("data が必ず書かれる形式なのに data が無い");
+            }
+
             // パレットが1要素ならdataは無くてよい
             if (result.palette.size() != 1) {
                 throw SpringNbtException.malformed(

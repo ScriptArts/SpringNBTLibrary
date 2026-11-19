@@ -16,6 +16,20 @@ export const PALETTE_ID_FORMAT_DATA_VERSION = 5006;
 /** DataVersionを指定して読み書きできる最も古いDataVersion（1.13の正式版） */
 export const OLDEST_FORMAT_DATA_VERSION = 1519;
 
+/** セクションのブロックの持ち方 */
+export enum BlockStorage {
+  /**
+   * セクションの`block_states`にあるパレット付きコンテナ（`palette` / `data`）
+   * パレットが1要素なら`data`を持たない
+   */
+  Container = "container",
+  /**
+   * セクションの直下の`Palette`と`BlockStates`
+   * `BlockStates`はパレットが1要素でも必ずある
+   */
+  SectionPalette = "section_palette",
+}
+
 /** バイオームの持ち方 */
 export enum BiomeStorage {
   /** セクションごとのパレット付きコンテナ */
@@ -28,6 +42,9 @@ export enum BiomeStorage {
 
 /** ルートの直下に置かれる、ブロックに紐づく付随データのキー（1.18以降） */
 const ROOT_BLOCK_DATA_KEYS: readonly string[] = ["block_entities", "block_ticks", "fluid_ticks"];
+
+/** `Level`の中に置かれる、ブロックに紐づく付随データのキー（1.17まで） */
+const LEVEL_BLOCK_DATA_KEYS: readonly string[] = ["TileEntities", "TileTicks", "LiquidTicks"];
 
 /** チャンクの形式の世代1つ分 */
 export class ChunkFormat {
@@ -42,10 +59,22 @@ export class ChunkFormat {
     readonly paletteDataVersion: number,
     /** ビット詰めで値が64bitの境目をまたぐか */
     readonly spanningBitStorage: boolean,
+    /** セクションのブロックの持ち方 */
+    readonly blockStorage: BlockStorage,
     /** バイオームの持ち方 */
     readonly biomeStorage: BiomeStorage,
     /** ブロックを置き換えたときに取り除く付随データのキー */
     readonly blockDataKeys: readonly string[],
+    /**
+     * ルートに最下段セクションのY位置（`yPos`）があるか
+     * 無い世代では、セクションは0段目から始まる
+     */
+    readonly hasYPos: boolean,
+    /**
+     * `isLightOn`の無いチャンクで光源を無効化するとき、`isLightOn`を書き足すか
+     * 1.17までは生成途中のチャンクに`isLightOn`が無く、書き足すと元に無いキーが増えるので足さない
+     */
+    readonly addsLightFlag: boolean,
   ) {}
 
   /**
@@ -72,9 +101,35 @@ export class ChunkFormat {
  * 境界のDataVersionの昇順に並べる
  */
 const FORMATS: readonly ChunkFormat[] = [
+  // C3: 1.16〜1.17.x
+  // 本体はLevelの中で、ブロックはセクションの直下のPalette / BlockStates
+  // バイオームは4×4×4ブロックごとの数値のID
+  new ChunkFormat(
+    2529,
+    true,
+    "Sections",
+    2529,
+    false,
+    BlockStorage.SectionPalette,
+    BiomeStorage.Ids3D,
+    LEVEL_BLOCK_DATA_KEYS,
+    false,
+    false,
+  ),
   // C4: 1.18〜26.2
   // Levelが無くなり、パレットの要素はName / Properties
-  new ChunkFormat(2844, false, "sections", 2844, false, BiomeStorage.Paletted, ROOT_BLOCK_DATA_KEYS),
+  new ChunkFormat(
+    2844,
+    false,
+    "sections",
+    2844,
+    false,
+    BlockStorage.Container,
+    BiomeStorage.Paletted,
+    ROOT_BLOCK_DATA_KEYS,
+    true,
+    true,
+  ),
   // C5: 26.3以降
   // パレットの要素は文字列かid / properties
   new ChunkFormat(
@@ -83,7 +138,10 @@ const FORMATS: readonly ChunkFormat[] = [
     "sections",
     PALETTE_ID_FORMAT_DATA_VERSION,
     false,
+    BlockStorage.Container,
     BiomeStorage.Paletted,
     ROOT_BLOCK_DATA_KEYS,
+    true,
+    true,
   ),
 ];

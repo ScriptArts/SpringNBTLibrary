@@ -41,6 +41,9 @@ DATA_VERSION = 5023
 #: 26.2までの形式（パレットの要素がName / Properties）のベクタに入れるDataVersion。26.2の値
 OLD_PALETTE_DATA_VERSION = 4903
 
+#: 1.17までの形式（本体がLevelの中にある）のベクタに入れるDataVersion。1.16.5の値
+LEVEL_DATA_VERSION = 2586
+
 
 def mutf8_encode(text: str) -> bytes:
     """文字列をMUTF-8へ符号化する。
@@ -1040,6 +1043,71 @@ def make_chunk(x, z, sections, status="minecraft:full",
     return to_java_file("", t_compound(entries))
 
 
+def properties_name_entry(name, properties=None):
+    """ブロックのパレット要素。1.17までの実データの並びで作る。
+
+    プロパティがあれば`Properties` -> `Name`の順に置く（1.16 / 1.17の実データと同じ）。
+    """
+    entries = []
+
+    # プロパティがあるときだけ、Nameより前にPropertiesを置く
+    if properties is not None:
+        entries.append(
+            ("Properties", t_compound([(key, t_string(value)) for key, value in properties])))
+
+    entries.append(("Name", t_string(name)))
+    return t_compound(entries)
+
+
+def make_level_section(y, block_palette, block_indices):
+    """1.17までの形式のセクションを1つ組み立てる。
+
+    `Palette`と`BlockStates`をセクションの直下に置く。`BlockStates`はパレットが1要素でも書く。
+    キーは実データと同じく`BlockStates` -> `Palette` -> `Y`の順に置く。
+    """
+    bits = max(4, ceil_log2(len(block_palette)))
+    return t_compound([
+        ("BlockStates", t_long_array(pack_indices(block_indices, bits))),
+        ("Palette", t_list(TAG_COMPOUND, block_palette)),
+        ("Y", t_byte(y)),
+    ])
+
+
+def make_level_chunk(x, z, sections, biomes, tile_entities=None, tile_ticks=None,
+                     liquid_ticks=None, status="full", data_version=LEVEL_DATA_VERSION):
+    """1.17までの形式のチャンクを組み立てる。本体はLevelの中に置き、キーの並びは実データをなぞる。"""
+
+    def block_data_list(values):
+        # 空なら要素型Endの空リストになる（実データと同じ）
+        if values is None or len(values) == 0:
+            return t_list(TAG_END, [])
+
+        return t_list(TAG_COMPOUND, values)
+
+    level = t_compound([
+        ("Status", t_string(status)),
+        ("zPos", t_int(z)),
+        ("LastUpdate", t_long(449)),
+        ("Biomes", t_int_array(biomes)),
+        ("InhabitedTime", t_long(0)),
+        ("xPos", t_int(x)),
+        ("Heightmaps", t_compound([
+            ("WORLD_SURFACE", t_long_array([0] * 37)),
+        ])),
+        ("TileEntities", block_data_list(tile_entities)),
+        ("Entities", t_list(TAG_END, [])),
+        ("isLightOn", t_byte(1)),
+        ("TileTicks", block_data_list(tile_ticks)),
+        ("Sections", t_list(TAG_COMPOUND, sections)),
+        ("LiquidTicks", block_data_list(liquid_ticks)),
+    ])
+
+    return to_java_file("", t_compound([
+        ("Level", level),
+        ("DataVersion", t_int(data_version)),
+    ]))
+
+
 AIR = block_palette_entry("minecraft:air")
 STONE = block_palette_entry("minecraft:stone")
 PLAINS = t_string("minecraft:plains")
@@ -1196,6 +1264,42 @@ def build_world():
             ],
             data_version=OLD_PALETTE_DATA_VERSION),
         "26.2の形式のチャンク（DataVersion 4903）。chunk-editで置いたブロックもName / Propertiesで書き出される")
+
+    # 1.16.5の形式のチャンク。本体はLevelの中で、バイオームは数値のIDの配列。
+    # チャンク (2,-1) なので、絶対座標はx = 32 + 相対x、z = -16 + 相対z
+    level_palette5 = [
+        properties_name_entry("minecraft:air"),
+        properties_name_entry("minecraft:stone"),
+        properties_name_entry("minecraft:dirt"),
+        properties_name_entry("minecraft:oak_stairs", [("facing", "east"), ("half", "bottom")]),
+        properties_name_entry("minecraft:oak_stairs", [("facing", "west"), ("half", "top")]),
+    ]
+    add_vector(
+        "world/v2586_level", "world/v2586_level.nbt",
+        make_level_chunk(
+            2, -1,
+            [
+                # 光源だけを持つセクション
+                t_compound([("SkyLight", t_byte_array([0] * 2048)), ("Y", t_byte(-1))]),
+                make_level_section(0, level_palette5, indices5),
+                # パレット1要素でもBlockStatesを持つ
+                make_level_section(1, [properties_name_entry("minecraft:air")], [0] * 4096),
+            ],
+            [(index * 3) % 11 + 1 for index in range(1024)],
+            tile_entities=[
+                # chunk_editが置き換える座標にあるもの（消えるはず）
+                block_entity("minecraft:chest", 32, 0, -16),
+                # 触らない座標にあるもの（残るはず）
+                block_entity("minecraft:barrel", 47, 20, -1),
+            ],
+            tile_ticks=[
+                block_tick("minecraft:water", 33, 0, -15),
+            ],
+            liquid_ticks=[
+                block_tick("minecraft:lava", 34, 2, -14),
+                block_tick("minecraft:water", 40, 5, -10),
+            ]),
+        "1.16.5の形式のチャンク（DataVersion 2586）。本体はLevelの中で、バイオームは数値のID")
 
     # 異常系: 添字がパレットの範囲外
     broken = t_compound([

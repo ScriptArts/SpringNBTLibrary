@@ -6,6 +6,7 @@ import io.github.scriptarts.springnbt.SpringNbtException;
 import io.github.scriptarts.springnbt.nbt.NbtByte;
 import io.github.scriptarts.springnbt.nbt.NbtCompound;
 import io.github.scriptarts.springnbt.nbt.NbtInt;
+import io.github.scriptarts.springnbt.nbt.NbtIntArray;
 import io.github.scriptarts.springnbt.nbt.NbtList;
 import io.github.scriptarts.springnbt.nbt.NbtString;
 import io.github.scriptarts.springnbt.nbt.NbtTag;
@@ -31,6 +32,15 @@ public final class Chunk {
     /** セクション1つに入るバイオームのエントリ数（4×4×4単位） */
     public static final int BIOMES_PER_SECTION = 64;
 
+    /** 1.17までの形式で、チャンクの{@code Biomes}が持つ数値のバイオームIDの数（4×4×4単位で高さ256まで） */
+    private static final int BIOME_IDS_3D_LENGTH = 1024;
+
+    /** 1.17までの形式で、バイオームIDを持つ最も高いY座標 */
+    private static final int BIOME_IDS_MAX_Y = 255;
+
+    /** 生成段階の名前空間 */
+    private static final String MINECRAFT_NAMESPACE = "minecraft:";
+
     private final NbtCompound root;
     private boolean modified;
     private final SortedMap<Integer, ChunkSection> sections = new TreeMap<>();
@@ -40,6 +50,11 @@ public final class Chunk {
      * 引けなかったチャンクはnullのままで、元のNBTだけを持つ
      */
     private ChunkFormat format;
+
+    /**
+     * チャンクの形式の世代を選ぶのに使ったDataVersion
+     * 読み込みのオプションで指定していればその値、指定が無ければチャンク自身のDataVersion
+     */
     private int formatDataVersion;
 
     private Chunk(NbtCompound root) {
@@ -59,6 +74,7 @@ public final class Chunk {
      * チャンクの形式の世代を選ぶのに使ったDataVersion
      *
      * <p>読み込みのオプションで指定していればその値、指定が無ければ{@link #dataVersion()}
+     * {@link #dataVersion()}が1519未満のチャンクでは、世代を選ばずに指定の値をそのまま返す
      *
      * @return DataVersion
      */
@@ -87,15 +103,22 @@ public final class Chunk {
     /**
      * 最下段セクションのY位置
      * オーバーワールドは-4
+     * 1.17までの形式では0
      *
      * @return Y位置
      */
     public int minSectionY() {
+        // 1.17までの形式はyPosを持たず、セクションは0段目から始まる
+        if (format != null && !format.hasYPos()) {
+            return 0;
+        }
+
         return root.getInt("yPos");
     }
 
     /**
      * 生成段階（{@code minecraft:full}など）
+     * 1.19までは名前空間の無い{@code full}などで入る
      *
      * @return 生成段階
      */
@@ -110,7 +133,14 @@ public final class Chunk {
      * @return 完了していればtrue
      */
     public boolean isFullyGenerated() {
-        return "minecraft:full".equals(status());
+        String status = status();
+
+        // 名前空間の有無はバージョンで違うので、外してから比べる
+        if (status.startsWith(MINECRAFT_NAMESPACE)) {
+            status = status.substring(MINECRAFT_NAMESPACE.length());
+        }
+
+        return "full".equals(status);
     }
 
     /**
@@ -232,7 +262,8 @@ public final class Chunk {
                         "sections の要素が compound でない: " + entry.type().asString());
             }
 
-            ChunkSection section = ChunkSection.fromNbt(sectionTag, effective);
+            // セクションのブロックの持ち方は世代で違う
+            ChunkSection section = ChunkSection.fromNbtForFormat(sectionTag, effective, format);
             chunk.sections.put(section.y(), section);
         }
 
@@ -330,12 +361,63 @@ public final class Chunk {
      * @throws SpringNbtException 世代を引けず、元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
      */
     private ChunkFormat requireFormat() {
+        // 世代を引けなかったチャンクは、ブロックなどの場所が分からない
         if (format == null) {
             throw new SpringNbtException(ErrorCode.UNSUPPORTED_DATA_VERSION,
                     "DataVersion " + dataVersion() + "のチャンクは形式を解釈せず元のNBTだけを持つので、この操作はできない");
         }
 
         return format;
+    }
+
+    /**
+     * バイオームを名前で読み書きできる世代を返す
+     *
+     * @throws SpringNbtException 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+     * バイオームを数値のIDで持つ世代の場合（UNSUPPORTED_FEATURE）
+     */
+    private ChunkFormat requireNamedBiomes() {
+        ChunkFormat chunkFormat = requireFormat();
+
+        // 1.17まではバイオームを数値のIDで持ち、名前では読み書きできない
+        if (chunkFormat.biomeStorage() != ChunkFormat.BiomeStorage.PALETTED) {
+            throw SpringNbtException.unsupportedFeature("DataVersion " + formatDataVersion
+                    + "のチャンクはバイオームを数値のIDで持つ。getBiomeId / setBiomeIdを使うこと");
+        }
+
+        return chunkFormat;
+    }
+
+    /**
+     * バイオームを数値のIDで読み書きできる世代を返す
+     *
+     * @throws SpringNbtException 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+     * バイオームを名前で持つ世代の場合（UNSUPPORTED_FEATURE）
+     */
+    private ChunkFormat requireBiomeIds() {
+        ChunkFormat chunkFormat = requireFormat();
+
+        // 1.18以降はバイオームを名前で持ち、数値のIDでは読み書きできない
+        if (chunkFormat.biomeStorage() == ChunkFormat.BiomeStorage.PALETTED) {
+            throw SpringNbtException.unsupportedFeature("DataVersion " + formatDataVersion
+                    + "のチャンクはバイオームを名前で持つ。getBiome / setBiomeを使うこと");
+        }
+
+        return chunkFormat;
+    }
+
+    /**
+     * 本体の{@code Biomes}を返す
+     * 無い、IntArrayでない、長さが合わない場合はnull
+     */
+    private int[] biomeIds() {
+        // 生成途中のチャンクなどは、Biomesを持たないか別の形で持つ
+        if (!(body().opt("Biomes") instanceof NbtIntArray biomes)
+                || biomes.value().length != BIOME_IDS_3D_LENGTH) {
+            return null;
+        }
+
+        return biomes.value();
     }
 
     /**
@@ -486,10 +568,11 @@ public final class Chunk {
      * @param z チャンク内相対Z座標 (0..15)
      * @return バイオームID
      * セクションが無い場合はnull
-     * @throws SpringNbtException 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
+     * @throws SpringNbtException 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+     * バイオームを数値のIDで持つ1.17までの形式の場合（UNSUPPORTED_FEATURE）
      */
     public String getBiome(int x, int y, int z) {
-        requireFormat();
+        requireNamedBiomes();
         checkLocalCoordinates(x, z);
         ChunkSection section = section(y >> 4);
 
@@ -516,11 +599,12 @@ public final class Chunk {
      * @param z     チャンク内相対Z座標 (0..15)
      * @param biome バイオームID
      * @throws SpringNbtException 対象のセクションが無い、またはバイオームを持たない場合、
-     * 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
+     * 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+     * バイオームを数値のIDで持つ1.17までの形式の場合（UNSUPPORTED_FEATURE）
      */
     public void setBiome(int x, int y, int z, String biome) {
         Objects.requireNonNull(biome, "biome");
-        requireFormat();
+        requireNamedBiomes();
         checkLocalCoordinates(x, z);
 
         int sectionY = y >> 4;
@@ -532,6 +616,68 @@ public final class Chunk {
         }
 
         section.biomes().set(biomeIndex(x, y, z), new NbtString(biome));
+        modified = true;
+    }
+
+    /**
+     * 数値のバイオームIDを取得する（1.17までの形式）
+     * 4×4×4の単位なので、座標は自動的に丸められる
+     *
+     * <p>IDは名前に直さない
+     * 1.16.2以降はデータパックで独自のバイオームを足せるので、固定の表では正しく引けないため
+     *
+     * @param x チャンク内相対X座標 (0..15)
+     * @param y 絶対Y座標
+     * @param z チャンク内相対Z座標 (0..15)
+     * @return バイオームID
+     * Yが0..255の外の場合と、{@code Biomes}が無いか形が違う場合はnull
+     * @throws SpringNbtException 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+     * バイオームを名前で持つ1.18以降の形式の場合（UNSUPPORTED_FEATURE）
+     */
+    public Integer getBiomeId(int x, int y, int z) {
+        requireBiomeIds();
+        checkLocalCoordinates(x, z);
+        int[] biomes = biomeIds();
+
+        // 高さの範囲外と、Biomesを読めないチャンクは値を持たない
+        if (biomes == null || y < 0 || y > BIOME_IDS_MAX_Y) {
+            return null;
+        }
+
+        return biomes[biomeIdIndex(x, y, z)];
+    }
+
+    /**
+     * 数値のバイオームIDを設定する（1.17までの形式）
+     * 4×4×4の単位
+     *
+     * @param x       チャンク内相対X座標 (0..15)
+     * @param y       絶対Y座標
+     * @param z       チャンク内相対Z座標 (0..15)
+     * @param biomeId バイオームID
+     * @throws SpringNbtException Yが0..255の外の場合、{@code Biomes}が無いか形が違う場合（INVALID_ARGUMENT）、
+     * 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+     * バイオームを名前で持つ1.18以降の形式の場合（UNSUPPORTED_FEATURE）
+     */
+    public void setBiomeId(int x, int y, int z, int biomeId) {
+        requireBiomeIds();
+        checkLocalCoordinates(x, z);
+
+        // 1.17までのバイオームIDは高さ0..255の分だけある
+        if (y < 0 || y > BIOME_IDS_MAX_Y) {
+            throw SpringNbtException.invalidArgument(
+                    "Y=" + y + " はバイオームIDを持つ高さ（0.." + BIOME_IDS_MAX_Y + "）の外");
+        }
+
+        int[] biomes = biomeIds();
+
+        // 読めないBiomesを作り直すと元のデータを失うので、書き込まない
+        if (biomes == null) {
+            throw SpringNbtException.invalidArgument(
+                    "Biomes が無いか、int[" + BIOME_IDS_3D_LENGTH + "] でない");
+        }
+
+        biomes[biomeIdIndex(x, y, z)] = biomeId;
         modified = true;
     }
 
@@ -552,11 +698,20 @@ public final class Chunk {
     /**
      * {@code isLightOn}を0にし、光源の再計算を促す
      *
-     * @throws SpringNbtException 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）
+     * @throws SpringNbtException 元のNBTだけを持つチャンクの場合（UNSUPPORTED_DATA_VERSION）、
+     * {@code isLightOn}の無い1.17までの形式のチャンクの場合（UNSUPPORTED_FEATURE）
      */
     public void invalidateLighting() {
-        requireFormat();
-        body().setByte("isLightOn", (byte) 0);
+        ChunkFormat chunkFormat = requireFormat();
+        NbtCompound body = body();
+
+        // 書き足さない世代では、isLightOnの無いチャンクは光源の印を持たない
+        if (!chunkFormat.addsLightFlag() && !body.containsKey("isLightOn")) {
+            throw SpringNbtException.unsupportedFeature(
+                    "DataVersion " + dataVersion() + "のチャンクは isLightOn を持たない");
+        }
+
+        body.setByte("isLightOn", (byte) 0);
         modified = true;
     }
 
@@ -595,6 +750,14 @@ public final class Chunk {
      */
     public static int biomeIndex(int x, int y, int z) {
         return (((y & 15) / 4) * 16) + (((z & 15) / 4) * 4) + ((x & 15) / 4);
+    }
+
+    /**
+     * 1.17までの形式の{@code Biomes}の添字
+     * 1エントリが4×4×4ブロック
+     */
+    private static int biomeIdIndex(int x, int y, int z) {
+        return (((y >> 2) & 63) * 16) + ((z >> 2) * 4) + (x >> 2);
     }
 
     private static void checkLocalCoordinates(int x, int z) {
