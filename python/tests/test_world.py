@@ -151,6 +151,31 @@ def level_chunk(data_version: int) -> NbtCompound:
     return root
 
 
+def sections_in_order(sections: NbtList, order) -> NbtList:
+    """セクションの一覧を、指定したYの並びに並べ替えた新しいリストを作る"""
+    result = NbtList(TagType.COMPOUND)
+
+    # 指定の順に、Yの合うセクションを探して足す
+    for section_y in order:
+        # Yの合うセクションだけを足す
+        for section in sections:
+            if section.get_byte("Y") == section_y:
+                result.append(section)
+
+    return result
+
+
+def reorder_block_states(root: NbtCompound) -> None:
+    """最初のセクションのblock_statesを、palette、data、ほかのキーの順に並べ替える"""
+    section = root.get_list("sections")[0]
+    container = section.get_compound("block_states")
+    reordered = NbtCompound()
+    reordered.set("palette", container.get("palette"))
+    reordered.set("data", container.get("data"))
+    reordered.set_int("extra", 7)
+    section.set("block_states", reordered)
+
+
 def chunk_bytes(tag: NbtCompound) -> bytes:
     """チャンクのNBTを無圧縮のバイト列にする"""
     return write_bytes(NamedTag("", tag), NbtWriteOptions(compression=Compression.NONE))
@@ -690,6 +715,67 @@ class TestChunk:
 
         assert after == before
 
+    def test_読んだときのセクションの並びで書き戻す(self):
+        root = read_file(vector_path("multi_section")).tag
+        root.set("sections", sections_in_order(root.get_list("sections"), [-2, -4, -3]))
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+
+        # Yの昇順でない並びでも、無変更なら元とバイト単位で一致する
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+        # 1つのセクションを書き換えても並びは変わらない
+        chunk.set_block(0, -48, 0, "minecraft:stone")
+        written = chunk.to_nbt()
+
+        assert [section.get_byte("Y") for section in written.get_list("sections")] == [-2, -4, -3]
+        assert chunk.section_ys == [-4, -3, -2]
+
+    def test_paletteが先のコンテナはその並びのまま書き戻す(self):
+        root = read_file(vector_path("palette_17")).tag
+        reorder_block_states(root)
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+
+        # 無変更なら元とバイト単位で一致する
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+        # ビット幅の変わらない書き換えなら、キーの並びもほかのキーも保つ
+        chunk.set_block(0, -64, 0, "minecraft:edited")
+        container = chunk.to_nbt().get_list("sections")[0].get_compound("block_states")
+
+        assert list(container.keys()) == ["palette", "data", "extra"]
+        assert len(container.get_list("palette")) == 18
+
+    def test_dataが要らなくなれば消しまた要るときは読んだときの位置に戻す(self):
+        root = read_file(vector_path("palette_17")).tag
+        reorder_block_states(root)
+        chunk = Chunk.from_nbt(root)
+
+        # パレットが1要素になればdataだけを消し、ほかのキーの位置は保つ
+        chunk.section(-4).block_states.fill(NbtString("minecraft:stone"))
+        container = chunk.to_nbt().get_list("sections")[0].get_compound("block_states")
+        assert list(container.keys()) == ["palette", "extra"]
+
+        # 読んだときにあったdataは、読んだときの位置に戻す
+        chunk.set_block(0, -64, 0, "minecraft:edited")
+        container = chunk.to_nbt().get_list("sections")[0].get_compound("block_states")
+        assert list(container.keys()) == ["palette", "data", "extra"]
+
+    def test_読んだときに無かったdataはライブラリの並びで先に置く(self):
+        root = read_file(vector_path("palette_1")).tag
+        root.get_list("sections")[0].get_compound("block_states").set_int("extra", 7)
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+
+        # 無変更なら元とバイト単位で一致する
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+        # パレットが育ってdataが要るようになれば、dataを先に置きほかのキーを後ろに残す
+        chunk.set_block(0, -64, 0, "minecraft:edited")
+        container = chunk.to_nbt().get_list("sections")[0].get_compound("block_states")
+        assert list(container.keys()) == ["data", "palette", "extra"]
+
     def test_ブロックを置き換えると同じ座標の付随データが消える(self):
         chunk = load_chunk("block_entities")
         assert len(chunk.raw.get_list("block_entities")) == 3
@@ -1074,6 +1160,22 @@ def positions(values: NbtList) -> list:
 class TestLevelChunk:
     """1.16〜1.17の形式（本体がLevelの中）のチャンク
     """
+
+    def test_DataVersion2586のチャンクも読んだときのセクションの並びで書き戻す(self):
+        root = level_vector()
+        level = root.get_compound("Level")
+        level.set("Sections", sections_in_order(level.get_list("Sections"), [1, -1, 0]))
+        before = chunk_bytes(root)
+        chunk = Chunk.from_nbt(root)
+
+        # Yの昇順でない並びでも、無変更なら元とバイト単位で一致する
+        assert chunk_bytes(chunk.to_nbt()) == before
+
+        # 1つのセクションを書き換えても並びは変わらない
+        chunk.set_block(0, 16, 0, "minecraft:stone")
+        sections = chunk.to_nbt().get_compound("Level").get_list("Sections")
+
+        assert [section.get_byte("Y") for section in sections] == [1, -1, 0]
 
     def test_DataVersion2586のチャンクを読み無変更で書き戻すと元と同じになる(self):
         root = level_vector()

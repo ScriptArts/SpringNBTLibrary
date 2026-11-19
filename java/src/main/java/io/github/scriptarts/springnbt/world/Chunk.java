@@ -11,6 +11,7 @@ import io.github.scriptarts.springnbt.nbt.NbtList;
 import io.github.scriptarts.springnbt.nbt.NbtString;
 import io.github.scriptarts.springnbt.nbt.NbtTag;
 import io.github.scriptarts.springnbt.nbt.TagType;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -51,6 +52,12 @@ public final class Chunk {
     private final NbtCompound root;
     private boolean modified;
     private final SortedMap<Integer, ChunkSection> sections = new TreeMap<>();
+
+    /**
+     * セクションのYを読んだ順に並べたもの
+     * 書き戻しで読んだときと同じ並びにするため
+     */
+    private final List<Integer> readOrder = new ArrayList<>();
 
     /**
      * チャンクの形式の世代
@@ -325,6 +332,12 @@ public final class Chunk {
 
             // セクションのブロックの持ち方は世代で違う
             ChunkSection section = ChunkSection.fromNbtForFormat(sectionTag, effective, format);
+
+            // 書き戻しの並びのため、初めて出たYだけを読んだ順に覚える
+            if (!chunk.sections.containsKey(section.y())) {
+                chunk.readOrder.add(section.y());
+            }
+
             chunk.sections.put(section.y(), section);
         }
 
@@ -356,7 +369,7 @@ public final class Chunk {
 
     /**
      * NBTへ書き戻す
-     * 全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
+     * 全セクションを読んだときの世代の形式で、読んだときの並びのまま書き戻し、他のキーはそのまま残す
      *
      * @param options 書き込みオプション
      * nullなら既定値
@@ -393,9 +406,9 @@ public final class Chunk {
 
         NbtList sectionList = new NbtList(TagType.COMPOUND);
 
-        // Yの昇順で書き出す
-        for (ChunkSection section : sections.values()) {
-            sectionList.add(section.toNbt());
+        // 読んだときの並びで書き出す
+        for (int sectionY : readOrder) {
+            sectionList.add(sections.get(sectionY).toNbt());
         }
 
         body().set(format.sectionsKey(), sectionList);

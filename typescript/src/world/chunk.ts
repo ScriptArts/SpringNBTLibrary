@@ -51,6 +51,64 @@ const BIOME_IDS_MAX_Y = 255;
 const MINECRAFT_NAMESPACE = "minecraft:";
 
 /** 付随データの要素が、指定の絶対座標を指しているか */
+/**
+ * パレット付きコンテナを、読んだときのキーの並びを保ってセクションへ書き戻す
+ *
+ * 読んだときにあったキーはその並びで置き、要らなくなった`data`は落とす
+ * 読んだときに無かった`data`を足すときだけ、ライブラリの並び（`data`、`palette`の順）を先に置く
+ * どちらの場合も、読んだときにあったほかのキーは残す
+ * 並びは読んだときのキーで決めるので、何度書き戻しても同じ結果になる
+ */
+function writeContainer(
+  section: NbtCompound,
+  key: string,
+  written: NbtCompound,
+  readKeys: string[] | undefined,
+): void {
+  const current = section.optCompound(key);
+
+  // 読んだときにコンテナが無ければ、書き出した形をそのまま置く
+  if (current === undefined || readKeys === undefined) {
+    section.set(key, written);
+    return;
+  }
+
+  const order: string[] = [];
+  // 読んだときに無かったdataを足すときだけ、ライブラリの並びを先に置く
+  if (written.containsKey("data") && !readKeys.includes("data")) {
+    order.push(...written.keys());
+  }
+
+  // 読んだときの並びで、残すキーを後ろに続ける
+  for (const name of readKeys) {
+    // 先に並べたキーは二度入れない
+    if (order.includes(name)) {
+      continue;
+    }
+
+    // 要らなくなったdataは落とす
+    if (name === "data" && !written.containsKey("data")) {
+      continue;
+    }
+
+    order.push(name);
+  }
+
+  const result = new NbtCompound();
+
+  // 書き出した形にあるキーはその値で、ほかのキーは元の値で並べる
+  for (const name of order) {
+    // コンテナの中身は書き出した形の値にする
+    if (written.containsKey(name)) {
+      result.set(name, written.get(name));
+    } else {
+      result.set(name, current.get(name));
+    }
+  }
+
+  section.set(key, result);
+}
+
 function matchesPosition(entry: NbtCompound, x: number, y: number, z: number): boolean {
   const entryX = entry.optInt("x");
   const entryY = entry.optInt("y");
@@ -152,6 +210,11 @@ export class ChunkSection {
    * 書き戻すときに読んだときと同じキーへ書くため、覚えておく
    */
   #blockStorage = BlockStorage.Container;
+  /**
+   * パレット付きコンテナを読んだときのキーの並び
+   * 書き戻しで同じ並びにするため、コンテナのキーごとに覚えておく
+   */
+  readonly #containerKeys = new Map<string, string[]>();
 
   private constructor(
     readonly raw: NbtCompound,
@@ -200,10 +263,12 @@ export class ChunkSection {
         4,
         lenientBitStorage,
       );
+      section.#containerKeys.set("block_states", [...blockStates.keys()]);
     }
 
     const biomes = nbt.optCompound("biomes");
 
+    // 光源だけを持つセクションにはバイオームが無い
     if (biomes !== undefined) {
       section.#biomes = PalettedContainer.fromNbt(
         biomes,
@@ -211,6 +276,7 @@ export class ChunkSection {
         1,
         lenientBitStorage,
       );
+      section.#containerKeys.set("biomes", [...biomes.keys()]);
     }
 
     return section;
@@ -286,12 +352,21 @@ export class ChunkSection {
       return this.raw;
     }
 
+    // 解釈したコンテナだけを書き戻す
+    // 持たないキーは元のまま残す
     if (this.#blockStates !== undefined) {
-      this.raw.set("block_states", this.#blockStates.toNbt());
+      writeContainer(
+        this.raw,
+        "block_states",
+        this.#blockStates.toNbt(),
+        this.#containerKeys.get("block_states"),
+      );
     }
 
+    // 解釈したコンテナだけを書き戻す
+    // 持たないキーは元のまま残す
     if (this.#biomes !== undefined) {
-      this.raw.set("biomes", this.#biomes.toNbt());
+      writeContainer(this.raw, "biomes", this.#biomes.toNbt(), this.#containerKeys.get("biomes"));
     }
 
     return this.raw;
@@ -317,6 +392,7 @@ export class ChunkSection {
  * 未知のキーを落とさないので、将来の追加要素があってもデータをおかしくしない
  */
 export class Chunk {
+  // 書き戻しで読んだときと同じ並びにするため、Yを読んだ順に持つ
   readonly #sections = new Map<number, ChunkSection>();
   #modified = false;
 
@@ -581,7 +657,7 @@ export class Chunk {
 
   /**
    * NBTへ書き戻す
-   * 全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
+   * 全セクションを読んだときの世代の形式で、読んだときの並びのまま書き戻し、他のキーはそのまま残す
    */
   toNbt(options?: ChunkWriteOptions): NbtCompound {
     const version = this.#ownDataVersion();
@@ -612,9 +688,9 @@ export class Chunk {
 
     const sectionList = new NbtList(TagType.Compound);
 
-    // Yの昇順で書き出す
-    for (const sectionY of this.sectionYs) {
-      sectionList.add(this.#sections.get(sectionY)!.toNbt());
+    // 読んだときの並びで書き出す
+    for (const section of this.#sections.values()) {
+      sectionList.add(section.toNbt());
     }
 
     this.#body().set(this.#format.sectionsKey, sectionList);

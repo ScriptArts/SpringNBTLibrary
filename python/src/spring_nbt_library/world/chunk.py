@@ -57,6 +57,52 @@ _BIOME_IDS_MAX_Y = 255
 _MINECRAFT_NAMESPACE = "minecraft:"
 
 
+def _write_container(section: NbtCompound, key: str, written: NbtCompound,
+                     read_keys: Optional[List[str]]) -> None:
+    """パレット付きコンテナを、読んだときのキーの並びを保ってセクションへ書き戻す
+
+    読んだときにあったキーはその並びで置き、要らなくなった``data``は落とす
+    読んだときに無かった``data``を足すときだけ、ライブラリの並び（``data``、``palette``の順）を先に置く
+    どちらの場合も、読んだときにあったほかのキーは残す
+    並びは読んだときのキーで決めるので、何度書き戻しても同じ結果になる
+    """
+    current = section.opt_compound(key)
+
+    # 読んだときにコンテナが無ければ、書き出した形をそのまま置く
+    if current is None or read_keys is None:
+        section.set(key, written)
+        return
+
+    order: List[str] = []
+    # 読んだときに無かったdataを足すときだけ、ライブラリの並びを先に置く
+    if "data" in written and "data" not in read_keys:
+        order.extend(written.keys())
+
+    # 読んだときの並びで、残すキーを後ろに続ける
+    for name in read_keys:
+        # 先に並べたキーは二度入れない
+        if name in order:
+            continue
+
+        # 要らなくなったdataは落とす
+        if name == "data" and "data" not in written:
+            continue
+
+        order.append(name)
+
+    result = NbtCompound()
+
+    # 書き出した形にあるキーはその値で、ほかのキーは元の値で並べる
+    for name in order:
+        # コンテナの中身は書き出した形の値にする
+        if name in written:
+            result.set(name, written.get(name))
+        else:
+            result.set(name, current.get(name))
+
+    section.set(key, result)
+
+
 def _matches_position(entry: NbtCompound, x: int, y: int, z: int) -> bool:
     """付随データの要素が、指定の絶対座標を指しているか"""
     entry_x = entry.opt_int("x")
@@ -156,7 +202,7 @@ class ChunkSection:
     書き戻しでそのまま出力される
     """
 
-    __slots__ = ("raw", "y", "block_states", "biomes", "_block_storage")
+    __slots__ = ("raw", "y", "block_states", "biomes", "_block_storage", "_container_keys")
 
     def __init__(self, raw: NbtCompound, y: int) -> None:
         self.raw = raw
@@ -165,6 +211,9 @@ class ChunkSection:
         self.biomes: Optional[PalettedContainer] = None
         # 書き戻すときに読んだときと同じキーへ書くため、ブロックの持ち方を覚えておく
         self._block_storage = BlockStorage.CONTAINER
+        # パレット付きコンテナを読んだときのキーの並び
+        # 書き戻しで同じ並びにするため、コンテナのキーごとに覚えておく
+        self._container_keys: Dict[str, List[str]] = {}
 
     @property
     def has_block_states(self) -> bool:
@@ -188,6 +237,7 @@ class ChunkSection:
         if block_states is not None:
             section.block_states = PalettedContainer.from_nbt(
                 block_states, BLOCKS_PER_SECTION, 4, options.lenient_bit_storage)
+            section._container_keys["block_states"] = list(block_states.keys())
 
         biomes = nbt.opt_compound("biomes")
 
@@ -195,6 +245,7 @@ class ChunkSection:
         if biomes is not None:
             section.biomes = PalettedContainer.from_nbt(
                 biomes, BIOMES_PER_SECTION, 1, options.lenient_bit_storage)
+            section._container_keys["biomes"] = list(biomes.keys())
 
         return section
 
@@ -251,12 +302,14 @@ class ChunkSection:
         # 解釈したコンテナだけを書き戻す
         # 持たないキーは元のまま残す
         if self.block_states is not None:
-            self.raw.set("block_states", self.block_states.to_nbt())
+            _write_container(self.raw, "block_states", self.block_states.to_nbt(),
+                             self._container_keys.get("block_states"))
 
         # 解釈したコンテナだけを書き戻す
         # 持たないキーは元のまま残す
         if self.biomes is not None:
-            self.raw.set("biomes", self.biomes.to_nbt())
+            _write_container(self.raw, "biomes", self.biomes.to_nbt(),
+                             self._container_keys.get("biomes"))
 
         return self.raw
 
@@ -277,6 +330,7 @@ class Chunk:
 
     def __init__(self, raw: NbtCompound) -> None:
         self.raw = raw
+        # 書き戻しで読んだときと同じ並びにするため、Yを読んだ順に持つ
         self._sections: Dict[int, ChunkSection] = {}
         self._modified = False
         # 世代を引けなかったチャンクはNoneのままで、元のNBTだけを持つ
@@ -483,7 +537,7 @@ class Chunk:
 
     def to_nbt(self, options: Optional[ChunkWriteOptions] = None) -> NbtCompound:
         """NBTへ書き戻す
-        全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
+        全セクションを読んだときの世代の形式で、読んだときの並びのまま書き戻し、他のキーはそのまま残す
 
         :raises SpringNbtError: DataVersionが扱える形式より古く、かつ書き戻しが許可されていない場合
         """
@@ -512,9 +566,9 @@ class Chunk:
 
         section_list = NbtList(TagType.COMPOUND)
 
-        # Yの昇順で書き出す
-        for section_y in self.section_ys:
-            section_list.append(self._sections[section_y].to_nbt())
+        # 読んだときの並びで書き出す
+        for section in self._sections.values():
+            section_list.append(section.to_nbt())
 
         self._body().set(self._format.sections_key, section_list)
         return self.raw

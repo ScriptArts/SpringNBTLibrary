@@ -134,6 +134,61 @@ public class WorldTests
         return root;
     }
 
+    /// <summary>セクションの一覧を、指定したYの並びに並べ替えた新しいリストを作る</summary>
+    private static NbtList SectionsInOrder(NbtList sections, params int[] order)
+    {
+        NbtList result = new NbtList(TagType.Compound);
+
+        // 指定の順に、Yの合うセクションを探して足す
+        foreach (int sectionY in order)
+        {
+            // Yの合うセクションだけを足す
+            foreach (NbtTag entry in sections)
+            {
+                NbtCompound section = (NbtCompound)entry;
+
+                if (section.GetByte("Y") == sectionY)
+                {
+                    result.Add(section);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>書き出したセクションの一覧のYを並べる</summary>
+    private static List<int> SectionYOrder(NbtList sections)
+    {
+        List<int> result = new List<int>();
+
+        // 一覧の並びのままYを取り出す
+        foreach (NbtTag entry in sections)
+        {
+            result.Add(((NbtCompound)entry).GetByte("Y"));
+        }
+
+        return result;
+    }
+
+    /// <summary>最初のセクションのblock_statesを、palette、data、ほかのキーの順に並べ替える</summary>
+    private static void ReorderBlockStates(NbtCompound root)
+    {
+        NbtCompound section = (NbtCompound)root.GetList("sections")[0];
+        NbtCompound container = section.GetCompound("block_states");
+        NbtCompound reordered = new NbtCompound();
+        reordered.Set("palette", container.Get("palette"));
+        reordered.Set("data", container.Get("data"));
+        reordered.SetInt("extra", 7);
+        section.Set("block_states", reordered);
+    }
+
+    /// <summary>書き出したチャンクの最初のセクションのblock_states</summary>
+    private static NbtCompound FirstBlockStates(NbtCompound written)
+    {
+        return ((NbtCompound)written.GetList("sections")[0]).GetCompound("block_states");
+    }
+
     /// <summary>チャンクのNBTを無圧縮のバイト列にする</summary>
     private static byte[] ChunkBytes(NbtCompound tag)
     {
@@ -888,6 +943,83 @@ public class WorldTests
         }
 
         [Fact]
+        public void 読んだときのセクションの並びで書き戻す()
+        {
+            NbtCompound root = (NbtCompound)NbtIo.ReadFile(VectorPath("multi_section")).Tag;
+            root.Set("sections", SectionsInOrder(root.GetList("sections"), -2, -4, -3));
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+
+            // Yの昇順でない並びでも、無変更なら元とバイト単位で一致する
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+
+            // 1つのセクションを書き換えても並びは変わらない
+            chunk.SetBlock(0, -48, 0, "minecraft:stone");
+            NbtCompound written = chunk.ToNbt();
+
+            Assert.Equal(new List<int> { -2, -4, -3 }, SectionYOrder(written.GetList("sections")));
+            Assert.Equal(new List<int> { -4, -3, -2 }, chunk.SectionYs.ToList());
+        }
+
+        [Fact]
+        public void paletteが先のコンテナはその並びのまま書き戻す()
+        {
+            NbtCompound root = (NbtCompound)NbtIo.ReadFile(VectorPath("palette_17")).Tag;
+            ReorderBlockStates(root);
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+
+            // 無変更なら元とバイト単位で一致する
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+
+            // ビット幅の変わらない書き換えなら、キーの並びもほかのキーも保つ
+            chunk.SetBlock(0, -64, 0, "minecraft:edited");
+            NbtCompound container = FirstBlockStates(chunk.ToNbt());
+
+            Assert.Equal(new List<string> { "palette", "data", "extra" }, container.Keys.ToList());
+            Assert.Equal(18, container.GetList("palette").Count);
+        }
+
+        [Fact]
+        public void dataが要らなくなれば消しまた要るときは読んだときの位置に戻す()
+        {
+            NbtCompound root = (NbtCompound)NbtIo.ReadFile(VectorPath("palette_17")).Tag;
+            ReorderBlockStates(root);
+            Chunk chunk = Chunk.FromNbt(root);
+            ChunkSection? section = chunk.Section(-4);
+            Assert.NotNull(section);
+            PalettedContainer? blockStates = section.BlockStates;
+            Assert.NotNull(blockStates);
+
+            // パレットが1要素になればdataだけを消し、ほかのキーの位置は保つ
+            blockStates.Fill(new NbtString("minecraft:stone"));
+            NbtCompound container = FirstBlockStates(chunk.ToNbt());
+            Assert.Equal(new List<string> { "palette", "extra" }, container.Keys.ToList());
+
+            // 読んだときにあったdataは、読んだときの位置に戻す
+            chunk.SetBlock(0, -64, 0, "minecraft:edited");
+            container = FirstBlockStates(chunk.ToNbt());
+            Assert.Equal(new List<string> { "palette", "data", "extra" }, container.Keys.ToList());
+        }
+
+        [Fact]
+        public void 読んだときに無かったdataはライブラリの並びで先に置く()
+        {
+            NbtCompound root = (NbtCompound)NbtIo.ReadFile(VectorPath("palette_1")).Tag;
+            ((NbtCompound)root.GetList("sections")[0]).GetCompound("block_states").SetInt("extra", 7);
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+
+            // 無変更なら元とバイト単位で一致する
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+
+            // パレットが育ってdataが要るようになれば、dataを先に置きほかのキーを後ろに残す
+            chunk.SetBlock(0, -64, 0, "minecraft:edited");
+            NbtCompound container = FirstBlockStates(chunk.ToNbt());
+            Assert.Equal(new List<string> { "data", "palette", "extra" }, container.Keys.ToList());
+        }
+
+        [Fact]
         public void ブロックを置き換えると同じ座標の付随データが消える()
         {
             Chunk chunk = LoadChunk("block_entities");
@@ -1393,6 +1525,25 @@ public class WorldTests
 
     public class LevelChunkTests
     {
+        [Fact]
+        public void DataVersion2586のチャンクも読んだときのセクションの並びで書き戻す()
+        {
+            NbtCompound root = LevelVector();
+            NbtCompound level = root.GetCompound("Level");
+            level.Set("Sections", SectionsInOrder(level.GetList("Sections"), 1, -1, 0));
+            byte[] before = ChunkBytes(root);
+            Chunk chunk = Chunk.FromNbt(root);
+
+            // Yの昇順でない並びでも、無変更なら元とバイト単位で一致する
+            Assert.Equal(before, ChunkBytes(chunk.ToNbt()));
+
+            // 1つのセクションを書き換えても並びは変わらない
+            chunk.SetBlock(0, 16, 0, "minecraft:stone");
+            NbtList sections = chunk.ToNbt().GetCompound("Level").GetList("Sections");
+
+            Assert.Equal(new List<int> { 1, -1, 0 }, SectionYOrder(sections));
+        }
+
         [Fact]
         public void DataVersion2586のチャンクを読み無変更で書き戻すと元と同じになる()
         {

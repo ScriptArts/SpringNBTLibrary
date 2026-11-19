@@ -163,6 +163,53 @@ class WorldTest {
         return root;
     }
 
+    /** セクションの一覧を、指定したYの並びに並べ替えた新しいリストを作る */
+    private static NbtList sectionsInOrder(NbtList sections, int... order) {
+        NbtList result = new NbtList(TagType.COMPOUND);
+
+        // 指定の順に、Yの合うセクションを探して足す
+        for (int sectionY : order) {
+            // Yの合うセクションだけを足す
+            for (NbtTag entry : sections) {
+                NbtCompound section = (NbtCompound) entry;
+
+                if (section.getByte("Y") == sectionY) {
+                    result.add(section);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /** 書き出したセクションの一覧のYを並べる */
+    private static List<Integer> sectionYOrder(NbtList sections) {
+        List<Integer> result = new ArrayList<>();
+
+        // 一覧の並びのままYを取り出す
+        for (NbtTag entry : sections) {
+            result.add((int) ((NbtCompound) entry).getByte("Y"));
+        }
+
+        return result;
+    }
+
+    /** 最初のセクションのblock_statesを、palette、data、ほかのキーの順に並べ替える */
+    private static void reorderBlockStates(NbtCompound root) {
+        NbtCompound section = (NbtCompound) root.getList("sections").get(0);
+        NbtCompound container = section.getCompound("block_states");
+        NbtCompound reordered = new NbtCompound();
+        reordered.set("palette", container.get("palette"));
+        reordered.set("data", container.get("data"));
+        reordered.setInt("extra", 7);
+        section.set("block_states", reordered);
+    }
+
+    /** 書き出したチャンクの最初のセクションのblock_states */
+    private static NbtCompound firstBlockStates(NbtCompound written) {
+        return ((NbtCompound) written.getList("sections").get(0)).getCompound("block_states");
+    }
+
     /** チャンクのNBTを無圧縮のバイト列にする */
     private static byte[] chunkBytes(NbtCompound tag) {
         return NbtIo.writeBytes(new NamedTag("", tag), new NbtWriteOptions().setCompression(Compression.NONE));
@@ -805,6 +852,75 @@ class WorldTest {
         }
 
         @Test
+        void 読んだときのセクションの並びで書き戻す() {
+            NbtCompound root = (NbtCompound) NbtIo.readFile(vectorPath("multi_section"), null).tag();
+            root.set("sections", sectionsInOrder(root.getList("sections"), -2, -4, -3));
+            byte[] before = chunkBytes(root);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+
+            // Yの昇順でない並びでも、無変更なら元とバイト単位で一致する
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(ChunkWriteOptions.defaults())));
+
+            // 1つのセクションを書き換えても並びは変わらない
+            chunk.setBlock(0, -48, 0, "minecraft:stone");
+            NbtCompound written = chunk.toNbt(ChunkWriteOptions.defaults());
+
+            assertEquals(List.of(-2, -4, -3), sectionYOrder(written.getList("sections")));
+            assertEquals(List.of(-4, -3, -2), new ArrayList<>(chunk.sectionYs()));
+        }
+
+        @Test
+        void paletteが先のコンテナはその並びのまま書き戻す() {
+            NbtCompound root = (NbtCompound) NbtIo.readFile(vectorPath("palette_17"), null).tag();
+            reorderBlockStates(root);
+            byte[] before = chunkBytes(root);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+
+            // 無変更なら元とバイト単位で一致する
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(ChunkWriteOptions.defaults())));
+
+            // ビット幅の変わらない書き換えなら、キーの並びもほかのキーも保つ
+            chunk.setBlock(0, -64, 0, "minecraft:edited");
+            NbtCompound container = firstBlockStates(chunk.toNbt(ChunkWriteOptions.defaults()));
+
+            assertEquals(List.of("palette", "data", "extra"), new ArrayList<>(container.keys()));
+            assertEquals(18, container.getList("palette").size());
+        }
+
+        @Test
+        void dataが要らなくなれば消しまた要るときは読んだときの位置に戻す() {
+            NbtCompound root = (NbtCompound) NbtIo.readFile(vectorPath("palette_17"), null).tag();
+            reorderBlockStates(root);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+
+            // パレットが1要素になればdataだけを消し、ほかのキーの位置は保つ
+            chunk.section(-4).blockStates().fill(new NbtString("minecraft:stone"));
+            NbtCompound container = firstBlockStates(chunk.toNbt(ChunkWriteOptions.defaults()));
+            assertEquals(List.of("palette", "extra"), new ArrayList<>(container.keys()));
+
+            // 読んだときにあったdataは、読んだときの位置に戻す
+            chunk.setBlock(0, -64, 0, "minecraft:edited");
+            container = firstBlockStates(chunk.toNbt(ChunkWriteOptions.defaults()));
+            assertEquals(List.of("palette", "data", "extra"), new ArrayList<>(container.keys()));
+        }
+
+        @Test
+        void 読んだときに無かったdataはライブラリの並びで先に置く() {
+            NbtCompound root = (NbtCompound) NbtIo.readFile(vectorPath("palette_1"), null).tag();
+            ((NbtCompound) root.getList("sections").get(0)).getCompound("block_states").setInt("extra", 7);
+            byte[] before = chunkBytes(root);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+
+            // 無変更なら元とバイト単位で一致する
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(ChunkWriteOptions.defaults())));
+
+            // パレットが育ってdataが要るようになれば、dataを先に置きほかのキーを後ろに残す
+            chunk.setBlock(0, -64, 0, "minecraft:edited");
+            NbtCompound container = firstBlockStates(chunk.toNbt(ChunkWriteOptions.defaults()));
+            assertEquals(List.of("data", "palette", "extra"), new ArrayList<>(container.keys()));
+        }
+
+        @Test
         void 無変更で書き戻すと元と同じNBTになる() {
             NamedTag named = NbtIo.readFile(vectorPath("multi_section"), null);
             NbtWriteOptions options = new NbtWriteOptions().setCompression(Compression.NONE);
@@ -1260,6 +1376,24 @@ class WorldTest {
 
     @Nested
     class LevelChunkTest {
+
+        @Test
+        void DataVersion2586のチャンクも読んだときのセクションの並びで書き戻す() {
+            NbtCompound root = levelVector();
+            NbtCompound level = root.getCompound("Level");
+            level.set("Sections", sectionsInOrder(level.getList("Sections"), 1, -1, 0));
+            byte[] before = chunkBytes(root);
+            Chunk chunk = Chunk.fromNbt(root, ChunkReadOptions.defaults());
+
+            // Yの昇順でない並びでも、無変更なら元とバイト単位で一致する
+            assertArrayEquals(before, chunkBytes(chunk.toNbt(ChunkWriteOptions.defaults())));
+
+            // 1つのセクションを書き換えても並びは変わらない
+            chunk.setBlock(0, 16, 0, "minecraft:stone");
+            NbtList sections = chunk.toNbt(ChunkWriteOptions.defaults()).getCompound("Level").getList("Sections");
+
+            assertEquals(List.of(1, -1, 0), sectionYOrder(sections));
+        }
 
         @Test
         void DataVersion2586のチャンクを読み無変更で書き戻すと元と同じになる() {

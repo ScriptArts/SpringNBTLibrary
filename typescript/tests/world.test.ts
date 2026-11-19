@@ -152,6 +152,53 @@ function chunkBytes(tag: NbtCompound): Uint8Array {
   return writeBytes(new NamedTag("", tag), { compression: Compression.None });
 }
 
+/** セクションの一覧を、指定したYの並びに並べ替えた新しいリストを作る */
+function sectionsInOrder(sections: NbtList, order: number[]): NbtList {
+  const result = new NbtList(TagType.Compound);
+
+  // 指定の順に、Yの合うセクションを探して足す
+  for (const sectionY of order) {
+    // Yの合うセクションだけを足す
+    for (const entry of sections) {
+      const section = entry as NbtCompound;
+
+      if (section.getByte("Y") === sectionY) {
+        result.add(section);
+      }
+    }
+  }
+
+  return result;
+}
+
+/** 書き出したセクションの一覧のYを並べる */
+function sectionYOrder(sections: NbtList): number[] {
+  const result: number[] = [];
+
+  // 一覧の並びのままYを取り出す
+  for (const entry of sections) {
+    result.push((entry as NbtCompound).getByte("Y"));
+  }
+
+  return result;
+}
+
+/** 最初のセクションのblock_statesを、palette、data、ほかのキーの順に並べ替える */
+function reorderBlockStates(root: NbtCompound): void {
+  const section = root.getList("sections").get(0) as NbtCompound;
+  const container = section.getCompound("block_states");
+  const reordered = new NbtCompound();
+  reordered.set("palette", container.get("palette"));
+  reordered.set("data", container.get("data"));
+  reordered.setInt("extra", 7);
+  section.set("block_states", reordered);
+}
+
+/** 書き出したチャンクの最初のセクションのblock_states */
+function firstBlockStates(written: NbtCompound): NbtCompound {
+  return (written.getList("sections").get(0) as NbtCompound).getCompound("block_states");
+}
+
 /** 書き出したチャンクの最初のセクションのブロックのパレット */
 function firstBlockPalette(written: NbtCompound): NbtList {
   const section = written.getList("sections").get(0) as NbtCompound;
@@ -743,6 +790,75 @@ test("Chunk: compact で未使用のパレット要素が消える", () => {
   assert.equal(after?.getCompound("block_states").getList("palette").size, 2);
 });
 
+test("Chunk: 読んだときのセクションの並びで書き戻す", () => {
+  const root = readFile(vectorPath("multi_section")).tag;
+  root.set("sections", sectionsInOrder(root.getList("sections"), [-2, -4, -3]));
+  const before = chunkBytes(root);
+  const chunk = Chunk.fromNbt(root);
+
+  // Yの昇順でない並びでも、無変更なら元とバイト単位で一致する
+  assert.deepEqual(chunkBytes(chunk.toNbt()), before);
+
+  // 1つのセクションを書き換えても並びは変わらない
+  chunk.setBlock(0, -48, 0, "minecraft:stone");
+  const written = chunk.toNbt();
+
+  assert.deepEqual(sectionYOrder(written.getList("sections")), [-2, -4, -3]);
+  assert.deepEqual(chunk.sectionYs, [-4, -3, -2]);
+});
+
+test("Chunk: paletteが先のコンテナはその並びのまま書き戻す", () => {
+  const root = readFile(vectorPath("palette_17")).tag;
+  reorderBlockStates(root);
+  const before = chunkBytes(root);
+  const chunk = Chunk.fromNbt(root);
+
+  // 無変更なら元とバイト単位で一致する
+  assert.deepEqual(chunkBytes(chunk.toNbt()), before);
+
+  // ビット幅の変わらない書き換えなら、キーの並びもほかのキーも保つ
+  chunk.setBlock(0, -64, 0, "minecraft:edited");
+  const container = firstBlockStates(chunk.toNbt());
+
+  assert.deepEqual([...container.keys()], ["palette", "data", "extra"]);
+  assert.equal(container.getList("palette").size, 18);
+});
+
+test("Chunk: dataが要らなくなれば消しまた要るときは読んだときの位置に戻す", () => {
+  const root = readFile(vectorPath("palette_17")).tag;
+  reorderBlockStates(root);
+  const chunk = Chunk.fromNbt(root);
+  const section = chunk.section(-4);
+  assert.ok(section !== undefined);
+  const blockStates = section.blockStates;
+  assert.ok(blockStates !== undefined);
+
+  // パレットが1要素になればdataだけを消し、ほかのキーの位置は保つ
+  blockStates.fill(new NbtString("minecraft:stone"));
+  let container = firstBlockStates(chunk.toNbt());
+  assert.deepEqual([...container.keys()], ["palette", "extra"]);
+
+  // 読んだときにあったdataは、読んだときの位置に戻す
+  chunk.setBlock(0, -64, 0, "minecraft:edited");
+  container = firstBlockStates(chunk.toNbt());
+  assert.deepEqual([...container.keys()], ["palette", "data", "extra"]);
+});
+
+test("Chunk: 読んだときに無かったdataはライブラリの並びで先に置く", () => {
+  const root = readFile(vectorPath("palette_1")).tag;
+  (root.getList("sections").get(0) as NbtCompound).getCompound("block_states").setInt("extra", 7);
+  const before = chunkBytes(root);
+  const chunk = Chunk.fromNbt(root);
+
+  // 無変更なら元とバイト単位で一致する
+  assert.deepEqual(chunkBytes(chunk.toNbt()), before);
+
+  // パレットが育ってdataが要るようになれば、dataを先に置きほかのキーを後ろに残す
+  chunk.setBlock(0, -64, 0, "minecraft:edited");
+  const container = firstBlockStates(chunk.toNbt());
+  assert.deepEqual([...container.keys()], ["data", "palette", "extra"]);
+});
+
 test("Chunk: 無変更で書き戻すと元と同じ NBT になる", () => {
   const named = readFile(vectorPath("multi_section"));
   const before = writeBytes(named, { compression: Compression.None });
@@ -1159,6 +1275,23 @@ function positions(values: NbtList): number[][] {
 
   return result;
 }
+
+test("LevelChunk: DataVersion2586のチャンクも読んだときのセクションの並びで書き戻す", () => {
+  const root = levelVector();
+  const level = root.getCompound("Level");
+  level.set("Sections", sectionsInOrder(level.getList("Sections"), [1, -1, 0]));
+  const before = chunkBytes(root);
+  const chunk = Chunk.fromNbt(root);
+
+  // Yの昇順でない並びでも、無変更なら元とバイト単位で一致する
+  assert.deepEqual(chunkBytes(chunk.toNbt()), before);
+
+  // 1つのセクションを書き換えても並びは変わらない
+  chunk.setBlock(0, 16, 0, "minecraft:stone");
+  const sections = chunk.toNbt().getCompound("Level").getList("Sections");
+
+  assert.deepEqual(sectionYOrder(sections), [1, -1, 0]);
+});
 
 test("LevelChunk: DataVersion 2586 のチャンクを読み無変更で書き戻すと元と同じになる", () => {
   const root = levelVector();

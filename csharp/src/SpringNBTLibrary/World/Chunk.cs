@@ -102,6 +102,12 @@ public sealed class Chunk
         new SortedDictionary<int, ChunkSection>();
 
     /// <summary>
+    /// セクションのYを読んだ順に並べたもの
+    /// 書き戻しで読んだときと同じ並びにするため
+    /// </summary>
+    private readonly List<int> readOrder = new List<int>();
+
+    /// <summary>
     /// チャンクの形式の世代
     /// 引けなかったチャンクはnullのままで、元のNBTだけを持つ
     /// </summary>
@@ -320,6 +326,13 @@ public sealed class Chunk
 
             // セクションのブロックの持ち方は世代で違う
             ChunkSection section = ChunkSection.FromNbtForFormat(sectionTag, effective, format);
+
+            // 書き戻しの並びのため、初めて出たYだけを読んだ順に覚える
+            if (!chunk.sections.ContainsKey(section.Y))
+            {
+                chunk.readOrder.Add(section.Y);
+            }
+
             chunk.sections[section.Y] = section;
         }
 
@@ -377,7 +390,7 @@ public sealed class Chunk
 
     /// <summary>
     /// NBTへ書き戻す
-    /// 全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
+    /// 全セクションを読んだときの世代の形式で、読んだときの並びのまま書き戻し、他のキーはそのまま残す
     /// </summary>
     /// <exception cref="SpringNbtException">
     /// DataVersionが扱える形式より古く、かつ
@@ -422,10 +435,10 @@ public sealed class Chunk
 
         NbtList sectionList = new NbtList(TagType.Compound);
 
-        // Yの昇順で書き出す
-        foreach (ChunkSection section in sections.Values)
+        // 読んだときの並びで書き出す
+        foreach (int sectionY in readOrder)
         {
-            sectionList.Add(section.ToNbt());
+            sectionList.Add(sections[sectionY].ToNbt());
         }
 
         Body().Set(format.SectionsKey, sectionList);

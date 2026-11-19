@@ -21,6 +21,12 @@ public sealed class ChunkSection
     /// </summary>
     private BlockStorage blockStorage = BlockStorage.Container;
 
+    /// <summary>
+    /// パレット付きコンテナを読んだときのキーの並び
+    /// 書き戻しで同じ並びにするため、コンテナのキーごとに覚えておく
+    /// </summary>
+    private readonly Dictionary<string, List<string>> containerKeys = new Dictionary<string, List<string>>();
+
     private ChunkSection(NbtCompound raw, int y)
     {
         this.raw = raw;
@@ -65,6 +71,7 @@ public sealed class ChunkSection
         {
             section.BlockStates = PalettedContainer.FromNbt(
                 blockStates, Chunk.BlocksPerSection, 4, options.LenientBitStorage);
+            section.containerKeys["block_states"] = blockStates.Keys.ToList();
         }
 
         NbtCompound? biomes = nbt.OptCompound("biomes");
@@ -74,6 +81,7 @@ public sealed class ChunkSection
         {
             section.Biomes = PalettedContainer.FromNbt(
                 biomes, Chunk.BiomesPerSection, 1, options.LenientBitStorage);
+            section.containerKeys["biomes"] = biomes.Keys.ToList();
         }
 
         return section;
@@ -149,17 +157,95 @@ public sealed class ChunkSection
         // 持たないキーは元のまま残す
         if (BlockStates is not null)
         {
-            raw.Set("block_states", BlockStates.ToNbt());
+            WriteContainer(raw, "block_states", BlockStates.ToNbt(), ReadKeys("block_states"));
         }
 
         // 解釈したコンテナだけを書き戻す
         // 持たないキーは元のまま残す
         if (Biomes is not null)
         {
-            raw.Set("biomes", Biomes.ToNbt());
+            WriteContainer(raw, "biomes", Biomes.ToNbt(), ReadKeys("biomes"));
         }
 
         return raw;
+    }
+
+    /// <summary>コンテナを読んだときのキーの並び
+    /// 読んでいなければnull</summary>
+    private List<string>? ReadKeys(string key)
+    {
+        // 読んだコンテナのキーだけを返す
+        if (containerKeys.TryGetValue(key, out List<string>? keys))
+        {
+            return keys;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// パレット付きコンテナを、読んだときのキーの並びを保ってセクションへ書き戻す
+    /// </summary>
+    /// <remarks>
+    /// 読んだときにあったキーはその並びで置き、要らなくなった<c>data</c>は落とす
+    /// 読んだときに無かった<c>data</c>を足すときだけ、ライブラリの並び（<c>data</c>、<c>palette</c>の順）を先に置く
+    /// どちらの場合も、読んだときにあったほかのキーは残す
+    /// 並びは読んだときのキーで決めるので、何度書き戻しても同じ結果になる
+    /// </remarks>
+    private static void WriteContainer(
+        NbtCompound section, string key, NbtCompound written, List<string>? readKeys)
+    {
+        NbtCompound? current = section.OptCompound(key);
+
+        // 読んだときにコンテナが無ければ、書き出した形をそのまま置く
+        if (current is null || readKeys is null)
+        {
+            section.Set(key, written);
+            return;
+        }
+
+        List<string> order = new List<string>();
+        // 読んだときに無かったdataを足すときだけ、ライブラリの並びを先に置く
+        if (written.ContainsKey("data") && !readKeys.Contains("data"))
+        {
+            order.AddRange(written.Keys);
+        }
+
+        // 読んだときの並びで、残すキーを後ろに続ける
+        foreach (string name in readKeys)
+        {
+            // 先に並べたキーは二度入れない
+            if (order.Contains(name))
+            {
+                continue;
+            }
+
+            // 要らなくなったdataは落とす
+            if (name == "data" && !written.ContainsKey("data"))
+            {
+                continue;
+            }
+
+            order.Add(name);
+        }
+
+        NbtCompound result = new NbtCompound();
+
+        // 書き出した形にあるキーはその値で、ほかのキーは元の値で並べる
+        foreach (string name in order)
+        {
+            // コンテナの中身は書き出した形の値にする
+            if (written.ContainsKey(name))
+            {
+                result.Set(name, written.Get(name));
+            }
+            else
+            {
+                result.Set(name, current.Get(name));
+            }
+        }
+
+        section.Set(key, result);
     }
 
     /// <summary>使われていないパレット要素を取り除く</summary>

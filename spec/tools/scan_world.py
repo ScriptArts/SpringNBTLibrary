@@ -13,8 +13,7 @@
   4. Worldレイヤ（`MinecraftWorld` / `Chunk` / `PalettedContainer`）で解釈し直し、
      NBTへ書き戻したものが元と一致するか、ブロックが読み出せるかを検証。
      26.1より前の構成のワールドも同じく開き、チャンクは自身のDataVersionで決まる世代ごとに数える。
-     セクションの並び（Yの昇順）や、パレット付きコンテナの`data`と`palette`の並びだけが
-     元と違うチャンクは、失敗と分けて数える
+     セクションやキーの並びだけが違う場合も失敗に数える
 
 次のファイルは失敗に数えず、種類ごとに数えて飛ばす。
 
@@ -49,10 +48,8 @@ from spring_nbt_library.nbt import (  # noqa: E402
     Compression,
     NamedTag,
     NbtCompound,
-    NbtList,
     NbtReadOptions,
     NbtWriteOptions,
-    TagType,
     read_bytes,
     write_bytes,
 )
@@ -110,18 +107,6 @@ GENERATED_STATUSES = ("full", "postprocessed", "fullchunk")
 
 #: 26.1以降の構成（L2）が始まるDataVersion
 L2_MIN_DATA_VERSION = 4786
-
-#: Worldレイヤで書き戻した結果の種類
-#: 元と一致した
-ROUNDTRIP_SAME = "same"
-#: セクションの並びか、パレット付きコンテナの``data``と``palette``の並びだけが元と違う
-ROUNDTRIP_ORDER_ONLY = "order_only"
-#: それ以外の違いがあるか、書き戻せなかった
-ROUNDTRIP_FAILED = "failed"
-
-#: パレット付きコンテナを書き出すときのキーの並び
-#: ライブラリはMinecraftと同じく``data``を先、``palette``を後に置く
-CONTAINER_KEY_ORDER = ("data", "palette")
 
 #: 飛ばしたファイルの種類
 SKIP_UID = "uid.dat（NBTでない）"
@@ -876,17 +861,11 @@ class WorldScanner:
             self.failures.append("%s: チャンクとして解釈できない: %s" % (label, error))
             return
 
-        result = self._check_roundtrip(label, expected, chunk)
-
-        # 書き戻せないか、並び以外も違えば、その先の確認はしない
-        if result == ROUNDTRIP_FAILED:
+        # 書き戻しが元と一致しなければ、その先の確認はしない
+        if not self._check_roundtrip(label, expected, chunk):
             return
 
-        # 並びだけが違うチャンクは、別に数えたうえで先へ進む
-        if result == ROUNDTRIP_ORDER_ONLY:
-            counts["order_only"] += 1
-        else:
-            counts["roundtrip_ok"] += 1
+        counts["roundtrip_ok"] += 1
 
         # 元のNBTだけを持つチャンクは、ブロックのAPIが止まることだけを確かめる
         if generation == RAW_ONLY:
@@ -942,39 +921,30 @@ class WorldScanner:
 
         sampled[version] += 1
 
-    def _check_roundtrip(self, label: str, expected: bytes, chunk: Chunk) -> str:
+    def _check_roundtrip(self, label: str, expected: bytes, chunk: Chunk) -> bool:
         """Worldレイヤで読んで書き戻した結果が、元のNBTと一致するかを見る。
 
         セクションは毎回パレットとビット詰めを組み直して書き出されるので、
         これが一致するならエンコード側の解釈も正しいことになる。
-
-        ライブラリはセクションをYの昇順に並べ、1.18以降の形式のパレット付きコンテナは
-        ``data``を先、``palette``を後に置いて書き出す。
-        実データにはこれらの並びが違うチャンクがあるので、
-        並びだけを揃えた元と一致する場合は失敗と分けて返す
+        セクションの並びやパレット付きコンテナのキーの並びも、読んだときのまま残るはず
         """
         try:
             rebuilt = chunk.to_nbt(ChunkWriteOptions(allow_foreign_data_version=True))
         except SpringNbtError as error:
             self.failures.append("%s: 書き戻せない: %s" % (label, error))
-            return ROUNDTRIP_FAILED
+            return False
 
         actual = write_bytes(NamedTag("", rebuilt), WRITE_OPTIONS)
 
-        # 元とバイト単位で一致すれば、それで確かめ終わる
-        if actual == expected:
-            self.stats["chunks_roundtrip_ok"] += 1
-            return ROUNDTRIP_SAME
+        # 並びも含めてバイト単位で一致しなければ失敗
+        if actual != expected:
+            self.failures.append(
+                "%s: Worldレイヤ経由の再エンコードが元と違う (%d bytes / %d bytes)"
+                % (label, len(expected), len(actual)))
+            return False
 
-        # セクションとコンテナのキーの並びを書き出しと同じ順に揃えた元と比べる
-        if write_bytes(normalize_order(expected), WRITE_OPTIONS) == actual:
-            self.stats["chunks_order_only"] += 1
-            return ROUNDTRIP_ORDER_ONLY
-
-        self.failures.append(
-            "%s: Worldレイヤ経由の再エンコードが元と違う (%d bytes / %d bytes)"
-            % (label, len(expected), len(actual)))
-        return ROUNDTRIP_FAILED
+        self.stats["chunks_roundtrip_ok"] += 1
+        return True
 
     def _check_raw_only(self, label: str, chunk: Chunk) -> None:
         """元のNBTだけを持つチャンクで、ブロックのAPIがUNSUPPORTED_DATA_VERSIONになるかを見る"""
@@ -1076,7 +1046,7 @@ class WorldScanner:
 
         print_counter("飛ばしたリージョンファイル", self.skipped, None)
 
-        columns = ("chunks", "roundtrip_ok", "order_only", "generated", "sections",
+        columns = ("chunks", "roundtrip_ok", "generated", "sections",
                    "block_sections", "packed_sections", "walked_chunks", "blocks_read")
         header = "  %-12s %-9s" % ("DataVersion", "世代") \
             + "".join(" %14s" % column for column in columns)
@@ -1139,86 +1109,8 @@ class WorldScanner:
 
             return 1
 
-        reordered = self.stats["chunks_order_only"]
-
-        # 並びだけが違うチャンクがあれば、その数も添える
-        if reordered > 0:
-            print("Worldレイヤの失敗なし。並びだけが違う%d個を除き、"
-                  "全チャンクの再エンコードが元と一致。" % reordered)
-            return 0
-
         print("Worldレイヤの失敗なし。全チャンクの再エンコードが元と一致。")
         return 0
-
-
-def normalize_order(plain: bytes) -> NamedTag:
-    """チャンクを読み、セクションとパレット付きコンテナのキーを書き出しと同じ順に並べ替える
-
-    セクションの一覧をYの昇順に並べ、1.18以降の形式のコンテナは``data``と``palette``の並びを揃える
-    ほかの値には触れない
-    """
-    named = read_bytes(plain, READ_OPTIONS)
-    body = named.tag.opt_compound("Level")
-    sections_key = "Sections"
-    # 1.18以降の形式は本体がルートで、セクションの一覧のキーも違う
-    if body is None:
-        body = named.tag
-        sections_key = "sections"
-
-    sections = body.opt_list(sections_key)
-
-    # セクションを持たないチャンクは並べ替えるものが無い
-    if sections is None:
-        return named
-
-    entries = list(sections)
-
-    # Compound以外の要素やYの無い要素があれば、ライブラリも書き出さないので並べ替えない
-    for section in entries:
-        # 並べ替えの鍵を読めない要素があれば元のまま返す
-        if not isinstance(section, NbtCompound) or section.opt_byte("Y") is None:
-            return named
-
-    ordered = NbtList(TagType.COMPOUND)
-
-    # Yの昇順に並べ直し、コンテナのキーの並びも揃える
-    for section in sorted(entries, key=lambda entry: entry.get_byte("Y")):
-        reorder_containers(section)
-        ordered.append(section)
-
-    body.set(sections_key, ordered)
-    return named
-
-
-def reorder_containers(section: NbtCompound) -> None:
-    """セクションのパレット付きコンテナのキーを書き出しと同じ順に並べ替える
-
-    ``data``と``palette``の並びだけを揃え、ほかの値には触れない
-    1.17までの形式のセクションはコンテナを持たないので何もしない
-    """
-    # ブロックとバイオームのコンテナを順に見る
-    for key in ("block_states", "biomes"):
-        container = section.opt_compound(key)
-
-        # コンテナを持たないセクションは飛ばす
-        if container is None:
-            continue
-
-        reordered = NbtCompound()
-
-        # 書き出しと同じ順に、あるキーだけを先に並べる
-        for name in CONTAINER_KEY_ORDER:
-            # 元に無いキーは足さない
-            if name in container:
-                reordered.set(name, container.get(name))
-
-        # 残りのキーは元の並びのまま後ろに置く
-        for name in container.keys():
-            # 先に並べたキーは二度入れない
-            if name not in CONTAINER_KEY_ORDER:
-                reordered.set(name, container.get(name))
-
-        section.set(key, reordered)
 
 
 def _decompress_for_scan(raw):

@@ -159,6 +159,11 @@ pub struct ChunkSection {
     /// ブロックの持ち方
     /// 書き戻すときに読んだときと同じキーへ書くため、覚えておく
     block_storage: BlockStorage,
+    /// `block_states`を読んだときのキーの並び
+    /// 書き戻しで同じ並びにするため、覚えておく
+    block_states_keys: Option<Vec<String>>,
+    /// `biomes`を読んだときのキーの並び
+    biomes_keys: Option<Vec<String>>,
 }
 
 impl ChunkSection {
@@ -215,6 +220,8 @@ impl ChunkSection {
             block_states: None,
             biomes: None,
             block_storage: BlockStorage::Container,
+            block_states_keys: None,
+            biomes_keys: None,
         };
 
         // 光源専用のセクションはblock_statesを持たない
@@ -225,6 +232,7 @@ impl ChunkSection {
                 4,
                 options.lenient_bit_storage,
             )?);
+            section.block_states_keys = Some(block_states.keys().map(String::from).collect());
         }
 
         // 光源だけを持つセクションにはバイオームが無い
@@ -235,6 +243,7 @@ impl ChunkSection {
                 1,
                 options.lenient_bit_storage,
             )?);
+            section.biomes_keys = Some(biomes.keys().map(String::from).collect());
         }
 
         Ok(section)
@@ -257,6 +266,8 @@ impl ChunkSection {
             block_states: None,
             biomes: None,
             block_storage: format.block_storage,
+            block_states_keys: None,
+            biomes_keys: None,
         };
 
         let palette = nbt.opt_list("Palette")?;
@@ -340,13 +351,18 @@ impl ChunkSection {
         // 解釈したコンテナだけを書き戻す
         // 持たないキーは元のまま残す
         if let Some(block_states) = &self.block_states {
-            result.set("block_states", NbtTag::Compound(block_states.to_nbt()?));
+            write_container(
+                &mut result,
+                "block_states",
+                block_states.to_nbt()?,
+                self.block_states_keys.as_deref(),
+            )?;
         }
 
         // 解釈したコンテナだけを書き戻す
         // 持たないキーは元のまま残す
         if let Some(biomes) = &self.biomes {
-            result.set("biomes", NbtTag::Compound(biomes.to_nbt()?));
+            write_container(&mut result, "biomes", biomes.to_nbt()?, self.biomes_keys.as_deref())?;
         }
 
         Ok(result)
@@ -382,11 +398,73 @@ fn body_mut(root: &mut NbtCompound) -> Result<&mut NbtCompound> {
     root.get_compound_mut("Level")
 }
 
+/// パレット付きコンテナを、読んだときのキーの並びを保ってセクションへ書き戻す
+///
+/// 読んだときにあったキーはその並びで置き、要らなくなった`data`は落とす
+/// 読んだときに無かった`data`を足すときだけ、ライブラリの並び（`data`、`palette`の順）を先に置く
+/// どちらの場合も、読んだときにあったほかのキーは残す
+/// 並びは読んだときのキーで決めるので、何度書き戻しても同じ結果になる
+fn write_container(
+    section: &mut NbtCompound,
+    key: &str,
+    written: NbtCompound,
+    read_keys: Option<&[String]>,
+) -> Result<()> {
+    // 読んだときにコンテナが無ければ、書き出した形をそのまま置く
+    let (current, read_keys) = match (section.opt_compound(key)?, read_keys) {
+        (Some(current), Some(read_keys)) => (current.clone(), read_keys),
+        _ => {
+            section.set(key, NbtTag::Compound(written));
+            return Ok(());
+        }
+    };
+
+    let mut order: Vec<String> = Vec::new();
+    let read_has_data = read_keys.iter().any(|name| name == "data");
+    // 読んだときに無かったdataを足すときだけ、ライブラリの並びを先に置く
+    if written.contains_key("data") && !read_has_data {
+        order.extend(written.keys().map(String::from));
+    }
+
+    // 読んだときの並びで、残すキーを後ろに続ける
+    for name in read_keys {
+        // 先に並べたキーは二度入れない
+        if order.contains(name) {
+            continue;
+        }
+
+        // 要らなくなったdataは落とす
+        if name == "data" && !written.contains_key("data") {
+            continue;
+        }
+
+        order.push(name.clone());
+    }
+
+    let mut result = NbtCompound::new();
+
+    // 書き出した形にあるキーはその値で、ほかのキーは元の値で並べる
+    for name in &order {
+        // コンテナの中身は書き出した形の値にする
+        if written.contains_key(name) {
+            result.set(name.clone(), written.get(name)?.clone());
+        } else {
+            result.set(name.clone(), current.get(name)?.clone());
+        }
+    }
+
+    section.set(key, NbtTag::Compound(result));
+    Ok(())
+}
+
 /// チャンク1つ分
 #[derive(Debug, Clone)]
 pub struct Chunk {
     raw: NbtCompound,
     sections: BTreeMap<i32, ChunkSection>,
+    /// セクションのYを読んだ順に並べたもの
+    /// 書き戻しで読んだときと同じ並びにするため
+    read_order: Vec<i32>,
     modified: bool,
     /// チャンクの形式の世代
     /// 引けなかったチャンクは`None`のままで、元のNBTだけを持つ
@@ -530,6 +608,7 @@ impl Chunk {
         let mut chunk = Chunk {
             raw: nbt,
             sections: BTreeMap::new(),
+            read_order: Vec::new(),
             modified: false,
             format: None,
             format_data_version: 0,
@@ -597,6 +676,12 @@ impl Chunk {
 
             // セクションのブロックの持ち方は世代で違う
             let section = ChunkSection::from_nbt_for_format(section_tag, options, format)?;
+
+            // 書き戻しの並びのため、初めて出たYだけを読んだ順に覚える
+            if !chunk.sections.contains_key(&section.y) {
+                chunk.read_order.push(section.y);
+            }
+
             chunk.sections.insert(section.y, section);
         }
 
@@ -636,7 +721,7 @@ impl Chunk {
     }
 
     /// NBTへ書き戻す
-    /// 全セクションを読んだときの世代の形式で書き戻し、他のキーはそのまま残す
+    /// 全セクションを読んだときの世代の形式で、読んだときの並びのまま書き戻し、他のキーはそのまま残す
     pub fn to_nbt(&self, options: &ChunkWriteOptions) -> Result<NbtCompound> {
         let version = self.own_data_version()?;
         let supported = match version {
@@ -668,9 +753,12 @@ impl Chunk {
 
         let mut section_list = NbtList::with_element_type(TagType::Compound);
 
-        // Yの昇順で書き出す
-        for section in self.sections.values() {
-            section_list.push(NbtTag::Compound(section.to_nbt()?))?;
+        // 読んだときの並びで書き出す
+        for section_y in &self.read_order {
+            // 読んだYは必ずセクションの索引にある
+            if let Some(section) = self.sections.get(section_y) {
+                section_list.push(NbtTag::Compound(section.to_nbt()?))?;
+            }
         }
 
         body_mut(&mut result)?.set(format.sections_key, NbtTag::List(section_list));

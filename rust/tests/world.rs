@@ -136,6 +136,67 @@ fn chunk_bytes(tag: &NbtCompound) -> Vec<u8> {
     write_bytes(&NamedTag::new("", tag.clone()), &options).unwrap()
 }
 
+/// セクションの一覧を、指定したYの並びに並べ替えた新しいリストを作る
+fn sections_in_order(sections: &NbtList, order: &[i8]) -> NbtTag {
+    let mut result = NbtList::with_element_type(TagType::Compound);
+
+    // 指定の順に、Yの合うセクションを探して足す
+    for section_y in order {
+        // Yの合うセクションだけを足す
+        for entry in sections.iter() {
+            if let NbtTag::Compound(section) = entry {
+                if section.get_byte("Y").unwrap() == *section_y {
+                    result.push(entry.clone()).unwrap();
+                }
+            }
+        }
+    }
+
+    NbtTag::List(result)
+}
+
+/// 書き出したセクションの一覧のYを並べる
+fn section_y_order(sections: &NbtList) -> Vec<i8> {
+    let mut result = Vec::new();
+
+    // 一覧の並びのままYを取り出す
+    for entry in sections.iter() {
+        if let NbtTag::Compound(section) = entry {
+            result.push(section.get_byte("Y").unwrap());
+        }
+    }
+
+    result
+}
+
+/// 最初のセクションのblock_statesを、palette、data、ほかのキーの順に並べ替える
+fn reorder_block_states(root: &mut NbtCompound) {
+    let mut sections = root.get_list("sections").unwrap().clone();
+    let mut section = match sections.get(0) {
+        Some(NbtTag::Compound(section)) => section.clone(),
+        _ => panic!("最初のセクションが無い"),
+    };
+    let container = section.get_compound("block_states").unwrap().clone();
+    let mut reordered = NbtCompound::new();
+    reordered.set("palette", container.get("palette").unwrap().clone());
+    reordered.set("data", container.get("data").unwrap().clone());
+    reordered.set_int("extra", 7);
+    section.set("block_states", NbtTag::Compound(reordered));
+    sections.remove_at(0);
+    sections.insert(0, NbtTag::Compound(section)).unwrap();
+    root.set("sections", NbtTag::List(sections));
+}
+
+/// 書き出したチャンクの最初のセクションのblock_statesのキーの並び
+fn first_block_states_keys(written: &NbtCompound) -> Vec<String> {
+    let section = match written.get_list("sections").unwrap().get(0) {
+        Some(NbtTag::Compound(section)) => section.clone(),
+        _ => panic!("最初のセクションが無い"),
+    };
+
+    section.get_compound("block_states").unwrap().keys().map(String::from).collect()
+}
+
 /// 書き出したチャンクの最初のセクションのブロックのパレット
 fn first_block_palette(written: &NbtCompound) -> NbtList {
     let section = match written.get_list("sections").unwrap().get(0) {
@@ -762,6 +823,87 @@ fn チャンクのcompactで未使用のパレット要素が消える() {
 }
 
 #[test]
+fn 読んだときのセクションの並びで書き戻す() {
+    let mut root = read_file(vector_path("multi_section"), &NbtReadOptions::default()).unwrap().tag;
+    let reordered = sections_in_order(root.get_list("sections").unwrap(), &[-2, -4, -3]);
+    root.set("sections", reordered);
+    let before = chunk_bytes(&root);
+    let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    // Yの昇順でない並びでも、無変更なら元とバイト単位で一致する
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+
+    // 1つのセクションを書き換えても並びは変わらない
+    chunk.set_block(0, -48, 0, "minecraft:stone").unwrap();
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+
+    assert_eq!(vec![-2, -4, -3], section_y_order(written.get_list("sections").unwrap()));
+    assert_eq!(vec![-4, -3, -2], chunk.section_ys());
+}
+
+#[test]
+fn paletteが先のコンテナはその並びのまま書き戻す() {
+    let mut root = read_file(vector_path("palette_17"), &NbtReadOptions::default()).unwrap().tag;
+    reorder_block_states(&mut root);
+    let before = chunk_bytes(&root);
+    let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    // 無変更なら元とバイト単位で一致する
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+
+    // ビット幅の変わらない書き換えなら、キーの並びもほかのキーも保つ
+    chunk.set_block(0, -64, 0, "minecraft:edited").unwrap();
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+
+    assert_eq!(vec!["palette", "data", "extra"], first_block_states_keys(&written));
+    assert_eq!(18, first_block_palette(&written).len());
+}
+
+#[test]
+fn dataが要らなくなれば消しまた要るときは読んだときの位置に戻す() {
+    let mut root = read_file(vector_path("palette_17"), &NbtReadOptions::default()).unwrap().tag;
+    reorder_block_states(&mut root);
+    let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    // パレットが1要素になればdataだけを消し、ほかのキーの位置は保つ
+    let section = chunk.section_mut(-4).unwrap();
+    section.block_states_mut().unwrap().fill(block_entry("minecraft:stone"));
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    assert_eq!(vec!["palette", "extra"], first_block_states_keys(&written));
+
+    // 読んだときにあったdataは、読んだときの位置に戻す
+    chunk.set_block(0, -64, 0, "minecraft:edited").unwrap();
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    assert_eq!(vec!["palette", "data", "extra"], first_block_states_keys(&written));
+}
+
+#[test]
+fn 読んだときに無かったdataはライブラリの並びで先に置く() {
+    let mut root = read_file(vector_path("palette_1"), &NbtReadOptions::default()).unwrap().tag;
+    let mut sections = root.get_list("sections").unwrap().clone();
+    let mut section = match sections.get(0) {
+        Some(NbtTag::Compound(section)) => section.clone(),
+        _ => panic!("最初のセクションが無い"),
+    };
+    let mut container = section.get_compound("block_states").unwrap().clone();
+    container.set_int("extra", 7);
+    section.set("block_states", NbtTag::Compound(container));
+    sections.remove_at(0);
+    sections.insert(0, NbtTag::Compound(section)).unwrap();
+    root.set("sections", NbtTag::List(sections));
+    let before = chunk_bytes(&root);
+    let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    // 無変更なら元とバイト単位で一致する
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+
+    // パレットが育ってdataが要るようになれば、dataを先に置きほかのキーを後ろに残す
+    chunk.set_block(0, -64, 0, "minecraft:edited").unwrap();
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    assert_eq!(vec!["data", "palette", "extra"], first_block_states_keys(&written));
+}
+
+#[test]
 fn 無変更で書き戻すと元と同じnbtになる() {
     let named = read_file(vector_path("multi_section"), &NbtReadOptions::default()).unwrap();
     let options = NbtWriteOptions {
@@ -1378,6 +1520,27 @@ fn positions(values: &NbtList) -> Vec<(i32, i32, i32)> {
     }
 
     result
+}
+
+#[test]
+fn data_version2586のチャンクも読んだときのセクションの並びで書き戻す() {
+    let mut root = level_vector();
+    update_level(&mut root, |level| {
+        let reordered = sections_in_order(level.get_list("Sections").unwrap(), &[1, -1, 0]);
+        level.set("Sections", reordered);
+    });
+    let before = chunk_bytes(&root);
+    let mut chunk = Chunk::from_nbt(root, &ChunkReadOptions::default()).unwrap();
+
+    // Yの昇順でない並びでも、無変更なら元とバイト単位で一致する
+    assert_eq!(before, chunk_bytes(&chunk.to_nbt(&ChunkWriteOptions::default()).unwrap()));
+
+    // 1つのセクションを書き換えても並びは変わらない
+    chunk.set_block(0, 16, 0, "minecraft:stone").unwrap();
+    let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
+    let sections = written.get_compound("Level").unwrap().get_list("Sections").unwrap();
+
+    assert_eq!(vec![1, -1, 0], section_y_order(sections));
 }
 
 #[test]
