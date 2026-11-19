@@ -401,7 +401,7 @@ public sealed class LevelData
     /// <summary>ハードコアか</summary>
     public bool IsHardcore => Data.GetCompound("difficulty_settings").GetBool("hardcore");
 
-    /// <summary>バージョン名（<c>26.2</c>など）</summary>
+    /// <summary>バージョン名（<c>26.3</c>など）</summary>
     public string VersionName => Data.GetCompound("Version").GetString("Name");
 
     /// <summary>書き出し用の<see cref="NamedTag"/>を作る</summary>

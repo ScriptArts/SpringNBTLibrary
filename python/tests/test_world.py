@@ -16,7 +16,10 @@ from spring_nbt_library.nbt import (
     NamedTag,
     NbtCompound,
     NbtInt,
+    NbtList,
+    NbtLongArray,
     NbtString,
+    TagType,
     NbtWriteOptions,
     read_file,
     write_bytes,
@@ -55,11 +58,18 @@ def load_chunk(name: str, options: ChunkReadOptions = None) -> Chunk:
     return Chunk.from_nbt(read_file(vector_path(name)).tag, options)
 
 
-def block_entry(name: str) -> NbtCompound:
-    """ブロックのパレット要素を作る"""
-    entry = NbtCompound()
-    entry.set("Name", NbtString(name))
-    return entry
+def block_entry(name: str) -> NbtString:
+    """プロパティの無いブロックのパレット要素を作る
+    26.3からはブロックIDだけの文字列で入る
+    """
+    return NbtString(name)
+
+
+def wrapped(tag) -> NbtCompound:
+    """異種リストの要素を包むCompoundを作る"""
+    wrapper = NbtCompound()
+    wrapper.set("", tag)
+    return wrapper
 
 
 class TestBlockState:
@@ -99,12 +109,42 @@ class TestBlockState:
     def test_NBTとの相互変換でプロパティが保たれる(self):
         state = BlockState.parse("minecraft:oak_stairs[facing=north,half=top]")
         nbt = state.to_nbt()
-        assert nbt.get_string("Name") == "minecraft:oak_stairs"
-        assert nbt.get_compound("Properties").get_string("facing") == "north"
+        assert list(nbt.keys()) == ["id", "properties"]
+        assert nbt.get_string("id") == "minecraft:oak_stairs"
+        assert nbt.get_compound("properties").get_string("facing") == "north"
         assert BlockState.from_nbt(nbt) == state
 
-    def test_プロパティ無しのNBTにはPropertiesを書かない(self):
-        assert BlockState.parse("minecraft:air").to_nbt().opt_compound("Properties") is None
+    def test_プロパティ無しのブロックは文字列になる(self):
+        assert BlockState.parse("minecraft:air").to_nbt() == NbtString("minecraft:air")
+
+    def test_文字列のパレット要素を読める(self):
+        state = BlockState.from_nbt(NbtString("minecraft:stone"))
+        assert state.name == "minecraft:stone"
+        assert len(state.properties) == 0
+
+    def test_包まれたパレット要素を読める(self):
+        state = BlockState.from_nbt(wrapped(NbtString("minecraft:stone")))
+        assert str(state) == "minecraft:stone"
+
+    def test_propertiesの無いCompoundも読める(self):
+        entry = NbtCompound()
+        entry.set("id", NbtString("minecraft:stone"))
+        assert str(BlockState.from_nbt(entry)) == "minecraft:stone"
+
+    def test_パレット要素が26_2までの形式ならMALFORMED_DATA(self):
+        entry = NbtCompound()
+        entry.set("Name", NbtString("minecraft:stone"))
+
+        with pytest.raises(SpringNbtError) as error:
+            BlockState.from_nbt(entry)
+
+        assert error.value.code == ErrorCode.MALFORMED_DATA
+
+    def test_文字列でもCompoundでもない要素はUNEXPECTED_TAG_TYPE(self):
+        with pytest.raises(SpringNbtError) as error:
+            BlockState.from_nbt(NbtInt(1))
+
+        assert error.value.code == ErrorCode.UNEXPECTED_TAG_TYPE
 
     @pytest.mark.parametrize("text", [
         "",
@@ -240,7 +280,7 @@ class TestPalettedContainer:
 
         # 残るのは実際に使われているairとdirtの2つ
         assert len(container.palette) == 2
-        assert container.get(0).get_string("Name") == "minecraft:dirt"
+        assert container.get(0).value == "minecraft:dirt"
 
     def test_fillで単一値に戻る(self):
         container = PalettedContainer.filled(block_entry("minecraft:air"), 4096, 4)
@@ -249,7 +289,57 @@ class TestPalettedContainer:
 
         assert len(container.palette) == 1
         assert container.bits_per_entry == 0
-        assert container.get(4095).get_string("Name") == "minecraft:water"
+        assert container.get(4095).value == "minecraft:water"
+
+    def test_文字列だけのパレットは文字列のリストで書く(self):
+        container = PalettedContainer.filled(block_entry("minecraft:air"), 4096, 4)
+        container.set(0, block_entry("minecraft:stone"))
+
+        palette = container.to_nbt().get_list("palette")
+        assert palette.element_type == TagType.STRING
+        assert palette[1] == NbtString("minecraft:stone")
+
+    def test_型が混ざったパレットは文字列を包んでCompoundのリストで書く(self):
+        stairs = BlockState.parse("minecraft:oak_stairs[facing=north]").to_nbt()
+        container = PalettedContainer.filled(block_entry("minecraft:air"), 4096, 4)
+        container.set(0, stairs)
+
+        palette = container.to_nbt().get_list("palette")
+        assert palette.element_type == TagType.COMPOUND
+        assert palette[0] == wrapped(NbtString("minecraft:air"))
+        assert palette[1] == stairs
+
+    def test_包まれたパレットは包みを外して持ち元どおりに書き戻す(self):
+        stairs = BlockState.parse("minecraft:oak_stairs[facing=north]").to_nbt()
+        palette = NbtList(TagType.COMPOUND)
+        palette.append(wrapped(NbtString("minecraft:air")))
+        palette.append(stairs)
+
+        # パレット2要素ならbits=4で256 long
+        nbt = NbtCompound()
+        nbt.set("data", NbtLongArray([0] * 256))
+        nbt.set("palette", palette)
+
+        container = PalettedContainer.from_nbt(nbt, 4096, 4)
+
+        # 包みは外れ、要素は文字列とCompoundとして並ぶ
+        assert container.palette[0] == NbtString("minecraft:air")
+        assert container.palette[1] == stairs
+
+        # 書き戻すと、また包まれて元と同じになる
+        assert container.to_nbt() == nbt
+
+    def test_compactでCompoundが消えると文字列のリストに戻る(self):
+        stairs = BlockState.parse("minecraft:oak_stairs[facing=north]").to_nbt()
+        container = PalettedContainer.filled(block_entry("minecraft:air"), 4096, 4)
+        container.set(0, stairs)
+        container.set(0, block_entry("minecraft:stone"))
+
+        container.compact()
+
+        palette = container.to_nbt().get_list("palette")
+        assert palette.element_type == TagType.STRING
+        assert len(palette) == 2
 
     def test_範囲外の添字はINVALID_ARGUMENT(self):
         container = PalettedContainer.filled(block_entry("minecraft:air"), 4096, 4)
@@ -427,6 +517,15 @@ class TestChunk:
 
         assert error.value.code == ErrorCode.MALFORMED_DATA
 
+    def test_パレットが26_2までの形式ならブロックを読むとMALFORMED_DATA(self):
+        options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.IGNORE)
+        chunk = load_chunk("palette_old_format", options)
+
+        with pytest.raises(SpringNbtError) as error:
+            chunk.get_block(0, -64, 0)
+
+        assert error.value.code == ErrorCode.MALFORMED_DATA
+
     def test_チャンク内の相対座標が範囲外ならINVALID_ARGUMENT(self):
         chunk = load_chunk("palette_1")
 
@@ -455,6 +554,16 @@ class TestDataVersion:
 
         chunk = Chunk.from_nbt(self.foreign_chunk(), options)
         assert chunk.data_version == 3953
+        assert len(warnings) == 1
+
+    def test_DataVersionが26_2のチャンクは扱える形式より古い(self):
+        warnings = []
+        options = ChunkReadOptions(
+            on_version_mismatch=VersionMismatchAction.WARN,
+            on_warning=warnings.append)
+
+        # 26.2まではパレットの形式が違う
+        load_chunk("palette_old_format", options)
         assert len(warnings) == 1
 
     def test_ERRORを指定すると読み込みで弾く(self):
@@ -501,7 +610,7 @@ class TestDataVersion:
     def newer_chunk() -> NbtCompound:
         """対象より新しいDataVersionを持つチャンクを作る"""
         root = read_file(vector_path("palette_1")).tag
-        root.set("DataVersion", NbtInt(5015))
+        root.set("DataVersion", NbtInt(5100))
         return root
 
     def test_新しいバージョンのチャンクは警告を出さない(self):
@@ -512,18 +621,18 @@ class TestDataVersion:
 
         # 形式が同じであれば、新しいバージョンでも警告を出さずに読める
         chunk = Chunk.from_nbt(self.newer_chunk(), options)
-        assert chunk.data_version == 5015
+        assert chunk.data_version == 5100
         assert warnings == []
 
     def test_新しいバージョンのチャンクはERRORでも通る(self):
         options = ChunkReadOptions(on_version_mismatch=VersionMismatchAction.ERROR)
-        assert Chunk.from_nbt(self.newer_chunk(), options).data_version == 5015
+        assert Chunk.from_nbt(self.newer_chunk(), options).data_version == 5100
 
     def test_新しいバージョンのチャンクはそのまま書き戻せる(self):
         chunk = Chunk.from_nbt(self.newer_chunk())
 
         # 許可を出さなくても書き戻せて、DataVersionも変わらない
-        assert chunk.to_nbt().get_int("DataVersion") == 5015
+        assert chunk.to_nbt().get_int("DataVersion") == 5100
 
 
 class TestMinecraftWorld:

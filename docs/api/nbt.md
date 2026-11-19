@@ -238,7 +238,7 @@ NBTのタグ型・読み書き・SNBT。バージョンに依存しない純粋�
 | `method_compressed` | — | — | — | `METHOD_COMPRESSED` | — |  |
 | `method_stored` | — | — | — | `METHOD_STORED` | — |  |
 | `min_match` | — | — | — | `MIN_MATCH` | — |  |
-| `min_supported_data_version` | `MinSupportedDataVersion` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | このライブラリが扱えるワールド形式の下限となるDataVersion (26.1) |
+| `min_supported_data_version` | `MinSupportedDataVersion` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | このライブラリが扱えるワールド形式の下限となるDataVersion (26.3) |
 | `parse` | `Parse()` | `parse()` | `parse()` | `parse()` | `parse()` | SNBT文字列をタグへ変換する |
 | `parse_compound` | `ParseCompound()` | `parseCompound()` | `parseCompound()` | `parse_compound()` | `parse_compound()` | SNBT文字列をCompoundへ変換する |
 | `read_bytes` | `ReadBytes()` | `readBytes()` | `readBytes()` | `read_bytes()` | `read_bytes()` | バイト列からNBTを読む |
@@ -247,7 +247,7 @@ NBTのタグ型・読み書き・SNBT。バージョンに依存しない純粋�
 | `read_file` | `ReadFile()` | `readFile()` | `readFile()` | `read_file()` | `read_file()` | ファイルからNBTを読む |
 | `read_stream` | `ReadStream()` | `readStream()` | — | `read_stream()` | `read_reader()` |  |
 | `sector_size` | `SectorSize` | `SECTOR_SIZE` | `SECTOR_SIZE` | `SECTOR_SIZE` | `SECTOR_SIZE` |  |
-| `target_data_version` | `TargetDataVersion` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | 動作を確かめたMinecraft Java版のDataVersion (26.2) |
+| `target_data_version` | `TargetDataVersion` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | 動作を確かめたMinecraft Java版のDataVersion (26.3) |
 | `utf16_to_string` | — | — | — | — | `utf16_to_string()` |  |
 | `write` | `Write()` | `write()` | `write()` | `write()` | `write()` | タグを1行のSNBTへ変換する |
 | `write_bytes` | `WriteBytes()` | `writeBytes()` | `writeBytes()` | `write_bytes()` | `write_bytes()` | NBTをバイト列へ書き出す |

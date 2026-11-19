@@ -155,27 +155,55 @@ public final class BlockState {
     /**
      * パレット要素のNBTから作る
      *
+     * <p>26.3で入った形式を読む
+     * 既定の状態はブロックIDだけの文字列で、それ以外は{@code id}と{@code properties}を持つCompoundで入っている
+     * 異種リストの要素を包む{@code {"": <値>}}は外してから読む
+     *
      * @param nbt パレット要素
      * @return ブロック状態
-     * @throws SpringNbtException {@code Name}が無い、または{@code Properties}の値が文字列でない場合
+     * @throws SpringNbtException 文字列でもCompoundでもない、{@code id}が無い、または{@code properties}の値が文字列でない場合
      */
-    public static BlockState fromNbt(NbtCompound nbt) {
+    public static BlockState fromNbt(NbtTag nbt) {
         Objects.requireNonNull(nbt, "nbt");
-        BlockState state = new BlockState(nbt.getString("Name"));
-        NbtCompound propertiesTag = nbt.optCompound("Properties");
+        NbtTag entry = PalettedContainer.unwrapListElement(nbt);
+
+        // 既定の状態は、ブロックIDだけの文字列で入っている
+        if (entry instanceof NbtString plain) {
+            return new BlockState(plain.value());
+        }
+
+        if (!(entry instanceof NbtCompound compound)) {
+            throw SpringNbtException.unexpectedTagType(
+                    "ブロックのパレット要素が string でも compound でもない: " + entry.type().asString());
+        }
+
+        String name = compound.optString("id");
+
+        if (name == null) {
+            // Name / Propertiesは26.2までの形式で、読み替えると誤った状態を返しかねない
+            if (compound.containsKey("Name")) {
+                throw SpringNbtException.malformed(
+                        "ブロックのパレット要素に id が無い。Name は26.2までの形式で、本ライブラリでは扱わない");
+            }
+
+            throw SpringNbtException.malformed("ブロックのパレット要素に id が無い");
+        }
+
+        BlockState state = new BlockState(name);
+        NbtCompound propertiesTag = compound.optCompound("properties");
 
         if (propertiesTag == null) {
             return state;
         }
 
-        // Propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
-        for (Map.Entry<String, NbtTag> entry : propertiesTag) {
-            if (!(entry.getValue() instanceof NbtString text)) {
-                throw SpringNbtException.unexpectedTagType("Properties の \"" + entry.getKey()
-                        + "\" が文字列でない: " + entry.getValue().type().asString());
+        // propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
+        for (Map.Entry<String, NbtTag> property : propertiesTag) {
+            if (!(property.getValue() instanceof NbtString text)) {
+                throw SpringNbtException.unexpectedTagType("properties の \"" + property.getKey()
+                        + "\" が文字列でない: " + property.getValue().type().asString());
             }
 
-            state.properties.put(entry.getKey(), text.value());
+            state.properties.put(property.getKey(), text.value());
         }
 
         return state;
@@ -184,19 +212,19 @@ public final class BlockState {
     /**
      * パレット要素のNBTへ変換する
      *
-     * <p>プロパティが空なら{@code Properties}キー自体を出力しない
+     * <p>プロパティが空ならブロックIDだけの文字列にし、それ以外は{@code id}と{@code properties}を持つCompoundにする
      * Minecraftと同じ振る舞い
      *
      * @return NBT
      */
-    public NbtCompound toNbt() {
-        NbtCompound result = new NbtCompound();
-        result.set("Name", new NbtString(name));
-
+    public NbtTag toNbt() {
+        // プロパティが無ければ、Minecraftが既定の状態を書くときと同じく文字列にする
         if (properties.isEmpty()) {
-            return result;
+            return new NbtString(name);
         }
 
+        NbtCompound result = new NbtCompound();
+        result.set("id", new NbtString(name));
         NbtCompound propertiesTag = new NbtCompound();
 
         // 名前の昇順で並ぶ
@@ -204,7 +232,7 @@ public final class BlockState {
             propertiesTag.set(entry.getKey(), new NbtString(entry.getValue()));
         }
 
-        result.set("Properties", propertiesTag);
+        result.set("properties", propertiesTag);
         return result;
     }
 

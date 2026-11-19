@@ -3,8 +3,8 @@
 本書はSpringNBTLibraryの全言語実装が従う共通規約を定める。
 各言語の実装は、本書と本ディレクトリ配下の仕様書を**唯一の拠り所**とする。
 
-- 対象: 26.1で導入されたワールド形式（DataVersion `4786`以降）
-- 検証: Minecraft Java版26.2（DataVersion `4903` / Protocol `776`）の実データ
+- 対象: 26.3で導入されたワールド形式（DataVersion `5006`以降）
+- 検証: Minecraft Java版26.3（DataVersion `5023` / Protocol `777`）の実データ
 - それより古い形式のワールド改変は非サポート（→ [07 バージョンポリシー](../guide/07-version-policy.md)）
 
 ---
@@ -92,7 +92,7 @@ C#は`Is*` / `Has*`のプロパティ、Javaは`is*()` / `has*()`のメソッド
 | `UNSUPPORTED_FEATURE` | 仕様上は妥当だが本ビルドで扱えない | 圧縮ID=127のチャンクを`read_chunk`で読んだ、圧縮ID=4（LZ4）を指定してチャンクを書こうとした、SNBTの`\N{...}`をパースした |
 | `LIMIT_EXCEEDED` | 安全上限を超えた | ネスト深さ512超、展開後のサイズが`max_decompressed_size`を超えた |
 | `INVALID_ARGUMENT` | 呼び出し側の引数が不正 | 座標がチャンク範囲外、`i8`に300を渡した |
-| `UNSUPPORTED_DATA_VERSION` | 扱える形式より古いデータ | DataVersion 4786未満のチャンクを既定設定で書き戻そうとした |
+| `UNSUPPORTED_DATA_VERSION` | 扱える形式より古いデータ | DataVersion 5006未満のチャンクを既定設定で書き戻そうとした |
 
 各言語での表現は次のとおり。
 

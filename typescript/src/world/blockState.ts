@@ -9,7 +9,7 @@
  */
 
 import { SpringNbtError } from "../errors.js";
-import { NbtCompound, NbtString, TagType } from "../nbt/index.js";
+import { NbtCompound, NbtString, NbtTag, TagType, tagTypeAsString } from "../nbt/index.js";
 
 /**
  * ブロックの状態
@@ -112,18 +112,51 @@ export class BlockState {
     return new BlockState(text.slice(0, bracket), entries);
   }
 
-  /** パレット要素のNBTから作る */
-  static fromNbt(nbt: NbtCompound): BlockState {
+  /**
+   * パレット要素のNBTから作る
+   *
+   * 26.3で入った形式を読む
+   * 既定の状態はブロックIDだけの文字列で、それ以外は`id`と`properties`を持つCompoundで入っている
+   * 異種リストの要素を包む`{"": <値>}`は外してから読む
+   *
+   * @throws SpringNbtError 文字列でもCompoundでもない、`id`が無い、または`properties`の値が文字列でない場合
+   */
+  static fromNbt(nbt: NbtTag): BlockState {
+    const entry = unwrapListElement(nbt);
+
+    // 既定の状態は、ブロックIDだけの文字列で入っている
+    if (entry instanceof NbtString) {
+      return new BlockState(entry.value);
+    }
+
+    if (!(entry instanceof NbtCompound)) {
+      throw SpringNbtError.unexpectedTagType(
+        `ブロックのパレット要素が string でも compound でもない: ${tagTypeAsString(entry.type)}`,
+      );
+    }
+
+    const name = entry.optString("id");
+
+    if (name === undefined) {
+      // Name / Propertiesは26.2までの形式で、読み替えると誤った状態を返しかねない
+      if (entry.containsKey("Name")) {
+        throw SpringNbtError.malformed(
+          "ブロックのパレット要素に id が無い。Name は26.2までの形式で、本ライブラリでは扱わない",
+        );
+      }
+
+      throw SpringNbtError.malformed("ブロックのパレット要素に id が無い");
+    }
+
     const entries: Array<[string, string]> = [];
-    const seen = new Set<string>();
-    const propertiesTag = nbt.optCompound("Properties");
+    const propertiesTag = entry.optCompound("properties");
 
     if (propertiesTag !== undefined) {
-      // Propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
+      // propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
       for (const [key, value] of propertiesTag.entries()) {
         if (value.type !== TagType.String) {
           throw SpringNbtError.unexpectedTagType(
-            `Properties の "${key}" が文字列でない`,
+            `properties の "${key}" が文字列でない`,
           );
         }
 
@@ -131,23 +164,23 @@ export class BlockState {
       }
     }
 
-    return new BlockState(nbt.getString("Name"), entries);
+    return new BlockState(name, entries);
   }
 
   /**
    * パレット要素のNBTへ変換する
    *
-   * プロパティが空なら`Properties`キー自体を出力しない
+   * プロパティが空ならブロックIDだけの文字列にし、それ以外は`id`と`properties`を持つCompoundにする
    * Minecraftと同じ振る舞い
    */
-  toNbt(): NbtCompound {
-    const result = new NbtCompound();
-    result.set("Name", new NbtString(this.#name));
-
+  toNbt(): NbtTag {
+    // プロパティが無ければ、Minecraftが既定の状態を書くときと同じく文字列にする
     if (this.#properties.size === 0) {
-      return result;
+      return new NbtString(this.#name);
     }
 
+    const result = new NbtCompound();
+    result.set("id", new NbtString(this.#name));
     const propertiesTag = new NbtCompound();
 
     // 名前の昇順で並ぶ
@@ -155,7 +188,7 @@ export class BlockState {
       propertiesTag.set(key, new NbtString(value));
     }
 
-    result.set("Properties", propertiesTag);
+    result.set("properties", propertiesTag);
     return result;
   }
 
@@ -212,6 +245,21 @@ export class BlockState {
       this.#properties.set(key, value);
     }
   }
+}
+
+/**
+ * 異種リストの包みを外す
+ * 包みでなければそのまま返す
+ *
+ * 空のキー1つだけを持つCompoundが包みに当たる（MinecraftのListTagと同じ判定）
+ * `PalettedContainer`の同名の関数と同じ処理で、公開APIを増やさないためにここにも置く
+ */
+function unwrapListElement(tag: NbtTag): NbtTag {
+  if (tag instanceof NbtCompound && tag.size === 1 && tag.containsKey("")) {
+    return tag.get("");
+  }
+
+  return tag;
 }
 
 /** 名前空間が省略されていたら`minecraft:`を補う */

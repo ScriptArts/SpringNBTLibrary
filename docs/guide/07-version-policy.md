@@ -2,30 +2,33 @@
 
 対応の判定はワールドの形式で行っています。Minecraftのバージョン番号は条件にしません（[adr/0003](../adr/0003-version-policy.md)）。
 
-いまの形式は26.1（DataVersion 4786）で入りました。
-次元とプレイヤーデータの置き場が変わり、`level.dat`の中身も分割されています。
+いまの形式は26.3（DataVersion 5006）で入りました。
+ブロックのパレットの書き方が変わり、既定の状態のブロックはブロックIDだけで保存されるようになっています（[adr/0010](../adr/0010-palette-format-26-3.md)）。
 それ以降のバージョンなら、形式が変わらない限りそのまま読み書きできます。
 
 ```
-MIN_SUPPORTED_DATA_VERSION = 4786   扱える形式の下限（26.1）
-TARGET_DATA_VERSION        = 4903   動作を確かめたバージョン（26.2）
+MIN_SUPPORTED_DATA_VERSION = 5006   扱える形式の下限（26.3）
+TARGET_DATA_VERSION        = 5023   動作を確かめたバージョン（26.3）
 ```
+
+5006はMinecraftが新しい形式へ変換するDataVersionで、26.3 Snapshot 7で入りました。
+26.1 / 26.2のワールドは扱えません。
 
 ---
 
 ## 1. 読み込み
 
-`DataVersion`が**4786以上なら何もしません。警告も出ません。**
+`DataVersion`が**5006以上なら何もしません。警告も出ません。**
 
 対象より新しいバージョンのワールドでも同じです。
 形式が同じなら読めるので、知らせる必要がありません。
 
 ```csharp
-// DataVersion 5015のチャンク（対象より新しい）
+// DataVersion 5100のチャンク（対象より新しい）
 Chunk chunk = Chunk.FromNbt(nbt);   // 警告なしで読める
 ```
 
-4786未満、つまり形式そのものが違うワールドのときだけ、動作を選べます。
+5006未満、つまり形式そのものが違うワールドのときだけ、動作を選べます。
 
 | 動作 | 意味 |
 |---|---|
@@ -59,11 +62,11 @@ ChunkReadOptions options = new ChunkReadOptions
 書き換えてしまうと、そのワールドを開いたゲーム側が「このチャンクは新しい形式だ」と判断してしまい、アップグレードの要否を誤ります。
 
 ```csharp
-// DataVersion 5015のチャンクを書き戻す
-chunk.ToNbt();   // 5015のままで、許可も要らない
+// DataVersion 5100のチャンクを書き戻す
+chunk.ToNbt();   // 5100のままで、許可も要らない
 ```
 
-形式の違う古いチャンク（4786未満）は、既定では書き戻せません。
+形式の違う古いチャンク（5006未満）は、既定では書き戻せません。
 
 ```csharp
 Chunk chunk = /* DataVersion 3700のチャンク */;
@@ -83,13 +86,17 @@ chunk.ToNbt(options);   // 3700のまま書き出される
 
 安全な手順は「先にMinecraftで一度ワールドを開いて公式のアップグレードを済ませ、そのあとこのライブラリで編集する」です。
 
+ただし、ワールドを開いただけでは読み込まれたチャンクしか新しい形式になりません。
+26.2で作ったワールドを26.3で開いても、行ったことのない場所のチャンクは古い形式のまま残ります。
+ワールドの編集画面にある「ワールドを最適化」で、すべてのチャンクを変換してから使ってください。
+
 ---
 
 ## 3. 対応している形式を確かめる
 
 ```csharp
-Console.WriteLine(SpringNbt.MinSupportedDataVersion);   // 4786
-Console.WriteLine(SpringNbt.TargetDataVersion);         // 4903
+Console.WriteLine(SpringNbt.MinSupportedDataVersion);   // 5006
+Console.WriteLine(SpringNbt.TargetDataVersion);         // 5023
 ```
 
 | 言語 | 下限 | 検証済み |

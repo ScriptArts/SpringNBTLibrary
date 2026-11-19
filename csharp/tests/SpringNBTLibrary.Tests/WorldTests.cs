@@ -44,6 +44,14 @@ public class WorldTests
         return Chunk.FromNbt((NbtCompound)named.Tag, options);
     }
 
+    /// <summary>異種リストの要素を包むCompoundを作る</summary>
+    private static NbtCompound Wrapped(NbtTag tag)
+    {
+        NbtCompound wrapper = new NbtCompound();
+        wrapper.Set("", tag);
+        return wrapper;
+    }
+
     // ------------------------------------------------------------------
     // BlockState
     // ------------------------------------------------------------------
@@ -101,17 +109,56 @@ public class WorldTests
         public void NBTとの相互変換でプロパティが保たれる()
         {
             BlockState state = BlockState.Parse("minecraft:oak_stairs[facing=north,half=top]");
-            NbtCompound nbt = state.ToNbt();
-            Assert.Equal("minecraft:oak_stairs", nbt.GetString("Name"));
-            Assert.Equal("north", nbt.GetCompound("Properties").GetString("facing"));
+            NbtCompound nbt = (NbtCompound)state.ToNbt();
+            Assert.Equal(new[] { "id", "properties" }, nbt.Keys.ToArray());
+            Assert.Equal("minecraft:oak_stairs", nbt.GetString("id"));
+            Assert.Equal("north", nbt.GetCompound("properties").GetString("facing"));
             Assert.Equal(state, BlockState.FromNbt(nbt));
         }
 
         [Fact]
-        public void プロパティ無しのNBTにはPropertiesを書かない()
+        public void プロパティ無しのブロックは文字列になる()
         {
-            NbtCompound nbt = BlockState.Parse("minecraft:air").ToNbt();
-            Assert.Null(nbt.OptCompound("Properties"));
+            Assert.Equal(new NbtString("minecraft:air"), BlockState.Parse("minecraft:air").ToNbt());
+        }
+
+        [Fact]
+        public void 文字列のパレット要素を読める()
+        {
+            BlockState state = BlockState.FromNbt(new NbtString("minecraft:stone"));
+            Assert.Equal("minecraft:stone", state.Name);
+            Assert.Empty(state.Properties);
+        }
+
+        [Fact]
+        public void 包まれたパレット要素を読める()
+        {
+            BlockState state = BlockState.FromNbt(Wrapped(new NbtString("minecraft:stone")));
+            Assert.Equal("minecraft:stone", state.ToString());
+        }
+
+        [Fact]
+        public void propertiesの無いCompoundも読める()
+        {
+            NbtCompound entry = new NbtCompound();
+            entry.Set("id", new NbtString("minecraft:stone"));
+            Assert.Equal("minecraft:stone", BlockState.FromNbt(entry).ToString());
+        }
+
+        [Fact]
+        public void パレット要素が26_2までの形式ならMALFORMED_DATA()
+        {
+            NbtCompound entry = new NbtCompound();
+            entry.Set("Name", new NbtString("minecraft:stone"));
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => BlockState.FromNbt(entry));
+            Assert.Equal(ErrorCode.MalformedData, error.Code);
+        }
+
+        [Fact]
+        public void 文字列でもCompoundでもない要素はUNEXPECTED_TAG_TYPE()
+        {
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => BlockState.FromNbt(new NbtInt(1)));
+            Assert.Equal(ErrorCode.UnexpectedTagType, error.Code);
         }
 
         [Theory]
@@ -234,11 +281,11 @@ public class WorldTests
 
     public class PalettedContainerTests
     {
-        private static NbtCompound BlockEntry(string name)
+        /// <summary>プロパティの無いブロックのパレット要素を作る
+        /// 26.3からはブロックIDだけの文字列で入る</summary>
+        private static NbtString BlockEntry(string name)
         {
-            NbtCompound entry = new NbtCompound();
-            entry.Set("Name", new NbtString(name));
-            return entry;
+            return new NbtString(name);
         }
 
         [Theory]
@@ -301,7 +348,7 @@ public class WorldTests
 
             // 残るのは実際に使われているairとdirtの2つ
             Assert.Equal(2, container.Palette.Count);
-            Assert.Equal("minecraft:dirt", ((NbtCompound)container.Get(0)).GetString("Name"));
+            Assert.Equal("minecraft:dirt", ((NbtString)container.Get(0)).Value);
         }
 
         [Fact]
@@ -313,7 +360,69 @@ public class WorldTests
 
             Assert.Single(container.Palette);
             Assert.Equal(0, container.BitsPerEntry);
-            Assert.Equal("minecraft:water", ((NbtCompound)container.Get(4095)).GetString("Name"));
+            Assert.Equal("minecraft:water", ((NbtString)container.Get(4095)).Value);
+        }
+
+        [Fact]
+        public void 文字列だけのパレットは文字列のリストで書く()
+        {
+            PalettedContainer container = PalettedContainer.Filled(BlockEntry("minecraft:air"), 4096, 4);
+            container.Set(0, BlockEntry("minecraft:stone"));
+
+            NbtList palette = container.ToNbt().GetList("palette");
+            Assert.Equal(TagType.String, palette.ElementType);
+            Assert.Equal(new NbtString("minecraft:stone"), palette[1]);
+        }
+
+        [Fact]
+        public void 型が混ざったパレットは文字列を包んでCompoundのリストで書く()
+        {
+            NbtTag stairs = BlockState.Parse("minecraft:oak_stairs[facing=north]").ToNbt();
+            PalettedContainer container = PalettedContainer.Filled(BlockEntry("minecraft:air"), 4096, 4);
+            container.Set(0, stairs);
+
+            NbtList palette = container.ToNbt().GetList("palette");
+            Assert.Equal(TagType.Compound, palette.ElementType);
+            Assert.Equal(Wrapped(new NbtString("minecraft:air")), palette[0]);
+            Assert.Equal(stairs, palette[1]);
+        }
+
+        [Fact]
+        public void 包まれたパレットは包みを外して持ち元どおりに書き戻す()
+        {
+            NbtTag stairs = BlockState.Parse("minecraft:oak_stairs[facing=north]").ToNbt();
+            NbtList palette = new NbtList(TagType.Compound);
+            palette.Add(Wrapped(new NbtString("minecraft:air")));
+            palette.Add(stairs);
+
+            // パレット2要素ならbits=4で256 long
+            NbtCompound nbt = new NbtCompound();
+            nbt.Set("data", new NbtLongArray(new long[256]));
+            nbt.Set("palette", palette);
+
+            PalettedContainer container = PalettedContainer.FromNbt(nbt, 4096, 4);
+
+            // 包みは外れ、要素は文字列とCompoundとして並ぶ
+            Assert.Equal(new NbtString("minecraft:air"), container.Palette[0]);
+            Assert.Equal(stairs, container.Palette[1]);
+
+            // 書き戻すと、また包まれて元と同じになる
+            Assert.Equal(nbt, container.ToNbt());
+        }
+
+        [Fact]
+        public void compactでCompoundが消えると文字列のリストに戻る()
+        {
+            NbtTag stairs = BlockState.Parse("minecraft:oak_stairs[facing=north]").ToNbt();
+            PalettedContainer container = PalettedContainer.Filled(BlockEntry("minecraft:air"), 4096, 4);
+            container.Set(0, stairs);
+            container.Set(0, BlockEntry("minecraft:stone"));
+
+            container.Compact();
+
+            NbtList palette = container.ToNbt().GetList("palette");
+            Assert.Equal(TagType.String, palette.ElementType);
+            Assert.Equal(2, palette.Count);
         }
 
         [Fact]
@@ -560,6 +669,15 @@ public class WorldTests
         }
 
         [Fact]
+        public void パレットが26_2までの形式ならブロックを読むとMALFORMED_DATA()
+        {
+            ChunkReadOptions options = new ChunkReadOptions { OnVersionMismatch = VersionMismatchAction.Ignore };
+            Chunk chunk = LoadChunk("palette_old_format", options);
+            SpringNbtException error = Assert.Throws<SpringNbtException>(() => chunk.GetBlock(0, -64, 0));
+            Assert.Equal(ErrorCode.MalformedData, error.Code);
+        }
+
+        [Fact]
         public void チャンク内の相対座標が範囲外ならINVALID_ARGUMENT()
         {
             Chunk chunk = LoadChunk("palette_1");
@@ -595,6 +713,21 @@ public class WorldTests
 
             Chunk chunk = Chunk.FromNbt(ForeignChunk(), options);
             Assert.Equal(3953, chunk.DataVersion);
+            Assert.Single(warnings);
+        }
+
+        [Fact]
+        public void DataVersionが26_2のチャンクは扱える形式より古い()
+        {
+            List<string> warnings = new List<string>();
+            ChunkReadOptions options = new ChunkReadOptions
+            {
+                OnVersionMismatch = VersionMismatchAction.Warn,
+                OnWarning = message => warnings.Add(message),
+            };
+
+            // 26.2まではパレットの形式が違う
+            LoadChunk("palette_old_format", options);
             Assert.Single(warnings);
         }
 
@@ -651,7 +784,7 @@ public class WorldTests
         {
             NamedTag named = NbtIo.ReadFile(VectorPath("palette_1"));
             NbtCompound root = (NbtCompound)named.Tag;
-            root.SetInt("DataVersion", 5015);
+            root.SetInt("DataVersion", 5100);
             return root;
         }
 
@@ -667,7 +800,7 @@ public class WorldTests
 
             // 形式が同じであれば、新しいバージョンでも警告を出さずに読める
             Chunk chunk = Chunk.FromNbt(NewerChunk(), options);
-            Assert.Equal(5015, chunk.DataVersion);
+            Assert.Equal(5100, chunk.DataVersion);
             Assert.Empty(warnings);
         }
 
@@ -679,7 +812,7 @@ public class WorldTests
                 OnVersionMismatch = VersionMismatchAction.Error,
             };
 
-            Assert.Equal(5015, Chunk.FromNbt(NewerChunk(), options).DataVersion);
+            Assert.Equal(5100, Chunk.FromNbt(NewerChunk(), options).DataVersion);
         }
 
         [Fact]
@@ -688,7 +821,7 @@ public class WorldTests
             Chunk chunk = Chunk.FromNbt(NewerChunk());
 
             // 許可を出さなくても書き戻せて、DataVersionも変わらない
-            Assert.Equal(5015, chunk.ToNbt().GetInt("DataVersion"));
+            Assert.Equal(5100, chunk.ToNbt().GetInt("DataVersion"));
         }
 
         [Fact]

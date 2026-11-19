@@ -102,7 +102,7 @@ impl LevelData {
             .get_bool("hardcore")
     }
 
-    /// バージョン名（`26.2`など）
+    /// バージョン名（`26.3`など）
     pub fn version_name(&self) -> Result<&str> {
         self.data()?.get_compound("Version")?.get_string("Name")
     }

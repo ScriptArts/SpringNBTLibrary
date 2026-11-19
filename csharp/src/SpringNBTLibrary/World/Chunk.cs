@@ -293,15 +293,8 @@ public sealed class Chunk
             return null;
         }
 
-        NbtTag entry = section.BlockStates!.Get(BlockIndex(x, y, z));
-
-        if (entry is not NbtCompound compound)
-        {
-            throw SpringNbtException.UnexpectedTagType(
-                $"ブロックのパレット要素が compound でない: {entry.Type.AsString()}");
-        }
-
-        return BlockState.FromNbt(compound);
+        // パレットの要素は文字列のこともCompoundのこともあり、どちらもBlockStateが読む
+        return BlockState.FromNbt(section.BlockStates!.Get(BlockIndex(x, y, z)));
     }
 
     /// <summary>

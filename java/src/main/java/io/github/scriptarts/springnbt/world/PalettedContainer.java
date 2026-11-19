@@ -5,6 +5,7 @@ import io.github.scriptarts.springnbt.nbt.NbtCompound;
 import io.github.scriptarts.springnbt.nbt.NbtList;
 import io.github.scriptarts.springnbt.nbt.NbtLongArray;
 import io.github.scriptarts.springnbt.nbt.NbtTag;
+import io.github.scriptarts.springnbt.nbt.TagType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -17,6 +18,10 @@ import java.util.Objects;
  * <p>パレットの要素は<strong>生の{@link NbtTag}のまま</strong>持つ
  * こうすると、触っていないブロックについてはMinecraftが書き出したときの
  * プロパティの並び順まで含めてそのまま書き戻せる
+ *
+ * <p>26.3からは、ブロックのパレットに文字列とCompoundが混ざる
+ * Minecraftはこうした異種リストをCompoundのリストとして保存し、Compoundでない要素を{@code {"": <値>}}で包む
+ * 読むときにこの包みを外して持ち、書くときに要素の型を見て包み直す
  */
 public final class PalettedContainer {
 
@@ -112,8 +117,9 @@ public final class PalettedContainer {
 
         // パレットの要素は生のNbtTagのまま持つ
         // 並び順まで元どおりに書き戻すため
+        // 異種リストの包みだけは外しておき、書くときに包み直す
         for (NbtTag entry : paletteTag) {
-            result.palette.add(entry);
+            result.palette.add(unwrapListElement(entry));
         }
 
         long[] data = nbt.optLongArray("data");
@@ -152,12 +158,10 @@ public final class PalettedContainer {
      */
     public NbtCompound toNbt() {
         NbtCompound result = new NbtCompound();
-        NbtList paletteTag = new NbtList();
 
         // パレットの要素は読んだときのまま書き出す
-        for (NbtTag entry : palette) {
-            paletteTag.add(entry);
-        }
+        // 型が混ざっていれば、Minecraftと同じく包んでCompoundのリストにする
+        NbtList paletteTag = paletteToList(palette);
 
         // パレットが1要素ならdataは書かない
         // Minecraftと同じ振る舞い
@@ -166,6 +170,65 @@ public final class PalettedContainer {
         }
 
         result.set("palette", paletteTag);
+        return result;
+    }
+
+    /**
+     * 異種リストの包みを外す
+     * 包みでなければそのまま返す
+     */
+    static NbtTag unwrapListElement(NbtTag tag) {
+        if (isListWrapper(tag)) {
+            return ((NbtCompound) tag).get("");
+        }
+
+        return tag;
+    }
+
+    /**
+     * 異種リストの要素を包むCompoundか
+     * 空のキー1つだけを持つものがそれに当たる（MinecraftのListTagと同じ判定）
+     */
+    private static boolean isListWrapper(NbtTag tag) {
+        if (!(tag instanceof NbtCompound compound)) {
+            return false;
+        }
+
+        return compound.size() == 1 && compound.containsKey("");
+    }
+
+    /**
+     * パレットの要素をリストへ詰める
+     *
+     * <p>要素の型がすべて同じならその型のリストにする
+     * 1つでも違えば、Minecraftと同じくCompoundのリストにして、Compoundでない要素と包みに見える要素を包む
+     */
+    private static NbtList paletteToList(List<NbtTag> entries) {
+        TagType elementType = entries.get(0).type();
+
+        // 先頭と型の違う要素があるか調べる
+        for (NbtTag entry : entries) {
+            // 1つでも違えば、異種リストとしてCompoundのリストにする
+            if (entry.type() != elementType) {
+                elementType = TagType.COMPOUND;
+                break;
+            }
+        }
+
+        NbtList result = new NbtList(elementType);
+
+        // 要素を順にリストへ入れる
+        for (NbtTag entry : entries) {
+            // Compoundのリストでは、Compoundでない要素と包みに見える要素を包む
+            if (elementType == TagType.COMPOUND && (!(entry instanceof NbtCompound) || isListWrapper(entry))) {
+                NbtCompound wrapper = new NbtCompound();
+                wrapper.set("", entry);
+                result.add(wrapper);
+            } else {
+                result.add(entry);
+            }
+        }
+
         return result;
     }
 

@@ -44,7 +44,7 @@
 | `playerdata/` | `players/data/` |
 | `level.dat`にゲームルール等を同梱 | `data/minecraft/*.dat`へ分離 |
 
-この構成は、[実際の26.2ワールドを走査して確かめました](../spec/40-world-layout.md)。
+この構成は、[実際の26.2と26.3のワールドを走査して確かめました](../spec/40-world-layout.md)。
 
 ---
 
@@ -54,8 +54,8 @@
 using MinecraftWorld world = MinecraftWorld.Open(worldPath);
 
 Console.WriteLine(world.Level.LevelName);
-Console.WriteLine(world.Level.VersionName);      // 26.2
-Console.WriteLine(world.Level.DataVersion);      // 4903
+Console.WriteLine(world.Level.VersionName);      // 26.3
+Console.WriteLine(world.Level.DataVersion);      // 5023
 ```
 
 既定は読み取り専用です。書き込むには明示的に許可します。
@@ -78,8 +78,8 @@ using MinecraftWorld world = MinecraftWorld.Open(worldPath, options);
 LevelData level = world.Level;
 
 level.LevelName;         // ワールド名
-level.DataVersion;       // 4903
-level.VersionName;       // "26.2"
+level.DataVersion;       // 5023
+level.VersionName;       // "26.3"
 level.Time;              // 経過tick
 level.GameType;          // 0=サバイバル 1=クリエイティブ 2=アドベンチャー 3=スペクテイター
 level.SpawnPos;          // [x, y, z]
@@ -170,7 +170,7 @@ world.SaveLevel();     // level.datを書き戻す
 ## 7. バージョンが違うワールド
 
 読み込みは寛容にしています。
-書き込みを既定で止めるのは、形式の違う古いチャンク（DataVersion 4786未満）だけです。`DataVersion`は読んだ値のまま残します（[adr/0003](../adr/0003-version-policy.md)）。
+書き込みを既定で止めるのは、形式の違う古いチャンク（DataVersion 5006未満）だけです。`DataVersion`は読んだ値のまま残します（[adr/0003](../adr/0003-version-policy.md)）。
 詳しくは[07](07-version-policy.md)。
 
 ---

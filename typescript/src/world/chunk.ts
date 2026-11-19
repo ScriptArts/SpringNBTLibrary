@@ -379,13 +379,8 @@ export class Chunk {
       return undefined;
     }
 
-    const entry = section.blockStates!.get(blockIndex(x, y, z));
-
-    if (entry.type !== TagType.Compound) {
-      throw SpringNbtError.unexpectedTagType("ブロックのパレット要素が compound でない");
-    }
-
-    return BlockState.fromNbt(entry as NbtCompound);
+    // パレットの要素は文字列のこともCompoundのこともあり、どちらもBlockStateが読む
+    return BlockState.fromNbt(section.blockStates!.get(blockIndex(x, y, z)));
   }
 
   /**

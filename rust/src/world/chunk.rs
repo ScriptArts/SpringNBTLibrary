@@ -412,16 +412,8 @@ impl Chunk {
 
         let entry = section.block_states().unwrap().get(block_index(x, y, z))?;
 
-        match entry {
-            NbtTag::Compound(compound) => Ok(Some(BlockState::from_nbt(compound)?)),
-            other => Err(Error::new(
-                ErrorCode::UnexpectedTagType,
-                format!(
-                    "ブロックのパレット要素が compound でない: {}",
-                    other.tag_type().as_str()
-                ),
-            )),
-        }
+        // パレットの要素は文字列のこともCompoundのこともあり、どちらもBlockStateが読む
+        Ok(Some(BlockState::from_nbt(entry)?))
     }
 
     /// ブロックを設定する
@@ -462,7 +454,7 @@ impl Chunk {
         section
             .block_states_mut()
             .unwrap()
-            .set(index, NbtTag::Compound(state.to_nbt()))?;
+            .set(index, state.to_nbt())?;
 
         self.remove_block_data(x, y, z)?;
         self.modified = true;

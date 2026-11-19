@@ -86,7 +86,7 @@ IReadOnlyList<NamedTag> tags = NbtIo.ReadBytesAll(bytes);
 ```csharp
 NbtCompound data = root.GetCompound("Data");
 NbtCompound version = data.GetCompound("Version");
-Console.WriteLine(version.GetString("Name"));   // 26.2
+Console.WriteLine(version.GetString("Name"));   // 26.3
 ```
 
 ---

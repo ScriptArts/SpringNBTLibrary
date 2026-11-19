@@ -12,7 +12,8 @@ from __future__ import annotations
 from typing import Dict, Mapping, Optional
 
 from ..errors import SpringNbtError
-from ..nbt import NbtCompound, NbtString
+from ..nbt import NbtCompound, NbtString, NbtTag
+from .paletted_container import _unwrap_list_element
 
 __all__ = ["BlockState"]
 
@@ -93,44 +94,69 @@ class BlockState:
         return BlockState(text[:bracket], properties)
 
     @staticmethod
-    def from_nbt(nbt: NbtCompound) -> "BlockState":
+    def from_nbt(nbt: NbtTag) -> "BlockState":
         """パレット要素のNBTから作る
 
-        :raises SpringNbtError: ``Name``が無い、または``Properties``の値が文字列でない場合
+        26.3で入った形式を読む
+        既定の状態はブロックIDだけの文字列で、それ以外は``id``と``properties``を持つCompoundで入っている
+        異種リストの要素を包む``{"": <値>}``は外してから読む
+
+        :raises SpringNbtError: 文字列でもCompoundでもない、``id``が無い、または``properties``の値が文字列でない場合
         """
-        properties_tag = nbt.opt_compound("Properties")
+        entry = _unwrap_list_element(nbt)
+
+        # 既定の状態は、ブロックIDだけの文字列で入っている
+        if isinstance(entry, NbtString):
+            return BlockState(entry.value)
+
+        if not isinstance(entry, NbtCompound):
+            raise SpringNbtError.unexpected_tag_type(
+                "ブロックのパレット要素が string でも compound でもない: %s"
+                % entry.type.as_string())
+
+        name = entry.opt_string("id")
+
+        if name is None:
+            # Name / Propertiesは26.2までの形式で、読み替えると誤った状態を返しかねない
+            if "Name" in entry:
+                raise SpringNbtError.malformed(
+                    "ブロックのパレット要素に id が無い。Name は26.2までの形式で、本ライブラリでは扱わない")
+
+            raise SpringNbtError.malformed("ブロックのパレット要素に id が無い")
+
+        properties_tag = entry.opt_compound("properties")
         properties = {}
 
         if properties_tag is not None:
-            # Propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
+            # propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
             for key, value in properties_tag.items():
                 if not isinstance(value, NbtString):
                     raise SpringNbtError.unexpected_tag_type(
-                        'Properties の "%s" が文字列でない: %s' % (key, value.type.as_string()))
+                        'properties の "%s" が文字列でない: %s' % (key, value.type.as_string()))
 
                 properties[key] = value.value
 
-        return BlockState(nbt.get_string("Name"), properties)
+        return BlockState(name, properties)
 
-    def to_nbt(self) -> NbtCompound:
+    def to_nbt(self) -> NbtTag:
         """パレット要素のNBTへ変換する
 
-        プロパティが空なら``Properties``キー自体を出力しない
+        プロパティが空ならブロックIDだけの文字列にし、それ以外は``id``と``properties``を持つCompoundにする
         Minecraftと同じ振る舞い
         """
-        result = NbtCompound()
-        result.set("Name", NbtString(self.name))
-
+        # プロパティが無ければ、Minecraftが既定の状態を書くときと同じく文字列にする
         if len(self._properties) == 0:
-            return result
+            return NbtString(self.name)
 
+        result = NbtCompound()
+        result.set("id", NbtString(self.name))
         properties_tag = NbtCompound()
 
         # 名前の昇順で並ぶ
         for key, value in self._properties.items():
             properties_tag.set(key, NbtString(value))
 
-        result.set("Properties", properties_tag)
+        result.set("properties", properties_tag)
         return result
 
     def __eq__(self, other) -> bool:

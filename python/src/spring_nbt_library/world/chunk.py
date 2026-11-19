@@ -340,13 +340,8 @@ class Chunk:
         if section is None or not section.has_block_states:
             return None
 
-        entry = section.block_states.get(block_index(x, y, z))
-
-        if not isinstance(entry, NbtCompound):
-            raise SpringNbtError.unexpected_tag_type(
-                "ブロックのパレット要素が compound でない: %s" % entry.type.as_string())
-
-        return BlockState.from_nbt(entry)
+        # パレットの要素は文字列のこともCompoundのこともあり、どちらもBlockStateが読む
+        return BlockState.from_nbt(section.block_states.get(block_index(x, y, z)))
 
     def set_block(self, x: int, y: int, z: int, state: Union[BlockState, str]) -> None:
         """ブロックを設定する

@@ -105,7 +105,7 @@ export class LevelData {
     return this.data.getCompound("difficulty_settings").getBool("hardcore");
   }
 
-  /** バージョン名（`26.2`など） */
+  /** バージョン名（`26.3`など） */
   get versionName(): string {
     return this.data.getCompound("Version").getString("Name");
   }

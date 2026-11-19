@@ -13,6 +13,8 @@ use std::fmt;
 use crate::error::{Error, ErrorCode, Result};
 use crate::nbt::tag::{NbtCompound, NbtString, NbtTag};
 
+use super::paletted_container::unwrap_list_element;
+
 /// ブロックの状態
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockState {
@@ -143,12 +145,55 @@ impl BlockState {
     }
 
     /// パレット要素のNBTから作る
-    pub fn from_nbt(nbt: &NbtCompound) -> Result<BlockState> {
-        let name = nbt.get_string("Name")?.to_string();
+    ///
+    /// 26.3で入った形式を読む
+    /// 既定の状態はブロックIDだけの文字列で、それ以外は`id`と`properties`を持つCompoundで入っている
+    /// 異種リストの要素を包む`{"": <値>}`は外してから読む
+    ///
+    /// 文字列でもCompoundでもない、`id`が無い、または`properties`の値が文字列でない場合はエラー
+    pub fn from_nbt(nbt: &NbtTag) -> Result<BlockState> {
+        let compound = match unwrap_list_element(nbt) {
+            // 既定の状態は、ブロックIDだけの文字列で入っている
+            NbtTag::String(text) => match text.as_str() {
+                Some(plain) => return Ok(BlockState::new(plain, BTreeMap::new())),
+                None => {
+                    return Err(Error::new(
+                        ErrorCode::UnexpectedTagType,
+                        "ブロックのパレット要素の文字列は UTF-8 に写せない（孤立サロゲートを含む）",
+                    ))
+                }
+            },
+            NbtTag::Compound(compound) => compound,
+            other => {
+                return Err(Error::new(
+                    ErrorCode::UnexpectedTagType,
+                    format!(
+                        "ブロックのパレット要素が string でも compound でもない: {}",
+                        other.tag_type().as_str()
+                    ),
+                ))
+            }
+        };
+
+        let name = match compound.opt_string("id")? {
+            Some(name) => name.to_string(),
+            None => {
+                // Name / Propertiesは26.2までの形式で、読み替えると誤った状態を返しかねない
+                if compound.contains_key("Name") {
+                    return Err(Error::new(
+                        ErrorCode::MalformedData,
+                        "ブロックのパレット要素に id が無い。Name は26.2までの形式で、本ライブラリでは扱わない",
+                    ));
+                }
+
+                return Err(Error::new(ErrorCode::MalformedData, "ブロックのパレット要素に id が無い"));
+            }
+        };
+
         let mut properties = BTreeMap::new();
 
-        if let Some(properties_tag) = nbt.opt_compound("Properties")? {
-            // Propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
+        if let Some(properties_tag) = compound.opt_compound("properties")? {
+            // propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
             for (key, value) in properties_tag.iter() {
                 match value {
                     NbtTag::String(text) => match text.as_str() {
@@ -158,7 +203,7 @@ impl BlockState {
                         None => {
                             return Err(Error::new(
                                 ErrorCode::MalformedData,
-                                format!("Properties の \"{key}\" が UTF-8 に写せない"),
+                                format!("properties の \"{key}\" が UTF-8 に写せない"),
                             ))
                         }
                     },
@@ -166,7 +211,7 @@ impl BlockState {
                         return Err(Error::new(
                             ErrorCode::UnexpectedTagType,
                             format!(
-                                "Properties の \"{key}\" が文字列でない: {}",
+                                "properties の \"{key}\" が文字列でない: {}",
                                 other.tag_type().as_str()
                             ),
                         ))
@@ -180,16 +225,16 @@ impl BlockState {
 
     /// パレット要素のNBTへ変換する
     ///
-    /// プロパティが空なら`Properties`キー自体を出力しない
+    /// プロパティが空ならブロックIDだけの文字列にし、それ以外は`id`と`properties`を持つCompoundにする
     /// Minecraftと同じ振る舞い
-    pub fn to_nbt(&self) -> NbtCompound {
-        let mut result = NbtCompound::new();
-        result.set("Name", NbtTag::String(NbtString::new(self.name.clone())));
-
+    pub fn to_nbt(&self) -> NbtTag {
+        // プロパティが無ければ、Minecraftが既定の状態を書くときと同じく文字列にする
         if self.properties.is_empty() {
-            return result;
+            return NbtTag::String(NbtString::new(self.name.clone()));
         }
 
+        let mut result = NbtCompound::new();
+        result.set("id", NbtTag::String(NbtString::new(self.name.clone())));
         let mut properties_tag = NbtCompound::new();
 
         // 名前の昇順で並ぶ
@@ -197,8 +242,8 @@ impl BlockState {
             properties_tag.set(key.clone(), NbtTag::String(NbtString::new(value.clone())));
         }
 
-        result.set("Properties", NbtTag::Compound(properties_tag));
-        result
+        result.set("properties", NbtTag::Compound(properties_tag));
+        NbtTag::Compound(result)
     }
 }
 

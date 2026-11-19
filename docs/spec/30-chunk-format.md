@@ -1,7 +1,7 @@
 # 30. チャンク形式
 
 `.mca`内に格納されるチャンク1つ分のNBT構造。**ここから先は形式依存**である。
-本書は**26.1で導入された形式（DataVersion 4786以降）** を対象とし、記述はJava版26.2（DataVersion 4903）の実データで確認した。
+本書は**26.3で導入された形式（DataVersion 5006以降）** を対象とし、記述はJava版26.3（DataVersion 5023）の実データで確認した。
 
 前提: [20 Anvilリージョン形式](20-anvil-region.md) / [31 パレット付きコンテナ](31-paletted-container.md)
 
@@ -10,12 +10,12 @@
 ## 1. ルート要素
 
 ルートは名前なし（空文字列）の`TAG_Compound`。
-下表はJava版26.2の実ワールド（3,481チャンク）を走査して確認した内容である。
+下表はJava版26.3の実ワールド（3,481チャンク）を走査して確認した内容である。
 「出現」欄は、走査したチャンク（full／未完成の両方を含む）のすべてに現れたキーを「全部」、一部のチャンクにだけ現れたキーを「一部」と示す。
 
 | キー | 型 | 出現 | 内容 |
 |---|---|---|---|
-| `DataVersion` | `Int` | 全部 | チャンク構造のバージョン。26.1は`4786`、26.2は`4903` |
+| `DataVersion` | `Int` | 全部 | チャンク構造のバージョン。26.2は`4903`、26.3は`5023`。パレットの形式は`5006`で変わった（→ 2.1） |
 | `xPos` | `Int` | 全部 | 絶対チャンクX座標 |
 | `zPos` | `Int` | 全部 | 絶対チャンクZ座標 |
 | `yPos` | `Int` | 全部 | 最下段セクションのY位置。オーバーワールドは`-4` |
@@ -31,7 +31,6 @@
 | `PostProcessing` | `List<List>` | 全部 | 生成後処理の待ち位置 |
 | `isLightOn` | `Byte` | 一部 | 光源計算済みフラグ。実データでは`minecraft:full`のチャンクにのみ現れた |
 | `entities` | `List<Compound>` | 一部 | **生成途中のチャンクだけが持つ**。完成すると`entities/`のリージョンへ移る |
-| `carving_mask` | `ByteArray` | 一部 | 洞窟の削り取り状況。`minecraft:carvers`前後の段階でのみ現れる |
 
 ### 1.1 Status
 
@@ -41,7 +40,7 @@
 |---|---|
 | `minecraft:structure_starts` | 構造物の開始点だけ決まった段階 |
 | `minecraft:biomes` | バイオームまで決まった段階 |
-| `minecraft:carvers` | 洞窟の削り取りまで済んだ段階 |
+| `minecraft:terrain` | 地形まで決まった段階。26.2までの`noise` / `surface` / `carvers`が26.3でまとまった |
 | `minecraft:initialize_light` | 光源の初期化まで済んだ段階 |
 | `minecraft:full` | 生成完了。ブロック操作の対象になるのはこれ |
 
@@ -71,24 +70,70 @@
 
 `Y`が`yPos - 1`や最上段+1になっている光源専用セクションが存在しうる。
 光源専用セクションは`block_states`を持たないため、ブロックAPIでは空セクションとして扱う。
-（26.2の実ワールドでは観測されず、全セクションが`block_states`と`biomes`を持っていた。
+（26.3の実ワールドでは観測されず、全セクションが`block_states`と`biomes`を持っていた。
 ただし将来や他の生成条件で現れうるため、`block_states`の有無は必ず確認する。）
 
 `BlockLight` / `SkyLight`は**必要なセクションにしか無い**。
-実データでは83,544セクションのうち`BlockLight`が5,103、`SkyLight`が4,904だった。
+実データでは83,544セクションのうち`BlockLight`が5,016、`SkyLight`が4,209だった。
 
 `sections`は`Y`の昇順に並んでいるが、**並び順に依存してはならない**。
 読み込み時に`Y`から索引を作る。
 
 ### 2.1 ブロック状態のパレット要素
 
+26.3で形式が変わった（DataVersion `5006`）。パレットの要素は次の2通りで入る。
+
 ```
-{ Name: "minecraft:oak_stairs", Properties: { facing: "north", half: "top", waterlogged: "false" } }
+"minecraft:stone"
+{ id: "minecraft:oak_stairs", properties: { facing: "north", half: "top", shape: "straight", waterlogged: "false" } }
 ```
 
-- `Name`は必須の`String`。名前空間が省略されていたら`minecraft:`を補う
-- `Properties`は任意の`Compound`。値はすべて`String`（数値や真偽値も文字列）
-- `Properties`が空の場合、Minecraftはキー自体を出力しない。本ライブラリも同様にする
+- ブロックが**既定の状態**なら、ブロックIDだけの`String`になる
+- それ以外は`id`と`properties`を持つ`Compound`になる
+  - `id`は必須の`String`。名前空間が省略されていたら`minecraft:`を補う
+  - `properties`の値はすべて`String`（数値や真偽値も文字列）。Minecraftはすべてのプロパティを名前の昇順で書く
+  - `properties`の無い`Compound`も読む。Minecraftも読める
+- 26.2までの`{Name: …, Properties: {…}}`は扱わない。`id`が無ければ`MALFORMED_DATA`
+- 文字列でも`Compound`でもなければ`UNEXPECTED_TAG_TYPE`
+
+本ライブラリは`BlockState`を次の形で書き出す。Minecraftと同じ形である。
+
+| `BlockState` | 書き出す形 |
+|---|---|
+| プロパティが空 | ブロックIDだけの`String` |
+| プロパティがある | `id`と`properties`を持つ`Compound`。`properties`は名前の昇順 |
+
+#### 既定の状態とプロパティ
+
+文字列の要素は「そのブロックの既定の状態」を表す。プロパティの値はファイルに書かれていない。
+本ライブラリはブロックごとの既定値を持たないので、文字列の要素は**プロパティが空の`BlockState`** として読む。
+
+そのため、次のことが起きる。
+
+- 既定の状態の`minecraft:oak_stairs`を`get_block`で読むと、プロパティは空で返る
+- `minecraft:oak_stairs`と、既定値をすべて書いた`minecraft:oak_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]`は等しくない。
+  後者を置くと、同じ状態を指す要素がパレットに2つ並ぶことがある
+- プロパティが空の`BlockState`を置くと文字列で書き出され、Minecraftは既定の状態として読む
+
+#### 文字列とCompoundが混ざったパレット
+
+パレットのリストの型は要素の型で決まる。
+
+| 要素 | リストの型 | 例 |
+|---|---|---|
+| すべて同じ型 | その型のリスト | `["minecraft:stone", "minecraft:air"]` |
+| 文字列とCompoundが混ざる | `List<Compound>`。文字列は`{"": <値>}`に包む | `[{"": "minecraft:stone"}, {id: "minecraft:oak_stairs", properties: {…}}]` |
+
+これは、Minecraftが異種リストをバイナリNBTへ保存するときのやり方である（[11 SNBT](11-snbt.md#4-リストの異種要素)）。
+空のキー1つだけを持つ`Compound`を包みとみなす。包みに見える`Compound`を混ざったリストへ入れるときは、それもさらに包む。
+
+本ライブラリはパレット付きコンテナに限ってこの包みを扱う。
+
+- 読み込み時は包みを外し、文字列の要素として持つ
+- 書き出し時は要素の型を調べる。混ざっていれば文字列を包み直して`List<Compound>`にし、そろっていればその型のリストにする
+
+規則はMinecraftと同じなので、触っていないパレットは元とバイト単位で一致する。
+NBTレイヤの`NbtList`は包みを扱わない（[adr/0010](../adr/0010-palette-format-26-3.md)）。
 
 ### 2.1.1 ブロック状態の文字列表現
 
@@ -142,11 +187,11 @@ biome index = ((y & 15) / 4) * 16 + ((z & 15) / 4) * 4 + ((x & 15) / 4)
 いずれも`List<Compound>`で、**座標は絶対ワールド座標の`Int`で持つ**。
 チャンク内の相対座標ではないので、チャンク座標から換算して比べる必要がある。
 
-Java版26.2の実データの例を示す。
+Java版26.3の実データの例を示す。
 
 ```
-block_entities: {id:"minecraft:mob_spawner", x:-318, y:-40, z:-302, SpawnData:{...}, ...}
-block_ticks:    {i:"minecraft:acacia_leaves", x:-93, y:75, z:-305, t:0, p:0}
+block_entities: {id:"minecraft:vault", x:-14, y:-7, z:-320, config:{...}, ...}
+block_ticks:    {i:"minecraft:cave_air", x:-36, y:55, z:-311, t:0, p:0}
 ```
 
 ### 2.4 ブロックを置き換えたときの掃除
@@ -188,6 +233,9 @@ index           = z * 16 + x
 | `MOTION_BLOCKING` | 移動を妨げるか液体である最上位ブロック |
 | `MOTION_BLOCKING_NO_LEAVES` | 上記から葉ブロックを除いたもの |
 | `OCEAN_FLOOR` | 移動を妨げる固体の最上位ブロック |
+
+26.3の実データでは、生成途中のチャンク（`minecraft:terrain` / `minecraft:initialize_light`）に生成用の`OCEAN_FLOOR_WG` / `WORLD_SURFACE_WG`も現れた。
+生成完了したチャンクは上の4つだけを持つ。
 
 **読み書き（そのまま保持）のみ対応し、再計算は行わない。**
 どのブロックが「移動を妨げる」かの判定にはブロック定義テーブルが必要で、それ自体が別の大きな成果物になるため（→ [adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
@@ -262,24 +310,24 @@ Xはチャンク内で連続するので、同じセクションに続けてア�
 
 対応の判定はワールドの形式で行う。Minecraftのバージョン番号は条件にしない。
 
-いまの形式は26.1（DataVersion `4786`）で入った。
+いまの形式は26.3（DataVersion `5006`）で入った。ブロックのパレットの形式が変わった（→ 2.1）。
 これ以降のバージョンは、形式が変わらない限りそのまま読み書きできる。
 
 ```
-MIN_SUPPORTED_DATA_VERSION = 4786   扱える形式の下限
-TARGET_DATA_VERSION        = 4903   動作を確かめたバージョン（26.2）
+MIN_SUPPORTED_DATA_VERSION = 5006   扱える形式の下限
+TARGET_DATA_VERSION        = 5023   動作を確かめたバージョン（26.3）
 ```
 
-- 読み込み時、`DataVersion`が`4786`**以上なら何もしない**
+- 読み込み時、`DataVersion`が`5006`**以上なら何もしない**
   - 対象より新しいバージョンでも警告を出さない
   - 形式が同じなら読めるので、知らせる必要がない
-- `4786`未満なら`ChunkReadOptions.on_version_mismatch`に従う
+- `5006`未満なら`ChunkReadOptions.on_version_mismatch`に従う
   - `Warn`（既定）: 警告コールバックを呼んで続行する
   - `Error`: `UNSUPPORTED_DATA_VERSION`
   - `Ignore`: 何もしない
 - 書き込み時、`DataVersion`は**読んだ値をそのまま残す**
   - 書き換えると、そのワールドを開くゲーム側の判断を誤らせる
-  - `4786`未満のチャンクは既定で`UNSUPPORTED_DATA_VERSION`
+  - `5006`未満のチャンクは既定で`UNSUPPORTED_DATA_VERSION`
   - `ChunkWriteOptions.allow_foreign_data_version = true`で明示的に許可できる。このときも`DataVersion`は書き換えない
 
 **形式が変わったときだけ下限を上げる。** 下限を上げると、そのワールドを扱えなくなる利用者が出るので、バージョン番号のいちばん上の桁も上げる。

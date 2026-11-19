@@ -35,7 +35,8 @@
    python3 spec/tools/scan_world.py "<新しいワールド>" --verbose
    ```
 
-   ルート直下キー・セクションキー・`Status`の出現数が出るので、[spec/30](../spec/30-chunk-format.md) / [spec/40](../spec/40-world-layout.md)の記述と照らし合わせる
+   ルート直下キー・セクションキー・`Status`・パレットの要素の形の出現数が出るので、[spec/30](../spec/30-chunk-format.md) / [spec/31](../spec/31-paletted-container.md) / [spec/40](../spec/40-world-layout.md)の記述と照らし合わせる。
+   Worldレイヤの走査で失敗が出たら、形式が変わっている
 3. 差が無ければここで終わり。そのバージョンのワールドはすでに扱える。確認した記録として`TARGET_DATA_VERSION`を上げてもよいが、必須ではない
 
 形式が変わっていた場合だけ、次へ進む。

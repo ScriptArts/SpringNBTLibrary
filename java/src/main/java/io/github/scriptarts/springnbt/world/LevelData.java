@@ -114,7 +114,7 @@ public final class LevelData {
     }
 
     /**
-     * バージョン名（{@code 26.2}など）
+     * バージョン名（{@code 26.3}など）
      *
      * @return バージョン名
      */

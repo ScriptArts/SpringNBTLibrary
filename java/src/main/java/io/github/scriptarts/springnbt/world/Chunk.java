@@ -282,14 +282,8 @@ public final class Chunk {
             return null;
         }
 
-        NbtTag entry = section.blockStates().get(blockIndex(x, y, z));
-
-        if (!(entry instanceof NbtCompound compound)) {
-            throw SpringNbtException.unexpectedTagType(
-                    "ブロックのパレット要素が compound でない: " + entry.type().asString());
-        }
-
-        return BlockState.fromNbt(compound);
+        // パレットの要素は文字列のこともCompoundのこともあり、どちらもBlockStateが読む
+        return BlockState.fromNbt(section.blockStates().get(blockIndex(x, y, z)));
     }
 
     /**

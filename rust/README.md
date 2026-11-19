@@ -1,9 +1,9 @@
 # SpringNBTLibrary（Rust版）
 
-Minecraft Java版26.1以降のワールド・NBTファイルを読み書きするライブラリです。
+Minecraft Java版26.3以降のワールド・NBTファイルを読み書きするライブラリです。
 Rust 2021 edition、MSRV 1.75です。
 
-いまのワールド形式は26.1で入ったものです。
+いまのワールド形式は26.3で入ったものです。
 それ以降のバージョンなら、形式が変わらない限りそのまま扱えます。
 
 C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書から作っています。

@@ -10,7 +10,7 @@
 
 ```csharp
 BlockState? block = overworld.GetBlock(100, 64, -200);
-Console.WriteLine(block);   // minecraft:grass_block[snowy=false]
+Console.WriteLine(block);   // minecraft:grass_block
 ```
 
 座標は絶対ワールド座標です。どのリージョンのどのチャンクのどのセクションか、という解決はすべて内部で行います。
@@ -54,6 +54,26 @@ BlockState.Parse("minecraft:oak_stairs[facing=north,half=top]")
 ```csharp
 BlockState facingSouth = stairs.With("facing", "south");
 ```
+
+### 既定の状態のブロック
+
+26.3から、Minecraftは**既定の状態のブロックをブロックIDだけで保存します**。
+このライブラリはブロックごとの既定値を持たないので、そうしたブロックはプロパティが空の`BlockState`として読みます。
+
+```csharp
+// 既定の状態（facing=north,half=bottom,shape=straight,waterlogged=false）の階段
+chunk.GetBlock(1, 64, 1);   // minecraft:oak_stairs
+```
+
+既定値をすべて書いた`BlockState`とは等しくなりません。
+
+```csharp
+BlockState.Parse("minecraft:oak_stairs")
+    .Equals(BlockState.Parse("minecraft:oak_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]"));   // false
+```
+
+既定の状態を置きたいときは、プロパティを書かずに置いてください。ブロックIDだけで保存され、Minecraftが書くものと同じになります。
+詳しくは[30 チャンク形式 2.1](../spec/30-chunk-format.md#21-ブロック状態のパレット要素)。
 
 ---
 
@@ -199,7 +219,7 @@ data:    [ 0,0,1,1,2,0,... ]         各マスがパレットの何番か
 | 17〜32 | 5 | 342 |
 | 33〜64 | 6 | 410 |
 
-この式は、[実際の26.2ワールドの167,088個のコンテナすべてで一致することを確認済みです](../spec/31-paletted-container.md#21-実データで確認した組み合わせ)。
+この式は、[実際の26.3ワールドの167,088個のコンテナすべてで一致することを確認済みです](../spec/31-paletted-container.md#21-実データで確認した組み合わせ)。
 
 パレットの要素は元のNBTのまま保持しています。
 そのため触っていないブロックは、プロパティの並び順まで含めて元どおりに書き戻されます。

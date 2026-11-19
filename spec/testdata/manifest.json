@@ -439,6 +439,36 @@
       "roundtrip": true
     },
     {
+      "id": "world/palette_compound_only",
+      "kind": "world",
+      "input": "world/palette_compound_only.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "パレットがプロパティ付きのブロックだけ -> 包みの無い Compound のリスト",
+      "expect": "expect/world/palette_compound_only.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/palette_mixed_compact",
+      "kind": "world",
+      "input": "world/palette_mixed_compact.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "2 段目は文字列と未使用の Compound が混ざる。compact() で文字列だけのリストに戻る",
+      "expect": "expect/world/palette_mixed_compact.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/palette_old_format",
+      "kind": "world",
+      "input": "world/palette_old_format.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "26.2 までの形式（Name / Properties）のパレット。ブロックを読むと弾かれる",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
       "id": "world/palette_index_out_of_range",
       "kind": "world",
       "input": "world/palette_index_out_of_range.nbt",

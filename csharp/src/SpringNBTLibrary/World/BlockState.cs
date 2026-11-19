@@ -143,30 +143,63 @@ public sealed class BlockState : IEquatable<BlockState>
     }
 
     /// <summary>パレット要素のNBTから作る</summary>
+    /// <remarks>
+    /// 26.3で入った形式を読む
+    /// 既定の状態はブロックIDだけの文字列で、それ以外は<c>id</c>と<c>properties</c>を持つCompoundで入っている
+    /// 異種リストの要素を包む<c>{"": &lt;値&gt;}</c>は外してから読む
+    /// </remarks>
     /// <exception cref="SpringNbtException">
-    /// <c>Name</c>が無い、または<c>Properties</c>の値が文字列でない場合
+    /// 文字列でもCompoundでもない、<c>id</c>が無い、または<c>properties</c>の値が文字列でない場合
     /// </exception>
-    public static BlockState FromNbt(NbtCompound nbt)
+    public static BlockState FromNbt(NbtTag nbt)
     {
         ArgumentNullException.ThrowIfNull(nbt);
-        BlockState state = new BlockState(nbt.GetString("Name"));
-        NbtCompound? propertiesTag = nbt.OptCompound("Properties");
+        NbtTag entry = PalettedContainer.UnwrapListElement(nbt);
+
+        // 既定の状態は、ブロックIDだけの文字列で入っている
+        if (entry is NbtString plain)
+        {
+            return new BlockState(plain.Value);
+        }
+
+        if (entry is not NbtCompound compound)
+        {
+            throw SpringNbtException.UnexpectedTagType(
+                $"ブロックのパレット要素が string でも compound でもない: {entry.Type.AsString()}");
+        }
+
+        string? name = compound.OptString("id");
+
+        if (name is null)
+        {
+            // Name / Propertiesは26.2までの形式で、読み替えると誤った状態を返しかねない
+            if (compound.ContainsKey("Name"))
+            {
+                throw SpringNbtException.Malformed(
+                    "ブロックのパレット要素に id が無い。Name は26.2までの形式で、本ライブラリでは扱わない");
+            }
+
+            throw SpringNbtException.Malformed("ブロックのパレット要素に id が無い");
+        }
+
+        BlockState state = new BlockState(name);
+        NbtCompound? propertiesTag = compound.OptCompound("properties");
 
         if (propertiesTag is null)
         {
             return state;
         }
 
-        // Propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
-        foreach (KeyValuePair<string, NbtTag> entry in propertiesTag)
+        // propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
+        foreach (KeyValuePair<string, NbtTag> property in propertiesTag)
         {
-            if (entry.Value is not NbtString text)
+            if (property.Value is not NbtString text)
             {
                 throw SpringNbtException.UnexpectedTagType(
-                    $"Properties の \"{entry.Key}\" が文字列でない: {entry.Value.Type.AsString()}");
+                    $"properties の \"{property.Key}\" が文字列でない: {property.Value.Type.AsString()}");
             }
 
-            state.properties[entry.Key] = text.Value;
+            state.properties[property.Key] = text.Value;
         }
 
         return state;
@@ -174,19 +207,19 @@ public sealed class BlockState : IEquatable<BlockState>
 
     /// <summary>パレット要素のNBTへ変換する</summary>
     /// <remarks>
-    /// プロパティが空なら<c>Properties</c>キー自体を出力しない
+    /// プロパティが空ならブロックIDだけの文字列にし、それ以外は<c>id</c>と<c>properties</c>を持つCompoundにする
     /// Minecraftと同じ振る舞い
     /// </remarks>
-    public NbtCompound ToNbt()
+    public NbtTag ToNbt()
     {
-        NbtCompound result = new NbtCompound();
-        result.Set("Name", new NbtString(Name));
-
+        // プロパティが無ければ、Minecraftが既定の状態を書くときと同じく文字列にする
         if (properties.Count == 0)
         {
-            return result;
+            return new NbtString(Name);
         }
 
+        NbtCompound result = new NbtCompound();
+        result.Set("id", new NbtString(Name));
         NbtCompound propertiesTag = new NbtCompound();
 
         // 名前の昇順で並ぶ
@@ -195,7 +228,7 @@ public sealed class BlockState : IEquatable<BlockState>
             propertiesTag.Set(entry.Key, new NbtString(entry.Value));
         }
 
-        result.Set("Properties", propertiesTag);
+        result.Set("properties", propertiesTag);
         return result;
     }
 

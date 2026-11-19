@@ -1,6 +1,6 @@
 # SpringNBTLibraryドキュメント
 
-Minecraft Java版26.1以降のワールド／NBTファイルを、複数の言語で同じように読み書きするライブラリのドキュメントです。
+Minecraft Java版26.3以降のワールド／NBTファイルを、複数の言語で同じように読み書きするライブラリのドキュメントです。
 
 まずどこを読むかは次のとおりです。
 
@@ -75,6 +75,7 @@ Minecraft Java版26.1以降のワールド／NBTファイルを、複数の言�
 - [0007. TypeScriptではi64にbigintを使う](adr/0007-typescript-bigint.md)
 - [0008. `session.lock`の確認は言語ごとにベストエフォートとする](adr/0008-session-lock.md)
 - [0009. 公開APIの抽出はソースの静的解析で行い、API対応表は生成する](adr/0009-static-api-extraction.md)
+- [0010. 26.3のパレット形式に合わせて対応の下限を上げる](adr/0010-palette-format-26-3.md)
 
 ---
 

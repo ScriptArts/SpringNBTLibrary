@@ -15,7 +15,7 @@
 | `UNSUPPORTED_FEATURE` | 仕様上は妥当だが本ビルドで扱えない | 圧縮ID=127のチャンクを`ReadChunk`で読んだ、圧縮ID=4（LZ4）を指定してチャンクを書こうとした |
 | `LIMIT_EXCEEDED` | 安全上限を超えた | ネスト深さ512超 |
 | `INVALID_ARGUMENT` | 呼び出し側の引数が不正 | 座標がチャンク範囲外、`i8`に300を渡した |
-| `UNSUPPORTED_DATA_VERSION` | 扱える形式より古いデータ | DataVersion 4786未満のチャンクを既定設定で書き戻そうとした |
+| `UNSUPPORTED_DATA_VERSION` | 扱える形式より古いデータ | DataVersion 5006未満のチャンクを既定設定で書き戻そうとした |
 
 ### 使い分けの考え方
 

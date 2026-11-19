@@ -4,6 +4,10 @@
 パレットの要素は**生のNbtTagのまま**持つ
 こうすると、触っていないブロックについてはMinecraftが書き出したときの
 プロパティの並び順まで含めてそのまま書き戻せる
+
+26.3からは、ブロックのパレットに文字列とCompoundが混ざる
+Minecraftはこうした異種リストをCompoundのリストとして保存し、Compoundでない要素を``{"": <値>}``で包む
+読むときにこの包みを外して持ち、書くときに要素の型を見て包み直す
 """
 
 from __future__ import annotations
@@ -11,7 +15,7 @@ from __future__ import annotations
 from typing import List, Optional, Sequence
 
 from ..errors import SpringNbtError
-from ..nbt import NbtCompound, NbtList, NbtLongArray, NbtTag
+from ..nbt import NbtCompound, NbtList, NbtLongArray, NbtTag, TagType
 from .bit_storage import BitStorage
 
 __all__ = ["PalettedContainer", "ceil_log2"]
@@ -28,6 +32,57 @@ def ceil_log2(count: int) -> int:
         bits += 1
 
     return bits
+
+
+def _is_list_wrapper(tag: NbtTag) -> bool:
+    """異種リストの要素を包むCompoundか
+    空のキー1つだけを持つものがそれに当たる（MinecraftのListTagと同じ判定）
+    """
+    if not isinstance(tag, NbtCompound):
+        return False
+
+    return len(tag) == 1 and "" in tag
+
+
+def _unwrap_list_element(tag: NbtTag) -> NbtTag:
+    """異種リストの包みを外す
+    包みでなければそのまま返す
+    """
+    if _is_list_wrapper(tag):
+        return tag.get("")
+
+    return tag
+
+
+def _palette_to_list(entries: Sequence[NbtTag]) -> NbtList:
+    """パレットの要素をリストへ詰める
+
+    要素の型がすべて同じならその型のリストにする
+    1つでも違えば、Minecraftと同じくCompoundのリストにして、Compoundでない要素と包みに見える要素を包む
+    """
+    element_type = entries[0].type
+
+    # 先頭と型の違う要素があるか調べる
+    for entry in entries:
+        # 1つでも違えば、異種リストとしてCompoundのリストにする
+        if entry.type != element_type:
+            element_type = TagType.COMPOUND
+            break
+
+    result = NbtList(element_type)
+
+    # 要素を順にリストへ入れる
+    for entry in entries:
+        # Compoundのリストでは、Compoundでない要素と包みに見える要素を包む
+        if element_type == TagType.COMPOUND and (
+                not isinstance(entry, NbtCompound) or _is_list_wrapper(entry)):
+            wrapper = NbtCompound()
+            wrapper.set("", entry)
+            result.append(wrapper)
+        else:
+            result.append(entry)
+
+    return result
 
 
 class PalettedContainer:
@@ -80,8 +135,9 @@ class PalettedContainer:
 
         # パレットの要素は生のNbtTagのまま持つ
         # 並び順まで元どおりに書き戻すため
+        # 異種リストの包みだけは外しておき、書くときに包み直す
         for entry in palette_tag:
-            result._palette.append(entry)
+            result._palette.append(_unwrap_list_element(entry))
 
         data = nbt.opt_long_array("data")
 
@@ -111,11 +167,10 @@ class PalettedContainer:
     def to_nbt(self) -> NbtCompound:
         """NBTへ変換する"""
         result = NbtCompound()
-        palette_tag = NbtList()
 
         # パレットの要素は読んだときのまま書き出す
-        for entry in self._palette:
-            palette_tag.append(entry)
+        # 型が混ざっていれば、Minecraftと同じく包んでCompoundのリストにする
+        palette_tag = _palette_to_list(self._palette)
 
         # パレットが1要素ならdataは書かない
         # Minecraftと同じ振る舞い

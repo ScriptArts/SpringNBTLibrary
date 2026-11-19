@@ -2,7 +2,7 @@
 
 Java版のセーブデータのディレクトリ構成と`level.dat`の扱い。
 
-> **この章は、Java版26.2の実データを走査して確認した内容に基づく。**
+> **この章は、Java版26.2の実データを走査して確認した内容に基づく。26.3でも構成が変わっていないことを実データで確かめた。**
 > 1.21.xまでの構成（`region/`が直下、`DIM-1` / `DIM1`、`playerdata/`）とは大きく異なる。
 > 検証方法は[90 適合性](90-conformance.md)の「実ワールド走査」を参照。
 
@@ -80,11 +80,12 @@ Java版のセーブデータのディレクトリ構成と`level.dat`の扱い�
 
 Gzip圧縮されたNBT。ルートは空名の`TAG_Compound`で、`Data`キーの下に本体がある。
 
-**26.xでは大幅に軽量化されている。** ゲームルール・ワールド生成設定・天候・スコアボードなどは、`data/minecraft/`配下の個別ファイルへ分離された。実データでは430バイトしかない。
+**26.xでは大幅に軽量化されている。** ゲームルール・ワールド生成設定・天候・スコアボードなどは、`data/minecraft/`配下の個別ファイルへ分離された。実データでは450バイトほどしかない。
 
 | キー | 型 | 内容 |
 |---|---|---|
-| `Data.DataVersion` | `Int` | `4903` |
+| `Data.DataVersion` | `Int` | `5023`（26.3） |
+| `Data.version_history` | `List<Int>` | このファイルを書いたDataVersionの履歴。26.3で追加。例: `[5023]` |
 | `Data.version` | `Int` | NBT保存形式のバージョン。`19133` |
 | `Data.LevelName` | `String` | ワールド名 |
 | `Data.Time` | `Long` | ワールドの経過時間（tick） |
@@ -121,7 +122,7 @@ Gzip圧縮されたNBT。ルートは空名の`TAG_Compound`で、`Data`キー�
 `data/minecraft/*.dat`はどれも同じ形をしている。
 
 ```
-{ data: { …本体… }, DataVersion: 4903 }
+{ data: { …本体… }, DataVersion: 5023 }
 ```
 
 ルートは空名の`TAG_Compound`、その直下に`data`と`DataVersion`が並ぶ。

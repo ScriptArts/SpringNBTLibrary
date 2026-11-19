@@ -112,7 +112,7 @@ class LevelData:
 
     @property
     def version_name(self) -> str:
-        """バージョン名（``26.2``など）"""
+        """バージョン名（``26.3``など）"""
         return self.data.get_compound("Version").get_string("Name")
 
     def to_named_tag(self) -> NamedTag:

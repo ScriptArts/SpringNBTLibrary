@@ -277,6 +277,10 @@ fn chunk_edit(chunk: &mut Chunk) -> Result<()> {
     chunk.set_block(2, base_y + 2, 2, &BlockState::parse("minecraft:oak_stairs[half=top,facing=north]")?)?;
     chunk.set_block(3, base_y + 2, 3, &BlockState::parse("oak_stairs[facing=south]")?)?;
 
+    // プロパティの無いブロックを置く
+    // パレットには文字列で入るので、Compoundの要素と混ざったリストの書き出しを通る
+    chunk.set_block(4, base_y + 2, 4, &BlockState::parse("minecraft:edited_plain")?)?;
+
     // バイオームも書き換える
     chunk.set_biome(0, base_y, 0, "minecraft:desert")?;
     chunk.set_biome(8, base_y + 8, 8, "minecraft:jungle")?;

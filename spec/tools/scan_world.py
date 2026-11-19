@@ -74,6 +74,7 @@ class Scanner:
         self.data_versions = Counter()
         self.chunk_statuses = Counter()
         self.palette_shapes = Counter()
+        self.palette_entries = Counter()
 
     # -- 検証 ---------------------------------------------------------------
 
@@ -248,6 +249,10 @@ class Scanner:
             self.failures.append("%s に palette が無い" % key)
             return
 
+        # パレットの要素の形を数える。形式が変わったときに最初に表れる部分
+        for entry in palette:
+            self.palette_entries["%s %s" % (key, describe_palette_entry(entry))] += 1
+
         bits = max(min_bits, ceil_log2(len(palette)))
         values_per_long = 64 // bits
         expected = (entry_count + values_per_long - 1) // values_per_long
@@ -291,6 +296,7 @@ class Scanner:
             ("entities チャンクのキー", self.entity_keys),
             ("poi チャンクのキー", self.poi_keys),
             ("Status", self.chunk_statuses),
+            ("パレットの要素の形", self.palette_entries),
         ]
 
         for title, counter in sections:
@@ -330,6 +336,25 @@ class Scanner:
         return 0
 
 
+
+
+def describe_palette_entry(entry) -> str:
+    """パレットの要素の形を短い文字列で表す
+
+    文字列ならその型名、Compoundならキーの並びを出す
+    異種リストの包み``{"": <値>}``は、包まれた値の型も添える
+    """
+    # Compound以外は型名だけで足りる
+    if not isinstance(entry, NbtCompound):
+        return entry.type.as_string()
+
+    keys = list(entry.keys())
+
+    # 異種リストの包みは、中身の型が分かるようにする
+    if keys == [""]:
+        return "compound{\"\"} -> %s" % entry.get("").type.as_string()
+
+    return "compound{%s}" % ",".join(keys)
 
 
 class WorldScanner:

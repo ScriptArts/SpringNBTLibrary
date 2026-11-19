@@ -38,7 +38,7 @@
 | `spawn_pos` | `SpawnPos` | `spawnPos()` | `spawnPos()` | `spawn_pos` | `spawn_pos()` | スポーン地点の[x, y, z] |
 | `time` | `Time` | `time()` | `time()` | `time` | `time()` | ワールドの経過時間（tick） |
 | `to_named_tag` | `ToNamedTag()` | `toNamedTag()` | `toNamedTag()` | `to_named_tag()` | `to_named_tag()` | 書き出し用のNamedTagを作る |
-| `version_name` | `VersionName` | `versionName()` | `versionName()` | `version_name` | `version_name()` | バージョン名（26.2など） |
+| `version_name` | `VersionName` | `versionName()` | `versionName()` | `version_name` | `version_name()` | バージョン名（26.3など） |
 | **Dimension** | `Dimension` | `Dimension` | `Dimension` | `Dimension` | `Dimension` | ワールド内の次元1つ分 |
 | `chunk` | `Chunk` | `chunk()` | `chunk()` | `chunk()` | `chunk()` | チャンクを読む |
 | `chunk_mut` | — | — | — | — | `chunk_mut()` |  |

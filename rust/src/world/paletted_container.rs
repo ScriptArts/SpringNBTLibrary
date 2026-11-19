@@ -4,9 +4,13 @@
 //! パレットの要素は**生の[`NbtTag`]のまま**持つ
 //! こうすると、触っていないブロックについてはMinecraftが書き出したときの
 //! プロパティの並び順まで含めてそのまま書き戻せる
+//!
+//! 26.3からは、ブロックのパレットに文字列とCompoundが混ざる
+//! Minecraftはこうした異種リストをCompoundのリストとして保存し、Compoundでない要素を`{"": <値>}`で包む
+//! 読むときにこの包みを外して持ち、書くときに要素の型を見て包み直す
 
 use crate::error::{Error, ErrorCode, Result};
-use crate::nbt::tag::{NbtCompound, NbtList, NbtTag};
+use crate::nbt::tag::{NbtCompound, NbtList, NbtTag, TagType};
 
 use super::bit_storage::BitStorage;
 
@@ -21,6 +25,66 @@ pub fn ceil_log2(count: usize) -> usize {
     }
 
     bits
+}
+
+/// 異種リストの要素を包むCompoundか
+/// 空のキー1つだけを持つものがそれに当たる（MinecraftのListTagと同じ判定）
+fn is_list_wrapper(tag: &NbtTag) -> bool {
+    match tag {
+        NbtTag::Compound(compound) => compound.len() == 1 && compound.contains_key(""),
+        _ => false,
+    }
+}
+
+/// 異種リストの包みを外す
+/// 包みでなければそのまま返す
+pub(crate) fn unwrap_list_element(tag: &NbtTag) -> &NbtTag {
+    // 包みなら中身を取り出す
+    if let NbtTag::Compound(compound) = tag {
+        // 空のキー1つだけなら包みとみなす
+        if compound.len() == 1 {
+            if let Ok(inner) = compound.get("") {
+                return inner;
+            }
+        }
+    }
+
+    tag
+}
+
+/// パレットの要素をリストへ詰める
+///
+/// 要素の型がすべて同じならその型のリストにする
+/// 1つでも違えば、Minecraftと同じくCompoundのリストにして、Compoundでない要素と包みに見える要素を包む
+fn palette_to_list(entries: &[NbtTag]) -> Result<NbtList> {
+    let mut element_type = entries[0].tag_type();
+
+    // 先頭と型の違う要素があるか調べる
+    for entry in entries {
+        // 1つでも違えば、異種リストとしてCompoundのリストにする
+        if entry.tag_type() != element_type {
+            element_type = TagType::Compound;
+            break;
+        }
+    }
+
+    let mut result = NbtList::with_element_type(element_type);
+
+    // 要素を順にリストへ入れる
+    for entry in entries {
+        let is_plain_compound = matches!(entry, NbtTag::Compound(_)) && !is_list_wrapper(entry);
+
+        // Compoundのリストでは、Compoundでない要素と包みに見える要素を包む
+        if element_type == TagType::Compound && !is_plain_compound {
+            let mut wrapper = NbtCompound::new();
+            wrapper.set("", entry.clone());
+            result.push(NbtTag::Compound(wrapper))?;
+        } else {
+            result.push(entry.clone())?;
+        }
+    }
+
+    Ok(result)
 }
 
 /// パレット付きのコンテナ
@@ -83,7 +147,10 @@ impl PalettedContainer {
             }
         };
 
-        let palette: Vec<NbtTag> = palette_tag.iter().cloned().collect();
+        // パレットの要素は生のNbtTagのまま持つ
+        // 並び順まで元どおりに書き戻すため
+        // 異種リストの包みだけは外しておき、書くときに包み直す
+        let palette: Vec<NbtTag> = palette_tag.iter().map(|entry| unwrap_list_element(entry).clone()).collect();
 
         let data = match nbt.opt_long_array("data")? {
             Some(values) => values.to_vec(),
@@ -135,12 +202,10 @@ impl PalettedContainer {
     /// NBTへ変換する
     pub fn to_nbt(&self) -> Result<NbtCompound> {
         let mut result = NbtCompound::new();
-        let mut palette_tag = NbtList::new();
 
         // パレットの要素は読んだときのまま書き出す
-        for entry in &self.palette {
-            palette_tag.push(entry.clone())?;
-        }
+        // 型が混ざっていれば、Minecraftと同じく包んでCompoundのリストにする
+        let palette_tag = palette_to_list(&self.palette)?;
 
         // パレットが1要素ならdataは書かない
         // Minecraftと同じ振る舞い

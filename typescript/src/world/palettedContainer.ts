@@ -5,10 +5,14 @@
  * パレットの要素は**生の`NbtTag`のまま**持つ
  * こうすると、触っていないブロックについてはMinecraftが書き出したときの
  * プロパティの並び順まで含めてそのまま書き戻せる
+ *
+ * 26.3からは、ブロックのパレットに文字列とCompoundが混ざる
+ * Minecraftはこうした異種リストをCompoundのリストとして保存し、Compoundでない要素を`{"": <値>}`で包む
+ * 読むときにこの包みを外して持ち、書くときに要素の型を見て包み直す
  */
 
 import { SpringNbtError } from "../errors.js";
-import { NbtCompound, NbtList, NbtLongArray, NbtTag } from "../nbt/index.js";
+import { NbtCompound, NbtList, NbtLongArray, NbtTag, TagType } from "../nbt/index.js";
 import { BitStorage } from "./bitStorage.js";
 
 /**
@@ -90,8 +94,9 @@ export class PalettedContainer {
 
     // パレットの要素は生のNbtTagのまま持つ
     // 並び順まで元どおりに書き戻すため
+    // 異種リストの包みだけは外しておき、書くときに包み直す
     for (const entry of paletteTag) {
-      result.#palette.push(entry);
+      result.#palette.push(unwrapListElement(entry));
     }
 
     const data = nbt.optLongArray("data");
@@ -128,12 +133,10 @@ export class PalettedContainer {
   /** NBTへ変換する */
   toNbt(): NbtCompound {
     const result = new NbtCompound();
-    const paletteTag = new NbtList();
 
     // パレットの要素は読んだときのまま書き出す
-    for (const entry of this.#palette) {
-      paletteTag.add(entry);
-    }
+    // 型が混ざっていれば、Minecraftと同じく包んでCompoundのリストにする
+    const paletteTag = paletteToList(this.#palette);
 
     // パレットが1要素ならdataは書かない
     // Minecraftと同じ振る舞い
@@ -297,10 +300,69 @@ export function ceilLog2(count: number): number {
 }
 
 /**
+ * 異種リストの要素を包むCompoundか
+ * 空のキー1つだけを持つものがそれに当たる（MinecraftのListTagと同じ判定）
+ */
+function isListWrapper(tag: NbtTag): boolean {
+  if (!(tag instanceof NbtCompound)) {
+    return false;
+  }
+
+  return tag.size === 1 && tag.containsKey("");
+}
+
+/**
+ * 異種リストの包みを外す
+ * 包みでなければそのまま返す
+ */
+function unwrapListElement(tag: NbtTag): NbtTag {
+  if (isListWrapper(tag)) {
+    return (tag as NbtCompound).get("");
+  }
+
+  return tag;
+}
+
+/**
+ * パレットの要素をリストへ詰める
+ *
+ * 要素の型がすべて同じならその型のリストにする
+ * 1つでも違えば、Minecraftと同じくCompoundのリストにして、Compoundでない要素と包みに見える要素を包む
+ */
+function paletteToList(entries: readonly NbtTag[]): NbtList {
+  let elementType = entries[0].type;
+
+  // 先頭と型の違う要素があるか調べる
+  for (const entry of entries) {
+    // 1つでも違えば、異種リストとしてCompoundのリストにする
+    if (entry.type !== elementType) {
+      elementType = TagType.Compound;
+      break;
+    }
+  }
+
+  const result = new NbtList(elementType);
+
+  // 要素を順にリストへ入れる
+  for (const entry of entries) {
+    // Compoundのリストでは、Compoundでない要素と包みに見える要素を包む
+    if (elementType === TagType.Compound && (!(entry instanceof NbtCompound) || isListWrapper(entry))) {
+      const wrapper = new NbtCompound();
+      wrapper.set("", entry);
+      result.add(wrapper);
+    } else {
+      result.add(entry);
+    }
+  }
+
+  return result;
+}
+
+/**
  * タグどうしが等しいか
  *
  * パレットの重複判定に使う
- * パレットに入るのはCompound（ブロック）かString（バイオーム）だけ
+ * パレットに入るのはCompoundかStringだけ
  */
 function nbtEquals(left: NbtTag, right: NbtTag): boolean {
   if (left.type !== right.type) {

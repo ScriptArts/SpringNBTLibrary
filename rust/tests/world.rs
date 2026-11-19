@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use spring_nbt_library::error::{Error, ErrorCode};
-use spring_nbt_library::nbt::tag::{NbtCompound, NbtString, NbtTag};
+use spring_nbt_library::nbt::tag::{NbtCompound, NbtList, NbtString, NbtTag, TagType};
 use spring_nbt_library::nbt::{
     read_file, write_bytes, write_file, Compression, NamedTag, NbtReadOptions, NbtWriteOptions,
 };
@@ -39,11 +39,27 @@ fn load_chunk(name: &str) -> Chunk {
     Chunk::from_nbt(named.tag, &ChunkReadOptions::default()).expect("チャンクとして解釈できない")
 }
 
-/// ブロックのパレット要素を作る
+/// プロパティの無いブロックのパレット要素を作る
+/// 26.3からはブロックIDだけの文字列で入る
 fn block_entry(name: &str) -> NbtTag {
-    let mut entry = NbtCompound::new();
-    entry.set("Name", NbtTag::String(NbtString::new(name)));
-    NbtTag::Compound(entry)
+    NbtTag::String(NbtString::new(name))
+}
+
+/// 異種リストの要素を包むCompoundを作る
+fn wrapped(tag: NbtTag) -> NbtTag {
+    let mut wrapper = NbtCompound::new();
+    wrapper.set("", tag);
+    NbtTag::Compound(wrapper)
+}
+
+/// テストベクタを、DataVersionの検査を止めてチャンクとして読む
+fn load_chunk_ignoring_version(name: &str) -> Chunk {
+    let named = read_file(vector_path(name), &NbtReadOptions::default()).expect("読めない");
+    let options = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Ignore,
+        ..ChunkReadOptions::default()
+    };
+    Chunk::from_nbt(named.tag, &options).expect("チャンクとして解釈できない")
 }
 
 /// エラーが期待したコードであることを確かめる
@@ -106,18 +122,65 @@ fn nbtとの相互変換でプロパティが保たれる() {
     let state = BlockState::parse("minecraft:oak_stairs[facing=north,half=top]").unwrap();
     let nbt = state.to_nbt();
 
-    assert_eq!("minecraft:oak_stairs", nbt.get_string("Name").unwrap());
-    assert_eq!(
-        "north",
-        nbt.get_compound("Properties").unwrap().get_string("facing").unwrap()
-    );
+    match &nbt {
+        NbtTag::Compound(compound) => {
+            assert_eq!(vec!["id", "properties"], compound.keys().collect::<Vec<_>>());
+            assert_eq!("minecraft:oak_stairs", compound.get_string("id").unwrap());
+            assert_eq!(
+                "north",
+                compound.get_compound("properties").unwrap().get_string("facing").unwrap()
+            );
+        }
+        other => panic!("compound でない: {other:?}"),
+    }
+
     assert_eq!(state, BlockState::from_nbt(&nbt).unwrap());
 }
 
 #[test]
-fn プロパティ無しのnbtにはpropertiesを書かない() {
+fn プロパティ無しのブロックは文字列になる() {
     let nbt = BlockState::parse("minecraft:air").unwrap().to_nbt();
-    assert!(nbt.opt_compound("Properties").unwrap().is_none());
+    assert_eq!(block_entry("minecraft:air"), nbt);
+}
+
+#[test]
+fn 文字列のパレット要素を読める() {
+    let state = BlockState::from_nbt(&block_entry("minecraft:stone")).unwrap();
+    assert_eq!("minecraft:stone", state.name());
+    assert!(state.properties().is_empty());
+}
+
+#[test]
+fn 包まれたパレット要素を読める() {
+    let state = BlockState::from_nbt(&wrapped(block_entry("minecraft:stone"))).unwrap();
+    assert_eq!("minecraft:stone", state.to_string());
+}
+
+#[test]
+fn propertiesの無いcompoundも読める() {
+    let mut entry = NbtCompound::new();
+    entry.set("id", block_entry("minecraft:stone"));
+    let state = BlockState::from_nbt(&NbtTag::Compound(entry)).unwrap();
+    assert_eq!("minecraft:stone", state.to_string());
+}
+
+#[test]
+fn パレット要素が26_2までの形式ならmalformed_data() {
+    let mut entry = NbtCompound::new();
+    entry.set("Name", block_entry("minecraft:stone"));
+
+    match BlockState::from_nbt(&NbtTag::Compound(entry)) {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::MalformedData, error),
+    }
+}
+
+#[test]
+fn 文字列でもcompoundでもない要素はunexpected_tag_type() {
+    match BlockState::from_nbt(&NbtTag::Int(1)) {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::UnexpectedTagType, error),
+    }
 }
 
 #[test]
@@ -293,10 +356,7 @@ fn compactで未使用のパレット要素が消える() {
     // 残るのは実際に使われているairとdirtの2つ
     assert_eq!(2, container.palette().len());
 
-    match container.get(0).unwrap() {
-        NbtTag::Compound(entry) => assert_eq!("minecraft:dirt", entry.get_string("Name").unwrap()),
-        other => panic!("compound でない: {other:?}"),
-    }
+    assert_eq!(&block_entry("minecraft:dirt"), container.get(0).unwrap());
 }
 
 #[test]
@@ -308,10 +368,68 @@ fn fillで単一値に戻る() {
     assert_eq!(1, container.palette().len());
     assert_eq!(0, container.bits_per_entry());
 
-    match container.get(4095).unwrap() {
-        NbtTag::Compound(entry) => assert_eq!("minecraft:water", entry.get_string("Name").unwrap()),
-        other => panic!("compound でない: {other:?}"),
-    }
+    assert_eq!(&block_entry("minecraft:water"), container.get(4095).unwrap());
+}
+
+#[test]
+fn 文字列だけのパレットは文字列のリストで書く() {
+    let mut container = PalettedContainer::filled(block_entry("minecraft:air"), 4096, 4);
+    container.set(0, block_entry("minecraft:stone")).unwrap();
+
+    let nbt = container.to_nbt().unwrap();
+    let palette = nbt.get_list("palette").unwrap();
+    assert_eq!(TagType::String, palette.element_type());
+    assert_eq!(Some(&block_entry("minecraft:stone")), palette.get(1));
+}
+
+#[test]
+fn 型が混ざったパレットは文字列を包んでcompoundのリストで書く() {
+    let stairs = BlockState::parse("minecraft:oak_stairs[facing=north]").unwrap().to_nbt();
+    let mut container = PalettedContainer::filled(block_entry("minecraft:air"), 4096, 4);
+    container.set(0, stairs.clone()).unwrap();
+
+    let nbt = container.to_nbt().unwrap();
+    let palette = nbt.get_list("palette").unwrap();
+    assert_eq!(TagType::Compound, palette.element_type());
+    assert_eq!(Some(&wrapped(block_entry("minecraft:air"))), palette.get(0));
+    assert_eq!(Some(&stairs), palette.get(1));
+}
+
+#[test]
+fn 包まれたパレットは包みを外して持ち元どおりに書き戻す() {
+    let stairs = BlockState::parse("minecraft:oak_stairs[facing=north]").unwrap().to_nbt();
+    let mut palette = NbtList::with_element_type(TagType::Compound);
+    palette.push(wrapped(block_entry("minecraft:air"))).unwrap();
+    palette.push(stairs.clone()).unwrap();
+
+    // パレット2要素ならbits=4で256 long
+    let mut nbt = NbtCompound::new();
+    nbt.set("data", NbtTag::LongArray(vec![0; 256]));
+    nbt.set("palette", NbtTag::List(palette));
+
+    let container = PalettedContainer::from_nbt(&nbt, 4096, 4, false).unwrap();
+
+    // 包みは外れ、要素は文字列とCompoundとして並ぶ
+    assert_eq!(block_entry("minecraft:air"), container.palette()[0]);
+    assert_eq!(stairs, container.palette()[1]);
+
+    // 書き戻すと、また包まれて元と同じになる
+    assert_eq!(nbt, container.to_nbt().unwrap());
+}
+
+#[test]
+fn compactでcompoundが消えると文字列のリストに戻る() {
+    let stairs = BlockState::parse("minecraft:oak_stairs[facing=north]").unwrap().to_nbt();
+    let mut container = PalettedContainer::filled(block_entry("minecraft:air"), 4096, 4);
+    container.set(0, stairs).unwrap();
+    container.set(0, block_entry("minecraft:stone")).unwrap();
+
+    container.compact().unwrap();
+
+    let nbt = container.to_nbt().unwrap();
+    let palette = nbt.get_list("palette").unwrap();
+    assert_eq!(TagType::String, palette.element_type());
+    assert_eq!(2, palette.len());
 }
 
 #[test]
@@ -562,6 +680,16 @@ fn data長が合わないチャンクはmalformed_data() {
 }
 
 #[test]
+fn パレットが26_2までの形式ならブロックを読むとmalformed_data() {
+    let chunk = load_chunk_ignoring_version("palette_old_format");
+
+    match chunk.get_block(0, -64, 0) {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::MalformedData, error),
+    }
+}
+
+#[test]
 fn チャンク内の相対座標が範囲外ならinvalid_argument() {
     let chunk = load_chunk("palette_1");
 
@@ -597,6 +725,24 @@ fn 既定では警告として通す() {
 
     let chunk = Chunk::from_nbt(foreign_chunk(), &options).unwrap();
     assert_eq!(3953, chunk.data_version().unwrap());
+    assert_eq!(1, warnings.borrow().len());
+}
+
+#[test]
+fn data_versionが26_2のチャンクは扱える形式より古い() {
+    let warnings: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+    let sink = Rc::clone(&warnings);
+    let options = ChunkReadOptions {
+        on_version_mismatch: VersionMismatchAction::Warn,
+        on_warning: Some(Box::new(move |message: &str| {
+            sink.borrow_mut().push(message.to_string());
+        })),
+        lenient_bit_storage: false,
+    };
+
+    // 26.2まではパレットの形式が違う
+    let named = read_file(vector_path("palette_old_format"), &NbtReadOptions::default()).unwrap();
+    Chunk::from_nbt(named.tag, &options).unwrap();
     assert_eq!(1, warnings.borrow().len());
 }
 
@@ -663,7 +809,7 @@ fn 許可すれば古いチャンクも元のバージョンのまま書き戻�
 fn newer_chunk() -> NbtCompound {
     let named = read_file(vector_path("palette_1"), &NbtReadOptions::default()).unwrap();
     let mut root = named.tag;
-    root.set_int("DataVersion", 5015);
+    root.set_int("DataVersion", 5100);
     root
 }
 
@@ -681,7 +827,7 @@ fn 新しいバージョンのチャンクは警告を出さない() {
 
     // 形式が同じであれば、新しいバージョンでも警告を出さずに読める
     let chunk = Chunk::from_nbt(newer_chunk(), &read).unwrap();
-    assert_eq!(chunk.data_version().unwrap(), 5015);
+    assert_eq!(chunk.data_version().unwrap(), 5100);
     assert!(warnings.borrow().is_empty());
 }
 
@@ -692,7 +838,7 @@ fn 新しいバージョンのチャンクはエラー設定でも通る() {
         ..ChunkReadOptions::default()
     };
     let chunk = Chunk::from_nbt(newer_chunk(), &read).unwrap();
-    assert_eq!(chunk.data_version().unwrap(), 5015);
+    assert_eq!(chunk.data_version().unwrap(), 5100);
 }
 
 #[test]
@@ -701,7 +847,7 @@ fn 新しいバージョンのチャンクはそのまま書き戻せる() {
 
     // 許可を出さなくても書き戻せて、DataVersionも変わらない
     let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
-    assert_eq!(5015, written.get_int("DataVersion").unwrap());
+    assert_eq!(5100, written.get_int("DataVersion").unwrap());
 }
 
 #[test]

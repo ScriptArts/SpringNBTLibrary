@@ -24,12 +24,16 @@ import {
   ceilLog2,
 } from "../src/world/index.js";
 import type { ChunkReadOptions } from "../src/world/index.js";
+import type { NbtTag } from "../src/nbt/index.js";
 import {
   Compression,
   NamedTag,
   NbtCompound,
   NbtInt,
+  NbtList,
+  NbtLongArray,
   NbtString,
+  TagType,
   readFile,
   writeBytes,
   writeFile,
@@ -50,11 +54,19 @@ function loadChunk(name: string, options?: ChunkReadOptions): Chunk {
   return Chunk.fromNbt(readFile(vectorPath(name)).tag, options);
 }
 
-/** ブロックのパレット要素を作る */
-function blockEntry(name: string): NbtCompound {
-  const entry = new NbtCompound();
-  entry.set("Name", new NbtString(name));
-  return entry;
+/**
+ * プロパティの無いブロックのパレット要素を作る
+ * 26.3からはブロックIDだけの文字列で入る
+ */
+function blockEntry(name: string): NbtString {
+  return new NbtString(name);
+}
+
+/** 異種リストの要素を包むCompoundを作る */
+function wrapped(tag: NbtTag): NbtCompound {
+  const wrapper = new NbtCompound();
+  wrapper.set("", tag);
+  return wrapper;
 }
 
 /** SpringNbtErrorが指定のコードで投げられることを確かめる */
@@ -107,14 +119,42 @@ test("BlockState: 存在しないプロパティは undefined", () => {
 
 test("BlockState: NBT との相互変換でプロパティが保たれる", () => {
   const state = BlockState.parse("minecraft:oak_stairs[facing=north,half=top]");
-  const nbt = state.toNbt();
-  assert.equal(nbt.getString("Name"), "minecraft:oak_stairs");
-  assert.equal(nbt.getCompound("Properties").getString("facing"), "north");
+  const nbt = state.toNbt() as NbtCompound;
+  assert.deepEqual([...nbt.keys()], ["id", "properties"]);
+  assert.equal(nbt.getString("id"), "minecraft:oak_stairs");
+  assert.equal(nbt.getCompound("properties").getString("facing"), "north");
   assert.ok(BlockState.fromNbt(nbt).equals(state));
 });
 
-test("BlockState: プロパティ無しの NBT には Properties を書かない", () => {
-  assert.equal(BlockState.parse("minecraft:air").toNbt().optCompound("Properties"), undefined);
+test("BlockState: プロパティ無しのブロックは文字列になる", () => {
+  assert.ok(BlockState.parse("minecraft:air").toNbt().equals(new NbtString("minecraft:air")));
+});
+
+test("BlockState: 文字列のパレット要素を読める", () => {
+  const state = BlockState.fromNbt(new NbtString("minecraft:stone"));
+  assert.equal(state.name, "minecraft:stone");
+  assert.equal(state.properties.size, 0);
+});
+
+test("BlockState: 包まれたパレット要素を読める", () => {
+  const state = BlockState.fromNbt(wrapped(new NbtString("minecraft:stone")));
+  assert.equal(state.toString(), "minecraft:stone");
+});
+
+test("BlockState: properties の無い Compound も読める", () => {
+  const entry = new NbtCompound();
+  entry.set("id", new NbtString("minecraft:stone"));
+  assert.equal(BlockState.fromNbt(entry).toString(), "minecraft:stone");
+});
+
+test("BlockState: パレット要素が 26.2 までの形式なら MALFORMED_DATA", () => {
+  const entry = new NbtCompound();
+  entry.set("Name", new NbtString("minecraft:stone"));
+  assertErrorCode(ErrorCode.MalformedData, () => BlockState.fromNbt(entry));
+});
+
+test("BlockState: 文字列でも Compound でもない要素は UNEXPECTED_TAG_TYPE", () => {
+  assertErrorCode(ErrorCode.UnexpectedTagType, () => BlockState.fromNbt(new NbtInt(1)));
 });
 
 test("BlockState: 壊れた文字列は INVALID_ARGUMENT", () => {
@@ -259,7 +299,7 @@ test("PalettedContainer: compact で未使用のパレット要素が消える",
 
   // 残るのは実際に使われているairとdirtの2つ
   assert.equal(container.palette.length, 2);
-  assert.equal((container.get(0) as NbtCompound).getString("Name"), "minecraft:dirt");
+  assert.equal((container.get(0) as NbtString).value, "minecraft:dirt");
 });
 
 test("PalettedContainer: fill で単一値に戻る", () => {
@@ -269,7 +309,61 @@ test("PalettedContainer: fill で単一値に戻る", () => {
 
   assert.equal(container.palette.length, 1);
   assert.equal(container.bitsPerEntry, 0);
-  assert.equal((container.get(4095) as NbtCompound).getString("Name"), "minecraft:water");
+  assert.equal((container.get(4095) as NbtString).value, "minecraft:water");
+});
+
+test("PalettedContainer: 文字列だけのパレットは文字列のリストで書く", () => {
+  const container = PalettedContainer.filled(blockEntry("minecraft:air"), 4096, 4);
+  container.set(0, blockEntry("minecraft:stone"));
+
+  const palette = container.toNbt().getList("palette");
+  assert.equal(palette.elementType, TagType.String);
+  assert.ok(palette.get(1).equals(new NbtString("minecraft:stone")));
+});
+
+test("PalettedContainer: 型が混ざったパレットは文字列を包んで Compound のリストで書く", () => {
+  const stairs = BlockState.parse("minecraft:oak_stairs[facing=north]").toNbt();
+  const container = PalettedContainer.filled(blockEntry("minecraft:air"), 4096, 4);
+  container.set(0, stairs);
+
+  const palette = container.toNbt().getList("palette");
+  assert.equal(palette.elementType, TagType.Compound);
+  assert.ok(palette.get(0).equals(wrapped(new NbtString("minecraft:air"))));
+  assert.ok(palette.get(1).equals(stairs));
+});
+
+test("PalettedContainer: 包まれたパレットは包みを外して持ち元どおりに書き戻す", () => {
+  const stairs = BlockState.parse("minecraft:oak_stairs[facing=north]").toNbt();
+  const palette = new NbtList(TagType.Compound);
+  palette.add(wrapped(new NbtString("minecraft:air")));
+  palette.add(stairs);
+
+  // パレット2要素ならbits=4で256 long
+  const nbt = new NbtCompound();
+  nbt.set("data", new NbtLongArray(new BigInt64Array(256)));
+  nbt.set("palette", palette);
+
+  const container = PalettedContainer.fromNbt(nbt, 4096, 4);
+
+  // 包みは外れ、要素は文字列とCompoundとして並ぶ
+  assert.ok(container.palette[0].equals(new NbtString("minecraft:air")));
+  assert.ok(container.palette[1].equals(stairs));
+
+  // 書き戻すと、また包まれて元と同じになる
+  assert.ok(container.toNbt().equals(nbt));
+});
+
+test("PalettedContainer: compact で Compound が消えると文字列のリストに戻る", () => {
+  const stairs = BlockState.parse("minecraft:oak_stairs[facing=north]").toNbt();
+  const container = PalettedContainer.filled(blockEntry("minecraft:air"), 4096, 4);
+  container.set(0, stairs);
+  container.set(0, blockEntry("minecraft:stone"));
+
+  container.compact();
+
+  const palette = container.toNbt().getList("palette");
+  assert.equal(palette.elementType, TagType.String);
+  assert.equal(palette.size, 2);
 });
 
 test("PalettedContainer: 範囲外の添字は INVALID_ARGUMENT", () => {
@@ -459,6 +553,11 @@ test("Chunk: data 長が合わないチャンクは MALFORMED_DATA", () => {
   assertErrorCode(ErrorCode.MalformedData, () => loadChunk("bitstorage_wrong_length"));
 });
 
+test("Chunk: パレットが 26.2 までの形式ならブロックを読むと MALFORMED_DATA", () => {
+  const chunk = loadChunk("palette_old_format", { onVersionMismatch: VersionMismatchAction.Ignore });
+  assertErrorCode(ErrorCode.MalformedData, () => chunk.getBlock(0, -64, 0));
+});
+
 test("Chunk: チャンク内の相対座標が範囲外なら INVALID_ARGUMENT", () => {
   const chunk = loadChunk("palette_1");
   assertErrorCode(ErrorCode.InvalidArgument, () => chunk.getBlock(16, -64, 0));
@@ -483,6 +582,18 @@ test("DataVersion: 既定では警告として通す", () => {
   });
 
   assert.equal(chunk.dataVersion, 3953);
+  assert.equal(warnings.length, 1);
+});
+
+test("DataVersion: 26.2 のチャンクは扱える形式より古い", () => {
+  const warnings: string[] = [];
+
+  // 26.2まではパレットの形式が違う
+  loadChunk("palette_old_format", {
+    onVersionMismatch: VersionMismatchAction.Warn,
+    onWarning: (message: string) => warnings.push(message),
+  });
+
   assert.equal(warnings.length, 1);
 });
 
@@ -522,7 +633,7 @@ test("DataVersion: 許可すれば古いチャンクも元のバージョンの�
 /** 対象より新しいDataVersionを持つチャンクを作る */
 function newerChunk(): NbtCompound {
   const root = readFile(vectorPath("palette_1")).tag;
-  root.setInt("DataVersion", 5015);
+  root.setInt("DataVersion", 5100);
   return root;
 }
 
@@ -535,7 +646,7 @@ test("DataVersion: 新しいバージョンのチャンクは警告を出さな�
     onWarning: (message) => warnings.push(message),
   });
 
-  assert.equal(chunk.dataVersion, 5015);
+  assert.equal(chunk.dataVersion, 5100);
   assert.deepEqual(warnings, []);
 });
 
@@ -544,14 +655,14 @@ test("DataVersion: 新しいバージョンのチャンクはエラー設定で�
     onVersionMismatch: VersionMismatchAction.Error,
   });
 
-  assert.equal(chunk.dataVersion, 5015);
+  assert.equal(chunk.dataVersion, 5100);
 });
 
 test("DataVersion: 新しいバージョンのチャンクはそのまま書き戻せる", () => {
   const chunk = Chunk.fromNbt(newerChunk());
 
   // 許可を出さなくても書き戻せて、DataVersionも変わらない
-  assert.equal(chunk.toNbt().getInt("DataVersion"), 5015);
+  assert.equal(chunk.toNbt().getInt("DataVersion"), 5100);
 });
 
 test("DataVersion: 対象バージョンのチャンクはそのまま書き戻せる", () => {

@@ -419,6 +419,10 @@ function chunkEdit(chunk: Chunk): void {
   chunk.setBlock(2, baseY + 2, 2, BlockState.parse("minecraft:oak_stairs[half=top,facing=north]"));
   chunk.setBlock(3, baseY + 2, 3, BlockState.parse("oak_stairs[facing=south]"));
 
+  // プロパティの無いブロックを置く
+  // パレットには文字列で入るので、Compoundの要素と混ざったリストの書き出しを通る
+  chunk.setBlock(4, baseY + 2, 4, BlockState.parse("minecraft:edited_plain"));
+
   // バイオームも書き換える
   chunk.setBiome(0, baseY, 0, "minecraft:desert");
   chunk.setBiome(8, baseY + 8, 8, "minecraft:jungle");

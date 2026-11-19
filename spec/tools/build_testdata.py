@@ -35,6 +35,9 @@ TAG_COMPOUND = 10
 TAG_INT_ARRAY = 11
 TAG_LONG_ARRAY = 12
 
+#: テストベクタのチャンクに入れるDataVersion。動作を確かめた26.3の値
+DATA_VERSION = 5023
+
 
 def mutf8_encode(text: str) -> bytes:
     """文字列をMUTF-8へ符号化する。
@@ -713,7 +716,7 @@ def lz4_chunk(payload, split=None, compressed=True):
 def sample_chunk(x, z, extra=None):
     """チャンクらしい形のNBTを作る。実データの構造を最小限まねる。"""
     entries = [
-        ("DataVersion", t_int(4903)),
+        ("DataVersion", t_int(DATA_VERSION)),
         ("xPos", t_int(x)),
         ("zPos", t_int(z)),
         ("yPos", t_int(-4)),
@@ -722,9 +725,7 @@ def sample_chunk(x, z, extra=None):
             t_compound([
                 ("Y", t_byte(-4)),
                 ("block_states", t_compound([
-                    ("palette", t_list(TAG_COMPOUND, [
-                        t_compound([("Name", t_string("minecraft:air"))]),
-                    ])),
+                    ("palette", t_list(TAG_STRING, [t_string("minecraft:air")])),
                 ])),
             ]),
         ])),
@@ -901,15 +902,44 @@ def pack_indices(indices, bits):
 
 
 def block_palette_entry(name, properties=None):
-    """ブロックのパレット要素。"""
-    entries = []
+    """ブロックのパレット要素。26.3の形式で作る。
 
-    if properties is not None:
-        entries.append(("Properties", t_compound(
-            [(key, t_string(value)) for key, value in properties])))
+    プロパティが無ければブロックIDだけの文字列、あればidとpropertiesを持つCompoundにする。
+    キーは実データと同じく`id` -> `properties`の順に置く。
+    """
+    if properties is None:
+        return t_string(name)
 
-    entries.append(("Name", t_string(name)))
-    return t_compound(entries)
+    return t_compound([
+        ("id", t_string(name)),
+        ("properties", t_compound([(key, t_string(value)) for key, value in properties])),
+    ])
+
+
+def palette_list(palette_entries):
+    """パレットの要素をリストへ詰める。MinecraftのListTagと同じ規則に従う。
+
+    要素の型がすべて同じならその型のリストにする。
+    混ざっていればCompoundのリストにして、Compoundでない要素を`{"": <値>}`で包む。
+    """
+    element_id = palette_entries[0].tag_id
+
+    # 型が1つでも違えば、異種リストとしてCompoundのリストにする
+    for entry in palette_entries:
+        if entry.tag_id != element_id:
+            element_id = TAG_COMPOUND
+            break
+
+    elements = []
+
+    # Compoundのリストでは、Compoundでない要素を包む
+    for entry in palette_entries:
+        if element_id == TAG_COMPOUND and entry.tag_id != TAG_COMPOUND:
+            elements.append(t_compound([("", entry)]))
+        else:
+            elements.append(entry)
+
+    return t_list(element_id, elements)
 
 
 def paletted_container(palette_entries, indices, min_bits):
@@ -923,7 +953,7 @@ def paletted_container(palette_entries, indices, min_bits):
         bits = max(min_bits, ceil_log2(len(palette_entries)))
         entries.append(("data", t_long_array(pack_indices(indices, bits))))
 
-    entries.append(("palette", t_list(palette_entries[0].tag_id, palette_entries)))
+    entries.append(("palette", palette_list(palette_entries)))
     return t_compound(entries)
 
 
@@ -962,7 +992,7 @@ def make_chunk(x, z, sections, status="minecraft:full",
                block_entities=None, block_ticks=None, fluid_ticks=None):
     """チャンクのNBTを組み立てる。実データの構造をなぞる。"""
     entries = [
-        ("DataVersion", t_int(4903)),
+        ("DataVersion", t_int(DATA_VERSION)),
         ("xPos", t_int(x)),
         ("zPos", t_int(z)),
         ("yPos", t_int(-4)),
@@ -1081,15 +1111,55 @@ def build_world():
                    status="minecraft:structure_starts"),
         "生成途中のチャンク（Status が full でない）")
 
+    # プロパティを持つブロックだけのパレット -> 包みの無いCompoundのリスト
+    stairs = [
+        block_palette_entry("minecraft:oak_stairs", [("facing", facing), ("half", "bottom")])
+        for facing in ("east", "north", "south", "west")
+    ]
+    indices_stairs = [position % 4 for position in range(4096)]
+    add_vector(
+        "world/palette_compound_only", "world/palette_compound_only.nbt",
+        make_chunk(0, 0, [make_section(-4, stairs, indices_stairs, [PLAINS], [0] * 64)]),
+        "パレットがプロパティ付きのブロックだけ -> 包みの無い Compound のリスト")
+
+    # 未使用のCompoundが消えると、文字列だけのパレットに戻る。
+    # 編集の手順が触るのは最下段だけなので、2段目はcompact()だけを受ける
+    add_vector(
+        "world/palette_mixed_compact", "world/palette_mixed_compact.nbt",
+        make_chunk(0, 0, [
+            make_section(-4, palette5, indices5, [PLAINS], [0] * 64),
+            make_section(-3, [STONE, stairs[0]], [0] * 4096, [PLAINS], [0] * 64),
+        ]),
+        "2 段目は文字列と未使用の Compound が混ざる。compact() で文字列だけのリストに戻る")
+
+    # 異常系: 26.2までの形式（Name / Properties）のパレット
+    old_palette = t_list(TAG_COMPOUND, [t_compound([("Name", t_string("minecraft:air"))])])
+    add_vector(
+        "world/palette_old_format", "world/palette_old_format.nbt",
+        to_java_file("", t_compound([
+            ("DataVersion", t_int(4903)),
+            ("xPos", t_int(0)),
+            ("zPos", t_int(0)),
+            ("yPos", t_int(-4)),
+            ("Status", t_string("minecraft:full")),
+            ("sections", t_list(TAG_COMPOUND, [t_compound([
+                ("Y", t_byte(-4)),
+                ("block_states", t_compound([("palette", old_palette)])),
+                ("biomes", paletted_container([PLAINS], [0] * 64, 1)),
+            ])])),
+        ])),
+        "26.2 までの形式（Name / Properties）のパレット。ブロックを読むと弾かれる",
+        expect_error="MALFORMED_DATA")
+
     # 異常系: 添字がパレットの範囲外
     broken = t_compound([
         ("data", t_long_array(pack_indices([5] * 4096, 4))),
-        ("palette", t_list(TAG_COMPOUND, [AIR, STONE])),
+        ("palette", palette_list([AIR, STONE])),
     ])
     add_vector(
         "world/palette_index_out_of_range", "world/palette_index_out_of_range.nbt",
         to_java_file("", t_compound([
-            ("DataVersion", t_int(4903)),
+            ("DataVersion", t_int(DATA_VERSION)),
             ("xPos", t_int(0)),
             ("zPos", t_int(0)),
             ("yPos", t_int(-4)),
@@ -1106,12 +1176,12 @@ def build_world():
     # 異常系: dataの長さがビット幅と合わない
     wrong_length = t_compound([
         ("data", t_long_array([0] * 100)),
-        ("palette", t_list(TAG_COMPOUND, [AIR, STONE, block_palette_entry("minecraft:dirt")])),
+        ("palette", palette_list([AIR, STONE, block_palette_entry("minecraft:dirt")])),
     ])
     add_vector(
         "world/bitstorage_wrong_length", "world/bitstorage_wrong_length.nbt",
         to_java_file("", t_compound([
-            ("DataVersion", t_int(4903)),
+            ("DataVersion", t_int(DATA_VERSION)),
             ("xPos", t_int(0)),
             ("zPos", t_int(0)),
             ("yPos", t_int(-4)),

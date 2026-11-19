@@ -12,6 +12,11 @@ namespace SpringNBTLibrary.World;
 /// こうすると、触っていないブロックについてはMinecraftが書き出したときの
 /// プロパティの並び順まで含めてそのまま書き戻せる
 /// </para>
+/// <para>
+/// 26.3からは、ブロックのパレットに文字列とCompoundが混ざる
+/// Minecraftはこうした異種リストをCompoundのリストとして保存し、Compoundでない要素を<c>{"": &lt;値&gt;}</c>で包む
+/// 読むときにこの包みを外して持ち、書くときに要素の型を見て包み直す
+/// </para>
 /// </remarks>
 public sealed class PalettedContainer
 {
@@ -83,9 +88,10 @@ public sealed class PalettedContainer
 
         // パレットの要素は生のNbtTagのまま持つ
         // 並び順まで元どおりに書き戻すため
+        // 異種リストの包みだけは外しておき、書くときに包み直す
         foreach (NbtTag entry in paletteTag)
         {
-            result.palette.Add(entry);
+            result.palette.Add(UnwrapListElement(entry));
         }
 
         long[]? data = nbt.OptLongArray("data");
@@ -125,13 +131,10 @@ public sealed class PalettedContainer
     public NbtCompound ToNbt()
     {
         NbtCompound result = new NbtCompound();
-        NbtList paletteTag = new NbtList();
 
         // パレットの要素は読んだときのまま書き出す
-        foreach (NbtTag entry in palette)
-        {
-            paletteTag.Add(entry);
-        }
+        // 型が混ざっていれば、Minecraftと同じく包んでCompoundのリストにする
+        NbtList paletteTag = PaletteToList(palette);
 
         // パレットが1要素ならdataは書かない
         // Minecraftと同じ振る舞い
@@ -141,6 +144,71 @@ public sealed class PalettedContainer
         }
 
         result.Set("palette", paletteTag);
+        return result;
+    }
+
+    /// <summary>異種リストの包みを外す
+    /// 包みでなければそのまま返す</summary>
+    internal static NbtTag UnwrapListElement(NbtTag tag)
+    {
+        if (IsListWrapper(tag))
+        {
+            return ((NbtCompound)tag).Get("");
+        }
+
+        return tag;
+    }
+
+    /// <summary>異種リストの要素を包むCompoundか
+    /// 空のキー1つだけを持つものがそれに当たる（MinecraftのListTagと同じ判定）</summary>
+    private static bool IsListWrapper(NbtTag tag)
+    {
+        if (tag is not NbtCompound compound)
+        {
+            return false;
+        }
+
+        return compound.Count == 1 && compound.ContainsKey("");
+    }
+
+    /// <summary>パレットの要素をリストへ詰める</summary>
+    /// <remarks>
+    /// 要素の型がすべて同じならその型のリストにする
+    /// 1つでも違えば、Minecraftと同じくCompoundのリストにして、Compoundでない要素と包みに見える要素を包む
+    /// </remarks>
+    private static NbtList PaletteToList(List<NbtTag> entries)
+    {
+        TagType elementType = entries[0].Type;
+
+        // 先頭と型の違う要素があるか調べる
+        foreach (NbtTag entry in entries)
+        {
+            // 1つでも違えば、異種リストとしてCompoundのリストにする
+            if (entry.Type != elementType)
+            {
+                elementType = TagType.Compound;
+                break;
+            }
+        }
+
+        NbtList result = new NbtList(elementType);
+
+        // 要素を順にリストへ入れる
+        foreach (NbtTag entry in entries)
+        {
+            // Compoundのリストでは、Compoundでない要素と包みに見える要素を包む
+            if (elementType == TagType.Compound && (entry is not NbtCompound || IsListWrapper(entry)))
+            {
+                NbtCompound wrapper = new NbtCompound();
+                wrapper.Set("", entry);
+                result.Add(wrapper);
+            }
+            else
+            {
+                result.Add(entry);
+            }
+        }
+
         return result;
     }
 

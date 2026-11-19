@@ -11,10 +11,12 @@
 
 ```
 block_states: {
-    palette: [ {Name: "minecraft:stone"}, {Name:"minecraft:oak_stairs", Properties:{facing:"north"}} ],
+    palette: [ {"": "minecraft:stone"}, {id: "minecraft:oak_stairs", properties: {facing: "north", …}} ],
     data: [L; ...]        // パレットが1要素のときは存在しない
 }
 ```
+
+ブロックのパレット要素の形と、文字列とCompoundが混ざったときのリストの書き方は、[30 チャンク形式 2.1](30-chunk-format.md#21-ブロック状態のパレット要素)で定める。
 
 `data`はパレットへの添字を64bit整数の配列へ詰めたもの。
 
@@ -79,17 +81,26 @@ Pythonは整数が無限精度なので、`i64`として扱う箇所では**読�
 
 ### 2.1 実データで確認した組み合わせ
 
-Java版26.2の実ワールド（83,544セクション = 167,088個のコンテナ）を走査した結果、上式で求めた`long_count`はすべて実際の`data`長と一致した。
+Java版26.3の実ワールド（83,544セクション = 167,088個のコンテナ）を走査した結果、上式で求めた`long_count`はすべて実際の`data`長と一致した。
 
 | コンテナ | パレット長 | bits | `data`の長さ | 出現数 |
 |---|---:|---:|---|---:|
-| `biomes` | 1 | — | **無し** | 73,345 |
-| `block_states` | 1 | — | **無し** | 67,532 |
-| `block_states` | 2〜16 | 4 | 256 long | 13,635 |
-| `biomes` | 2 | 1 | 1 long | 9,464 |
-| `block_states` | 17〜32 | 5 | 342 long | 2,016 |
-| `biomes` | 3〜4 | 2 | 2 long | 735 |
-| `block_states` | 33〜64 | 6 | 410 long | 361 |
+| `biomes` | 1 | — | **無し** | 72,167 |
+| `block_states` | 1 | — | **無し** | 68,634 |
+| `block_states` | 2〜16 | 4 | 256 long | 13,513 |
+| `biomes` | 2 | 1 | 1 long | 10,285 |
+| `block_states` | 17〜32 | 5 | 342 long | 1,191 |
+| `biomes` | 3〜4 | 2 | 2 long | 1,092 |
+| `block_states` | 33〜64 | 6 | 410 long | 206 |
+
+パレットの要素の形は次のとおりだった。
+
+| コンテナ | 要素の形 | 出現数 |
+|---|---|---:|
+| `block_states` | 文字列（すべて文字列のリスト） | 155,363 |
+| `block_states` | `{"": <文字列>}`（混ざったリストの中の文字列） | 45,241 |
+| `block_states` | `{id, properties}` | 22,274 |
+| `biomes` | 文字列 | 96,016 |
 
 `spec/tools/scan_world.py`がこの検証を行う。仕様を変えたら必ず実ワールドで再確認すること。
 
@@ -143,14 +154,14 @@ long_count      = ceil(4096 / 12) = 342
 
 compoundへ書き出すときは **`data`を先、`palette`を後**に置く。
 
-Minecraft 26.2が実際に書き出したデータを走査したところ、`block_states` / `biomes`のどちらも例外なくこの順だった。
+Minecraft 26.3が実際に書き出したデータを走査したところ、`block_states` / `biomes`のどちらも例外なくこの順だった。
 
 | コンテナ | キーの並び | 出現数 |
 |---|---|---|
-| `block_states` | `palette`のみ（`data`無し） | 67,532 |
-| `block_states` | `data`, `palette` | 16,012 |
-| `biomes` | `palette`のみ（`data`無し） | 73,345 |
-| `biomes` | `data`, `palette` | 10,199 |
+| `block_states` | `palette`のみ（`data`無し） | 68,634 |
+| `block_states` | `data`, `palette` | 14,910 |
+| `biomes` | `palette`のみ（`data`無し） | 72,167 |
+| `biomes` | `data`, `palette` | 11,377 |
 
 NBTのcompoundは挿入順を保持するため、この並びを揃えないと**内容が同じでもバイト列が変わる**。
 触っていないチャンクを書き戻しても元と一致させるために、並び順まで仕様として固定する。

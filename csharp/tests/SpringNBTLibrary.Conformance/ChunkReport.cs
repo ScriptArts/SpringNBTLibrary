@@ -133,6 +133,10 @@ internal static class ChunkReport
         chunk.SetBlock(2, baseY + 2, 2, BlockState.Parse("minecraft:oak_stairs[half=top,facing=north]"));
         chunk.SetBlock(3, baseY + 2, 3, BlockState.Parse("oak_stairs[facing=south]"));
 
+        // プロパティの無いブロックを置く
+        // パレットには文字列で入るので、Compoundの要素と混ざったリストの書き出しを通る
+        chunk.SetBlock(4, baseY + 2, 4, BlockState.Parse("minecraft:edited_plain"));
+
         // バイオームも書き換える
         chunk.SetBiome(0, baseY, 0, "minecraft:desert");
         chunk.SetBiome(8, baseY + 8, 8, "minecraft:jungle");
