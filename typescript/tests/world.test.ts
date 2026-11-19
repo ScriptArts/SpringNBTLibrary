@@ -157,6 +157,81 @@ test("BlockState: 文字列でも Compound でもない要素は UNEXPECTED_TAG_
   assertErrorCode(ErrorCode.UnexpectedTagType, () => BlockState.fromNbt(new NbtInt(1)));
 });
 
+test("BlockState: DataVersion 2844 では Name / Properties を読む", () => {
+  const properties = new NbtCompound();
+  properties.set("facing", new NbtString("north"));
+  const entry = new NbtCompound();
+  entry.set("Name", new NbtString("minecraft:oak_stairs"));
+  entry.set("Properties", properties);
+
+  const state = BlockState.fromNbtForDataVersion(entry, 2844);
+  assert.equal(state.toString(), "minecraft:oak_stairs[facing=north]");
+});
+
+test("BlockState: DataVersion 2844 で id を持つ要素は MALFORMED_DATA", () => {
+  const entry = new NbtCompound();
+  entry.set("id", new NbtString("minecraft:stone"));
+  assertErrorCode(ErrorCode.MalformedData, () => BlockState.fromNbtForDataVersion(entry, 2844));
+});
+
+test("BlockState: DataVersion 2844 で文字列の要素は UNEXPECTED_TAG_TYPE", () => {
+  assertErrorCode(ErrorCode.UnexpectedTagType, () =>
+    BlockState.fromNbtForDataVersion(new NbtString("minecraft:stone"), 2844));
+});
+
+test("BlockState: DataVersion 2844 で Properties の値が文字列でなければ UNEXPECTED_TAG_TYPE", () => {
+  const properties = new NbtCompound();
+  properties.set("facing", new NbtInt(1));
+  const entry = new NbtCompound();
+  entry.set("Name", new NbtString("minecraft:oak_stairs"));
+  entry.set("Properties", properties);
+  assertErrorCode(ErrorCode.UnexpectedTagType, () => BlockState.fromNbtForDataVersion(entry, 2844));
+});
+
+test("BlockState: DataVersion 2844 では Name / Properties で書く", () => {
+  const plain = BlockState.parse("minecraft:stone").toNbtForDataVersion(2844) as NbtCompound;
+  const expected = new NbtCompound();
+  expected.set("Name", new NbtString("minecraft:stone"));
+  assert.ok(plain.equals(expected));
+  assert.equal(plain.containsKey("Properties"), false);
+
+  const stairs = BlockState.parse("minecraft:oak_stairs[half=top,facing=north]");
+  const nbt = stairs.toNbtForDataVersion(2844) as NbtCompound;
+  assert.deepEqual([...nbt.keys()], ["Name", "Properties"]);
+  assert.equal(nbt.getString("Name"), "minecraft:oak_stairs");
+  assert.deepEqual([...nbt.getCompound("Properties").keys()], ["facing", "half"]);
+  assert.ok(BlockState.fromNbtForDataVersion(nbt, 2844).equals(stairs));
+});
+
+for (const dataVersion of [5006, 5023]) {
+  test(`BlockState: DataVersion ${dataVersion} は fromNbt / toNbt と同じ`, () => {
+    const stairs = BlockState.parse("minecraft:oak_stairs[facing=north,half=top]");
+    assert.ok(stairs.toNbtForDataVersion(dataVersion).equals(stairs.toNbt()));
+
+    const plain = BlockState.parse("minecraft:stone");
+    assert.ok(plain.toNbtForDataVersion(dataVersion).equals(new NbtString("minecraft:stone")));
+
+    assert.ok(BlockState.fromNbtForDataVersion(new NbtString("minecraft:stone"), dataVersion).equals(plain));
+    assert.ok(BlockState.fromNbtForDataVersion(stairs.toNbt(), dataVersion).equals(stairs));
+    const wrapper = wrapped(new NbtString("minecraft:stone"));
+    assert.ok(
+      BlockState.fromNbtForDataVersion(wrapper, dataVersion).equals(BlockState.fromNbt(wrapper)),
+    );
+  });
+}
+
+test("BlockState: DataVersion 1519 で境界の形式を扱える", () => {
+  const state = BlockState.parse("minecraft:oak_stairs[facing=north]");
+  assert.ok(BlockState.fromNbtForDataVersion(state.toNbtForDataVersion(1519), 1519).equals(state));
+});
+
+test("BlockState: DataVersion が 1519 未満なら INVALID_ARGUMENT", () => {
+  assertErrorCode(ErrorCode.InvalidArgument, () =>
+    BlockState.fromNbtForDataVersion(new NbtString("minecraft:stone"), 1518));
+  assertErrorCode(ErrorCode.InvalidArgument, () =>
+    BlockState.parse("minecraft:stone").toNbtForDataVersion(1518));
+});
+
 test("BlockState: 壊れた文字列は INVALID_ARGUMENT", () => {
   const broken = [
     "",

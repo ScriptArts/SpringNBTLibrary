@@ -161,6 +161,103 @@ public class WorldTests
             Assert.Equal(ErrorCode.UnexpectedTagType, error.Code);
         }
 
+        [Fact]
+        public void DataVersion2844ではName_Propertiesを読む()
+        {
+            NbtCompound properties = new NbtCompound();
+            properties.Set("facing", new NbtString("north"));
+            NbtCompound entry = new NbtCompound();
+            entry.Set("Name", new NbtString("minecraft:oak_stairs"));
+            entry.Set("Properties", properties);
+
+            BlockState state = BlockState.FromNbtForDataVersion(entry, 2844);
+            Assert.Equal("minecraft:oak_stairs[facing=north]", state.ToString());
+        }
+
+        [Fact]
+        public void DataVersion2844でidを持つ要素はMALFORMED_DATA()
+        {
+            NbtCompound entry = new NbtCompound();
+            entry.Set("id", new NbtString("minecraft:stone"));
+            SpringNbtException error = Assert.Throws<SpringNbtException>(
+                () => BlockState.FromNbtForDataVersion(entry, 2844));
+            Assert.Equal(ErrorCode.MalformedData, error.Code);
+        }
+
+        [Fact]
+        public void DataVersion2844で文字列の要素はUNEXPECTED_TAG_TYPE()
+        {
+            SpringNbtException error = Assert.Throws<SpringNbtException>(
+                () => BlockState.FromNbtForDataVersion(new NbtString("minecraft:stone"), 2844));
+            Assert.Equal(ErrorCode.UnexpectedTagType, error.Code);
+        }
+
+        [Fact]
+        public void DataVersion2844でPropertiesの値が文字列でなければUNEXPECTED_TAG_TYPE()
+        {
+            NbtCompound properties = new NbtCompound();
+            properties.Set("facing", new NbtInt(1));
+            NbtCompound entry = new NbtCompound();
+            entry.Set("Name", new NbtString("minecraft:oak_stairs"));
+            entry.Set("Properties", properties);
+            SpringNbtException error = Assert.Throws<SpringNbtException>(
+                () => BlockState.FromNbtForDataVersion(entry, 2844));
+            Assert.Equal(ErrorCode.UnexpectedTagType, error.Code);
+        }
+
+        [Fact]
+        public void DataVersion2844ではName_Propertiesで書く()
+        {
+            NbtCompound plain = (NbtCompound)BlockState.Parse("minecraft:stone").ToNbtForDataVersion(2844);
+            NbtCompound expected = new NbtCompound();
+            expected.Set("Name", new NbtString("minecraft:stone"));
+            Assert.Equal(expected, plain);
+            Assert.False(plain.ContainsKey("Properties"));
+
+            BlockState stairs = BlockState.Parse("minecraft:oak_stairs[half=top,facing=north]");
+            NbtCompound nbt = (NbtCompound)stairs.ToNbtForDataVersion(2844);
+            Assert.Equal(new[] { "Name", "Properties" }, nbt.Keys.ToArray());
+            Assert.Equal("minecraft:oak_stairs", nbt.GetString("Name"));
+            Assert.Equal(new[] { "facing", "half" }, nbt.GetCompound("Properties").Keys.ToArray());
+            Assert.Equal(stairs, BlockState.FromNbtForDataVersion(nbt, 2844));
+        }
+
+        [Theory]
+        [InlineData(5006)]
+        [InlineData(5023)]
+        public void DataVersion5006以降はFromNbtとToNbtと同じ(int dataVersion)
+        {
+            BlockState stairs = BlockState.Parse("minecraft:oak_stairs[facing=north,half=top]");
+            Assert.Equal(stairs.ToNbt(), stairs.ToNbtForDataVersion(dataVersion));
+
+            BlockState plain = BlockState.Parse("minecraft:stone");
+            Assert.Equal(new NbtString("minecraft:stone"), plain.ToNbtForDataVersion(dataVersion));
+
+            Assert.Equal(plain, BlockState.FromNbtForDataVersion(new NbtString("minecraft:stone"), dataVersion));
+            Assert.Equal(stairs, BlockState.FromNbtForDataVersion(stairs.ToNbt(), dataVersion));
+            NbtCompound wrapper = Wrapped(new NbtString("minecraft:stone"));
+            Assert.Equal(BlockState.FromNbt(wrapper), BlockState.FromNbtForDataVersion(wrapper, dataVersion));
+        }
+
+        [Fact]
+        public void DataVersion1519で境界の形式を扱える()
+        {
+            BlockState state = BlockState.Parse("minecraft:oak_stairs[facing=north]");
+            Assert.Equal(state, BlockState.FromNbtForDataVersion(state.ToNbtForDataVersion(1519), 1519));
+        }
+
+        [Fact]
+        public void DataVersionが1519未満ならINVALID_ARGUMENT()
+        {
+            SpringNbtException readError = Assert.Throws<SpringNbtException>(
+                () => BlockState.FromNbtForDataVersion(new NbtString("minecraft:stone"), 1518));
+            Assert.Equal(ErrorCode.InvalidArgument, readError.Code);
+
+            SpringNbtException writeError = Assert.Throws<SpringNbtException>(
+                () => BlockState.Parse("minecraft:stone").ToNbtForDataVersion(1518));
+            Assert.Equal(ErrorCode.InvalidArgument, writeError.Code);
+        }
+
         [Theory]
         [InlineData("")]
         [InlineData("minecraft:oak_stairs[facing=north")]

@@ -183,6 +183,129 @@ fn 文字列でもcompoundでもない要素はunexpected_tag_type() {
     }
 }
 
+/// `Name`と`Properties`を持つパレット要素を作る
+fn name_properties_entry(name: &str, properties: &[(&str, NbtTag)]) -> NbtTag {
+    let mut entry = NbtCompound::new();
+    entry.set("Name", block_entry(name));
+
+    if !properties.is_empty() {
+        let mut tag = NbtCompound::new();
+
+        for (key, value) in properties {
+            tag.set(*key, value.clone());
+        }
+
+        entry.set("Properties", NbtTag::Compound(tag));
+    }
+
+    NbtTag::Compound(entry)
+}
+
+#[test]
+fn data_version2844ではname_propertiesを読む() {
+    let entry = name_properties_entry("minecraft:oak_stairs", &[("facing", block_entry("north"))]);
+    let state = BlockState::from_nbt_for_data_version(&entry, 2844).unwrap();
+    assert_eq!("minecraft:oak_stairs[facing=north]", state.to_string());
+}
+
+#[test]
+fn data_version2844でidを持つ要素はmalformed_data() {
+    let mut entry = NbtCompound::new();
+    entry.set("id", block_entry("minecraft:stone"));
+
+    match BlockState::from_nbt_for_data_version(&NbtTag::Compound(entry), 2844) {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::MalformedData, error),
+    }
+}
+
+#[test]
+fn data_version2844で文字列の要素はunexpected_tag_type() {
+    match BlockState::from_nbt_for_data_version(&block_entry("minecraft:stone"), 2844) {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::UnexpectedTagType, error),
+    }
+}
+
+#[test]
+fn data_version2844でpropertiesの値が文字列でなければunexpected_tag_type() {
+    let entry = name_properties_entry("minecraft:oak_stairs", &[("facing", NbtTag::Int(1))]);
+
+    match BlockState::from_nbt_for_data_version(&entry, 2844) {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::UnexpectedTagType, error),
+    }
+}
+
+#[test]
+fn data_version2844ではname_propertiesで書く() {
+    let plain = BlockState::parse("minecraft:stone").unwrap().to_nbt_for_data_version(2844).unwrap();
+    assert_eq!(name_properties_entry("minecraft:stone", &[]), plain);
+
+    let stairs = BlockState::parse("minecraft:oak_stairs[half=top,facing=north]").unwrap();
+    let nbt = stairs.to_nbt_for_data_version(2844).unwrap();
+
+    match &nbt {
+        NbtTag::Compound(compound) => {
+            assert_eq!(vec!["Name", "Properties"], compound.keys().collect::<Vec<_>>());
+            assert_eq!("minecraft:oak_stairs", compound.get_string("Name").unwrap());
+            assert_eq!(
+                vec!["facing", "half"],
+                compound.get_compound("Properties").unwrap().keys().collect::<Vec<_>>()
+            );
+        }
+        other => panic!("compound でない: {other:?}"),
+    }
+
+    assert_eq!(stairs, BlockState::from_nbt_for_data_version(&nbt, 2844).unwrap());
+}
+
+#[test]
+fn data_version5006以降はfrom_nbtとto_nbtと同じ() {
+    // 境界と、動作を確かめたバージョンの両方で確かめる
+    for data_version in [5006, 5023] {
+        let stairs = BlockState::parse("minecraft:oak_stairs[facing=north,half=top]").unwrap();
+        assert_eq!(stairs.to_nbt(), stairs.to_nbt_for_data_version(data_version).unwrap());
+
+        let plain = BlockState::parse("minecraft:stone").unwrap();
+        assert_eq!(block_entry("minecraft:stone"), plain.to_nbt_for_data_version(data_version).unwrap());
+
+        assert_eq!(
+            plain,
+            BlockState::from_nbt_for_data_version(&block_entry("minecraft:stone"), data_version).unwrap()
+        );
+        assert_eq!(
+            stairs,
+            BlockState::from_nbt_for_data_version(&stairs.to_nbt(), data_version).unwrap()
+        );
+        let wrapper = wrapped(block_entry("minecraft:stone"));
+        assert_eq!(
+            BlockState::from_nbt(&wrapper).unwrap(),
+            BlockState::from_nbt_for_data_version(&wrapper, data_version).unwrap()
+        );
+    }
+}
+
+#[test]
+fn data_version1519で境界の形式を扱える() {
+    let state = BlockState::parse("minecraft:oak_stairs[facing=north]").unwrap();
+    let nbt = state.to_nbt_for_data_version(1519).unwrap();
+    assert_eq!(state, BlockState::from_nbt_for_data_version(&nbt, 1519).unwrap());
+}
+
+#[test]
+fn data_versionが1519未満ならinvalid_argument() {
+    match BlockState::from_nbt_for_data_version(&block_entry("minecraft:stone"), 1518) {
+        Ok(_) => panic!("読めてしまった"),
+        Err(error) => assert_code(ErrorCode::InvalidArgument, error),
+    }
+
+    match BlockState::parse("minecraft:stone").unwrap().to_nbt_for_data_version(1518) {
+        Ok(_) => panic!("書けてしまった"),
+        Err(error) => assert_code(ErrorCode::InvalidArgument, error),
+    }
+}
+
 #[test]
 fn 壊れた文字列はinvalid_argument() {
     let broken = [

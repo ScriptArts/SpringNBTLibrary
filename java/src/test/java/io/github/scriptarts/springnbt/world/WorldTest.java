@@ -174,6 +174,94 @@ class WorldTest {
             assertEquals(ErrorCode.UNEXPECTED_TAG_TYPE, error.code());
         }
 
+        @Test
+        void DataVersion2844ではName_Propertiesを読む() {
+            NbtCompound properties = new NbtCompound();
+            properties.set("facing", new NbtString("north"));
+            NbtCompound entry = new NbtCompound();
+            entry.set("Name", new NbtString("minecraft:oak_stairs"));
+            entry.set("Properties", properties);
+
+            BlockState state = BlockState.fromNbtForDataVersion(entry, 2844);
+            assertEquals("minecraft:oak_stairs[facing=north]", state.toString());
+        }
+
+        @Test
+        void DataVersion2844でidを持つ要素はMALFORMED_DATA() {
+            NbtCompound entry = new NbtCompound();
+            entry.set("id", new NbtString("minecraft:stone"));
+            SpringNbtException error = assertThrows(SpringNbtException.class,
+                    () -> BlockState.fromNbtForDataVersion(entry, 2844));
+            assertEquals(ErrorCode.MALFORMED_DATA, error.code());
+        }
+
+        @Test
+        void DataVersion2844で文字列の要素はUNEXPECTED_TAG_TYPE() {
+            SpringNbtException error = assertThrows(SpringNbtException.class,
+                    () -> BlockState.fromNbtForDataVersion(new NbtString("minecraft:stone"), 2844));
+            assertEquals(ErrorCode.UNEXPECTED_TAG_TYPE, error.code());
+        }
+
+        @Test
+        void DataVersion2844でPropertiesの値が文字列でなければUNEXPECTED_TAG_TYPE() {
+            NbtCompound properties = new NbtCompound();
+            properties.set("facing", new NbtInt(1));
+            NbtCompound entry = new NbtCompound();
+            entry.set("Name", new NbtString("minecraft:oak_stairs"));
+            entry.set("Properties", properties);
+            SpringNbtException error = assertThrows(SpringNbtException.class,
+                    () -> BlockState.fromNbtForDataVersion(entry, 2844));
+            assertEquals(ErrorCode.UNEXPECTED_TAG_TYPE, error.code());
+        }
+
+        @Test
+        void DataVersion2844ではName_Propertiesで書く() {
+            NbtCompound plain = (NbtCompound) BlockState.parse("minecraft:stone").toNbtForDataVersion(2844);
+            NbtCompound expected = new NbtCompound();
+            expected.set("Name", new NbtString("minecraft:stone"));
+            assertEquals(expected, plain);
+            assertFalse(plain.containsKey("Properties"));
+
+            BlockState stairs = BlockState.parse("minecraft:oak_stairs[half=top,facing=north]");
+            NbtCompound nbt = (NbtCompound) stairs.toNbtForDataVersion(2844);
+            assertEquals(List.of("Name", "Properties"), new ArrayList<>(nbt.keys()));
+            assertEquals("minecraft:oak_stairs", nbt.getString("Name"));
+            assertEquals(List.of("facing", "half"), new ArrayList<>(nbt.getCompound("Properties").keys()));
+            assertEquals(stairs, BlockState.fromNbtForDataVersion(nbt, 2844));
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = {5006, 5023})
+        void DataVersion5006以降はfromNbtとtoNbtと同じ(int dataVersion) {
+            BlockState stairs = BlockState.parse("minecraft:oak_stairs[facing=north,half=top]");
+            assertEquals(stairs.toNbt(), stairs.toNbtForDataVersion(dataVersion));
+
+            BlockState plain = BlockState.parse("minecraft:stone");
+            assertEquals(new NbtString("minecraft:stone"), plain.toNbtForDataVersion(dataVersion));
+
+            assertEquals(plain, BlockState.fromNbtForDataVersion(new NbtString("minecraft:stone"), dataVersion));
+            assertEquals(stairs, BlockState.fromNbtForDataVersion(stairs.toNbt(), dataVersion));
+            NbtCompound wrapper = wrapped(new NbtString("minecraft:stone"));
+            assertEquals(BlockState.fromNbt(wrapper), BlockState.fromNbtForDataVersion(wrapper, dataVersion));
+        }
+
+        @Test
+        void DataVersion1519で境界の形式を扱える() {
+            BlockState state = BlockState.parse("minecraft:oak_stairs[facing=north]");
+            assertEquals(state, BlockState.fromNbtForDataVersion(state.toNbtForDataVersion(1519), 1519));
+        }
+
+        @Test
+        void DataVersionが1519未満ならINVALID_ARGUMENT() {
+            SpringNbtException readError = assertThrows(SpringNbtException.class,
+                    () -> BlockState.fromNbtForDataVersion(new NbtString("minecraft:stone"), 1518));
+            assertEquals(ErrorCode.INVALID_ARGUMENT, readError.code());
+
+            SpringNbtException writeError = assertThrows(SpringNbtException.class,
+                    () -> BlockState.parse("minecraft:stone").toNbtForDataVersion(1518));
+            assertEquals(ErrorCode.INVALID_ARGUMENT, writeError.code());
+        }
+
         @ParameterizedTest
         @ValueSource(strings = {
             "",

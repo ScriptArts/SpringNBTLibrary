@@ -152,6 +152,8 @@ EXCLUDED_FILES = {
     "ChunkReport",
     "RegionReport",
     "NormalizedJson",
+    # チャンクの形式の世代の境界。ライブラリの内部だけで使う
+    "chunkFormat",
 }
 
 #: 言語のキーワード。正規表現が制御構文を拾ってしまった場合に落とす。

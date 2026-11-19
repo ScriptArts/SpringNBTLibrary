@@ -4,6 +4,7 @@ pub mod bit_storage;
 pub mod block_pos;
 pub mod block_state;
 pub mod chunk;
+pub(crate) mod chunk_format;
 pub mod minecraft_world;
 pub mod paletted_container;
 

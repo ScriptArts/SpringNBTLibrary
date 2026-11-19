@@ -146,6 +146,85 @@ class TestBlockState:
 
         assert error.value.code == ErrorCode.UNEXPECTED_TAG_TYPE
 
+    def test_DataVersion2844ではName_Propertiesを読む(self):
+        properties = NbtCompound()
+        properties.set("facing", NbtString("north"))
+        entry = NbtCompound()
+        entry.set("Name", NbtString("minecraft:oak_stairs"))
+        entry.set("Properties", properties)
+
+        state = BlockState.from_nbt_for_data_version(entry, 2844)
+        assert str(state) == "minecraft:oak_stairs[facing=north]"
+
+    def test_DataVersion2844でidを持つ要素はMALFORMED_DATA(self):
+        entry = NbtCompound()
+        entry.set("id", NbtString("minecraft:stone"))
+
+        with pytest.raises(SpringNbtError) as error:
+            BlockState.from_nbt_for_data_version(entry, 2844)
+
+        assert error.value.code == ErrorCode.MALFORMED_DATA
+
+    def test_DataVersion2844で文字列の要素はUNEXPECTED_TAG_TYPE(self):
+        with pytest.raises(SpringNbtError) as error:
+            BlockState.from_nbt_for_data_version(NbtString("minecraft:stone"), 2844)
+
+        assert error.value.code == ErrorCode.UNEXPECTED_TAG_TYPE
+
+    def test_DataVersion2844でPropertiesの値が文字列でなければUNEXPECTED_TAG_TYPE(self):
+        properties = NbtCompound()
+        properties.set("facing", NbtInt(1))
+        entry = NbtCompound()
+        entry.set("Name", NbtString("minecraft:oak_stairs"))
+        entry.set("Properties", properties)
+
+        with pytest.raises(SpringNbtError) as error:
+            BlockState.from_nbt_for_data_version(entry, 2844)
+
+        assert error.value.code == ErrorCode.UNEXPECTED_TAG_TYPE
+
+    def test_DataVersion2844ではName_Propertiesで書く(self):
+        plain = BlockState.parse("minecraft:stone").to_nbt_for_data_version(2844)
+        expected = NbtCompound()
+        expected.set("Name", NbtString("minecraft:stone"))
+        assert plain == expected
+        assert "Properties" not in plain
+
+        stairs = BlockState.parse("minecraft:oak_stairs[half=top,facing=north]")
+        nbt = stairs.to_nbt_for_data_version(2844)
+        assert list(nbt.keys()) == ["Name", "Properties"]
+        assert nbt.get_string("Name") == "minecraft:oak_stairs"
+        assert list(nbt.get_compound("Properties").keys()) == ["facing", "half"]
+        assert BlockState.from_nbt_for_data_version(nbt, 2844) == stairs
+
+    @pytest.mark.parametrize("data_version", [5006, 5023])
+    def test_DataVersion5006以降はfrom_nbtとto_nbtと同じ(self, data_version):
+        stairs = BlockState.parse("minecraft:oak_stairs[facing=north,half=top]")
+        assert stairs.to_nbt_for_data_version(data_version) == stairs.to_nbt()
+
+        plain = BlockState.parse("minecraft:stone")
+        assert plain.to_nbt_for_data_version(data_version) == NbtString("minecraft:stone")
+
+        assert BlockState.from_nbt_for_data_version(NbtString("minecraft:stone"), data_version) == plain
+        assert BlockState.from_nbt_for_data_version(stairs.to_nbt(), data_version) == stairs
+        wrapper = wrapped(NbtString("minecraft:stone"))
+        assert BlockState.from_nbt_for_data_version(wrapper, data_version) == BlockState.from_nbt(wrapper)
+
+    def test_DataVersion1519で境界の形式を扱える(self):
+        state = BlockState.parse("minecraft:oak_stairs[facing=north]")
+        assert BlockState.from_nbt_for_data_version(state.to_nbt_for_data_version(1519), 1519) == state
+
+    def test_DataVersionが1519未満ならINVALID_ARGUMENT(self):
+        with pytest.raises(SpringNbtError) as read_error:
+            BlockState.from_nbt_for_data_version(NbtString("minecraft:stone"), 1518)
+
+        assert read_error.value.code == ErrorCode.INVALID_ARGUMENT
+
+        with pytest.raises(SpringNbtError) as write_error:
+            BlockState.parse("minecraft:stone").to_nbt_for_data_version(1518)
+
+        assert write_error.value.code == ErrorCode.INVALID_ARGUMENT
+
     @pytest.mark.parametrize("text", [
         "",
         "minecraft:oak_stairs[facing=north",

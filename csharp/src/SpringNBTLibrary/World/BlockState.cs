@@ -144,16 +144,47 @@ public sealed class BlockState : IEquatable<BlockState>
 
     /// <summary>パレット要素のNBTから作る</summary>
     /// <remarks>
-    /// 26.3で入った形式を読む
-    /// 既定の状態はブロックIDだけの文字列で、それ以外は<c>id</c>と<c>properties</c>を持つCompoundで入っている
-    /// 異種リストの要素を包む<c>{"": &lt;値&gt;}</c>は外してから読む
+    /// <see cref="SpringNbt.TargetDataVersion"/>の形式で読む
+    /// DataVersionを指定するときは<see cref="FromNbtForDataVersion"/>を使う
     /// </remarks>
     /// <exception cref="SpringNbtException">
     /// 文字列でもCompoundでもない、<c>id</c>が無い、または<c>properties</c>の値が文字列でない場合
     /// </exception>
     public static BlockState FromNbt(NbtTag nbt)
     {
+        return FromNbtForDataVersion(nbt, SpringNbt.TargetDataVersion);
+    }
+
+    /// <summary>DataVersionを指定して、パレット要素のNBTから作る</summary>
+    /// <remarks>
+    /// 26.3（DataVersion 5006）以降は、既定の状態がブロックIDだけの文字列で、それ以外は<c>id</c>と<c>properties</c>を持つCompoundで入っている
+    /// 異種リストの要素を包む<c>{"": &lt;値&gt;}</c>は外してから読む
+    /// 1519以上5006未満は、<c>Name</c>と<c>Properties</c>を持つCompoundを読む
+    /// 文字列は受け付けない
+    /// </remarks>
+    /// <param name="nbt">パレット要素</param>
+    /// <param name="dataVersion">パレット要素を含むチャンクのDataVersion（1519以上）</param>
+    /// <exception cref="SpringNbtException">
+    /// <paramref name="dataVersion"/>が1519未満の場合（<see cref="ErrorCode.InvalidArgument"/>）、
+    /// 要素が形式に合うタグでない場合、<c>id</c> / <c>Name</c>が無い場合、またはプロパティの値が文字列でない場合
+    /// </exception>
+    public static BlockState FromNbtForDataVersion(NbtTag nbt, int dataVersion)
+    {
         ArgumentNullException.ThrowIfNull(nbt);
+        CheckDataVersion(dataVersion);
+
+        // 26.3より前は、Name / Propertiesの形式で入っている
+        if (dataVersion < ChunkFormat.PaletteIdFormatDataVersion)
+        {
+            return FromNameProperties(nbt);
+        }
+
+        return FromPaletteId(nbt);
+    }
+
+    /// <summary>26.3以降の<c>id</c> / <c>properties</c>の形式から読む</summary>
+    private static BlockState FromPaletteId(NbtTag nbt)
+    {
         NbtTag entry = PalettedContainer.UnwrapListElement(nbt);
 
         // 既定の状態は、ブロックIDだけの文字列で入っている
@@ -205,12 +236,92 @@ public sealed class BlockState : IEquatable<BlockState>
         return state;
     }
 
+
+    /// <summary>26.2までの<c>Name</c> / <c>Properties</c>の形式から読む</summary>
+    private static BlockState FromNameProperties(NbtTag nbt)
+    {
+        // 26.2までは文字列のパレット要素も、異種リストの包みも無い
+        if (nbt is not NbtCompound compound)
+        {
+            throw SpringNbtException.UnexpectedTagType(
+                $"ブロックのパレット要素が compound でない: {nbt.Type.AsString()}");
+        }
+
+        string? name = compound.OptString("Name");
+
+        if (name is null)
+        {
+            throw SpringNbtException.Malformed("ブロックのパレット要素に Name が無い");
+        }
+
+        BlockState state = new BlockState(name);
+        NbtCompound? propertiesTag = compound.OptCompound("Properties");
+
+        if (propertiesTag is null)
+        {
+            return state;
+        }
+
+        // Propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
+        foreach (KeyValuePair<string, NbtTag> property in propertiesTag)
+        {
+            if (property.Value is not NbtString text)
+            {
+                throw SpringNbtException.UnexpectedTagType(
+                    $"Properties の \"{property.Key}\" が文字列でない: {property.Value.Type.AsString()}");
+            }
+
+            state.properties[property.Key] = text.Value;
+        }
+
+        return state;
+    }
+
+    /// <summary>指定されたDataVersionが、読み書きできる下限以上であることを確かめる</summary>
+    private static void CheckDataVersion(int dataVersion)
+    {
+        if (dataVersion < ChunkFormat.OldestFormatDataVersion)
+        {
+            throw SpringNbtException.InvalidArgument(
+                $"DataVersionは{ChunkFormat.OldestFormatDataVersion}以上でなければならない: {dataVersion}");
+        }
+    }
+
     /// <summary>パレット要素のNBTへ変換する</summary>
     /// <remarks>
-    /// プロパティが空ならブロックIDだけの文字列にし、それ以外は<c>id</c>と<c>properties</c>を持つCompoundにする
-    /// Minecraftと同じ振る舞い
+    /// <see cref="SpringNbt.TargetDataVersion"/>の形式で書く
+    /// DataVersionを指定するときは<see cref="ToNbtForDataVersion"/>を使う
     /// </remarks>
     public NbtTag ToNbt()
+    {
+        return ToNbtForDataVersion(SpringNbt.TargetDataVersion);
+    }
+
+    /// <summary>DataVersionを指定して、パレット要素のNBTへ変換する</summary>
+    /// <remarks>
+    /// 26.3（DataVersion 5006）以降は、プロパティが空ならブロックIDだけの文字列にし、それ以外は<c>id</c>と<c>properties</c>を持つCompoundにする
+    /// 1519以上5006未満は、<c>Name</c>を持つCompoundにし、プロパティが空なら<c>Properties</c>キー自体を出力しない
+    /// いずれもMinecraftと同じ振る舞い
+    /// </remarks>
+    /// <param name="dataVersion">書き込み先のチャンクのDataVersion（1519以上）</param>
+    /// <exception cref="SpringNbtException">
+    /// <paramref name="dataVersion"/>が1519未満の場合（<see cref="ErrorCode.InvalidArgument"/>）
+    /// </exception>
+    public NbtTag ToNbtForDataVersion(int dataVersion)
+    {
+        CheckDataVersion(dataVersion);
+
+        // 26.3より前は、Name / Propertiesの形式で書く
+        if (dataVersion < ChunkFormat.PaletteIdFormatDataVersion)
+        {
+            return ToNameProperties();
+        }
+
+        return ToPaletteId();
+    }
+
+    /// <summary>26.3以降の<c>id</c> / <c>properties</c>の形式へ変換する</summary>
+    private NbtTag ToPaletteId()
     {
         // プロパティが無ければ、Minecraftが既定の状態を書くときと同じく文字列にする
         if (properties.Count == 0)
@@ -229,6 +340,30 @@ public sealed class BlockState : IEquatable<BlockState>
         }
 
         result.Set("properties", propertiesTag);
+        return result;
+    }
+
+    /// <summary>26.2までの<c>Name</c> / <c>Properties</c>の形式へ変換する</summary>
+    private NbtCompound ToNameProperties()
+    {
+        NbtCompound result = new NbtCompound();
+        result.Set("Name", new NbtString(Name));
+
+        // プロパティが無ければ、Propertiesキー自体を出力しない
+        if (properties.Count == 0)
+        {
+            return result;
+        }
+
+        NbtCompound propertiesTag = new NbtCompound();
+
+        // 名前の昇順で並ぶ
+        foreach (KeyValuePair<string, string> entry in properties)
+        {
+            propertiesTag.Set(entry.Key, new NbtString(entry.Value));
+        }
+
+        result.Set("Properties", propertiesTag);
         return result;
     }
 

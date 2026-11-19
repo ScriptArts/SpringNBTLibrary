@@ -114,12 +114,14 @@
 | `copy` | `Copy()` | `copy()` | `copy()` | `copy()` | `clone()` |  |
 | `equals` | `Equals()` | `equals()` | `equals()` | `==` | `==` |  |
 | `from_nbt` | `FromNbt()` | `fromNbt()` | `fromNbt()` | `from_nbt()` | `from_nbt()` | パレット要素のNBTから作る |
+| `from_nbt_for_data_version` | `FromNbtForDataVersion()` | `fromNbtForDataVersion()` | `fromNbtForDataVersion()` | `from_nbt_for_data_version()` | `from_nbt_for_data_version()` | DataVersionを指定して、パレット要素のNBTから作る |
 | `name` | `Name` | `name()` | `name()` | `name` | `name()` | ブロックID（名前空間つき） |
 | `of` | `Of()` | `of()` | `of()` | `of()` | `of()` |  |
 | `parse` | `Parse()` | `parse()` | `parse()` | `parse()` | `parse()` | minecraft:oak_stairs[facing=north,half=top]形式の文字列から作る |
 | `properties` | `Properties` | `properties()` | `properties()` | `properties` | `properties()` |  |
 | `property` | `Property()` | `property()` | `property()` | `property()` | `property()` |  |
 | `to_nbt` | `ToNbt()` | `toNbt()` | `toNbt()` | `to_nbt()` | `to_nbt()` | パレット要素のNBTへ変換する |
+| `to_nbt_for_data_version` | `ToNbtForDataVersion()` | `toNbtForDataVersion()` | `toNbtForDataVersion()` | `to_nbt_for_data_version()` | `to_nbt_for_data_version()` | DataVersionを指定して、パレット要素のNBTへ変換する |
 | `to_string` | `ToString()` | `toString()` | `toString()` | `==` | `to_string()` | minecraft:oak_stairs[facing=north,half=top]形式の文字列を返す |
 | `with` | `With()` | `with()` | `with()` | `with_property()` | `with()` | プロパティを1つ差し替えた新しい状態を返す |
 | **BlockPos** | `BlockPos` | `BlockPos` | `BlockPos` | `BlockPos` | `BlockPos` | ブロックの絶対座標 |
