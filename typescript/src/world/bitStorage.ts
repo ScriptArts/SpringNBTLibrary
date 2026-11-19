@@ -1,19 +1,25 @@
 /**
  * 添字を64bit整数の配列へ詰めた表現
- * 1.16以降の**跨ぎなし**パッキング
+ * 公開の入口は1.16以降の**跨ぎなし**パッキング
  *
  * 1つの`bigint`に入りきらない分は、その値の残りビットを未使用のまま捨て、
  * 次の値の最下位ビットから始める
+ *
+ * DataVersionが2529より前（1.13から1.15）の形式は、値が64bitの境目をまたぐ詰め方で、
+ * 内部の入口からだけ使う
  */
 
 import { SpringNbtError } from "../errors.js";
 
 /**
  * 添字を64bit整数の配列へ詰めた表現
- * 1.16以降の**跨ぎなし**パッキング
+ * 公開の入口は1.16以降の**跨ぎなし**パッキング
  *
  * 1つの`bigint`に入りきらない分は、その値の残りビットを未使用のまま捨て、
  * 次の値の最下位ビットから始める
+ *
+ * DataVersionが2529より前（1.13から1.15）の形式は、値が64bitの境目をまたぐ詰め方で、
+ * 内部の入口からだけ使う
  */
 export class BitStorage {
   readonly #data: BigInt64Array;
@@ -31,16 +37,6 @@ export class BitStorage {
     this.#bitsPerEntry = bitsPerEntry;
     this.#entryCount = entryCount;
     this.#spanning = spanning;
-  }
-
-  /**
-   * 64bitの境目をまたいで詰めるか
-   * 1.13から1.15までの形式ならtrue
-   *
-   * @internal
-   */
-  get spanning(): boolean {
-    return this.#spanning;
   }
 
   /** 1エントリあたりのビット数 */

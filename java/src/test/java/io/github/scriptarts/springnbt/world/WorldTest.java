@@ -413,6 +413,33 @@ class WorldTest {
         }
 
         @Test
+        void またぐ詰め方で境目の値を上書きしても隣が壊れない() {
+            BitStorage storage = BitStorage.create(5, 4096, true);
+            storage.set(11, 0b11111);
+            storage.set(13, 0b11111);
+
+            // 添字12は境目をまたぐので、書き込みのたびに両隣が保たれるか確かめる
+            for (int value : new int[] {0b11111, 0b00000, 0b10101}) {
+                storage.set(12, value);
+                assertEquals(value, storage.get(12));
+                assertEquals(0b11111, storage.get(11));
+                assertEquals(0b11111, storage.get(13));
+            }
+        }
+
+        @Test
+        void またぐ詰め方で最後のlongの末尾まで読み書きできる() {
+            BitStorage storage = BitStorage.create(5, 4096, true);
+            storage.set(4094, 0b10101);
+            storage.set(4095, 0b11011);
+
+            // 添字4095はビット20475から20479で、最後のlongのビット59から63に収まる
+            assertEquals(0b10101, storage.get(4094));
+            assertEquals(0b11011, storage.get(4095));
+            assertEquals(0b11011L, storage.toLongs()[319] >>> 59);
+        }
+
+        @Test
         void long境界を跨がずに詰める() {
             BitStorage storage = BitStorage.create(5, 4096);
 

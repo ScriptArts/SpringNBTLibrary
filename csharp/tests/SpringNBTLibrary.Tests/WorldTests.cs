@@ -404,6 +404,36 @@ public class WorldTests
         }
 
         [Fact]
+        public void またぐ詰め方で境目の値を上書きしても隣が壊れない()
+        {
+            BitStorage storage = BitStorage.Create(5, 4096, true);
+            storage.Set(11, 0b11111);
+            storage.Set(13, 0b11111);
+
+            // 添字12は境目をまたぐので、書き込みのたびに両隣が保たれるか確かめる
+            foreach (int value in new[] { 0b11111, 0b00000, 0b10101 })
+            {
+                storage.Set(12, value);
+                Assert.Equal(value, storage.Get(12));
+                Assert.Equal(0b11111, storage.Get(11));
+                Assert.Equal(0b11111, storage.Get(13));
+            }
+        }
+
+        [Fact]
+        public void またぐ詰め方で最後のlongの末尾まで読み書きできる()
+        {
+            BitStorage storage = BitStorage.Create(5, 4096, true);
+            storage.Set(4094, 0b10101);
+            storage.Set(4095, 0b11011);
+
+            // 添字4095はビット20475から20479で、最後のlongのビット59から63に収まる
+            Assert.Equal(0b10101, storage.Get(4094));
+            Assert.Equal(0b11011, storage.Get(4095));
+            Assert.Equal(0b11011UL, (ulong)storage.ToLongs()[319] >> 59);
+        }
+
+        [Fact]
         public void 書いた値をそのまま読み出せる()
         {
             BitStorage storage = BitStorage.Create(5, 4096);

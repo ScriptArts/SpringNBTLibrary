@@ -5,10 +5,13 @@ import java.util.Objects;
 
 /**
  * 添字を64bit整数の配列へ詰めた表現
- * 1.16以降の<strong>跨ぎなし</strong>パッキング
+ * 公開の入口は1.16以降の<strong>跨ぎなし</strong>パッキング
  *
  * <p>1つの{@code long}に入りきらない分は、その{@code long}の残りビットを未使用のまま捨て、
  * 次の{@code long}の最下位ビットから始める
+ *
+ * <p>DataVersionが2529より前（1.13から1.15）の形式は、値が64bitの境目をまたぐ詰め方で、
+ * 内部の入口からだけ使う
  */
 public final class BitStorage {
 
@@ -22,16 +25,6 @@ public final class BitStorage {
         this.bitsPerEntry = bitsPerEntry;
         this.entryCount = entryCount;
         this.spanning = spanning;
-    }
-
-    /**
-     * 64bitの境目をまたいで詰めるか
-     * 1.13から1.15までの形式ならtrue
-     *
-     * @return またぐならtrue
-     */
-    boolean spanning() {
-        return spanning;
     }
 
     /**

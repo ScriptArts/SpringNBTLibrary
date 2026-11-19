@@ -363,6 +363,31 @@ test("BitStorage: またぐ詰め方では値が 64bit の境目をまたいで�
   assert.equal(storage.get(12), 0b10111);
 });
 
+test("BitStorage: またぐ詰め方で境目の値を上書きしても隣が壊れない", () => {
+  const storage = BitStorage.createWith(5, 4096, true);
+  storage.set(11, 0b11111);
+  storage.set(13, 0b11111);
+
+  // 添字12は境目をまたぐので、書き込みのたびに両隣が保たれるか確かめる
+  for (const value of [0b11111, 0b00000, 0b10101]) {
+    storage.set(12, value);
+    assert.equal(storage.get(12), value);
+    assert.equal(storage.get(11), 0b11111);
+    assert.equal(storage.get(13), 0b11111);
+  }
+});
+
+test("BitStorage: またぐ詰め方で最後の long の末尾まで読み書きできる", () => {
+  const storage = BitStorage.createWith(5, 4096, true);
+  storage.set(4094, 0b10101);
+  storage.set(4095, 0b11011);
+
+  // 添字4095はビット20475から20479で、最後のlongのビット59から63に収まる
+  assert.equal(storage.get(4094), 0b10101);
+  assert.equal(storage.get(4095), 0b11011);
+  assert.equal(BigInt.asUintN(64, storage.toLongs()[319]) >> 59n, 0b11011n);
+});
+
 test("BitStorage: 書いた値をそのまま読み出せる", () => {
   const storage = BitStorage.create(5, 4096);
 
@@ -464,7 +489,9 @@ test("PalettedContainer: またぐ詰め方のコンテナは17種類目でビ�
 
   container.set(7, blockEntry("minecraft:block_16"));
   assert.equal(container.bitsPerEntry, 5);
-  assert.equal(container.toParts().data?.length, 320);
+  const grownData = container.toParts().data;
+  assert.ok(grownData !== undefined);
+  assert.equal(grownData.length, 320);
 
   for (let index = 0; index < 4096; index++) {
     let expected = `minecraft:block_${index % 16}`;
@@ -491,7 +518,8 @@ for (const spanning of [false, true]) {
 
     const parts = container.toParts();
     assert.equal(parts.palette.length, 1);
-    assert.equal(parts.data?.length, 256);
+    assert.ok(parts.data !== undefined);
+    assert.equal(parts.data.length, 256);
   });
 }
 

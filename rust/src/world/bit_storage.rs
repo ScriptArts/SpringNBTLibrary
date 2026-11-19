@@ -1,8 +1,11 @@
 //! 添字を64bit整数の配列へ詰めた表現
-//! 1.16以降の**跨ぎなし**パッキング
+//! 公開の入口は1.16以降の**跨ぎなし**パッキング
 //!
 //! 1つの`i64`に入りきらない分は、その`i64`の残りビットを未使用のまま捨て、
 //! 次の`i64`の最下位ビットから始める
+//!
+//! DataVersionが2529より前（1.13から1.15）の形式は、値が64bitの境目をまたぐ詰め方で、
+//! 内部の入口からだけ使う
 
 use crate::error::{Error, ErrorCode, Result};
 
@@ -25,13 +28,6 @@ impl BitStorage {
     /// ブロックなら4096、バイオームなら64
     pub fn entry_count(&self) -> usize {
         self.entry_count
-    }
-
-    /// 64bitの境目をまたいで詰めるか
-    /// 1.13から1.15までの形式なら`true`
-    #[allow(dead_code)] // 読み込み側から使われるまでは、テストだけが呼ぶ
-    pub(crate) fn spanning(&self) -> bool {
-        self.spanning
     }
 
     /// 1つの`i64`に入るエントリ数
@@ -270,5 +266,32 @@ mod tests {
         assert_eq!(0b0111u64, ((longs[0] as u64) >> 60) & 0b1111);
         assert_eq!(1i64, longs[1] & 1);
         assert_eq!(0b10111, storage.get(12).unwrap());
+    }
+
+    #[test]
+    fn またぐ詰め方で境目の値を上書きしても隣が壊れない() {
+        let mut storage = BitStorage::create_with(5, 4096, true).unwrap();
+        storage.set(11, 0b11111).unwrap();
+        storage.set(13, 0b11111).unwrap();
+
+        // 添字12は境目をまたぐので、書き込みのたびに両隣が保たれるか確かめる
+        for value in [0b11111, 0b00000, 0b10101] {
+            storage.set(12, value).unwrap();
+            assert_eq!(value, storage.get(12).unwrap());
+            assert_eq!(0b11111, storage.get(11).unwrap());
+            assert_eq!(0b11111, storage.get(13).unwrap());
+        }
+    }
+
+    #[test]
+    fn またぐ詰め方で最後のlongの末尾まで読み書きできる() {
+        let mut storage = BitStorage::create_with(5, 4096, true).unwrap();
+        storage.set(4094, 0b10101).unwrap();
+        storage.set(4095, 0b11011).unwrap();
+
+        // 添字4095はビット20475から20479で、最後のlongのビット59から63に収まる
+        assert_eq!(0b10101, storage.get(4094).unwrap());
+        assert_eq!(0b11011, storage.get(4095).unwrap());
+        assert_eq!(0b11011u64, (storage.as_longs()[319] as u64) >> 59);
     }
 }

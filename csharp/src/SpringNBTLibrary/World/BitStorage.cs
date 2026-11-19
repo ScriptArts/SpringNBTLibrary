@@ -2,12 +2,16 @@ namespace SpringNBTLibrary.World;
 
 /// <summary>
 /// 添字を64bit整数の配列へ詰めた表現
-/// 1.16以降の**跨ぎなし**パッキング
+/// 公開の入口は1.16以降の**跨ぎなし**パッキング
 /// </summary>
 /// <remarks>
 /// <para>
 /// 1つの<c>i64</c>に入りきらない分は、その<c>i64</c>の残りビットを未使用のまま捨て、
 /// 次の<c>i64</c>の最下位ビットから始める
+/// </para>
+/// <para>
+/// DataVersionが2529より前（1.13から1.15）の形式は、値が64bitの境目をまたぐ詰め方で、
+/// 内部の入口からだけ使う
 /// </para>
 /// </remarks>
 public sealed class BitStorage

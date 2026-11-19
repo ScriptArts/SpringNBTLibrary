@@ -350,6 +350,28 @@ class TestBitStorage:
         assert longs[1] & 1 == 1
         assert storage.get(12) == 0b10111
 
+    def test_またぐ詰め方で境目の値を上書きしても隣が壊れない(self):
+        storage = BitStorage._create_with(5, 4096, True)
+        storage.set(11, 0b11111)
+        storage.set(13, 0b11111)
+
+        # 添字12は境目をまたぐので、書き込みのたびに両隣が保たれるか確かめる
+        for value in (0b11111, 0b00000, 0b10101):
+            storage.set(12, value)
+            assert storage.get(12) == value
+            assert storage.get(11) == 0b11111
+            assert storage.get(13) == 0b11111
+
+    def test_またぐ詰め方で最後のlongの末尾まで読み書きできる(self):
+        storage = BitStorage._create_with(5, 4096, True)
+        storage.set(4094, 0b10101)
+        storage.set(4095, 0b11011)
+
+        # 添字4095はビット20475から20479で、最後のlongのビット59から63に収まる
+        assert storage.get(4094) == 0b10101
+        assert storage.get(4095) == 0b11011
+        assert (storage.to_longs()[319] & 0xFFFFFFFFFFFFFFFF) >> 59 == 0b11011
+
     def test_書いた値をそのまま読み出せる(self):
         storage = BitStorage.create(5, 4096)
 
