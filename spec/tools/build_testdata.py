@@ -897,6 +897,15 @@ def ceil_log2(count):
     return bits
 
 
+def to_signed64(value):
+    """0以上2^64未満の値を、符号付き64bit整数として読んだ値に直す。"""
+    # 最上位ビットが立っていれば負の数になる
+    if value >= (1 << 63):
+        return value - (1 << 64)
+
+    return value
+
+
 def pack_indices(indices, bits):
     """添字の並びを、跨ぎなしで64bit整数の配列へ詰める。
 
@@ -913,7 +922,7 @@ def pack_indices(indices, bits):
         longs[long_index] |= (value & ((1 << bits) - 1)) << bit_offset
 
     # 符号付き64bitとして書き出す
-    return [value - (1 << 64) if value >= (1 << 63) else value for value in longs]
+    return [to_signed64(value) for value in longs]
 
 
 def pack_indices_spanning(indices, bits):
@@ -937,7 +946,7 @@ def pack_indices_spanning(indices, bits):
             longs[long_index + 1] |= value >> (64 - shift)
 
     # 符号付き64bitとして書き出す
-    return [value - (1 << 64) if value >= (1 << 63) else value for value in longs]
+    return [to_signed64(value) for value in longs]
 
 
 def block_palette_entry(name, properties=None):
