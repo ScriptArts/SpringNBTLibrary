@@ -55,7 +55,7 @@
 
 ## 段階1: 世代を選ぶ作りと、1.18〜26.2のチャンク
 
-### タスク1: `BlockState`のDataVersion指定の変換
+### Task 1: `BlockState`のDataVersion指定の変換
 
 **ファイル:** 各言語の`BlockState`と単体テスト
 
@@ -75,7 +75,7 @@
 - [ ] **手順4: 5言語のテストと`check_docs_sync.py --write`を流し、通ることを確かめる**
 - [ ] **手順5: コミットする**（`BlockStateをDataVersionを指定して読み書きできるようにする`）
 
-### タスク2: チャンクの世代の表とC4 / C5の読み書き
+### Task 2: チャンクの世代の表とC4 / C5の読み書き
 
 **ファイル:** 各言語の`_chunk_format`（新規）、`chunk`、`paletted_container`、定数、適合性ツール、`build_testdata.py`、単体テスト
 
@@ -117,7 +117,7 @@
 
 ## 段階2: 26.1より前のワールドの構成と`level.dat`
 
-### タスク3: L1の構成と`level.dat`
+### Task 3: L1の構成と`level.dat`
 
 **ファイル:** 各言語の`_world_layout`（新規）、`minecraft_world`、単体テスト
 
@@ -141,7 +141,7 @@
 
 ## 段階3: 1.13〜1.17のチャンク
 
-### タスク4: 64bitの境目をまたぐビット詰め
+### Task 4: 64bitの境目をまたぐビット詰め
 
 **ファイル:** 各言語の`bit_storage`、`paletted_container`、単体テスト
 
@@ -171,7 +171,7 @@ value &= (1 << bits) - 1
 - [ ] **手順4: 5言語のテストを流し、通ることを確かめる**
 - [ ] **手順5: コミットする**（`64bitの境目をまたぐビット詰めを扱う`）
 
-### タスク5: C3（1.16〜1.17）のチャンクと数値のバイオームID
+### Task 5: C3（1.16〜1.17）のチャンクと数値のバイオームID
 
 **ファイル:** 各言語の`_chunk_format`、`chunk`、適合性ツール、`build_testdata.py`、単体テスト
 
@@ -204,7 +204,7 @@ C3では次のとおりに扱う。
 - [ ] **手順6: 5言語のテスト、適合性検証、3つの検査を流し、通ることを確かめる**
 - [ ] **手順7: コミットする**（`1.16〜1.17のチャンクと数値のバイオームIDを扱う`）
 
-### タスク6: C1 / C2（1.13〜1.15）のチャンクと下限の引き下げ
+### Task 6: C1 / C2（1.13〜1.15）のチャンクと下限の引き下げ
 
 **ファイル:** タスク5と同じ
 
@@ -229,7 +229,7 @@ C1の`is_fully_generated`は`full`に加えて1.13の`postprocessed`も生成済
 
 ## 仕上げ
 
-### タスク7: 実ワールドでの確認と走査ツール
+### Task 7: 実ワールドでの確認と走査ツール
 
 **ファイル:** `spec/tools/scan_world.py`、必要に応じて各言語の`_chunk_format`と`_world_layout`
 
@@ -239,7 +239,7 @@ C1の`is_fully_generated`は`full`に加えて1.13の`postprocessed`も生成済
 - [ ] **手順4: 5言語の結果がそろうことを確かめる。** 各世代の実ワールドから代表のチャンクを取り出して5言語の`chunk-report` / `chunk-edit`に通し、出力が一致することを確かめる
 - [ ] **手順5: コミットする**（`走査ツールが過去の形式のワールドを扱う`）
 
-### タスク8: ドキュメント
+### Task 8: ドキュメント
 
 **ファイル:** `docs/adr/0011-*.md`（新規）、`docs/adr/0003-version-policy.md`、`docs/adr/0010-palette-format-26-3.md`、`docs/README.md`、`docs/spec/00-conventions.md` / `30-chunk-format.md` / `31-paletted-container.md` / `40-world-layout.md` / `90-conformance.md`、`docs/guide/04-world-and-level-dat.md` / `05-blocks-and-biomes.md` / `06-errors-and-limits.md` / `07-version-policy.md`、`docs/features.md`、`README.md`と各言語の`README.md`、`.github/release-common.md`、`CHANGELOG.md`
 
@@ -250,7 +250,7 @@ C1の`is_fully_generated`は`full`に加えて1.13の`postprocessed`も生成済
 - [ ] **手順5: yomiyasuで推敲し、`check_links.py` / `check_docs_sync.py`を流す**
 - [ ] **手順6: コミットする**（`過去バージョンへの対応をドキュメントに書く`）
 
-### タスク9: 全体の確認とプルリクエスト
+### Task 9: 全体の確認とプルリクエスト
 
 - [ ] **手順1: リリース前の確認（`docs/contributing/release.md`の3章）をすべて流す**
 - [ ] **手順2: ブランチ全体を別のレビュー役に読ませる**
