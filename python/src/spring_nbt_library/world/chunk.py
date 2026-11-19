@@ -487,7 +487,7 @@ class Chunk:
 
         has_level = nbt.opt_compound("Level") is not None
 
-        # 選んだ世代と本体の包み方が食い違うなら、黙って空のチャンクとして読まずに弾く
+        # 選んだ世代と本体の包み方が食い違うなら、空のチャンクとして読み進めずにエラーにする
         if has_level != chunk._format.wrapped_in_level:
             raise SpringNbtError.malformed(
                 "DataVersion %dで選んだ形式と、ルートのLevelの有無が合わない"
@@ -678,6 +678,7 @@ class Chunk:
 
         置き換えによって不整合になる付随データ（``block_entities`` /
         ``block_ticks`` / ``fluid_ticks``のうち、その座標を指すもの）は同時に取り除く
+        1.17までの形式では、``Level``の中の``TileEntities`` / ``TileTicks`` / ``LiquidTicks``から取り除く
         残すとブロックと中身が食い違い、Minecraft側で予期しない挙動になるため
 
         パレットには、チャンクを読んだときの世代の形式で入れる
@@ -717,6 +718,7 @@ class Chunk:
 
         ``block_entities`` / ``block_ticks`` / ``fluid_ticks``の要素は
         いずれも``x`` ``y`` ``z``を**絶対座標**で持つ
+        1.17までの形式の``TileEntities`` / ``TileTicks`` / ``LiquidTicks``も同じ
         """
         absolute_x = (self.x * 16) + x
         absolute_z = (self.z * 16) + z

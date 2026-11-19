@@ -978,7 +978,7 @@ class TestChunkFormat:
         before = chunk_bytes(named.tag)
         chunk = Chunk.from_nbt(named.tag)
 
-        # ベクタの添字は (位置 * 7) % 5
+        # ベクタの添字は(位置 * 7) % 5
         assert chunk.data_version == 4903
         assert str(chunk.get_block(0, -64, 0)) == "minecraft:air"
         assert str(chunk.get_block(1, -64, 0)) == "minecraft:dirt"
@@ -1190,7 +1190,7 @@ class TestLevelChunk:
         assert chunk.is_fully_generated
         assert chunk.section_ys == [-1, 0, 1]
 
-        # ベクタの添字は (位置 * 7) % 5
+        # ベクタの添字は(位置 * 7) % 5
         assert str(chunk.get_block(0, 0, 0)) == "minecraft:air"
         assert str(chunk.get_block(1, 0, 0)) == "minecraft:dirt"
         assert str(chunk.get_block(2, 0, 0)) == "minecraft:oak_stairs[facing=west,half=top]"
@@ -1280,7 +1280,7 @@ class TestLevelChunk:
         level = root.get_compound("Level")
         level.remove("Biomes")
 
-        # Noneなら Biomes を持たないチャンクにする
+        # NoneならBiomesを持たないチャンクにする
         if biomes is not None:
             level.set("Biomes", biomes)
 
@@ -1458,7 +1458,7 @@ class TestLegacyChunk:
         assert len(chunk.section(0).block_states.palette) == 17
         assert chunk.section(0).block_states.bits_per_entry == 5
 
-        # ベクタの添字は (位置 * 7) % 17
+        # ベクタの添字は(位置 * 7) % 17
         # ビット幅5なので、位置12や25の値は64bitの境目をまたぐ
         assert str(chunk.get_block(12, 0, 0)) == SPANNING_STATES[(12 * 7) % 17]
         assert str(chunk.get_block(9, 0, 1)) == SPANNING_STATES[(25 * 7) % 17]
@@ -1483,7 +1483,7 @@ class TestLegacyChunk:
         written = chunk.to_nbt()
         section = level_section(written, 0)
 
-        # またぐ詰め方なので、長さは ceil(4096 * 6 / 64) = 384
+        # またぐ詰め方なので、長さはceil(4096 * 6 / 64) = 384
         assert len(section.get_list("Palette")) == 37
         assert len(section.get_long_array("BlockStates")) == 384
         assert written.get_int("DataVersion") == 2230
@@ -1521,7 +1521,7 @@ class TestLegacyChunk:
         assert chunk.min_section_y == 0
         assert chunk.section_ys == [0, 1]
 
-        # ベクタの添字は (位置 * 7) % 5
+        # ベクタの添字は(位置 * 7) % 5
         assert str(chunk.get_block(0, 0, 0)) == "minecraft:air"
         assert str(chunk.get_block(1, 0, 0)) == "minecraft:dirt"
         assert str(chunk.get_block(2, 0, 0)) == "minecraft:oak_stairs[facing=west,half=top]"
@@ -1541,7 +1541,7 @@ class TestLegacyChunk:
         written = chunk.to_nbt()
         section = level_section(written, 0)
 
-        # またぐ詰め方なので、長さは ceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
+        # またぐ詰め方なので、長さはceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
         assert len(section.get_list("Palette")) == 17
         assert len(section.get_long_array("BlockStates")) == 320
 
@@ -1560,7 +1560,7 @@ class TestLegacyChunk:
     def test_DataVersion1976のバイオームIDは高さに関係なく列ごとに読み書きできる(self):
         chunk = Chunk.from_nbt(biomes_2d_vector())
 
-        # 添字は z * 16 + x で、yは見ない
+        # 添字はz * 16 + xで、yは見ない
         assert chunk.get_biome_id(3, 0, 7) == BIOMES_2D[7 * 16 + 3]
         assert chunk.get_biome_id(3, 200, 7) == BIOMES_2D[7 * 16 + 3]
         assert chunk.get_biome_id(3, -10, 7) == BIOMES_2D[7 * 16 + 3]
@@ -1584,7 +1584,7 @@ class TestLegacyChunk:
         level = root.get_compound("Level")
         level.remove("Biomes")
 
-        # Noneなら Biomes を持たないチャンクにする
+        # NoneならBiomesを持たないチャンクにする
         if biomes is not None:
             level.set("Biomes", biomes)
 
@@ -1680,7 +1680,7 @@ class TestLegacyChunk:
         assert chunk.section_ys == []
         assert chunk.format_data_version == -1
 
-        # DataVersionの取得子は、いまと同じく無ければエラー
+        # DataVersionの取得子は無ければエラーになる（いまと同じ）
         with pytest.raises(SpringNbtError):
             chunk.data_version
 

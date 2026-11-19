@@ -1316,7 +1316,7 @@ def build_world():
         "26.2の形式のチャンク（DataVersion 4903）。chunk-editで置いたブロックもName / Propertiesで書き出される")
 
     # 1.16.5の形式のチャンク。本体はLevelの中で、バイオームは数値のIDの配列。
-    # チャンク (2,-1) なので、絶対座標はx = 32 + 相対x、z = -16 + 相対z
+    # チャンク(2,-1)なので、絶対座標はx = 32 + 相対x、z = -16 + 相対z
     level_palette5 = [
         properties_name_entry("minecraft:air"),
         properties_name_entry("minecraft:stone"),
@@ -1353,7 +1353,7 @@ def build_world():
 
     # 1.15.2の形式のチャンク。ビット詰めは値が64bitの境目をまたぐ。
     # パレット17種類でビット幅5になり、添字12、25、38などの値が境目をまたぐ。
-    # チャンク (-3,5) なので、絶対座標はx = -48 + 相対x、z = 80 + 相対z
+    # チャンク(-3,5)なので、絶対座標はx = -48 + 相対x、z = 80 + 相対z
     spanning_palette17 = [
         properties_name_entry("minecraft:air"),
         properties_name_entry("minecraft:stone"),
@@ -1398,7 +1398,7 @@ def build_world():
 
     # 1.14.4の形式のチャンク。バイオームは列ごとのint[256]で、添字はz * 16 + x。
     # xとzを取り違えると値が変わるよう、添字ごとに違う値を入れる。
-    # チャンク (4,-2) なので、絶対座標はx = 64 + 相対x、z = -32 + 相対z
+    # チャンク(4,-2)なので、絶対座標はx = 64 + 相対x、z = -32 + 相対z
     add_vector(
         "world/v1976_biomes_2d", "world/v1976_biomes_2d.nbt",
         make_level_chunk(

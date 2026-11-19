@@ -1082,7 +1082,7 @@ test("ChunkFormat: DataVersion 4903 のチャンクを読み無変更で書き�
   const before = chunkBytes(tag);
   const chunk = Chunk.fromNbt(tag);
 
-  // ベクタの添字は (位置 * 7) % 5
+  // ベクタの添字は(位置 * 7) % 5
   assert.equal(chunk.dataVersion, 4903);
   assert.equal(chunk.getBlock(0, -64, 0)!.toString(), "minecraft:air");
   assert.equal(chunk.getBlock(1, -64, 0)!.toString(), "minecraft:dirt");
@@ -1306,7 +1306,7 @@ test("LevelChunk: DataVersion 2586 のチャンクを読み無変更で書き戻
   assert.equal(chunk.isFullyGenerated, true);
   assert.deepEqual(chunk.sectionYs, [-1, 0, 1]);
 
-  // ベクタの添字は (位置 * 7) % 5
+  // ベクタの添字は(位置 * 7) % 5
   assert.equal(String(chunk.getBlock(0, 0, 0)), "minecraft:air");
   assert.equal(String(chunk.getBlock(1, 0, 0)), "minecraft:dirt");
   assert.equal(String(chunk.getBlock(2, 0, 0)), "minecraft:oak_stairs[facing=west,half=top]");
@@ -1583,7 +1583,7 @@ test("LegacyChunk: DataVersion 2230 のまたぐ詰め方のチャンクを読�
   assert.equal(section.blockStates.palette.length, 17);
   assert.equal(section.blockStates.bitsPerEntry, 5);
 
-  // ベクタの添字は (位置 * 7) % 17
+  // ベクタの添字は(位置 * 7) % 17
   // ビット幅5なので、位置12や25の値は64bitの境目をまたぐ
   assert.equal(String(chunk.getBlock(12, 0, 0)), states[(12 * 7) % 17]);
   assert.equal(String(chunk.getBlock(9, 0, 1)), states[(25 * 7) % 17]);
@@ -1612,7 +1612,7 @@ test("LegacyChunk: DataVersion 2230 のチャンクでパレットが育って�
   const written = chunk.toNbt();
   const section = levelSection(written, 0);
 
-  // またぐ詰め方なので、長さは ceil(4096 * 6 / 64) = 384
+  // またぐ詰め方なので、長さはceil(4096 * 6 / 64) = 384
   assert.equal(section.getList("Palette").size, 37);
   assert.equal(section.getLongArray("BlockStates").length, 384);
   assert.equal(written.getInt("DataVersion"), 2230);
@@ -1654,7 +1654,7 @@ test("LegacyChunk: DataVersion 1976 のチャンクを読み無変更で書き�
   assert.equal(chunk.minSectionY, 0);
   assert.deepEqual(chunk.sectionYs, [0, 1]);
 
-  // ベクタの添字は (位置 * 7) % 5
+  // ベクタの添字は(位置 * 7) % 5
   assert.equal(String(chunk.getBlock(0, 0, 0)), "minecraft:air");
   assert.equal(String(chunk.getBlock(1, 0, 0)), "minecraft:dirt");
   assert.equal(String(chunk.getBlock(2, 0, 0)), "minecraft:oak_stairs[facing=west,half=top]");
@@ -1676,7 +1676,7 @@ test("LegacyChunk: DataVersion 1976 のチャンクでパレットが育って�
   const written = chunk.toNbt();
   const section = levelSection(written, 0);
 
-  // またぐ詰め方なので、長さは ceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
+  // またぐ詰め方なので、長さはceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
   assert.equal(section.getList("Palette").size, 17);
   assert.equal(section.getLongArray("BlockStates").length, 320);
 
@@ -1698,7 +1698,7 @@ test("LegacyChunk: DataVersion 1976 のチャンクでパレットが育って�
 test("LegacyChunk: DataVersion 1976 のバイオーム ID は高さに関係なく列ごとに読み書きできる", () => {
   const chunk = Chunk.fromNbt(biomes2DVector());
 
-  // 添字は z * 16 + x で、yは見ない
+  // 添字はz * 16 + xで、yは見ない
   assert.equal(chunk.getBiomeId(3, 0, 7), biome2D(7 * 16 + 3));
   assert.equal(chunk.getBiomeId(3, 200, 7), biome2D(7 * 16 + 3));
   assert.equal(chunk.getBiomeId(3, -10, 7), biome2D(7 * 16 + 3));
@@ -1728,7 +1728,7 @@ for (const [label, biomes] of unreadable2DBiomes) {
     const level = root.getCompound("Level");
     level.remove("Biomes");
 
-    // undefinedなら Biomes を持たないチャンクにする
+    // undefinedならBiomesを持たないチャンクにする
     if (biomes !== undefined) {
       level.set("Biomes", biomes.copy());
     }
@@ -1824,7 +1824,7 @@ test("LegacyChunk: DataVersion の無いチャンクは元の NBT だけを持�
   assert.deepEqual(chunk.sectionYs, []);
   assert.equal(chunk.formatDataVersion, -1);
 
-  // DataVersionの取得子は、いまと同じく無ければエラー
+  // DataVersionの取得子は無ければエラーになる（いまと同じ）
   assert.throws(() => chunk.dataVersion, SpringNbtError);
 
   // ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない

@@ -207,7 +207,7 @@ public sealed class BlockState : IEquatable<BlockState>
             if (compound.ContainsKey("Name"))
             {
                 throw SpringNbtException.Malformed(
-                    "ブロックのパレット要素に id が無い。NameはDataVersion 5006より前の形式なので、5006未満のDataVersionで読むこと");
+                    "ブロックのパレット要素にidが無い。NameはDataVersion 5006より前の形式なので、5006未満のDataVersionで読むこと");
             }
 
             throw SpringNbtException.Malformed("ブロックのパレット要素に id が無い");

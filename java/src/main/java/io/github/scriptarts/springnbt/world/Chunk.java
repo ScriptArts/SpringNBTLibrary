@@ -311,7 +311,7 @@ public final class Chunk {
         chunk.format = format;
         boolean hasLevel = nbt.optCompound("Level") != null;
 
-        // 選んだ世代と本体の包み方が食い違うなら、黙って空のチャンクとして読まずに弾く
+        // 選んだ世代と本体の包み方が食い違うなら、空のチャンクとして読み進めずにエラーにする
         if (hasLevel != format.wrappedInLevel()) {
             throw SpringNbtException.malformed("DataVersion " + chunk.formatDataVersion
                     + "で選んだ形式と、ルートのLevelの有無が合わない");
@@ -559,6 +559,7 @@ public final class Chunk {
      *
      * <p>置き換えによって不整合になる付随データ（{@code block_entities} /
      * {@code block_ticks} / {@code fluid_ticks}のうち、その座標を指すもの）は同時に取り除く
+     * 1.17までの形式では、{@code Level}の中の{@code TileEntities} / {@code TileTicks} / {@code LiquidTicks}から取り除く
      * 残すとブロックと中身が食い違い、Minecraft側で予期しない挙動になるため
      *
      * <p>パレットには、チャンクを読んだときの世代の形式で入れる
@@ -621,6 +622,7 @@ public final class Chunk {
      *
      * <p>{@code block_entities} / {@code block_ticks} / {@code fluid_ticks}の要素は
      * いずれも{@code x} {@code y} {@code z}を<b>絶対座標</b>で持つ
+     * 1.17までの形式の{@code TileEntities} / {@code TileTicks} / {@code LiquidTicks}も同じ
      */
     private void removeBlockData(ChunkFormat chunkFormat, int x, int y, int z) {
         int absoluteX = (x() * 16) + x;

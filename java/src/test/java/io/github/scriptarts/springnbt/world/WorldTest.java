@@ -1168,7 +1168,7 @@ class WorldTest {
             byte[] before = chunkBytes(tag);
             Chunk chunk = Chunk.fromNbt(tag, ChunkReadOptions.defaults());
 
-            // ベクタの添字は (位置 * 7) % 5
+            // ベクタの添字は(位置 * 7) % 5
             assertEquals(4903, chunk.dataVersion());
             assertEquals("minecraft:air", chunk.getBlock(0, -64, 0).toString());
             assertEquals("minecraft:dirt", chunk.getBlock(1, -64, 0).toString());
@@ -1409,7 +1409,7 @@ class WorldTest {
             assertTrue(chunk.isFullyGenerated());
             assertEquals(List.of(-1, 0, 1), new ArrayList<>(chunk.sectionYs()));
 
-            // ベクタの添字は (位置 * 7) % 5
+            // ベクタの添字は(位置 * 7) % 5
             assertEquals("minecraft:air", chunk.getBlock(0, 0, 0).toString());
             assertEquals("minecraft:dirt", chunk.getBlock(1, 0, 0).toString());
             assertEquals("minecraft:oak_stairs[facing=west,half=top]", chunk.getBlock(2, 0, 0).toString());
@@ -1704,7 +1704,7 @@ class WorldTest {
             assertEquals(17, chunk.section(0).blockStates().palette().size());
             assertEquals(5, chunk.section(0).blockStates().bitsPerEntry());
 
-            // ベクタの添字は (位置 * 7) % 17
+            // ベクタの添字は(位置 * 7) % 17
             // ビット幅5なので、位置12や25の値は64bitの境目をまたぐ
             assertEquals(states.get((12 * 7) % 17), chunk.getBlock(12, 0, 0).toString());
             assertEquals(states.get((25 * 7) % 17), chunk.getBlock(9, 0, 1).toString());
@@ -1734,7 +1734,7 @@ class WorldTest {
             NbtCompound written = chunk.toNbt(null);
             NbtCompound section = levelSection(written, 0);
 
-            // またぐ詰め方なので、長さは ceil(4096 * 6 / 64) = 384
+            // またぐ詰め方なので、長さはceil(4096 * 6 / 64) = 384
             assertEquals(37, section.getList("Palette").size());
             assertEquals(384, section.getLongArray("BlockStates").length);
             assertEquals(2230, written.getInt("DataVersion"));
@@ -1778,7 +1778,7 @@ class WorldTest {
             assertEquals(0, chunk.minSectionY());
             assertEquals(List.of(0, 1), new ArrayList<>(chunk.sectionYs()));
 
-            // ベクタの添字は (位置 * 7) % 5
+            // ベクタの添字は(位置 * 7) % 5
             assertEquals("minecraft:air", chunk.getBlock(0, 0, 0).toString());
             assertEquals("minecraft:dirt", chunk.getBlock(1, 0, 0).toString());
             assertEquals("minecraft:oak_stairs[facing=west,half=top]", chunk.getBlock(2, 0, 0).toString());
@@ -1801,7 +1801,7 @@ class WorldTest {
             NbtCompound written = chunk.toNbt(null);
             NbtCompound section = levelSection(written, 0);
 
-            // またぐ詰め方なので、長さは ceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
+            // またぐ詰め方なので、長さはceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
             assertEquals(17, section.getList("Palette").size());
             assertEquals(320, section.getLongArray("BlockStates").length);
 
@@ -1824,7 +1824,7 @@ class WorldTest {
         void DataVersion1976のバイオームIDは高さに関係なく列ごとに読み書きできる() {
             Chunk chunk = Chunk.fromNbt(biomes2DVector(), ChunkReadOptions.defaults());
 
-            // 添字は z * 16 + x で、yは見ない
+            // 添字はz * 16 + xで、yは見ない
             assertEquals(biome2D((7 * 16) + 3), chunk.getBiomeId(3, 0, 7));
             assertEquals(biome2D((7 * 16) + 3), chunk.getBiomeId(3, 200, 7));
             assertEquals(biome2D((7 * 16) + 3), chunk.getBiomeId(3, -10, 7));
@@ -1958,7 +1958,7 @@ class WorldTest {
             assertTrue(chunk.sectionYs().isEmpty());
             assertEquals(-1, chunk.formatDataVersion());
 
-            // DataVersionの取得子は、いまと同じく無ければエラー
+            // DataVersionの取得子は無ければエラーになる（いまと同じ）
             assertThrows(SpringNbtException.class, chunk::dataVersion);
 
             // ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない

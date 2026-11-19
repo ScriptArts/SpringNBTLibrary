@@ -584,7 +584,7 @@ export class Chunk {
     chunk.#format = format;
     const hasLevel = nbt.optCompound("Level") !== undefined;
 
-    // 選んだ世代と本体の包み方が食い違うなら、黙って空のチャンクとして読まずに弾く
+    // 選んだ世代と本体の包み方が食い違うなら、空のチャンクとして読み進めずにエラーにする
     if (hasLevel !== format.wrappedInLevel) {
       throw SpringNbtError.malformed(
         `DataVersion ${chunk.#formatDataVersion}で選んだ形式と、ルートのLevelの有無が合わない`,
@@ -823,6 +823,7 @@ export class Chunk {
    *
    * 置き換えによって不整合になる付随データ（`block_entities` /
    * `block_ticks` / `fluid_ticks`のうち、その座標を指すもの）は同時に取り除く
+   * 1.17までの形式では、`Level`の中の`TileEntities` / `TileTicks` / `LiquidTicks`から取り除く
    * 残すとブロックと中身が食い違い、Minecraft側で予期しない挙動になるため
    *
    * パレットには、チャンクを読んだときの世代の形式で入れる
@@ -869,6 +870,7 @@ export class Chunk {
    *
    * `block_entities` / `block_ticks` / `fluid_ticks`の要素は
    * いずれも`x` `y` `z`を**絶対座標**で持つ
+   * 1.17までの形式の`TileEntities` / `TileTicks` / `LiquidTicks`も同じ
    */
   #removeBlockData(format: ChunkFormat, x: number, y: number, z: number): void {
     const absoluteX = this.x * 16 + x;
@@ -1020,7 +1022,7 @@ export class Chunk {
       );
     }
 
-    // Int32Arrayへ入れると範囲外の値が黙って丸められるので、intの範囲の検査を先に通す
+    // Int32Arrayへ入れると範囲外の値がエラーにならずに丸められるので、intの範囲の検査を先に通す
     biomes[index] = new NbtInt(biomeId).value;
     this.#modified = true;
   }

@@ -1296,7 +1296,7 @@ public class WorldTests
             byte[] before = ChunkBytes(tag);
             Chunk chunk = Chunk.FromNbt(tag);
 
-            // ベクタの添字は (位置 * 7) % 5
+            // ベクタの添字は(位置 * 7) % 5
             Assert.Equal(4903, chunk.DataVersion);
             Assert.Equal("minecraft:air", chunk.GetBlock(0, -64, 0)!.ToString());
             Assert.Equal("minecraft:dirt", chunk.GetBlock(1, -64, 0)!.ToString());
@@ -1559,7 +1559,7 @@ public class WorldTests
             Assert.True(chunk.IsFullyGenerated);
             Assert.Equal(new[] { -1, 0, 1 }, chunk.SectionYs);
 
-            // ベクタの添字は (位置 * 7) % 5
+            // ベクタの添字は(位置 * 7) % 5
             Assert.Equal("minecraft:air", chunk.GetBlock(0, 0, 0)!.ToString());
             Assert.Equal("minecraft:dirt", chunk.GetBlock(1, 0, 0)!.ToString());
             Assert.Equal("minecraft:oak_stairs[facing=west,half=top]", chunk.GetBlock(2, 0, 0)!.ToString());
@@ -1878,7 +1878,7 @@ public class WorldTests
             Assert.Equal(17, chunk.Section(0)!.BlockStates!.Palette.Count);
             Assert.Equal(5, chunk.Section(0)!.BlockStates!.BitsPerEntry);
 
-            // ベクタの添字は (位置 * 7) % 17
+            // ベクタの添字は(位置 * 7) % 17
             // ビット幅5なので、位置12や25の値は64bitの境目をまたぐ
             Assert.Equal(states[(12 * 7) % 17], chunk.GetBlock(12, 0, 0)!.ToString());
             Assert.Equal(states[(25 * 7) % 17], chunk.GetBlock(9, 0, 1)!.ToString());
@@ -1911,7 +1911,7 @@ public class WorldTests
             NbtCompound written = chunk.ToNbt();
             NbtCompound section = LevelSection(written, 0);
 
-            // またぐ詰め方なので、長さは ceil(4096 * 6 / 64) = 384
+            // またぐ詰め方なので、長さはceil(4096 * 6 / 64) = 384
             Assert.Equal(37, section.GetList("Palette").Count);
             Assert.Equal(384, section.GetLongArray("BlockStates").Length);
             Assert.Equal(2230, written.GetInt("DataVersion"));
@@ -1961,7 +1961,7 @@ public class WorldTests
             Assert.Equal(0, chunk.MinSectionY);
             Assert.Equal(new[] { 0, 1 }, chunk.SectionYs);
 
-            // ベクタの添字は (位置 * 7) % 5
+            // ベクタの添字は(位置 * 7) % 5
             Assert.Equal("minecraft:air", chunk.GetBlock(0, 0, 0)!.ToString());
             Assert.Equal("minecraft:dirt", chunk.GetBlock(1, 0, 0)!.ToString());
             Assert.Equal("minecraft:oak_stairs[facing=west,half=top]", chunk.GetBlock(2, 0, 0)!.ToString());
@@ -1986,7 +1986,7 @@ public class WorldTests
             NbtCompound written = chunk.ToNbt();
             NbtCompound section = LevelSection(written, 0);
 
-            // またぐ詰め方なので、長さは ceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
+            // またぐ詰め方なので、長さはceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
             Assert.Equal(17, section.GetList("Palette").Count);
             Assert.Equal(320, section.GetLongArray("BlockStates").Length);
 
@@ -2014,7 +2014,7 @@ public class WorldTests
         {
             Chunk chunk = Chunk.FromNbt(Biomes2DVector());
 
-            // 添字は z * 16 + x で、yは見ない
+            // 添字はz * 16 + xで、yは見ない
             Assert.Equal(Biome2D((7 * 16) + 3), chunk.GetBiomeId(3, 0, 7));
             Assert.Equal(Biome2D((7 * 16) + 3), chunk.GetBiomeId(3, 200, 7));
             Assert.Equal(Biome2D((7 * 16) + 3), chunk.GetBiomeId(3, -10, 7));
@@ -2160,7 +2160,7 @@ public class WorldTests
             Assert.Empty(chunk.SectionYs);
             Assert.Equal(-1, chunk.FormatDataVersion);
 
-            // DataVersionの取得子は、いまと同じく無ければエラー
+            // DataVersionの取得子は無ければエラーになる（いまと同じ）
             Assert.Throws<SpringNbtException>(() => chunk.DataVersion);
 
             // ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない

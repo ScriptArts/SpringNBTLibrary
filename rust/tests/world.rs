@@ -1226,7 +1226,7 @@ fn data_version4903のチャンクを読み無変更で書き戻すと元と同�
     let before = chunk_bytes(&tag);
     let chunk = Chunk::from_nbt(tag, &ChunkReadOptions::default()).unwrap();
 
-    // ベクタの添字は (位置 * 7) % 5
+    // ベクタの添字は(位置 * 7) % 5
     let block = |x: i32| chunk.get_block(x, -64, 0).unwrap().unwrap().to_string();
     assert_eq!(4903, chunk.data_version().unwrap());
     assert_eq!("minecraft:air", block(0));
@@ -1557,7 +1557,7 @@ fn data_version2586のチャンクを読み無変更で書き戻すと元と同�
     assert!(chunk.is_fully_generated());
     assert_eq!(vec![-1, 0, 1], chunk.section_ys());
 
-    // ベクタの添字は (位置 * 7) % 5
+    // ベクタの添字は(位置 * 7) % 5
     let block = |x, y, z| chunk.get_block(x, y, z).unwrap().unwrap().to_string();
     assert_eq!("minecraft:air", block(0, 0, 0));
     assert_eq!("minecraft:dirt", block(1, 0, 0));
@@ -1660,7 +1660,7 @@ fn biomesを読めないチャンクのバイオームidはnoneで書き込め�
         update_level(&mut root, |level| {
             level.remove("Biomes");
 
-            // Noneなら Biomes を持たないチャンクにする
+            // NoneならBiomesを持たないチャンクにする
             if let Some(tag) = biomes {
                 level.set("Biomes", tag);
             }
@@ -1865,7 +1865,7 @@ fn data_version2230のまたぐ詰め方のチャンクを読み無変更で書�
     assert_eq!(17, container.palette().len());
     assert_eq!(5, container.bits_per_entry());
 
-    // ベクタの添字は (位置 * 7) % 17
+    // ベクタの添字は(位置 * 7) % 17
     // ビット幅5なので、位置12や25の値は64bitの境目をまたぐ
     let block = |x, y, z| chunk.get_block(x, y, z).unwrap().unwrap().to_string();
     assert_eq!(states[(12 * 7) % 17], block(12, 0, 0));
@@ -1897,7 +1897,7 @@ fn data_version2230のチャンクでパレットが育ってもまたぐ詰め�
     let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
     let section = level_section(&written, 0);
 
-    // またぐ詰め方なので、長さは ceil(4096 * 6 / 64) = 384
+    // またぐ詰め方なので、長さはceil(4096 * 6 / 64) = 384
     assert_eq!(37, section.get_list("Palette").unwrap().len());
     assert_eq!(384, section.get_long_array("BlockStates").unwrap().len());
     assert_eq!(2230, written.get_int("DataVersion").unwrap());
@@ -1944,7 +1944,7 @@ fn data_version1976のチャンクを読み無変更で書き戻すと元と同�
     assert_eq!(0, chunk.min_section_y().unwrap());
     assert_eq!(vec![0, 1], chunk.section_ys());
 
-    // ベクタの添字は (位置 * 7) % 5
+    // ベクタの添字は(位置 * 7) % 5
     let block = |x, y, z| chunk.get_block(x, y, z).unwrap().unwrap().to_string();
     assert_eq!("minecraft:air", block(0, 0, 0));
     assert_eq!("minecraft:dirt", block(1, 0, 0));
@@ -1970,7 +1970,7 @@ fn data_version1976のチャンクでパレットが育ってもまたぐ詰め�
     let written = chunk.to_nbt(&ChunkWriteOptions::default()).unwrap();
     let section = level_section(&written, 0);
 
-    // またぐ詰め方なので、長さは ceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
+    // またぐ詰め方なので、長さはceil(4096 * 5 / 64) = 320（またがない詰め方なら342）
     assert_eq!(17, section.get_list("Palette").unwrap().len());
     assert_eq!(320, section.get_long_array("BlockStates").unwrap().len());
 
@@ -1997,7 +1997,7 @@ fn data_version1976のチャンクでパレットが育ってもまたぐ詰め�
 fn data_version1976のバイオームidは高さに関係なく列ごとに読み書きできる() {
     let mut chunk = Chunk::from_nbt(biomes_2d_vector(), &ChunkReadOptions::default()).unwrap();
 
-    // 添字は z * 16 + x で、yは見ない
+    // 添字はz * 16 + xで、yは見ない
     assert_eq!(Some(biome_2d(7 * 16 + 3)), chunk.get_biome_id(3, 0, 7).unwrap());
     assert_eq!(Some(biome_2d(7 * 16 + 3)), chunk.get_biome_id(3, 200, 7).unwrap());
     assert_eq!(Some(biome_2d(7 * 16 + 3)), chunk.get_biome_id(3, -10, 7).unwrap());
@@ -2030,7 +2030,7 @@ fn data_version1976のbiomesを読めないチャンクのバイオームidはno
         update_level(&mut root, |level| {
             level.remove("Biomes");
 
-            // Noneなら Biomes を持たないチャンクにする
+            // NoneならBiomesを持たないチャンクにする
             if let Some(tag) = biomes {
                 level.set("Biomes", tag);
             }
@@ -2147,7 +2147,7 @@ fn data_versionの無いチャンクは元のnbtだけを持つ() {
     assert!(chunk.section_ys().is_empty());
     assert_eq!(-1, chunk.format_data_version());
 
-    // DataVersionの取得子は、いまと同じく無ければエラー
+    // DataVersionの取得子は無ければエラーになる（いまと同じ）
     assert!(chunk.data_version().is_err());
 
     // ブロック・バイオーム・高さマップ・光源の操作はどれも受け付けない

@@ -243,7 +243,7 @@ def _from_palette_id(nbt: NbtTag) -> BlockState:
         # Name / Propertiesは26.2までの形式で、読み替えると誤った状態を返しかねない
         if "Name" in entry:
             raise SpringNbtError.malformed(
-                "ブロックのパレット要素に id が無い。NameはDataVersion 5006より前の形式なので、5006未満のDataVersionで読むこと")
+                "ブロックのパレット要素にidが無い。NameはDataVersion 5006より前の形式なので、5006未満のDataVersionで読むこと")
 
         raise SpringNbtError.malformed("ブロックのパレット要素に id が無い")
 

@@ -643,7 +643,7 @@ impl Chunk {
         chunk.format = Some(format);
         let has_level = chunk.raw.opt_compound("Level")?.is_some();
 
-        // 選んだ世代と本体の包み方が食い違うなら、黙って空のチャンクとして読まずに弾く
+        // 選んだ世代と本体の包み方が食い違うなら、空のチャンクとして読み進めずにエラーにする
         if has_level != format.wrapped_in_level {
             return Err(Error::new(
                 ErrorCode::MalformedData,
@@ -873,6 +873,7 @@ impl Chunk {
     ///
     /// 置き換えによって不整合になる付随データ（`block_entities` /
     /// `block_ticks` / `fluid_ticks`のうち、その座標を指すもの）は同時に取り除く
+    /// 1.17までの形式では、`Level`の中の`TileEntities` / `TileTicks` / `LiquidTicks`から取り除く
     /// パレットには、チャンクを読んだときの世代の形式で入れる
     ///
     /// 元のNBTだけを持つチャンクなら[`ErrorCode::UnsupportedDataVersion`]を返す
@@ -923,6 +924,7 @@ impl Chunk {
     ///
     /// `block_entities` / `block_ticks` / `fluid_ticks`の要素は
     /// いずれも`x` `y` `z`を**絶対座標**で持つ
+    /// 1.17までの形式の`TileEntities` / `TileTicks` / `LiquidTicks`も同じ
     fn remove_block_data(&mut self, format: &ChunkFormat, x: i32, y: i32, z: i32) -> Result<()> {
         let absolute_x = (self.x()? * 16) + x;
         let absolute_z = (self.z()? * 16) + z;

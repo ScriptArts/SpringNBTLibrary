@@ -300,7 +300,7 @@ public sealed class Chunk
         chunk.format = format;
         bool hasLevel = nbt.OptCompound("Level") is not null;
 
-        // 選んだ世代と本体の包み方が食い違うなら、黙って空のチャンクとして読まずに弾く
+        // 選んだ世代と本体の包み方が食い違うなら、空のチャンクとして読み進めずにエラーにする
         if (hasLevel != format.WrappedInLevel)
         {
             throw SpringNbtException.Malformed(string.Create(
@@ -612,6 +612,7 @@ public sealed class Chunk
     /// <para>
     /// 置き換えによって不整合になる付随データ（<c>block_entities</c> /
     /// <c>block_ticks</c> / <c>fluid_ticks</c>のうち、その座標を指すもの）は同時に取り除く
+    /// 1.17までの形式では、<c>Level</c>の中の<c>TileEntities</c> / <c>TileTicks</c> / <c>LiquidTicks</c>から取り除く
     /// 残すとブロックと中身が食い違い、Minecraft側で予期しない挙動になるため
     /// </para>
     /// <para>
@@ -686,6 +687,7 @@ public sealed class Chunk
     /// <remarks>
     /// <c>block_entities</c> / <c>block_ticks</c> / <c>fluid_ticks</c>の要素は
     /// いずれも<c>x</c> <c>y</c> <c>z</c>を**絶対座標**で持つ
+    /// 1.17までの形式の<c>TileEntities</c> / <c>TileTicks</c> / <c>LiquidTicks</c>も同じ
     /// </remarks>
     private void RemoveBlockData(ChunkFormat chunkFormat, int x, int y, int z)
     {
