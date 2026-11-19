@@ -243,14 +243,14 @@ public sealed class BlockState : IEquatable<BlockState>
         if (nbt is not NbtCompound compound)
         {
             throw SpringNbtException.UnexpectedTagType(
-                $"ブロックのパレット要素が compound でない: {nbt.Type.AsString()}");
+                $"ブロックのパレット要素がcompoundでない: {nbt.Type.AsString()}");
         }
 
         string? name = compound.OptString("Name");
 
         if (name is null)
         {
-            throw SpringNbtException.Malformed("ブロックのパレット要素に Name が無い");
+            throw SpringNbtException.Malformed("ブロックのパレット要素にNameが無い");
         }
 
         BlockState state = new BlockState(name);
@@ -267,7 +267,7 @@ public sealed class BlockState : IEquatable<BlockState>
             if (property.Value is not NbtString text)
             {
                 throw SpringNbtException.UnexpectedTagType(
-                    $"Properties の \"{property.Key}\" が文字列でない: {property.Value.Type.AsString()}");
+                    $"Propertiesの\"{property.Key}\"が文字列でない: {property.Value.Type.AsString()}");
             }
 
             state.properties[property.Key] = text.Value;

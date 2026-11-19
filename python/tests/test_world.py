@@ -45,7 +45,7 @@ from spring_nbt_library.world import (
     WorldOpenOptions,
     ceil_log2,
 )
-from spring_nbt_library.anvil import RegionFile, RegionFileMode
+from spring_nbt_library.anvil import RegionFile, RegionFileMode, RegionFolder
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 VECTORS = os.path.join(REPO_ROOT, "spec", "testdata", "world")
@@ -485,7 +485,6 @@ class TestPalettedContainer:
 
         for index in range(4096):
             expected = "minecraft:block_%d" % (index % 16)
-
             if index == 7:
                 expected = "minecraft:block_16"
 
@@ -1981,3 +1980,39 @@ class TestWorldLayout:
 
         # 渡したオプションは書き換えない
         assert read_options.format_data_version == 5023
+
+    def test_world_l1_mixed_formats_write(self, tmp_path):
+        # 形式の違うチャンクと、それぞれに置くブロックの絶対座標
+        # 座標は各チャンクのセクションがある高さの中にとる
+        chunks = [
+            ("minecraft:overworld", "region", "v2586_level", 37, 3, -10, 2586, True),
+            ("minecraft:overworld", "region", "v1976_biomes_2d", 69, 3, -26, 1976, True),
+            ("minecraft:overworld", "region", "v4903_edit", 5, -61, 6, 4903, False),
+            ("minecraft:the_nether", "DIM-1/region", "v2230_spanning", -43, 3, 86, 2230, True),
+        ]
+        write_level(tmp_path, {"DataVersion": NbtInt(2586)})
+
+        # 各ベクタを、元のNBTのまま自身の座標のリージョンへ書く
+        for _, folder_name, vector, x, _, z, _, _ in chunks:
+            nbt = read_file(vector_path(vector)).tag
+
+            with RegionFolder.open(str(tmp_path / folder_name), RegionFileMode.READ_WRITE) as folder:
+                folder.write_chunk(x >> 4, z >> 4, nbt)
+
+        with MinecraftWorld.open(str(tmp_path), WorldOpenOptions(writable=True)) as world:
+            # 各チャンクに、次元を通して絶対座標でブロックを置く
+            for dimension_id, _, _, x, y, z, _, _ in chunks:
+                world.dimension(dimension_id).set_block(x, y, z, "minecraft:gold_block")
+
+            # オーバーワールドはここで書き戻し、ネザーは閉じるときの書き戻しに任せる
+            world.dimension("minecraft:overworld").flush()
+
+        with MinecraftWorld.open(str(tmp_path)) as reopened:
+            # 開き直すと置いたブロックが読め、各チャンクは読んだときの形式のまま残る
+            for dimension_id, _, _, x, y, z, data_version, has_level in chunks:
+                dimension = reopened.dimension(dimension_id)
+                assert dimension.get_block(x, y, z) == BlockState.parse("minecraft:gold_block")
+
+                stored = dimension.region_folder().read_chunk(x >> 4, z >> 4)
+                assert stored.get_int("DataVersion") == data_version
+                assert stored.contains_key("Level") == has_level

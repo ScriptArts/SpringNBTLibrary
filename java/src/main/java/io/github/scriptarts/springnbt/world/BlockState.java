@@ -244,13 +244,13 @@ public final class BlockState {
         // 26.2までは文字列のパレット要素も、異種リストの包みも無い
         if (!(nbt instanceof NbtCompound compound)) {
             throw SpringNbtException.unexpectedTagType(
-                    "ブロックのパレット要素が compound でない: " + nbt.type().asString());
+                    "ブロックのパレット要素がcompoundでない: " + nbt.type().asString());
         }
 
         String name = compound.optString("Name");
 
         if (name == null) {
-            throw SpringNbtException.malformed("ブロックのパレット要素に Name が無い");
+            throw SpringNbtException.malformed("ブロックのパレット要素にNameが無い");
         }
 
         BlockState state = new BlockState(name);
@@ -263,8 +263,8 @@ public final class BlockState {
         // Propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
         for (Map.Entry<String, NbtTag> property : propertiesTag) {
             if (!(property.getValue() instanceof NbtString text)) {
-                throw SpringNbtException.unexpectedTagType("Properties の \"" + property.getKey()
-                        + "\" が文字列でない: " + property.getValue().type().asString());
+                throw SpringNbtException.unexpectedTagType("Propertiesの\"" + property.getKey()
+                        + "\"が文字列でない: " + property.getValue().type().asString());
             }
 
             state.properties.put(property.getKey(), text.value());

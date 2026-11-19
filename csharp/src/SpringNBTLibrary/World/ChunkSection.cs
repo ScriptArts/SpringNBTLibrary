@@ -118,7 +118,7 @@ public sealed class ChunkSection
             if (entry is not NbtCompound)
             {
                 throw SpringNbtException.UnexpectedTagType(
-                    $"Palette の要素が compound でない: {entry.Type.AsString()}");
+                    $"Paletteの要素がcompoundでない: {entry.Type.AsString()}");
             }
 
             entries.Add(entry);

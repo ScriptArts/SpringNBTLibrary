@@ -133,7 +133,7 @@ public sealed class PalettedContainer
             // 書き戻しで元に無いdataを作ってしまわないため
             if (alwaysHasData)
             {
-                throw SpringNbtException.Malformed("data が必ず書かれる形式なのに data が無い");
+                throw SpringNbtException.Malformed("dataが必ず書かれる形式なのにdataが無い");
             }
 
             // パレットが1要素ならdataは無くてよい

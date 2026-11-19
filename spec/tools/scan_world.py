@@ -423,7 +423,6 @@ class Scanner:
         # 生成を終えたチャンクとそれ以外を分けて数える
         if status is not None:
             stage = "生成途中"
-
             # 名前空間を外してから、生成済みとみなす値と比べる
             if strip_namespace(status) in GENERATED_STATUSES:
                 stage = "生成済み"
@@ -445,6 +444,7 @@ class Scanner:
             self.legacy_sections["%sのSectionsが無いチャンク" % generation] += 1
             return
 
+        # セクションごとに、ブロックの持ち方を数える
         for section in sections:
             # Compound以外の要素は数えない
             if not isinstance(section, NbtCompound):
@@ -1009,6 +1009,7 @@ class WorldScanner:
                 for x in range(16):
                     biome_id = chunk.get_biome_id(x, 0, z)
 
+                    # Biomesを読めない列は数えない
                     if biome_id is not None:
                         self.biome_ids[biome_id] += 1
             return
@@ -1019,6 +1020,7 @@ class WorldScanner:
                 for x in range(0, 16, 4):
                     biome_id = chunk.get_biome_id(x, y, z)
 
+                    # Biomesを読めない位置は数えない
                     if biome_id is not None:
                         self.biome_ids[biome_id] += 1
 
@@ -1082,7 +1084,9 @@ class WorldScanner:
         biomes = ("バイオーム", self.biomes)
         biome_ids = ("数値のバイオームID", self.biome_ids)
 
+        # ブロック、バイオーム、数値のバイオームIDの順に、多いものから出す
         for title, counter in (blocks, biomes, biome_ids):
+            # 1件も数えていない集計は、見出しごと出さない
             if len(counter) == 0:
                 continue
 
@@ -1202,7 +1206,6 @@ def main() -> int:
 
     scanner, world_scanner = scan_world(args.world, args.verbose, args.block_sample)
     status = scanner.report()
-
     # どちらかのレイヤに失敗があれば終了コード1
     if world_scanner.report() != 0:
         status = 1

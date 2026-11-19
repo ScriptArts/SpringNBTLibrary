@@ -265,6 +265,8 @@ python3 spec/tools/scan_world.py "<ワールドのパス>" --verbose
 | `world/v2230_spanning` | 1.15.2の形式のチャンク（DataVersion 2230）。ビット詰めが64bitの境目をまたぎ、パレット17要素でビット幅5 |
 | `world/v1976_biomes_2d` | 1.14.4の形式のチャンク（DataVersion 1976）。バイオームは列ごとの`int[256]` |
 | `world/v1343_numeric_ids` | 1.12.2の形式のチャンク（DataVersion 1343）。ブロックが数値IDなので解釈せず、`chunk-report`は`UNSUPPORTED_DATA_VERSION` |
+| `world/order_preserved` | セクションが`Y`の昇順でなく、`Y=-3`が2回現れる。`chunk-edit`で書き換える`Y=-4`のコンテナは`palette`が先で、余分なキーを持つ。書き戻しは読んだときの並びを保ち、`Y=-3`は先に現れた位置へ後の中身で1つにまとまる |
+| `world/v2586_order_preserved` | 1.16.5の形式のチャンク（DataVersion 2586）。セクションが`Y`の昇順でなく、`Y=1`が2回現れる。`chunk-edit`で書き換える`Y=0`はキーの並びが実データと違い、余分なキーを持つ |
 | `world/palette_index_out_of_range` | 添字がパレットの範囲外を指す → `MALFORMED_DATA` |
 | `world/bitstorage_wrong_length` | `data`の長さがパレット長から求めたビット幅と合わない → `MALFORMED_DATA` |
 

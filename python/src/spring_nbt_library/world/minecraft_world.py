@@ -158,6 +158,9 @@ class Dimension:
 
     def __init__(self, dimension_id: str, directory: str, options: WorldOpenOptions,
                  layout: WorldLayout) -> None:
+        """ワールドが内部で作る
+        利用者は直接作らず、``MinecraftWorld.dimension()``で得る
+        """
         self.id = dimension_id
         self.directory = directory
         self._options = options

@@ -196,7 +196,6 @@ public final class Chunk {
         }
 
         List<String> fullStatuses = ChunkFormat.DEFAULT_FULL_STATUSES;
-
         // 生成済みとみなす値は世代で違う
         if (format != null) {
             fullStatuses = format.fullStatuses();
@@ -284,7 +283,6 @@ public final class Chunk {
         chunk.checkDataVersion(effective);
         Integer dataVersion = chunk.ownDataVersion();
         chunk.formatDataVersion = MISSING_DATA_VERSION;
-
         // DataVersionを持つチャンクは、指定が無ければそれで世代を選ぶ
         if (dataVersion != null) {
             chunk.formatDataVersion = dataVersion;
@@ -781,13 +779,12 @@ public final class Chunk {
         ChunkFormat chunkFormat = requireBiomeIds();
         checkLocalCoordinates(x, z);
         int index = biomeId2DIndex(x, z);
-
         // 4×4×4ごとに持つ形式は、高さ0..255の分だけある
         if (chunkFormat.biomeStorage() == ChunkFormat.BiomeStorage.IDS_3D) {
             // 範囲外の高さはどの値にも当たらない
             if (y < 0 || y > BIOME_IDS_MAX_Y) {
                 throw SpringNbtException.invalidArgument(
-                        "Y=" + y + " はバイオームIDを持つ高さ（0.." + BIOME_IDS_MAX_Y + "）の外");
+                        "Y=" + y + "はバイオームIDを持つ高さ（0.." + BIOME_IDS_MAX_Y + "）の外");
             }
 
             index = biomeIdIndex(x, y, z);
@@ -798,7 +795,7 @@ public final class Chunk {
         // 読めないBiomesを作り直すと元のデータを失うので、書き込まない
         if (biomes == null) {
             throw SpringNbtException.invalidArgument(
-                    "Biomes が無いか、int[" + biomeIdsLength(chunkFormat) + "] でない");
+                    "Biomesが無いか、int[" + biomeIdsLength(chunkFormat) + "]でない");
         }
 
         biomes[index] = biomeId;
@@ -832,7 +829,7 @@ public final class Chunk {
         // 書き足さない世代では、isLightOnの無いチャンクは光源の印を持たない
         if (!chunkFormat.addsLightFlag() && !body.containsKey("isLightOn")) {
             throw SpringNbtException.unsupportedFeature(
-                    "DataVersion " + formatDataVersion + "のチャンクは isLightOn を持たない");
+                    "DataVersion " + formatDataVersion + "のチャンクはisLightOnを持たない");
         }
 
         body.setByte("isLightOn", (byte) 0);

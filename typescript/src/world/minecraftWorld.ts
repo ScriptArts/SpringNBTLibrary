@@ -175,7 +175,12 @@ export class Dimension {
   #poi: RegionFolder | undefined;
   #closed = false;
 
-  /** @internal ワールドが内部で作る（利用者は`MinecraftWorld.dimension()`で得る） */
+  /**
+   * ワールドが内部で作る
+   * 利用者は直接作らず、`MinecraftWorld.dimension()`で得る
+   *
+   * @internal
+   */
   constructor(
     readonly id: string,
     readonly directory: string,

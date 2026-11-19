@@ -289,7 +289,7 @@ impl ChunkSection {
                 return Err(Error::new(
                     ErrorCode::UnexpectedTagType,
                     format!(
-                        "Palette の要素が compound でない: {}",
+                        "Paletteの要素がcompoundでない: {}",
                         entry.tag_type().as_str()
                     ),
                 ));
@@ -335,7 +335,7 @@ impl ChunkSection {
                     None => {
                         return Err(Error::new(
                             ErrorCode::MalformedData,
-                            "BlockStates を書くための data が無い",
+                            "BlockStatesを書くためのdataが無い",
                         ))
                     }
                 };
@@ -616,7 +616,6 @@ impl Chunk {
         chunk.check_data_version(options)?;
         let data_version = chunk.own_data_version()?;
         chunk.format_data_version = MISSING_DATA_VERSION;
-
         // DataVersionを持つチャンクは、指定が無ければそれで世代を選ぶ
         if let Some(version) = data_version {
             chunk.format_data_version = version;
@@ -1082,14 +1081,13 @@ impl Chunk {
         check_local_coordinates(x, z)?;
         let length = biome_ids_length(format);
         let mut index = biome_id_2d_index(x, z);
-
         // 4×4×4ごとに持つ形式は、高さ0..255の分だけある
         if format.biome_storage == BiomeStorage::Ids3D {
             // 範囲外の高さはどの値にも当たらない
             if !(0..=BIOME_IDS_MAX_Y).contains(&y) {
                 return Err(Error::new(
                     ErrorCode::InvalidArgument,
-                    format!("Y={y} はバイオームIDを持つ高さ（0..{BIOME_IDS_MAX_Y}）の外"),
+                    format!("Y={y}はバイオームIDを持つ高さ（0..{BIOME_IDS_MAX_Y}）の外"),
                 ));
             }
 
@@ -1102,7 +1100,7 @@ impl Chunk {
             _ => {
                 return Err(Error::new(
                     ErrorCode::InvalidArgument,
-                    format!("Biomes が無いか、int[{length}] でない"),
+                    format!("Biomesが無いか、int[{length}]でない"),
                 ))
             }
         };
@@ -1137,7 +1135,7 @@ impl Chunk {
             return Err(Error::new(
                 ErrorCode::UnsupportedFeature,
                 format!(
-                    "DataVersion {}のチャンクは isLightOn を持たない",
+                    "DataVersion {}のチャンクはisLightOnを持たない",
                     self.format_data_version
                 ),
             ));

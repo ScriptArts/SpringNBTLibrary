@@ -735,6 +735,7 @@ def extract_typescript() -> Api:
                 internal_pending = True
                 continue
 
+            # 印を持ち越したあと、コメントでない最初の行でその印を使い切る
             if internal_pending and stripped != "" and not stripped.startswith(("/**", "*", "//")):
                 internal_pending = False
 

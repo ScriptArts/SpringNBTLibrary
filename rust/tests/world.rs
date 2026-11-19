@@ -12,7 +12,7 @@ use spring_nbt_library::nbt::tag::{NbtCompound, NbtList, NbtString, NbtTag, TagT
 use spring_nbt_library::nbt::{
     read_file, write_bytes, write_file, Compression, NamedTag, NbtReadOptions, NbtWriteOptions,
 };
-use spring_nbt_library::anvil::{ChunkCompression, RegionFile, RegionFileMode};
+use spring_nbt_library::anvil::{ChunkCompression, RegionFile, RegionFileMode, RegionFolder};
 use spring_nbt_library::world::{
     ceil_log2, BitStorage, BlockState, Chunk, ChunkReadOptions, ChunkWriteOptions, MinecraftWorld,
     PalettedContainer, VersionMismatchAction, WorldOpenOptions,
@@ -2606,6 +2606,60 @@ fn ワールドの指定は読むチャンクの世代にも効く() {
     let loaded = overworld.chunk(0, 0).unwrap().unwrap();
     assert_eq!(5006, loaded.format_data_version());
 
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+#[test]
+fn world_l1_mixed_formats_write() {
+    // 形式の違うチャンクと、それぞれに置くブロックの絶対座標
+    // 座標は各チャンクのセクションがある高さの中にとる
+    let chunks: [(&str, &str, &str, i32, i32, i32, i32, bool); 4] = [
+        ("minecraft:overworld", "region", "v2586_level", 37, 3, -10, 2586, true),
+        ("minecraft:overworld", "region", "v1976_biomes_2d", 69, 3, -26, 1976, true),
+        ("minecraft:overworld", "region", "v4903_edit", 5, -61, 6, 4903, false),
+        ("minecraft:the_nether", "DIM-1/region", "v2230_spanning", -43, 3, 86, 2230, true),
+    ];
+    let work = temp_world("mixed-formats");
+    write_level(&work, |data| data.set_int("DataVersion", 2586));
+
+    // 各ベクタを、元のNBTのまま自身の座標のリージョンへ書く
+    for (_, folder_name, vector, x, _, z, _, _) in chunks {
+        let named = read_file(vector_path(vector), &NbtReadOptions::default()).unwrap();
+        let mut folder = RegionFolder::open(work.join(folder_name), RegionFileMode::ReadWrite).unwrap();
+        folder.write_chunk(x >> 4, z >> 4, &named.tag, ChunkCompression::Zlib).unwrap();
+        folder.close().unwrap();
+    }
+
+    {
+        let options = WorldOpenOptions { writable: true, ..WorldOpenOptions::default() };
+        let mut world = MinecraftWorld::open(&work, options).unwrap();
+
+        // 各チャンクに、次元を通して絶対座標でブロックを置く
+        for (dimension_id, _, _, x, y, z, _, _) in chunks {
+            let dimension = world.dimension(dimension_id).unwrap().unwrap();
+            dimension.set_block(x, y, z, "minecraft:gold_block").unwrap();
+        }
+
+        // オーバーワールドはここで書き戻し、ネザーは閉じるときの書き戻しに任せる
+        world.dimension("minecraft:overworld").unwrap().unwrap().flush().unwrap();
+        world.close().unwrap();
+    }
+
+    let mut reopened = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+    let gold = BlockState::parse("minecraft:gold_block").unwrap();
+
+    // 開き直すと置いたブロックが読め、各チャンクは読んだときの形式のまま残る
+    for (dimension_id, _, _, x, y, z, data_version, has_level) in chunks {
+        let dimension = reopened.dimension(dimension_id).unwrap().unwrap();
+        assert_eq!(Some(gold.clone()), dimension.get_block(x, y, z).unwrap());
+
+        let folder = dimension.region_folder().unwrap().unwrap();
+        let stored = folder.read_chunk(x >> 4, z >> 4).unwrap().unwrap();
+        assert_eq!(data_version, stored.get_int("DataVersion").unwrap());
+        assert_eq!(has_level, stored.contains_key("Level"));
+    }
+
+    reopened.close().unwrap();
     std::fs::remove_dir_all(&work).unwrap();
 }
 

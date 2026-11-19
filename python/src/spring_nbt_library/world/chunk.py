@@ -272,7 +272,7 @@ class ChunkSection:
             # Compound以外の要素は1.17までの形式に無い
             if not isinstance(entry, NbtCompound):
                 raise SpringNbtError.unexpected_tag_type(
-                    "Palette の要素が compound でない: %s" % entry.type.as_string())
+                    "Paletteの要素がcompoundでない: %s" % entry.type.as_string())
 
         # BlockStatesはパレットが1要素でも必ず書かれる
         section.block_states = PalettedContainer._from_parts(
@@ -407,7 +407,6 @@ class Chunk:
             status = status[len(_MINECRAFT_NAMESPACE):]
 
         full_statuses = FULL_STATUSES
-
         # 生成済みとみなす値は世代で違う
         if self._format is not None:
             full_statuses = self._format.full_statuses
@@ -465,7 +464,6 @@ class Chunk:
         chunk._check_data_version(effective)
         data_version = chunk._own_data_version()
         chunk._format_data_version = _MISSING_DATA_VERSION
-
         # DataVersionを持つチャンクは、指定が無ければそれで世代を選ぶ
         if data_version is not None:
             chunk._format_data_version = data_version
@@ -829,13 +827,12 @@ class Chunk:
         chunk_format = self._require_biome_ids()
         _check_local_coordinates(x, z)
         index = _biome_id_2d_index(x, z)
-
         # 4×4×4ごとに持つ形式は、高さ0..255の分だけある
         if chunk_format.biome_storage == BiomeStorage.IDS_3D:
             # 範囲外の高さはどの値にも当たらない
             if y < 0 or y > _BIOME_IDS_MAX_Y:
                 raise SpringNbtError.invalid_argument(
-                    "Y=%d はバイオームIDを持つ高さ（0..%d）の外" % (y, _BIOME_IDS_MAX_Y))
+                    "Y=%dはバイオームIDを持つ高さ（0..%d）の外" % (y, _BIOME_IDS_MAX_Y))
 
             index = _biome_id_index(x, y, z)
 
@@ -844,7 +841,7 @@ class Chunk:
         # 読めないBiomesを作り直すと元のデータを失うので、書き込まない
         if biomes is None:
             raise SpringNbtError.invalid_argument(
-                "Biomes が無いか、int[%d] でない" % _biome_ids_length(chunk_format))
+                "Biomesが無いか、int[%d]でない" % _biome_ids_length(chunk_format))
 
         # 配列へ直接入れると範囲の検査を通らないので、intの範囲を先に確かめる
         biomes.value[index] = NbtInt(biome_id).value
@@ -874,7 +871,7 @@ class Chunk:
         # 書き足さない世代では、isLightOnの無いチャンクは光源の印を持たない
         if not chunk_format.adds_light_flag and "isLightOn" not in body:
             raise SpringNbtError.unsupported_feature(
-                "DataVersion %dのチャンクは isLightOn を持たない" % self._format_data_version)
+                "DataVersion %dのチャンクはisLightOnを持たない" % self._format_data_version)
 
         body.set_byte("isLightOn", 0)
         self._modified = True

@@ -164,7 +164,7 @@ public final class ChunkSection {
             // Compound以外の要素は1.17までの形式に無い
             if (!(entry instanceof NbtCompound)) {
                 throw SpringNbtException.unexpectedTagType(
-                        "Palette の要素が compound でない: " + entry.type().asString());
+                        "Paletteの要素がcompoundでない: " + entry.type().asString());
             }
 
             entries.add(entry);

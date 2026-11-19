@@ -373,7 +373,7 @@ fn from_name_properties(nbt: &NbtTag) -> Result<BlockState> {
         other => {
             return Err(Error::new(
                 ErrorCode::UnexpectedTagType,
-                format!("ブロックのパレット要素が compound でない: {}", other.tag_type().as_str()),
+                format!("ブロックのパレット要素がcompoundでない: {}", other.tag_type().as_str()),
             ))
         }
     };
@@ -381,7 +381,7 @@ fn from_name_properties(nbt: &NbtTag) -> Result<BlockState> {
     let name = match compound.opt_string("Name")? {
         Some(name) => name.to_string(),
         None => {
-            return Err(Error::new(ErrorCode::MalformedData, "ブロックのパレット要素に Name が無い"))
+            return Err(Error::new(ErrorCode::MalformedData, "ブロックのパレット要素にNameが無い"))
         }
     };
 
@@ -398,7 +398,7 @@ fn from_name_properties(nbt: &NbtTag) -> Result<BlockState> {
                     None => {
                         return Err(Error::new(
                             ErrorCode::MalformedData,
-                            format!("Properties の \"{key}\" が UTF-8 に写せない"),
+                            format!("Propertiesの\"{key}\"がUTF-8に写せない"),
                         ))
                     }
                 },
@@ -406,7 +406,7 @@ fn from_name_properties(nbt: &NbtTag) -> Result<BlockState> {
                     return Err(Error::new(
                         ErrorCode::UnexpectedTagType,
                         format!(
-                            "Properties の \"{key}\" が文字列でない: {}",
+                            "Propertiesの\"{key}\"が文字列でない: {}",
                             other.tag_type().as_str()
                         ),
                     ))

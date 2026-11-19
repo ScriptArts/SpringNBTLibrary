@@ -624,7 +624,6 @@ public class WorldTests
             for (int index = 0; index < 4096; index++)
             {
                 string expected = "minecraft:block_" + (index % 16);
-
                 if (index == 7)
                 {
                     expected = "minecraft:block_16";
@@ -2263,6 +2262,10 @@ public class WorldTests
         }
     }
 
+    /// <summary>形式の違うチャンクを置く次元とベクタ、ブロックを置く絶対座標、元のDataVersionとLevelの有無</summary>
+    private sealed record MixedChunk(
+        string DimensionId, string Folder, string Vector, int X, int Y, int Z, int DataVersion, bool HasLevel);
+
     /// <summary>L1の合成ワールドを作る</summary>
     private static void MakeL1World(string root)
     {
@@ -2611,6 +2614,58 @@ public class WorldTests
 
                 // 渡したオプションは書き換えない
                 Assert.Equal(5023, readOptions.FormatDataVersion);
+            });
+        }
+
+        [Fact]
+        public void World_l1_mixed_formats_write()
+        {
+            WithTempWorld(root =>
+            {
+                // 形式の違うチャンクと、それぞれに置くブロックの絶対座標
+                // 座標は各チャンクのセクションがある高さの中にとる
+                MixedChunk[] chunks =
+                {
+                    new MixedChunk("minecraft:overworld", "region", "v2586_level", 37, 3, -10, 2586, true),
+                    new MixedChunk("minecraft:overworld", "region", "v1976_biomes_2d", 69, 3, -26, 1976, true),
+                    new MixedChunk("minecraft:overworld", "region", "v4903_edit", 5, -61, 6, 4903, false),
+                    new MixedChunk("minecraft:the_nether", "DIM-1/region", "v2230_spanning", -43, 3, 86, 2230, true),
+                };
+                WriteLevel(root, new Dictionary<string, NbtTag> { ["DataVersion"] = new NbtInt(2586) });
+
+                // 各ベクタを、元のNBTのまま自身の座標のリージョンへ書く
+                foreach (MixedChunk entry in chunks)
+                {
+                    NbtCompound nbt = (NbtCompound)NbtIo.ReadFile(VectorPath(entry.Vector)).Tag;
+
+                    using RegionFolder folder = RegionFolder.Open(Path.Combine(root, entry.Folder), RegionFileMode.ReadWrite);
+                    folder.WriteChunk(entry.X >> 4, entry.Z >> 4, nbt);
+                }
+
+                using (MinecraftWorld world = MinecraftWorld.Open(root, new WorldOpenOptions { Writable = true }))
+                {
+                    // 各チャンクに、次元を通して絶対座標でブロックを置く
+                    foreach (MixedChunk entry in chunks)
+                    {
+                        world.Dimension(entry.DimensionId)!.SetBlock(entry.X, entry.Y, entry.Z, "minecraft:gold_block");
+                    }
+
+                    // オーバーワールドはここで書き戻し、ネザーは閉じるときの書き戻しに任せる
+                    world.Dimension("minecraft:overworld")!.Flush();
+                }
+
+                using MinecraftWorld reopened = MinecraftWorld.Open(root);
+
+                // 開き直すと置いたブロックが読め、各チャンクは読んだときの形式のまま残る
+                foreach (MixedChunk entry in chunks)
+                {
+                    Dimension dimension = reopened.Dimension(entry.DimensionId)!;
+                    Assert.Equal(BlockState.Parse("minecraft:gold_block"), dimension.GetBlock(entry.X, entry.Y, entry.Z));
+
+                    NbtCompound stored = dimension.RegionFolder!.ReadChunk(entry.X >> 4, entry.Z >> 4)!;
+                    Assert.Equal(entry.DataVersion, stored.GetInt("DataVersion"));
+                    Assert.Equal(entry.HasLevel, stored.ContainsKey("Level"));
+                }
             });
         }
     }

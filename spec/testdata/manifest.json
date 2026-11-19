@@ -519,6 +519,26 @@
       "roundtrip": false
     },
     {
+      "id": "world/order_preserved",
+      "kind": "world",
+      "input": "world/order_preserved.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "セクションがYの昇順でなく、Y=-3が2回現れる。chunk-editで書き換えるY=-4のコンテナはpaletteが先で、余分なキーを持つ。書き戻しは読んだときの並びを保ち、Y=-3は先に現れた位置へ後の中身で1つにまとまる",
+      "expect": "expect/world/order_preserved.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/v2586_order_preserved",
+      "kind": "world",
+      "input": "world/v2586_order_preserved.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "1.16.5の形式（DataVersion 2586）。セクションがYの昇順でなく、Y=1が2回現れる。chunk-editで書き換えるY=0はキーの並びが実データと違い、余分なキーを持つ",
+      "expect": "expect/world/v2586_order_preserved.json",
+      "roundtrip": true
+    },
+    {
       "id": "world/palette_index_out_of_range",
       "kind": "world",
       "input": "world/palette_index_out_of_range.nbt",

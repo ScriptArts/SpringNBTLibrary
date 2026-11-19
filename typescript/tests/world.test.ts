@@ -41,7 +41,7 @@ import {
   writeBytes,
   writeFile,
 } from "../src/nbt/index.js";
-import { RegionFile, RegionFileMode } from "../src/anvil/index.js";
+import { RegionFile, RegionFileMode, RegionFolder } from "../src/anvil/index.js";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
@@ -543,7 +543,6 @@ test("PalettedContainer: またぐ詰め方のコンテナは17種類目でビ�
 
   for (let index = 0; index < 4096; index++) {
     let expected = `minecraft:block_${index % 16}`;
-
     if (index === 7) {
       expected = "minecraft:block_16";
     }
@@ -1715,6 +1714,20 @@ test("LegacyChunk: DataVersion 1976 のバイオーム ID は高さに関係な�
   assert.equal(biomes[3 * 16 + 7], biome2D(3 * 16 + 7));
 });
 
+test("LegacyChunk: DataVersion 1976のバイオームIDは小数の座標を切り捨てた列で読み書きする", () => {
+  const chunk = Chunk.fromNbt(biomes2DVector());
+
+  // 小数の座標は、整数に切り捨てた列を指す
+  assert.equal(chunk.getBiomeId(3.5, 0, 7.25), biome2D(7 * 16 + 3));
+
+  chunk.setBiomeId(3.5, 0, 7.25, 42);
+
+  // 書き込みも切り捨てた列に入り、空振りしない
+  assert.equal(chunk.getBiomeId(3, 0, 7), 42);
+  const biomes = chunk.toNbt().getCompound("Level").getIntArray("Biomes");
+  assert.equal(biomes[7 * 16 + 3], 42);
+});
+
 const unreadable2DBiomes: [string, NbtTag | undefined][] = [
   ["無し", undefined],
   ["int[0]", new NbtIntArray(new Int32Array(0))],
@@ -2205,5 +2218,56 @@ test("WorldLayout: ワールドの指定は読むチャンクの世代にも効�
 
     // 渡したオプションは書き換えない
     assert.equal(readOptions.formatDataVersion, 5023);
+  });
+});
+
+test("WorldLayout: world_l1_mixed_formats_write", () => {
+  withTempWorld((work) => {
+    // 形式の違うチャンクと、それぞれに置くブロックの絶対座標
+    // 座標は各チャンクのセクションがある高さの中にとる
+    const chunks: [string, string, string, number, number, number, number, boolean][] = [
+      ["minecraft:overworld", "region", "v2586_level", 37, 3, -10, 2586, true],
+      ["minecraft:overworld", "region", "v1976_biomes_2d", 69, 3, -26, 1976, true],
+      ["minecraft:overworld", "region", "v4903_edit", 5, -61, 6, 4903, false],
+      ["minecraft:the_nether", "DIM-1/region", "v2230_spanning", -43, 3, 86, 2230, true],
+    ];
+    writeLevel(work, { DataVersion: new NbtInt(2586) });
+
+    // 各ベクタを、元のNBTのまま自身の座標のリージョンへ書く
+    for (const [, folderName, vector, x, , z] of chunks) {
+      const folder = RegionFolder.open(join(work, folderName), RegionFileMode.ReadWrite);
+      folder.writeChunk(x >> 4, z >> 4, readFile(vectorPath(vector)).tag);
+      folder.close();
+    }
+
+    const world = MinecraftWorld.open(work, { writable: true });
+
+    try {
+      // 各チャンクに、次元を通して絶対座標でブロックを置く
+      for (const [dimensionId, , , x, y, z] of chunks) {
+        world.dimension(dimensionId)!.setBlock(x, y, z, "minecraft:gold_block");
+      }
+
+      // オーバーワールドはここで書き戻し、ネザーは閉じるときの書き戻しに任せる
+      world.dimension("minecraft:overworld")!.flush();
+    } finally {
+      world.close();
+    }
+
+    const reopened = MinecraftWorld.open(work);
+
+    try {
+      // 開き直すと置いたブロックが読め、各チャンクは読んだときの形式のまま残る
+      for (const [dimensionId, , , x, y, z, dataVersion, hasLevel] of chunks) {
+        const dimension = reopened.dimension(dimensionId)!;
+        assert.ok(BlockState.parse("minecraft:gold_block").equals(dimension.getBlock(x, y, z)!));
+
+        const stored = dimension.regionFolder!.readChunk(x >> 4, z >> 4)!;
+        assert.equal(stored.getInt("DataVersion"), dataVersion);
+        assert.equal(stored.containsKey("Level"), hasLevel);
+      }
+    } finally {
+      reopened.close();
+    }
   });
 });

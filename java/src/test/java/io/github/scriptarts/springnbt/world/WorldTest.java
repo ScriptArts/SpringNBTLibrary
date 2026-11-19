@@ -14,6 +14,7 @@ import io.github.scriptarts.springnbt.SpringNbt;
 import io.github.scriptarts.springnbt.SpringNbtException;
 import io.github.scriptarts.springnbt.anvil.RegionFile;
 import io.github.scriptarts.springnbt.anvil.RegionFileMode;
+import io.github.scriptarts.springnbt.anvil.RegionFolder;
 import io.github.scriptarts.springnbt.nbt.Compression;
 import io.github.scriptarts.springnbt.nbt.NamedTag;
 import io.github.scriptarts.springnbt.nbt.NbtCompound;
@@ -587,7 +588,6 @@ class WorldTest {
 
             for (int index = 0; index < 4096; index++) {
                 String expected = "minecraft:block_" + (index % 16);
-
                 if (index == 7) {
                     expected = "minecraft:block_16";
                 }
@@ -2034,6 +2034,11 @@ class WorldTest {
         NbtIo.writeFile(path, new NamedTag("", root), null);
     }
 
+    /** 形式の違うチャンクを置く次元とベクタ、ブロックを置く絶対座標、元のDataVersionとLevelの有無 */
+    private record MixedChunk(
+            String dimensionId, String folder, String vector, int x, int y, int z, int dataVersion, boolean hasLevel) {
+    }
+
     /** L1の合成ワールドを作る */
     private static void makeL1World(Path directory) throws Exception {
         writeLevel(directory, Map.of("DataVersion", new NbtInt(3953)));
@@ -2302,6 +2307,50 @@ class WorldTest {
 
             // 渡したオプションは書き換えない
             assertEquals(5023, readOptions.formatDataVersion());
+        }
+
+        @Test
+        void world_l1_mixed_formats_write() throws Exception {
+            // 形式の違うチャンクと、それぞれに置くブロックの絶対座標
+            // 座標は各チャンクのセクションがある高さの中にとる
+            List<MixedChunk> chunks = List.of(
+                    new MixedChunk("minecraft:overworld", "region", "v2586_level", 37, 3, -10, 2586, true),
+                    new MixedChunk("minecraft:overworld", "region", "v1976_biomes_2d", 69, 3, -26, 1976, true),
+                    new MixedChunk("minecraft:overworld", "region", "v4903_edit", 5, -61, 6, 4903, false),
+                    new MixedChunk("minecraft:the_nether", "DIM-1/region", "v2230_spanning", -43, 3, 86, 2230, true));
+            writeLevel(work, Map.of("DataVersion", new NbtInt(2586)));
+
+            // 各ベクタを、元のNBTのまま自身の座標のリージョンへ書く
+            for (MixedChunk entry : chunks) {
+                NbtCompound nbt = (NbtCompound) NbtIo.readFile(vectorPath(entry.vector()), null).tag();
+
+                try (RegionFolder folder = RegionFolder.open(work.resolve(entry.folder()), RegionFileMode.READ_WRITE)) {
+                    folder.writeChunk(entry.x() >> 4, entry.z() >> 4, nbt);
+                }
+            }
+
+            try (MinecraftWorld world = MinecraftWorld.open(work, WorldOpenOptions.defaults().setWritable(true))) {
+                // 各チャンクに、次元を通して絶対座標でブロックを置く
+                for (MixedChunk entry : chunks) {
+                    world.dimension(entry.dimensionId()).setBlock(entry.x(), entry.y(), entry.z(), "minecraft:gold_block");
+                }
+
+                // オーバーワールドはここで書き戻し、ネザーは閉じるときの書き戻しに任せる
+                world.dimension("minecraft:overworld").flush();
+            }
+
+            try (MinecraftWorld reopened = MinecraftWorld.open(work)) {
+                // 開き直すと置いたブロックが読め、各チャンクは読んだときの形式のまま残る
+                for (MixedChunk entry : chunks) {
+                    Dimension dimension = reopened.dimension(entry.dimensionId());
+                    assertEquals(BlockState.parse("minecraft:gold_block"),
+                            dimension.getBlock(entry.x(), entry.y(), entry.z()));
+
+                    NbtCompound stored = dimension.regionFolder().readChunk(entry.x() >> 4, entry.z() >> 4);
+                    assertEquals(entry.dataVersion(), stored.getInt("DataVersion"));
+                    assertEquals(entry.hasLevel(), stored.containsKey("Level"));
+                }
+            }
         }
     }
 }

@@ -362,14 +362,14 @@ function fromNameProperties(nbt: NbtTag): BlockState {
   // 26.2までは文字列のパレット要素も、異種リストの包みも無い
   if (!(nbt instanceof NbtCompound)) {
     throw SpringNbtError.unexpectedTagType(
-      `ブロックのパレット要素が compound でない: ${tagTypeAsString(nbt.type)}`,
+      `ブロックのパレット要素がcompoundでない: ${tagTypeAsString(nbt.type)}`,
     );
   }
 
   const name = nbt.optString("Name");
 
   if (name === undefined) {
-    throw SpringNbtError.malformed("ブロックのパレット要素に Name が無い");
+    throw SpringNbtError.malformed("ブロックのパレット要素にNameが無い");
   }
 
   const entries: Array<[string, string]> = [];
@@ -380,7 +380,7 @@ function fromNameProperties(nbt: NbtTag): BlockState {
     for (const [key, value] of propertiesTag.entries()) {
       if (value.type !== TagType.String) {
         throw SpringNbtError.unexpectedTagType(
-          `Properties の "${key}" が文字列でない`,
+          `Propertiesの"${key}"が文字列でない: ${tagTypeAsString(value.type)}`,
         );
       }
 

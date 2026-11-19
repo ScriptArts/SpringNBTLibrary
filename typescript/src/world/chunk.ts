@@ -50,7 +50,6 @@ const BIOME_IDS_MAX_Y = 255;
 /** 生成段階の名前空間 */
 const MINECRAFT_NAMESPACE = "minecraft:";
 
-/** 付随データの要素が、指定の絶対座標を指しているか */
 /**
  * パレット付きコンテナを、読んだときのキーの並びを保ってセクションへ書き戻す
  *
@@ -109,6 +108,7 @@ function writeContainer(
   section.set(key, result);
 }
 
+/** 付随データの要素が、指定の絶対座標を指しているか */
 function matchesPosition(entry: NbtCompound, x: number, y: number, z: number): boolean {
   const entryX = entry.optInt("x");
   const entryY = entry.optInt("y");
@@ -311,7 +311,7 @@ export class ChunkSection {
       // Compound以外の要素は1.17までの形式に無い
       if (entry.type !== TagType.Compound) {
         throw SpringNbtError.unexpectedTagType(
-          `Palette の要素が compound でない: ${tagTypeAsString(entry.type)}`,
+          `Paletteの要素がcompoundでない: ${tagTypeAsString(entry.type)}`,
         );
       }
 
@@ -494,7 +494,6 @@ export class Chunk {
     }
 
     let fullStatuses = DEFAULT_FULL_STATUSES;
-
     // 生成済みとみなす値は世代で違う
     if (this.#format !== undefined) {
       fullStatuses = this.#format.fullStatuses;
@@ -540,7 +539,6 @@ export class Chunk {
    */
   static fromNbt(nbt: NbtCompound, options?: ChunkReadOptions): Chunk {
     let requested: number | undefined = undefined;
-
     // 指定があるときだけ、その値で世代を選ぶ
     if (options !== undefined) {
       requested = options.formatDataVersion;
@@ -557,7 +555,6 @@ export class Chunk {
     chunk.#checkDataVersion(options);
     const dataVersion = chunk.#ownDataVersion();
     chunk.#formatDataVersion = MISSING_DATA_VERSION;
-
     // DataVersionを持つチャンクは、指定が無ければそれで世代を選ぶ
     if (dataVersion !== undefined) {
       chunk.#formatDataVersion = dataVersion;
@@ -1000,13 +997,12 @@ export class Chunk {
     const format = this.#requireBiomeIds();
     checkLocalCoordinates(x, z);
     let index = biomeId2DIndex(x, z);
-
     // 4×4×4ごとに持つ形式は、高さ0..255の分だけある
     if (format.biomeStorage === BiomeStorage.Ids3D) {
       // 範囲外の高さはどの値にも当たらない
       if (y < 0 || y > BIOME_IDS_MAX_Y) {
         throw SpringNbtError.invalidArgument(
-          `Y=${y} はバイオームIDを持つ高さ（0..${BIOME_IDS_MAX_Y}）の外`,
+          `Y=${y}はバイオームIDを持つ高さ（0..${BIOME_IDS_MAX_Y}）の外`,
         );
       }
 
@@ -1018,7 +1014,7 @@ export class Chunk {
     // 読めないBiomesを作り直すと元のデータを失うので、書き込まない
     if (biomes === undefined) {
       throw SpringNbtError.invalidArgument(
-        `Biomes が無いか、int[${biomeIdsLength(format)}] でない`,
+        `Biomesが無いか、int[${biomeIdsLength(format)}]でない`,
       );
     }
 
@@ -1054,7 +1050,7 @@ export class Chunk {
     // 書き足さない世代では、isLightOnの無いチャンクは光源の印を持たない
     if (!format.addsLightFlag && !body.containsKey("isLightOn")) {
       throw SpringNbtError.unsupportedFeature(
-        `DataVersion ${this.#formatDataVersion}のチャンクは isLightOn を持たない`,
+        `DataVersion ${this.#formatDataVersion}のチャンクはisLightOnを持たない`,
       );
     }
 
@@ -1101,7 +1097,7 @@ function biomeIdIndex(x: number, y: number, z: number): number {
  * 1エントリが1列
  */
 function biomeId2DIndex(x: number, z: number): number {
-  return z * 16 + x;
+  return ((z & 15) << 4) | (x & 15);
 }
 
 /** 世代の`Biomes`が持つ数値のバイオームIDの数 */

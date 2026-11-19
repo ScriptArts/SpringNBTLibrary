@@ -1021,6 +1021,22 @@ def paletted_container(palette_entries, indices, min_bits):
     return t_compound(entries)
 
 
+def container_parts(palette_entries, indices, min_bits):
+    """パレット付きコンテナの値を、キーの名前で引ける形で返す。
+
+    キーの並びを実データと変えたコンテナを組み立てるときに使う。
+    パレットが1要素なら`data`を含めない。
+    """
+    parts = {"palette": palette_list(palette_entries)}
+
+    # パレットが2要素以上のときだけdataを持つ
+    if len(palette_entries) > 1:
+        bits = max(min_bits, ceil_log2(len(palette_entries)))
+        parts["data"] = t_long_array(pack_indices(indices, bits))
+
+    return parts
+
+
 def make_section(y, block_palette, block_indices, biome_palette, biome_indices):
     """セクションを1つ組み立てる。"""
     return t_compound([
@@ -1446,6 +1462,66 @@ def build_world():
         ])),
         "1.12.2の形式のチャンク（DataVersion 1343）。ブロックが数値のIDなので解釈せず、chunk-reportはUNSUPPORTED_DATA_VERSION",
         expect_error="UNSUPPORTED_DATA_VERSION")
+
+    # セクションとコンテナのキーの並びを、読んだときのまま書き戻すことの確認用。
+    # セクションはYの昇順でなく、Y=-3が2回現れる。後に読んだ方の中身（石）が、先に現れた位置へ1つにまとまる。
+    # chunk-editが書き換えるY=-4は先頭に置かず、コンテナはpaletteが先で、余分なキーを持つ
+    edited_blocks = container_parts(palette5, indices5, 4)
+    untouched_blocks = container_parts(palette17, indices17, 4)
+    add_vector(
+        "world/order_preserved", "world/order_preserved.nbt",
+        make_chunk(0, 0, [
+            # 書き換えないセクション。余分なキーがpaletteとdataの間にある
+            t_compound([
+                ("Y", t_byte(-2)),
+                ("block_states", t_compound([
+                    ("palette", untouched_blocks["palette"]),
+                    ("extra", t_int(1)),
+                    ("data", untouched_blocks["data"]),
+                ])),
+                ("biomes", paletted_container([PLAINS], [0] * 64, 1)),
+            ]),
+            # chunk-editが書き換えるセクション
+            t_compound([
+                ("Y", t_byte(-4)),
+                ("block_states", t_compound([
+                    ("palette", edited_blocks["palette"]),
+                    ("data", edited_blocks["data"]),
+                    ("extra", t_int(7)),
+                ])),
+                # dataを持たないバイオーム。chunk-editでdataが要るようになる
+                ("biomes", t_compound([
+                    ("palette", palette_list([PLAINS])),
+                    ("extra", t_string("kept")),
+                ])),
+            ]),
+            make_section(-3, [AIR], [0] * 4096, [PLAINS], [0] * 64),
+            make_section(-3, [STONE], [0] * 4096, [PLAINS], [0] * 64),
+        ]),
+        "セクションがYの昇順でなく、Y=-3が2回現れる。chunk-editで書き換えるY=-4のコンテナはpaletteが先で、余分なキーを持つ。"
+        "書き戻しは読んだときの並びを保ち、Y=-3は先に現れた位置へ後の中身で1つにまとまる")
+
+    # 1.16.5の形式でも、セクションとキーの並びを読んだときのまま書き戻すことの確認用。
+    # セクションはYの昇順でなく、Y=1が2回現れる。chunk-editが書き換えるY=0は、キーの並びが実データと違い余分なキーを持つ
+    add_vector(
+        "world/v2586_order_preserved", "world/v2586_order_preserved.nbt",
+        make_level_chunk(
+            0, 0,
+            [
+                make_level_section(1, [properties_name_entry("minecraft:air")], [0] * 4096),
+                # 光源だけを持つセクション
+                t_compound([("SkyLight", t_byte_array([0] * 2048)), ("Y", t_byte(-1))]),
+                # chunk-editが書き換えるセクション
+                t_compound([
+                    ("Y", t_byte(0)),
+                    ("Palette", t_list(TAG_COMPOUND, level_palette5)),
+                    ("extra", t_int(7)),
+                    ("BlockStates", t_long_array(pack_indices(indices5, 4))),
+                ]),
+                make_level_section(1, [properties_name_entry("minecraft:stone")], [0] * 4096),
+            ],
+            [(index * 3) % 11 + 1 for index in range(1024)]),
+        "1.16.5の形式（DataVersion 2586）。セクションがYの昇順でなく、Y=1が2回現れる。chunk-editで書き換えるY=0はキーの並びが実データと違い、余分なキーを持つ")
 
     # 異常系: 添字がパレットの範囲外
     broken = t_compound([

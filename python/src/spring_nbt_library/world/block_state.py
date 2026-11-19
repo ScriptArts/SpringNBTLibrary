@@ -267,12 +267,12 @@ def _from_name_properties(nbt: NbtTag) -> BlockState:
     # 26.2までは文字列のパレット要素も、異種リストの包みも無い
     if not isinstance(nbt, NbtCompound):
         raise SpringNbtError.unexpected_tag_type(
-            "ブロックのパレット要素が compound でない: %s" % nbt.type.as_string())
+            "ブロックのパレット要素がcompoundでない: %s" % nbt.type.as_string())
 
     name = nbt.opt_string("Name")
 
     if name is None:
-        raise SpringNbtError.malformed("ブロックのパレット要素に Name が無い")
+        raise SpringNbtError.malformed("ブロックのパレット要素にNameが無い")
 
     properties_tag = nbt.opt_compound("Properties")
     properties = {}
@@ -282,7 +282,7 @@ def _from_name_properties(nbt: NbtTag) -> BlockState:
         for key, value in properties_tag.items():
             if not isinstance(value, NbtString):
                 raise SpringNbtError.unexpected_tag_type(
-                    'Properties の "%s" が文字列でない: %s' % (key, value.type.as_string()))
+                    'Propertiesの"%s"が文字列でない: %s' % (key, value.type.as_string()))
 
             properties[key] = value.value
 

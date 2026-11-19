@@ -165,7 +165,7 @@ class PalettedContainer:
             # dataが必ず書かれる形式で無いなら、壊れたデータとして扱う
             # 書き戻しで元に無いdataを作ってしまわないため
             if always_has_data:
-                raise SpringNbtError.malformed("data が必ず書かれる形式なのに data が無い")
+                raise SpringNbtError.malformed("dataが必ず書かれる形式なのにdataが無い")
 
             # パレットが1要素ならdataは無くてよい
             if len(result._palette) != 1:

@@ -186,7 +186,7 @@ impl PalettedContainer {
                 if always_has_data {
                     return Err(Error::new(
                         ErrorCode::MalformedData,
-                        "data が必ず書かれる形式なのに data が無い",
+                        "dataが必ず書かれる形式なのにdataが無い",
                     ));
                 }
 
@@ -453,7 +453,6 @@ mod tests {
         // 位置7以外は元の値のまま読めることを確かめる
         for index in 0..4096 {
             let mut expected = format!("minecraft:block_{}", index % 16);
-
             // 7番だけが17種類目に置き換わっている
             if index == 7 {
                 expected = "minecraft:block_16".to_string();

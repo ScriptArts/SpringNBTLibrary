@@ -195,7 +195,6 @@ public sealed class Chunk
             }
 
             IReadOnlyList<string> fullStatuses = ChunkFormat.DefaultFullStatuses;
-
             // 生成済みとみなす値は世代で違う
             if (format is not null)
             {
@@ -269,7 +268,6 @@ public sealed class Chunk
         chunk.CheckDataVersion(effective);
         int? dataVersion = chunk.OwnDataVersion();
         chunk.FormatDataVersion = MissingDataVersion;
-
         // DataVersionを持つチャンクは、指定が無ければそれで世代を選ぶ
         if (dataVersion is not null)
         {
@@ -854,7 +852,6 @@ public sealed class Chunk
         ChunkFormat chunkFormat = RequireBiomeIds();
         CheckLocalCoordinates(x, z);
         int index = BiomeId2DIndex(x, z);
-
         // 4×4×4ごとに持つ形式は、高さ0..255の分だけある
         if (chunkFormat.BiomeStorage == BiomeStorage.Ids3D)
         {
@@ -863,7 +860,7 @@ public sealed class Chunk
             {
                 throw SpringNbtException.InvalidArgument(string.Create(
                     CultureInfo.InvariantCulture,
-                    $"Y={y} はバイオームIDを持つ高さ（0..{BiomeIdsMaxY}）の外"));
+                    $"Y={y}はバイオームIDを持つ高さ（0..{BiomeIdsMaxY}）の外"));
             }
 
             index = BiomeIdIndex(x, y, z);
@@ -876,7 +873,7 @@ public sealed class Chunk
         {
             throw SpringNbtException.InvalidArgument(string.Create(
                 CultureInfo.InvariantCulture,
-                $"Biomes が無いか、int[{BiomeIdsLength(chunkFormat)}] でない"));
+                $"Biomesが無いか、int[{BiomeIdsLength(chunkFormat)}]でない"));
         }
 
         biomes[index] = biomeId;
@@ -917,7 +914,7 @@ public sealed class Chunk
         {
             throw SpringNbtException.UnsupportedFeature(string.Create(
                 CultureInfo.InvariantCulture,
-                $"DataVersion {FormatDataVersion}のチャンクは isLightOn を持たない"));
+                $"DataVersion {FormatDataVersion}のチャンクはisLightOnを持たない"));
         }
 
         body.SetByte("isLightOn", 0);
