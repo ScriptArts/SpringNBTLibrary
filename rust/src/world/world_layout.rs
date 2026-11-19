@@ -25,12 +25,15 @@ const L1_STANDARD_DIMENSIONS: [(&str, &str); 3] = [
 /// L1の`Difficulty`の数値に対応する名前
 const L1_DIFFICULTIES: [&str; 4] = ["peaceful", "easy", "normal", "hard"];
 
+/// L1の標準の次元のIDか
+fn is_l1_standard(dimension_id: &str) -> bool {
+    // 標準の次元のIDと一致するものがあれば真
+    L1_STANDARD_DIMENSIONS.iter().any(|(standard_id, _)| *standard_id == dimension_id)
+}
+
 /// ワールドの構成の世代1つ分
 #[derive(Debug)]
 pub(crate) struct WorldLayout {
-    /// この世代が始まるDataVersion
-    #[allow(dead_code)]
-    pub(crate) min_data_version: i32,
     /// 標準の次元が直下と`DIM-1/` `DIM1/`に置かれ、`level.dat`にスポーンなどが直に入る構成か
     legacy: bool,
     /// ワールド直下からプレイヤーデータのフォルダまでの道
@@ -41,7 +44,6 @@ pub(crate) struct WorldLayout {
 
 /// L1: 1.13〜1.21.x
 static L1: WorldLayout = WorldLayout {
-    min_data_version: OLDEST_FORMAT_DATA_VERSION,
     legacy: true,
     player_folder: &["playerdata"],
     data_folder: &["data"],
@@ -49,7 +51,6 @@ static L1: WorldLayout = WorldLayout {
 
 /// L2: 26.1以降
 static L2: WorldLayout = WorldLayout {
-    min_data_version: L2_MIN_DATA_VERSION,
     legacy: false,
     player_folder: &["players", "data"],
     data_folder: &["data", "minecraft"],
@@ -166,7 +167,7 @@ impl WorldLayout {
 
                     // ディレクトリだけを次元として数える
                     // L1では標準の次元をdimensions/の下からは探さない
-                    if entry.path().is_dir() && !(self.legacy && found.contains(&dimension_id)) {
+                    if entry.path().is_dir() && !(self.legacy && is_l1_standard(&dimension_id)) {
                         extra.push(dimension_id);
                     }
                 }

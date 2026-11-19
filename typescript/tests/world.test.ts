@@ -1111,6 +1111,21 @@ test("WorldLayout: L1で存在しない標準の次元は並ばない", () => {
   });
 });
 
+test("WorldLayout: L1では dimensions の下の標準の次元は並ばない", () => {
+  withTempWorld((work) => {
+    writeLevel(work, { DataVersion: new NbtInt(3953) });
+    mkdirSync(join(work, "dimensions", "minecraft", "the_nether", "region"), { recursive: true });
+    const world = MinecraftWorld.open(work);
+
+    try {
+      assert.ok(!world.dimensionIds().includes("minecraft:the_nether"));
+      assert.equal(world.dimension("minecraft:the_nether"), undefined);
+    } finally {
+      world.close();
+    }
+  });
+});
+
 test("WorldLayout: world_l1_players", () => {
   withTempWorld((work) => {
     makeL1World(work);

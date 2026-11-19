@@ -1355,6 +1355,20 @@ public class WorldTests
         }
 
         [Fact]
+        public void L1ではdimensionsの下の標準の次元は並ばない()
+        {
+            WithTempWorld(root =>
+            {
+                WriteLevel(root, new Dictionary<string, NbtTag> { ["DataVersion"] = new NbtInt(3953) });
+                System.IO.Directory.CreateDirectory(Path.Combine(root, "dimensions", "minecraft", "the_nether", "region"));
+
+                using MinecraftWorld world = MinecraftWorld.Open(root);
+                Assert.DoesNotContain("minecraft:the_nether", world.DimensionIds());
+                Assert.Null(world.Dimension("minecraft:the_nether"));
+            });
+        }
+
+        [Fact]
         public void World_l1_players()
         {
             WithTempWorld(root =>

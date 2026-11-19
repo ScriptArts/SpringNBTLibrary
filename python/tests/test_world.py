@@ -1022,6 +1022,14 @@ class TestWorldLayout:
             assert world.dimension_ids() == ["minecraft:overworld"]
             assert world.dimension("minecraft:the_nether") is None
 
+    def test_L1ではdimensionsの下の標準の次元は並ばない(self, tmp_path):
+        write_level(tmp_path, {"DataVersion": NbtInt(3953)})
+        (tmp_path / "dimensions" / "minecraft" / "the_nether" / "region").mkdir(parents=True)
+
+        with MinecraftWorld.open(str(tmp_path)) as world:
+            assert "minecraft:the_nether" not in world.dimension_ids()
+            assert world.dimension("minecraft:the_nether") is None
+
     def test_world_l1_players(self, tmp_path):
         make_l1_world(tmp_path)
         write_dat(tmp_path / "playerdata" / "b-uuid.dat", {"Health": NbtInt(20)})

@@ -393,7 +393,7 @@ class MinecraftWorld:
     def __init__(self, directory: str, options: WorldOpenOptions, level: NamedTag) -> None:
         self.directory = directory
         self.level = LevelData(level, options.format_data_version)
-        self._layout = WorldLayout.detect(self.level.data, options.format_data_version)
+        self._layout = self.level._layout
         self._options = _with_format_data_version(options)
         self._dimensions: Dict[str, Dimension] = {}
         self._closed = False

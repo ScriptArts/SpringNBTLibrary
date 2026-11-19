@@ -25,6 +25,14 @@ import { Chunk, ChunkReadOptions, ChunkWriteOptions } from "./chunk.js";
 import { BlockState } from "./blockState.js";
 import { WorldLayout } from "./worldLayout.js";
 
+/** `LevelData`が決めた構成の世代 */
+const LEVEL_LAYOUTS = new WeakMap<LevelData, WorldLayout>();
+
+/** `LevelData`が決めた構成の世代を引く */
+function layoutOf(level: LevelData): WorldLayout {
+  return LEVEL_LAYOUTS.get(level)!;
+}
+
 /** ワールドを開くときの動作 */
 export interface WorldOpenOptions {
   /**
@@ -75,6 +83,7 @@ export class LevelData {
     this.raw = named.tag;
     this.data = named.tag.getCompound("Data");
     this.#layout = WorldLayout.detect(this.data, formatDataVersion);
+    LEVEL_LAYOUTS.set(this, this.#layout);
   }
 
   /** チャンク構造のバージョン */
@@ -166,6 +175,7 @@ export class Dimension {
   #poi: RegionFolder | undefined;
   #closed = false;
 
+  /** @internal ワールドが内部で作る（利用者は`MinecraftWorld.dimension()`で得る） */
   constructor(
     readonly id: string,
     readonly directory: string,
@@ -460,7 +470,7 @@ export class MinecraftWorld {
     options: WorldOpenOptions,
     readonly level: LevelData,
   ) {
-    this.#layout = WorldLayout.detect(level.data, options.formatDataVersion);
+    this.#layout = layoutOf(level);
     this.#options = withFormatDataVersion(options);
   }
 

@@ -38,37 +38,24 @@ final class WorldLayout {
 
     /** L1: 1.13〜1.21.x */
     private static final WorldLayout L1 = new WorldLayout(
-            ChunkFormat.OLDEST_FORMAT_DATA_VERSION,
             true,
             new String[] {"playerdata"},
             new String[] {"data"});
 
     /** L2: 26.1以降 */
     private static final WorldLayout L2 = new WorldLayout(
-            L2_MIN_DATA_VERSION,
             false,
             new String[] {"players", "data"},
             new String[] {"data", "minecraft"});
 
-    private final int minDataVersion;
     private final boolean legacy;
     private final String[] playerFolder;
     private final String[] dataFolder;
 
-    private WorldLayout(int minDataVersion, boolean legacy, String[] playerFolder, String[] dataFolder) {
-        this.minDataVersion = minDataVersion;
+    private WorldLayout(boolean legacy, String[] playerFolder, String[] dataFolder) {
         this.legacy = legacy;
         this.playerFolder = playerFolder;
         this.dataFolder = dataFolder;
-    }
-
-    /**
-     * この世代が始まるDataVersion
-     *
-     * @return DataVersion
-     */
-    int minDataVersion() {
-        return minDataVersion;
     }
 
     /**
@@ -208,7 +195,7 @@ final class WorldLayout {
 
                             // ディレクトリだけを次元として数える
                             // L1では標準の次元をdimensions/の下からは探さない
-                            if (Files.isDirectory(pathDir) && !(legacy && found.contains(dimensionId))) {
+                            if (Files.isDirectory(pathDir) && !(legacy && isL1Standard(dimensionId))) {
                                 extra.add(dimensionId);
                             }
                         }
@@ -224,6 +211,18 @@ final class WorldLayout {
         Collections.sort(extra);
         found.addAll(extra);
         return found;
+    }
+
+    /** L1の標準の次元のIDか */
+    private static boolean isL1Standard(String dimensionId) {
+        for (String[] standard : L1_STANDARD_DIMENSIONS) {
+            // 標準の次元のIDと一致すれば真
+            if (dimensionId.equals(standard[0])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

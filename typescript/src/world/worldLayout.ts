@@ -35,11 +35,15 @@ function isDirectory(path: string): boolean {
   return existsSync(path) && statSync(path).isDirectory();
 }
 
+/** L1の標準の次元のIDか */
+function isL1Standard(dimensionId: string): boolean {
+  // 標準の次元のIDと一致するものがあれば真
+  return L1_STANDARD_DIMENSIONS.some(([standardId]) => standardId === dimensionId);
+}
+
 /** ワールドの構成の世代1つ分 */
 export class WorldLayout {
   private constructor(
-    /** この世代が始まるDataVersion */
-    readonly minDataVersion: number,
     /** 標準の次元が直下と`DIM-1/` `DIM1/`に置かれ、`level.dat`にスポーンなどが直に入る構成か */
     readonly legacy: boolean,
     /** ワールド直下からプレイヤーデータのフォルダまでの道 */
@@ -49,10 +53,10 @@ export class WorldLayout {
   ) {}
 
   /** L1: 1.13〜1.21.x */
-  static readonly #L1 = new WorldLayout(OLDEST_FORMAT_DATA_VERSION, true, ["playerdata"], ["data"]);
+  static readonly #L1 = new WorldLayout(true, ["playerdata"], ["data"]);
 
   /** L2: 26.1以降 */
-  static readonly #L2 = new WorldLayout(L2_MIN_DATA_VERSION, false, ["players", "data"], ["data", "minecraft"]);
+  static readonly #L2 = new WorldLayout(false, ["players", "data"], ["data", "minecraft"]);
 
   /**
    * DataVersionから世代を引く
@@ -168,7 +172,7 @@ export class WorldLayout {
 
           // ディレクトリだけを次元として数える
           // L1では標準の次元をdimensions/の下からは探さない
-          if (statSync(join(namespaceDir, pathName)).isDirectory() && !(this.legacy && found.includes(dimensionId))) {
+          if (statSync(join(namespaceDir, pathName)).isDirectory() && !(this.legacy && isL1Standard(dimensionId))) {
             extra.push(dimensionId);
           }
         }

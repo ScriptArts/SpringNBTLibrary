@@ -1409,6 +1409,20 @@ fn l1で存在しない標準の次元は並ばない() {
 }
 
 #[test]
+fn l1ではdimensionsの下の標準の次元は並ばない() {
+    let work = temp_world("standard-under-dimensions");
+    write_level(&work, |data| data.set_int("DataVersion", 3953));
+    std::fs::create_dir_all(work.join("dimensions/minecraft/the_nether/region")).unwrap();
+
+    let mut world = MinecraftWorld::open(&work, WorldOpenOptions::default()).unwrap();
+    assert!(!world.dimension_ids().unwrap().contains(&"minecraft:the_nether".to_string()));
+    assert!(world.dimension("minecraft:the_nether").unwrap().is_none());
+
+    world.close().unwrap();
+    std::fs::remove_dir_all(&work).unwrap();
+}
+
+#[test]
 fn world_l1_players() {
     let work = make_l1_world("players");
     write_dat(&work.join("playerdata").join("b-uuid.dat"), |root| root.set_int("Health", 20));

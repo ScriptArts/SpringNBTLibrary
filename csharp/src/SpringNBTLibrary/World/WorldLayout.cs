@@ -32,28 +32,22 @@ internal sealed class WorldLayout
 
     /// <summary>L1: 1.13〜1.21.x</summary>
     private static readonly WorldLayout L1 = new WorldLayout(
-        minDataVersion: ChunkFormat.OldestFormatDataVersion,
         legacy: true,
         playerFolder: new[] { "playerdata" },
         dataFolder: new[] { "data" });
 
     /// <summary>L2: 26.1以降</summary>
     private static readonly WorldLayout L2 = new WorldLayout(
-        minDataVersion: L2MinDataVersion,
         legacy: false,
         playerFolder: new[] { "players", "data" },
         dataFolder: new[] { "data", "minecraft" });
 
-    private WorldLayout(int minDataVersion, bool legacy, string[] playerFolder, string[] dataFolder)
+    private WorldLayout(bool legacy, string[] playerFolder, string[] dataFolder)
     {
-        MinDataVersion = minDataVersion;
         Legacy = legacy;
         PlayerFolder = playerFolder;
         DataFolder = dataFolder;
     }
-
-    /// <summary>この世代が始まるDataVersion</summary>
-    internal int MinDataVersion { get; }
 
     /// <summary>標準の次元が直下と<c>DIM-1/</c> <c>DIM1/</c>に置かれ、<c>level.dat</c>にスポーンなどが直に入る構成か</summary>
     internal bool Legacy { get; }
@@ -194,7 +188,7 @@ internal sealed class WorldLayout
                     string dimensionId = namespaceName + ":" + Path.GetFileName(pathDir);
 
                     // L1では標準の次元をdimensions/の下からは探さない
-                    if (!Legacy || !found.Contains(dimensionId))
+                    if (!Legacy || !IsL1Standard(dimensionId))
                     {
                         extra.Add(dimensionId);
                     }
@@ -206,6 +200,21 @@ internal sealed class WorldLayout
         extra.Sort(StringComparer.Ordinal);
         found.AddRange(extra);
         return found;
+    }
+
+    /// <summary>L1の標準の次元のIDか</summary>
+    private static bool IsL1Standard(string dimensionId)
+    {
+        foreach ((string id, _) in L1StandardDimensions)
+        {
+            // 標準の次元のIDと一致すれば真
+            if (dimensionId == id)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>プレイヤーデータのフォルダのパス</summary>

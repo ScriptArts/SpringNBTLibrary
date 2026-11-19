@@ -30,15 +30,23 @@ _L1_STANDARD_DIMENSIONS = (
 _L1_DIFFICULTIES = ("peaceful", "easy", "normal", "hard")
 
 
+def _is_l1_standard(dimension_id: str) -> bool:
+    """L1の標準の次元のIDか"""
+    for standard_id, _ in _L1_STANDARD_DIMENSIONS:
+        # 標準の次元のIDと一致すれば真
+        if dimension_id == standard_id:
+            return True
+
+    return False
+
+
 class WorldLayout:
     """ワールドの構成の世代1つ分"""
 
-    __slots__ = ("min_data_version", "legacy", "player_folder", "data_folder")
+    __slots__ = ("legacy", "player_folder", "data_folder")
 
-    def __init__(self, min_data_version: int, legacy: bool,
+    def __init__(self, legacy: bool,
                  player_folder: List[str], data_folder: List[str]) -> None:
-        #: この世代が始まるDataVersion
-        self.min_data_version = min_data_version
         #: 標準の次元が直下と``DIM-1/`` ``DIM1/``に置かれ、``level.dat``にスポーンなどが直に入る構成か
         self.legacy = legacy
         #: ワールド直下からプレイヤーデータのフォルダまでの道
@@ -148,7 +156,7 @@ class WorldLayout:
                         continue
 
                     # L1では標準の次元をdimensions/の下からは探さない
-                    if self.legacy and dimension_id in found:
+                    if self.legacy and _is_l1_standard(dimension_id):
                         continue
 
                     extra.append(dimension_id)
@@ -212,14 +220,12 @@ class WorldLayout:
 
 #: L1: 1.13〜1.21.x
 _L1 = WorldLayout(
-    min_data_version=OLDEST_FORMAT_DATA_VERSION,
     legacy=True,
     player_folder=["playerdata"],
     data_folder=["data"])
 
 #: L2: 26.1以降
 _L2 = WorldLayout(
-    min_data_version=L2_MIN_DATA_VERSION,
     legacy=False,
     player_folder=["players", "data"],
     data_folder=["data", "minecraft"])

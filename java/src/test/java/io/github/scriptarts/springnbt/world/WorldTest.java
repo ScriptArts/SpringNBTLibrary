@@ -1193,6 +1193,17 @@ class WorldTest {
         }
 
         @Test
+        void L1ではdimensionsの下の標準の次元は並ばない() throws Exception {
+            writeLevel(work, Map.of("DataVersion", new NbtInt(3953)));
+            Files.createDirectories(work.resolve("dimensions/minecraft/the_nether/region"));
+
+            try (MinecraftWorld world = MinecraftWorld.open(work)) {
+                assertFalse(world.dimensionIds().contains("minecraft:the_nether"));
+                assertNull(world.dimension("minecraft:the_nether"));
+            }
+        }
+
+        @Test
         void world_l1_players() throws Exception {
             makeL1World(work);
             writeDat(work.resolve("playerdata/b-uuid.dat"), Map.of("Health", new NbtInt(20)));
