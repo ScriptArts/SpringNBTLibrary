@@ -54,6 +54,13 @@ function copyVector(name: string, work: string): string {
   return destination;
 }
 
+/** チャンクを読んでxPosを返す。チャンクが無ければテストを失敗させる */
+function readXPos(region: RegionFile, chunkX: number, chunkZ: number): number {
+  const chunk = region.readChunk(chunkX, chunkZ);
+  assert.ok(chunk !== undefined);
+  return chunk.getInt("xPos");
+}
+
 function sampleChunk(x: number, z: number): NbtCompound {
   const chunk = new NbtCompound();
   chunk.set("DataVersion", new NbtInt(TARGET_DATA_VERSION));
@@ -265,11 +272,88 @@ test("外部ファイルへ退避されたチャンクを読める", () => {
 });
 
 test("壊れたヘッダを弾く", () => {
-  for (const vector of ["bad_offset", "overlapping_sectors", "unaligned_length", "offset_out_of_file"]) {
+  for (const vector of [
+    "bad_offset",
+    "overlapping_sectors",
+    "offset_out_of_file",
+    "truncated_chunk",
+    "truncated_length",
+  ]) {
     assertErrorCode(
       () => RegionFile.open(join(vectorDir(vector), "r.0.0.mca")),
       ErrorCode.MalformedData,
     );
+  }
+});
+
+test("長さが4096の倍数でないファイルは、末尾をゼロで埋めたものとして読む", () => {
+  for (const [vector, chunkCount] of [
+    ["unaligned_tail", 2],
+    ["unaligned_extra_byte", 1],
+  ] as const) {
+    const path = join(vectorDir(vector), "r.0.0.mca");
+    const original = readFileSync(path);
+
+    // 長さが4096の倍数でないことを前提にしたベクタ
+    assert.notEqual(original.length % SECTOR_SIZE, 0);
+
+    const region = RegionFile.open(path);
+    const positions = region.chunkPositions();
+    assert.equal(positions.length, chunkCount);
+
+    // すべてのチャンクを最後まで読めること
+    for (const position of positions) {
+      assert.equal(readXPos(region, position.x, position.z), position.x);
+    }
+
+    // 組み立て直すと、元のバイト列の後ろに次のセクタ境界までゼロが続く
+    const padding = SECTOR_SIZE - (original.length % SECTOR_SIZE);
+    const expected = new Uint8Array(original.length + padding);
+    expected.set(original);
+    assert.deepEqual(region.toBytes(), expected);
+    region.close();
+  }
+});
+
+test("長さが4096の倍数でないファイルは、変えずに閉じても書き直さない", () => {
+  const work = makeWorkDir();
+
+  try {
+    const path = join(copyVector("unaligned_tail", work), "r.0.0.mca");
+    const original = readFileSync(path);
+
+    // 読み書きで開いても、変えずに閉じるだけならファイルは元のまま
+    const region = RegionFile.open(path, RegionFileMode.ReadWrite);
+    region.readChunk(1, 0);
+    region.close();
+
+    assert.deepEqual(readFileSync(path), original);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test("長さが4096の倍数でないファイルに書き込むと、セクタ境界まで埋めて書き出す", () => {
+  const work = makeWorkDir();
+
+  try {
+    const path = join(copyVector("unaligned_tail", work), "r.0.0.mca");
+
+    const region = RegionFile.open(path, RegionFileMode.ReadWrite);
+    region.writeChunk(2, 0, sampleChunk(2, 0));
+    region.close();
+
+    // 書き出したファイルは4096の倍数になり、元からあったチャンクも読める
+    assert.equal(statSync(path).size % SECTOR_SIZE, 0);
+
+    const reopened = RegionFile.open(path);
+    assert.equal(reopened.chunkPositions().length, 3);
+    assert.equal(readXPos(reopened, 0, 0), 0);
+    assert.equal(readXPos(reopened, 1, 0), 1);
+    assert.equal(readXPos(reopened, 2, 0), 2);
+    reopened.close();
+  } finally {
+    rmSync(work, { recursive: true, force: true });
   }
 });
 

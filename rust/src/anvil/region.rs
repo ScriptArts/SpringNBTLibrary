@@ -327,11 +327,13 @@ impl RegionFile {
             ));
         }
 
-        if self.data.len() % SECTOR_SIZE != 0 {
-            return Err(Error::new(
-                ErrorCode::MalformedData,
-                format!("ファイル長がセクタ境界に揃っていない: {} バイト", self.data.len()),
-            ));
+        let file_length = self.data.len();
+
+        // 最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数になっていないことがある
+        // 足りない分をゼロで埋め、ほかのファイルと同じようにセクタ単位で扱う
+        if file_length % SECTOR_SIZE != 0 {
+            self.data
+                .resize(file_length + (SECTOR_SIZE - (file_length % SECTOR_SIZE)), 0);
         }
 
         let total_sectors = self.data.len() / SECTOR_SIZE;
@@ -371,6 +373,11 @@ impl RegionFile {
                 ));
             }
 
+            // ゼロで埋めた部分まで割り当てが続くチャンクは、データが元のファイルの中で終わっていなければならない
+            if (offset + count) * SECTOR_SIZE > file_length {
+                self.ensure_data_within_file(index, offset * SECTOR_SIZE, file_length)?;
+            }
+
             // 同じセクタを2つのチャンクが指していたら、どちらかがおかしくなっている
             for sector in offset..offset + count {
                 if let Some(owner) = sector_owner.insert(sector, index) {
@@ -383,6 +390,29 @@ impl RegionFile {
 
             self.offsets[index] = offset;
             self.sector_counts[index] = count;
+        }
+
+        Ok(())
+    }
+
+    /// チャンクのデータ（長さの4バイトを含む）が元のファイルの中で終わっているかを確かめる
+    fn ensure_data_within_file(&self, index: usize, start: usize, file_length: usize) -> Result<()> {
+        // 長さの4バイトを読み切れなければ、データの終わりが分からない
+        if start + 4 > file_length {
+            return Err(Error::new(
+                ErrorCode::MalformedData,
+                format!("チャンク{index}のデータがファイルの終わりで切れている"),
+            ));
+        }
+
+        let length = self.read_unsigned(start, 4) as u32 as i32;
+
+        // 埋めたゼロをデータとして読まないよう、元のファイルの長さと比べる
+        if start as i64 + 4 + length as i64 > file_length as i64 {
+            return Err(Error::new(
+                ErrorCode::MalformedData,
+                format!("チャンク{index}のデータがファイルの終わりで切れている"),
+            ));
         }
 
         Ok(())

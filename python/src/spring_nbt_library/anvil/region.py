@@ -298,9 +298,12 @@ class RegionFile:
                 "ヘッダが足りない: %d バイト（最低 %d バイト必要）"
                 % (len(self._data), _HEADER_SECTORS * SECTOR_SIZE))
 
-        if len(self._data) % SECTOR_SIZE != 0:
-            raise SpringNbtError.malformed(
-                "ファイル長がセクタ境界に揃っていない: %d バイト" % len(self._data))
+        file_length = len(self._data)
+
+        # 最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数になっていないことがある
+        # 足りない分をゼロで埋め、ほかのファイルと同じようにセクタ単位で扱う
+        if file_length % SECTOR_SIZE != 0:
+            self._data.extend(bytearray(SECTOR_SIZE - (file_length % SECTOR_SIZE)))
 
         total_sectors = len(self._data) // SECTOR_SIZE
         sector_owner: Dict[int, int] = {}
@@ -329,6 +332,10 @@ class RegionFile:
                 raise SpringNbtError.malformed(
                     "チャンク %d の割り当てがファイル外へはみ出している" % index)
 
+            # ゼロで埋めた部分まで割り当てが続くチャンクは、データが元のファイルの中で終わっていなければならない
+            if (offset + count) * SECTOR_SIZE > file_length:
+                self._ensure_data_within_file(index, offset * SECTOR_SIZE, file_length)
+
             # 同じセクタを2つのチャンクが指していたら、どちらかがおかしくなっている
             for sector in range(offset, offset + count):
                 owner = sector_owner.get(sector)
@@ -342,6 +349,18 @@ class RegionFile:
 
             self._offsets[index] = offset
             self._sector_counts[index] = count
+
+    def _ensure_data_within_file(self, index: int, start: int, file_length: int) -> None:
+        """チャンクのデータ（長さの4バイトを含む）が元のファイルの中で終わっているかを確かめる"""
+        # 長さの4バイトを読み切れなければ、データの終わりが分からない
+        if start + 4 > file_length:
+            raise SpringNbtError.malformed("チャンク%dのデータがファイルの終わりで切れている" % index)
+
+        length = struct.unpack_from(">i", self._data, start)[0]
+
+        # 埋めたゼロをデータとして読まないよう、元のファイルの長さと比べる
+        if start + 4 + length > file_length:
+            raise SpringNbtError.malformed("チャンク%dのデータがファイルの終わりで切れている" % index)
 
     def _write_header(self) -> None:
         """ロケーションテーブルとタイムスタンプテーブルを先頭2セクタへ書き戻す"""

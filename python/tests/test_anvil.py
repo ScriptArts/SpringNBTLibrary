@@ -224,14 +224,71 @@ def test_reads_chunk_stored_in_external_file():
 @pytest.mark.parametrize("vector", [
     "bad_offset",
     "overlapping_sectors",
-    "unaligned_length",
     "offset_out_of_file",
+    "truncated_chunk",
+    "truncated_length",
 ])
 def test_broken_headers_are_rejected(vector):
     with pytest.raises(SpringNbtError) as info:
         RegionFile.open(os.path.join(vector_dir(vector), "r.0.0.mca"))
 
     assert info.value.code == ErrorCode.MALFORMED_DATA
+
+
+@pytest.mark.parametrize("vector, chunk_count", [
+    ("unaligned_tail", 2),
+    ("unaligned_extra_byte", 1),
+])
+def test_unaligned_file_is_read_as_if_padded_with_zeros(vector, chunk_count):
+    path = os.path.join(vector_dir(vector), "r.0.0.mca")
+
+    with open(path, "rb") as handle:
+        original = handle.read()
+
+    # 長さが4096の倍数でないことを前提にしたベクタ
+    assert len(original) % SECTOR_SIZE != 0
+
+    with RegionFile.open(path) as region:
+        positions = region.chunk_positions()
+        assert len(positions) == chunk_count
+
+        # すべてのチャンクを最後まで読めること
+        for position in positions:
+            assert region.read_chunk(position.x, position.z).get_int("xPos") == position.x
+
+        # 組み立て直すと、元のバイト列の後ろに次のセクタ境界までゼロが続く
+        padding = SECTOR_SIZE - (len(original) % SECTOR_SIZE)
+        assert region.to_bytes() == original + bytes(padding)
+
+
+def test_unaligned_file_is_not_rewritten_when_closed_without_changes(work):
+    path = os.path.join(copy_vector("unaligned_tail", work), "r.0.0.mca")
+
+    with open(path, "rb") as handle:
+        original = handle.read()
+
+    # 読み書きで開いても、変えずに閉じるだけならファイルは元のまま
+    with RegionFile.open(path, RegionFileMode.READ_WRITE) as region:
+        region.read_chunk(1, 0)
+
+    with open(path, "rb") as handle:
+        assert handle.read() == original
+
+
+def test_writing_to_unaligned_file_pads_it_to_sector_boundary(work):
+    path = os.path.join(copy_vector("unaligned_tail", work), "r.0.0.mca")
+
+    with RegionFile.open(path, RegionFileMode.READ_WRITE) as region:
+        region.write_chunk(2, 0, sample_chunk(2, 0))
+
+    # 書き出したファイルは4096の倍数になり、元からあったチャンクも読める
+    assert os.path.getsize(path) % SECTOR_SIZE == 0
+
+    with RegionFile.open(path) as reopened:
+        assert len(reopened.chunk_positions()) == 3
+        assert reopened.read_chunk(0, 0).get_int("xPos") == 0
+        assert reopened.read_chunk(1, 0).get_int("xPos") == 1
+        assert reopened.read_chunk(2, 0).get_int("xPos") == 2
 
 
 def test_chunk_outside_the_region_is_rejected():

@@ -614,6 +614,17 @@ class RegionBuilder:
             out += sector
         return bytes(out)
 
+    def data_start(self, local_x, local_z):
+        """置いたチャンクのデータが始まるバイト位置。"""
+        offset, _ = self.locations[self._index(local_x, local_z)]
+        return offset * SECTOR
+
+    def data_end(self, local_x, local_z):
+        """置いたチャンクのデータ（長さの4バイトを含む）が終わるバイト位置。"""
+        start = self.data_start(local_x, local_z)
+        length = struct.unpack_from(">i", self.sectors[start // SECTOR], 0)[0]
+        return start + 4 + length
+
 
 # ---------------------------------------------------------------------------
 # LZ4（圧縮方式ID 4）の符号化
@@ -863,12 +874,43 @@ def build_anvil():
         "2 つのチャンクが同じセクタを指している",
         expect_error="MALFORMED_DATA")
 
-    # 異常系: ファイル長がセクタ境界に揃っていない
+    # 最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数になっていない
+    # 実ワールドで見つかった形。足りない分をゼロで埋めて読む
+    builder = RegionBuilder()
+    builder.add_chunk(0, 0, zlib.compress(sample_chunk(0, 0), 6))
+    builder.add_chunk(1, 0, zlib.compress(sample_chunk(1, 0), 6))
+    add_vector(
+        "anvil/unaligned_tail", "anvil/unaligned_tail/r.0.0.mca",
+        builder.build()[:builder.data_end(1, 0)],
+        "最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数になっていない")
+
+    # 4096の倍数の長さのあとに、どのチャンクにも属さない1バイトが付いている
     builder = RegionBuilder()
     builder.add_chunk(0, 0, zlib.compress(sample_chunk(0, 0), 6))
     add_vector(
-        "anvil/unaligned_length", "anvil/unaligned_length/r.0.0.mca", builder.build() + b"\x00",
-        "ファイル長が 4096 の倍数になっていない",
+        "anvil/unaligned_extra_byte", "anvil/unaligned_extra_byte/r.0.0.mca",
+        builder.build() + b"\x00",
+        "4096の倍数の長さのあとに、どのチャンクにも属さない1バイトが付いている")
+
+    # 異常系: 最後のチャンクのデータが1バイト欠けたところでファイルが終わっている
+    # 無圧縮なので、欠けたのはNBTの最後のTAG_End（0x00）になる
+    # ゼロで埋めると元に戻ってしまうため、開くときに確かめていなければ読めてしまう
+    builder = RegionBuilder()
+    builder.add_chunk(0, 0, sample_chunk(0, 0), compression=3)
+    add_vector(
+        "anvil/truncated_chunk", "anvil/truncated_chunk/r.0.0.mca",
+        builder.build()[:builder.data_end(0, 0) - 1],
+        "最後のチャンクのデータが1バイト欠けたところでファイルが終わっている",
+        expect_error="MALFORMED_DATA")
+
+    # 異常系: 最後のチャンクの長さの4バイトの途中でファイルが終わっている
+    builder = RegionBuilder()
+    builder.add_chunk(0, 0, zlib.compress(sample_chunk(0, 0), 6))
+    builder.add_chunk(1, 0, zlib.compress(sample_chunk(1, 0), 6))
+    add_vector(
+        "anvil/truncated_length", "anvil/truncated_length/r.0.0.mca",
+        builder.build()[:builder.data_start(1, 0) + 2],
+        "最後のチャンクの長さの4バイトの途中でファイルが終わっている",
         expect_error="MALFORMED_DATA")
 
     # 異常系: 割り当てがファイル外へはみ出す

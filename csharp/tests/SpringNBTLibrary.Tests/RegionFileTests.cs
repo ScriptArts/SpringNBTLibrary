@@ -254,14 +254,77 @@ public class RegionFileTests : IDisposable
     [Theory]
     [InlineData("bad_offset")]
     [InlineData("overlapping_sectors")]
-    [InlineData("unaligned_length")]
     [InlineData("offset_out_of_file")]
+    [InlineData("truncated_chunk")]
+    [InlineData("truncated_length")]
     public void BrokenHeadersAreRejected(string vector)
     {
         SpringNbtException error = Assert.Throws<SpringNbtException>(
             () => RegionFile.Open(Path.Combine(VectorDirectory(vector), "r.0.0.mca")));
 
         Assert.Equal(ErrorCode.MalformedData, error.Code);
+    }
+
+    [Theory]
+    [InlineData("unaligned_tail", 2)]
+    [InlineData("unaligned_extra_byte", 1)]
+    public void UnalignedFileIsReadAsIfPaddedWithZeros(string vector, int chunkCount)
+    {
+        string path = Path.Combine(VectorDirectory(vector), "r.0.0.mca");
+        byte[] original = File.ReadAllBytes(path);
+
+        // 長さが4096の倍数でないことを前提にしたベクタ
+        Assert.NotEqual(0, original.Length % RegionFile.SectorSize);
+
+        using RegionFile region = RegionFile.Open(path);
+        List<ChunkPos> positions = region.ChunkPositions().ToList();
+        Assert.Equal(chunkCount, positions.Count);
+
+        // すべてのチャンクを最後まで読めること
+        foreach (ChunkPos position in positions)
+        {
+            Assert.Equal(position.X, region.ReadChunk(position.X, position.Z)!.GetInt("xPos"));
+        }
+
+        // 組み立て直すと、元のバイト列の後ろに次のセクタ境界までゼロが続く
+        int padding = RegionFile.SectorSize - (original.Length % RegionFile.SectorSize);
+        byte[] expected = original.Concat(new byte[padding]).ToArray();
+        Assert.Equal(expected, region.ToBytes());
+    }
+
+    [Fact]
+    public void UnalignedFileIsNotRewrittenWhenClosedWithoutChanges()
+    {
+        string path = Path.Combine(CopyVector("unaligned_tail"), "r.0.0.mca");
+        byte[] original = File.ReadAllBytes(path);
+
+        // 読み書きで開いても、変えずに閉じるだけならファイルは元のまま
+        using (RegionFile region = RegionFile.Open(path, RegionFileMode.ReadWrite))
+        {
+            region.ReadChunk(1, 0);
+        }
+
+        Assert.Equal(original, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void WritingToUnalignedFilePadsItToSectorBoundary()
+    {
+        string path = Path.Combine(CopyVector("unaligned_tail"), "r.0.0.mca");
+
+        using (RegionFile region = RegionFile.Open(path, RegionFileMode.ReadWrite))
+        {
+            region.WriteChunk(2, 0, SampleChunk(2, 0));
+        }
+
+        // 書き出したファイルは4096の倍数になり、元からあったチャンクも読める
+        Assert.Equal(0, new FileInfo(path).Length % RegionFile.SectorSize);
+
+        using RegionFile reopened = RegionFile.Open(path);
+        Assert.Equal(3, reopened.ChunkPositions().Count());
+        Assert.Equal(0, reopened.ReadChunk(0, 0)!.GetInt("xPos"));
+        Assert.Equal(1, reopened.ReadChunk(1, 0)!.GetInt("xPos"));
+        Assert.Equal(2, reopened.ReadChunk(2, 0)!.GetInt("xPos"));
     }
 
     [Fact]

@@ -349,12 +349,42 @@
       "roundtrip": false
     },
     {
-      "id": "anvil/unaligned_length",
+      "id": "anvil/unaligned_tail",
       "kind": "anvil",
-      "input": "anvil/unaligned_length/r.0.0.mca",
+      "input": "anvil/unaligned_tail/r.0.0.mca",
       "format": "java",
       "compression": "none",
-      "description": "ファイル長が 4096 の倍数になっていない",
+      "description": "最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数になっていない",
+      "expect": "expect/anvil/unaligned_tail.json",
+      "roundtrip": true
+    },
+    {
+      "id": "anvil/unaligned_extra_byte",
+      "kind": "anvil",
+      "input": "anvil/unaligned_extra_byte/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "4096の倍数の長さのあとに、どのチャンクにも属さない1バイトが付いている",
+      "expect": "expect/anvil/unaligned_extra_byte.json",
+      "roundtrip": true
+    },
+    {
+      "id": "anvil/truncated_chunk",
+      "kind": "anvil",
+      "input": "anvil/truncated_chunk/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "最後のチャンクのデータが1バイト欠けたところでファイルが終わっている",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "anvil/truncated_length",
+      "kind": "anvil",
+      "input": "anvil/truncated_length/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "最後のチャンクの長さの4バイトの途中でファイルが終わっている",
       "expect_error": "MALFORMED_DATA",
       "roundtrip": false
     },
