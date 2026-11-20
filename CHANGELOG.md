@@ -20,12 +20,12 @@
 
 ### 変更
 
-- C#・TypeScript・Pythonを、NuGet・npm・PyPIへも公開するようにした。`dotnet add package SpringNBTLibrary`、`npm install spring-nbt-library`、`pip install spring-nbt-library`で入れられる（[リリース手順 5.5](docs/contributing/release.md#55-パッケージレジストリへの公開)）
+- C#・TypeScript・Pythonを、NuGet・npm・PyPIへも公開するようにした。`dotnet add package SpringNBTLibrary`、`npm install spring-nbt-library`、`pip install spring-nbt-library`で入れられる
 - パッケージに同梱するREADMEの相対リンクを、そのタグを指す絶対URLへ直してから組み立てる。パッケージのページからもリンクを辿れるようにするため
 
 ## [3.0.0]
 
-Java版1.13以降のワールドを扱えるようにした。チャンクとワールドの構成を形式の世代に分け、読んだときの形式のまま読み書きする。バージョン間の変換はしない（[adr/0011](docs/adr/0011-format-eras.md)）。
+Java版1.13以降のワールドを扱えるようにした。チャンクとワールドの構成を形式の世代に分け、読んだときの形式のまま読み書きする。バージョン間の変換はしない。
 26.2で作ったワールドを26.3で開いたときに残る26.2の形式のチャンクも、読み書きできる。
 動作はJava版1.13.2から26.3までの実ワールドで確かめている。
 
@@ -45,7 +45,7 @@ Rustの公開APIに互換性の崩れる変更（下の「互換性の崩れる�
 ### 変更
 
 - 扱える形式の下限`MIN_SUPPORTED_DATA_VERSION`を`5006`（26.3）から`1519`（1.13）へ下げた。`TARGET_DATA_VERSION`は`5023`のまま
-- 新しい形式が出たら、下限を上げずに世代を足して対応する（[adr/0011](docs/adr/0011-format-eras.md)。[adr/0003](docs/adr/0003-version-policy.md)の下限の決め方と、[adr/0010](docs/adr/0010-palette-format-26-3.md)の決定1を置き換えた）
+- 新しい形式が出たら、下限を上げずに世代を足して対応する
 - 1.13より前（DataVersionが`1519`未満か、無い）のチャンクは解釈せず、元のNBTだけを持つ。ブロックとバイオームのAPI、`min_section_y`、`clear_heightmaps`、`invalidate_lighting`は`UNSUPPORTED_DATA_VERSION`になる
 - 1.17までの形式のチャンクでは、`get_biome` / `set_biome`が`UNSUPPORTED_FEATURE`になる。`isLightOn`の無いチャンクでは、`invalidate_lighting`も`UNSUPPORTED_FEATURE`になる
 - DataVersionが`5006`未満のチャンクのパレット（`{Name, Properties}`）を、`MALFORMED_DATA`にせず、その形式のまま読み書きする
@@ -77,19 +77,10 @@ Rustの公開APIに互換性の崩れる変更（下の「互換性の崩れる�
 - 世代の境界のDataVersionは、実ワールドでは観測したDataVersionの間にあることまでしか確かめていない（[仕様30 7.1](docs/spec/30-chunk-format.md#71-世代の表)）
 - 開発版（スナップショット）で書かれたチャンクのうち、正式版と形式が違うものは扱わない
 
-### 検証
-
-- 各言語の単体テスト: C# 323件、Java 306件、TypeScript 256件、Python 325件、Rust 239件
-- クロス言語適合性1133件（全言語で出力バイト列が一致）。1.12.2、1.14.4、1.15.2、1.16.5、26.2の形式のチャンクのベクタと、読んだときの並びを保って書き戻すことを確かめるベクタを足した
-- 実ワールド（Java版1.12.2から26.3までの33ワールド）: NBTファイル884個とリージョンのチャンク374,006個のすべてでラウンドトリップ成功。
-  Worldレイヤでも地形チャンク359,078個の再エンコードが原本と一致し、7,315万ブロックの読み出しに成功（[仕様90 2.4](docs/spec/90-conformance.md#検証実績)）
-- 代表のチャンク326個・リージョンファイル78個・NBTファイル54個を5言語に通し、出力が全言語で一致した
-- 適合性検証のベクタ`anvil/unaligned_length`（4096の倍数の長さに1バイト足したファイルを`MALFORMED_DATA`にする）を、読めることを確かめる`anvil/unaligned_extra_byte`に変えた。最後のチャンクのデータの直後で終わるファイル（`anvil/unaligned_tail`）と、データが途中で切れたファイル（`anvil/truncated_chunk`、`anvil/truncated_length`）のベクタを足した
-
 ## [2.0.0]
 
 Java版26.3のワールド形式に対応した。26.3でブロックのパレットの形式が変わったため、26.1 / 26.2のワールドは扱わなくなる。
-動作はJava版26.3（DataVersion 5023）の実ワールドで確かめている（[adr/0010](docs/adr/0010-palette-format-26-3.md)）。
+動作はJava版26.3（DataVersion 5023）の実ワールドで確かめている。
 
 ### 変更
 
@@ -105,14 +96,6 @@ Java版26.3のワールド形式に対応した。26.3でブロックのパレ�
 
 - 文字列で保存された既定の状態のブロックは、プロパティが空の`BlockState`として読む。ブロックごとの既定値は持たないので、`minecraft:oak_stairs`と、既定値をすべて書いた`minecraft:oak_stairs[facing=north,…]`は等しくならない（[ガイド05](docs/guide/05-blocks-and-biomes.md#既定の状態のブロック)）
 - 26.2で作ったワールドを26.3で開いても、読み込まれなかったチャンクは古い形式のまま残る。ゲームの「ワールドを最適化」で変換してから使う
-
-### 検証
-
-- 各言語の単体テストに、26.3のパレット形式のテストを足した（各言語11件）
-- クロス言語適合性893件（全言語で出力バイト列が一致）。文字列だけ・Compoundだけ・混ざったパレット、26.2までの形式のベクタを足した
-- 実ワールド（Java版26.3）: `.dat` 23個 + チャンク3,654個すべてラウンドトリップ成功。
-  Worldレイヤでも3,481チャンク・83,544セクションの再エンコードが原本と一致し、393万ブロックの読み出しに成功
-- 同じワールドの`.dat` 21個・リージョンファイル11個・チャンク32個を5言語に通し、出力が全言語で一致した
 
 ## [1.0.1]
 
@@ -198,7 +181,7 @@ Java版26.3のワールド形式に対応した。26.3でブロックのパレ�
 ### 共通
 
 - 全言語で一致する`ErrorCode`
-- ワールド形式による対応判定。下限（26.1）以降なら警告を出さず、書き戻すときも`DataVersion`を書き換えない（[adr/0003](docs/adr/0003-version-policy.md)）
+- ワールド形式による対応判定。下限（26.1）以降なら警告を出さず、書き戻すときも`DataVersion`を書き換えない
 - 扱えない形式を見つけたときの警告／エラー切り替え
 - クロス言語適合性検証（`spec/run-conformance.sh`）
 - 実ワールド走査ツール（`spec/tools/scan_world.py`）
@@ -206,27 +189,20 @@ Java版26.3のワールド形式に対応した。26.3でブロックのパレ�
 
 ### 対応していないもの
 
-- `Heightmaps`と光源の再計算（無効化のみ提供。[adr/0004](docs/adr/0004-defer-heightmap-recalc.md)）
+- `Heightmaps`と光源の再計算（無効化のみ提供）
 - 圧縮ID 4 (LZ4)での書き込み、圧縮ID 127（カスタム方式）の展開
 - SNBTの異種リストと`\N{文字名}`エスケープ
 - `entities` / `poi`の型付きAPI（生NBTとしてなら読み書きできる）
 - チャンクの新規生成（ワールド生成は本ライブラリの範囲外）
-- 過去バージョンのワールド改変（[adr/0003](docs/adr/0003-version-policy.md)）
+- 過去バージョンのワールド改変
 - Bedrock版（LevelDB形式）
 
 ### 言語ごとの差異
 
 言語の性質上どうしても揃えられない箇所は、[機能一覧の「言語ごとの差異」](docs/features.md#言語ごとの差異)にまとめてある。
 
-- `session.lock`の確認はC# / Java / Python(POSIX)のみ（[adr/0008](docs/adr/0008-session-lock.md)）
-- TypeScriptは`i64`に`bigint`を使う（[adr/0007](docs/adr/0007-typescript-bigint.md)）
+- `session.lock`の確認はC# / Java / Python(POSIX)のみ
+- TypeScriptは`i64`に`bigint`を使う
 - TypeScriptにストリーム入出力は無い。Nodeのストリームは非同期しか無いため
-- Rustのみ例外ではなく`Result<T, Error>`を返す（[adr/0005](docs/adr/0005-unified-error-model.md)）
+- Rustのみ例外ではなく`Result<T, Error>`を返す
 - Rustの`NbtString`は2形態の列挙。孤立サロゲートを保持するため
-
-### 検証
-
-- 各言語の単体テスト888件
-- クロス言語適合性834件（全言語で出力バイト列が一致）
-- 実ワールド（Java版26.2）: `.dat` 23個 + チャンク3,717個すべてラウンドトリップ成功。
-  Worldレイヤでも3,481チャンク・83,544セクションの再エンコードが原本と一致し、393万ブロックの読み出しに成功

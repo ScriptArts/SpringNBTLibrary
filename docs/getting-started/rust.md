@@ -28,7 +28,7 @@ spring-nbt-library = { path = "spring-nbt-library-<版>" }
 ## 例外ではなく`Result`
 
 Rust版だけは例外ではなく`Result<T, Error>`を返します。
-`ErrorCode`の集合は他言語と完全に一致します（[adr/0005](../adr/0005-unified-error-model.md)）。
+`ErrorCode`の集合は他言語と完全に一致します。
 
 ```rust
 use spring_nbt_library::error::{ErrorCode, Result};
@@ -111,10 +111,10 @@ world.close()?;
 ```
 
 > **Minecraftを終了してから実行してください。**
-> Rust版は`std`にファイルロックが無いため、`session.lock`は確認しません（[adr/0008](../adr/0008-session-lock.md)）。
+> Rust版は`std`にファイルロックが無いため、`session.lock`は確認しません。
 > 起動していないことは呼び出し側で保証してください。
 
-> ブロックを置き換えてもHeightmapsと光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> ブロックを置き換えてもHeightmapsと光源は再計算されません。
 
 ## スタックの深さに注意
 

@@ -297,4 +297,3 @@ Rustでは、`NbtString` / `NbtList` / `NbtCompound`が`Display`も実装する�
 ## 8. 関連
 
 - SNBTテキスト表現 → [11 SNBT](11-snbt.md)
-- 適合性テストベクタ → [90 適合性](90-conformance.md)

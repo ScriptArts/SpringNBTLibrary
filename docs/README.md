@@ -11,7 +11,6 @@ Minecraft Java版1.13以降のワールド／NBTファイルを、複数の言�
 | 使い方を調べたい | [ガイド](guide/) |
 | 他の言語版の対応するAPIを知りたい | [API対応表](api/overview.md) |
 | 自分で実装・移植したい | [仕様](spec/00-conventions.md) |
-| なぜその設計なのか知りたい | [設計判断の記録](adr/) |
 
 ---
 
@@ -55,34 +54,17 @@ Minecraft Java版1.13以降のワールド／NBTファイルを、複数の言�
 - [30. チャンク形式](spec/30-chunk-format.md)
 - [31. パレット付きコンテナとBitStorage](spec/31-paletted-container.md)
 - [40. ワールドのディレクトリ構成](spec/40-world-layout.md)
-- [90. 適合性](spec/90-conformance.md)
 
 ### 開発
 
-- [実ワールドで検証する](spec/90-conformance.md#24-実ワールド走査): `spec/tools/scan_world.py`
-- [新しい言語を追加する](contributing/porting-guide.md)
-- [リリース手順](contributing/release.md)
+- [テストの回し方](testing.md)
 - [変更履歴](../CHANGELOG.md)
-
-### 設計判断の記録 (ADR)
-
-- [0001. モノレポにする](adr/0001-monorepo.md)
-- [0002. 命名は各言語のイディオムに従う](adr/0002-idiomatic-naming.md)
-- [0003. ワールド形式で対応を判定する](adr/0003-version-policy.md)
-- [0004. Heightmapと光源の再計算は行わない](adr/0004-defer-heightmap-recalc.md)
-- [0005. 全言語で共通のエラーモデルを使う](adr/0005-unified-error-model.md)
-- [0006. SNBTはバイナリへ写せる範囲だけを扱う](adr/0006-snbt-scope.md)
-- [0007. TypeScriptではi64にbigintを使う](adr/0007-typescript-bigint.md)
-- [0008. `session.lock`の確認は言語ごとにベストエフォートとする](adr/0008-session-lock.md)
-- [0009. 公開APIの抽出はソースの静的解析で行い、API対応表は生成する](adr/0009-static-api-extraction.md)
-- [0010. 26.3のパレット形式に合わせて対応の下限を上げる](adr/0010-palette-format-26-3.md)
-- [0011. 形式の世代を選んで1.13以降のワールドを読み書きする](adr/0011-format-eras.md)
 
 ---
 
 ## 仕様が先にある
 
 実装より先に[`spec/`](spec/00-conventions.md)に仕様を書き、各言語はそれを実装しています。
-どの言語版でも同じ入力から同じバイト列が出るかは[適合性テスト](spec/90-conformance.md)が確かめていて、[機能一覧](features.md)が実装からずれていないかもCIで見ています。
+どの言語版でも同じ入力から同じバイト列が出るかは[適合性テスト](testing.md)が確かめていて、[機能一覧](features.md)が実装からずれていないかもCIで見ています。
 
 Rustのツールで書いたワールドをJavaのプラグインで読む、といった場面で、ライブラリごとの違いに悩まされずに済むのが狙いです。

@@ -85,9 +85,9 @@ with MinecraftWorld.open(world_path, WorldOpenOptions(writable=True)) as world:
 ```
 
 > **Minecraftを終了してから実行してください。**
-> Python版が`session.lock`を確認するのはPOSIX環境だけです（Windowsには`fcntl`がありません。[adr/0008](../adr/0008-session-lock.md)）。
+> Python版が`session.lock`を確認するのはPOSIX環境だけです（Windowsには`fcntl`がありません）。
 
-> ブロックを置き換えてもHeightmapsと光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> ブロックを置き換えてもHeightmapsと光源は再計算されません。
 
 ## 自分のワールドで検証する
 

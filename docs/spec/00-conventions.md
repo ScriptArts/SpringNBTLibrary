@@ -53,7 +53,7 @@ NBTおよびAnvilのすべての多バイト数値はビッグエンディアン
 - Pythonは整数幅を持たないため、**構築時と書き込み時の双方で範囲検証**を行い、範囲外なら`ErrorCode.INVALID_ARGUMENT`を送出する。
   `f32`は`struct.pack('>f', ...)`相当の丸めを構築時に適用する
 - TypeScriptの`number`は倍精度で、`i32`までは正確だが`i64`を表せない。
-  そのため、**`i64`だけは`bigint`を使う**（→ [adr/0007](../adr/0007-typescript-bigint.md)）。
+  そのため、**`i64`だけは`bigint`を使う**。
   `i8` / `i16` / `i32`は`number`のまま範囲検証を行い、`f32`は`Math.fround`で丸める
 
 ---
@@ -105,7 +105,7 @@ C#は`Is*` / `Has*`のプロパティ、Javaは`is*()` / `has*()`のメソッド
 | Rust | `pub struct Error { code: ErrorCode, message: String, source: Option<...> }`を`Result<T, Error>`で返す |
 
 `IO`は下位の入出力例外を必ず原因として保持し、握り潰さない。
-Javaは検査例外を使わず、`IOException`を`ErrorCode.IO`でラップして送出する（全言語でシグネチャを揃えるため。→ [adr/0005](../adr/0005-unified-error-model.md)）。
+Javaは検査例外を使わず、`IOException`を`ErrorCode.IO`でラップして送出する（全言語でシグネチャを揃えるため）。
 
 ---
 
@@ -174,7 +174,7 @@ Minecraftの実データのネストは10段程度なので、既定値を触る
 - **compoundはキーと値の組の配列**で表す。JSONオブジェクトだと挿入順の保持が処理系依存になるため
 - **stringは`mutf8`を必ず併記**する。孤立サロゲートなどUTF-8に写せない値を厳密に比較するため
 
-詳細と検証手順は[90 適合性](90-conformance.md)を参照。
+適合性テストの回し方は[テストの回し方](../testing.md)を参照。
 
 ---
 
@@ -186,4 +186,3 @@ Minecraftの実データのネストは10段程度なので、既定値を触る
 - [30 チャンク形式](30-chunk-format.md)
 - [31 パレット付きコンテナ](31-paletted-container.md)
 - [40 ワールドのディレクトリ構成](40-world-layout.md)
-- [90 適合性](90-conformance.md)

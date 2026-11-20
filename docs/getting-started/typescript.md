@@ -47,7 +47,7 @@ npm install ./spring-nbt-library-<版>.tgz
 ## `i64`はbigint
 
 TypeScriptの`number`は2^53を超える整数を表せません。
-`TAG_Long`と`TAG_Long_Array`だけ`bigint`を使います（[adr/0007](../adr/0007-typescript-bigint.md)）。
+`TAG_Long`と`TAG_Long_Array`だけ`bigint`を使います。
 他の整数型は`number`のままです。
 
 ```ts
@@ -119,10 +119,10 @@ try {
 ```
 
 > **Minecraftを終了してから実行してください。**
-> TypeScript版はNodeにファイルロックの手段が無いため、`session.lock`は確認しません（[adr/0008](../adr/0008-session-lock.md)）。
+> TypeScript版はNodeにファイルロックの手段が無いため、`session.lock`は確認しません。
 > 起動していないことは呼び出し側で保証してください。
 
-> ブロックを置き換えてもHeightmapsと光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> ブロックを置き換えてもHeightmapsと光源は再計算されません。
 
 ## 次に読むもの
 
