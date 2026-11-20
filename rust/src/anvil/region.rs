@@ -229,6 +229,9 @@ pub struct RegionFile {
     data: Vec<u8>,
     dirty: bool,
     closed: bool,
+    /// 開いたときにファイルがまだ無かったか
+    /// 無ければ、変更が無くても書き出すときに作る
+    missing_on_disk: bool,
 }
 
 impl RegionFile {
@@ -254,7 +257,9 @@ impl RegionFile {
             }
         };
 
-        let data = if path.exists() {
+        let exists = path.exists();
+
+        let data = if exists {
             match std::fs::read(path) {
                 Ok(bytes) => bytes,
                 Err(error) => {
@@ -292,6 +297,7 @@ impl RegionFile {
             data,
             dirty: false,
             closed: false,
+            missing_on_disk: !exists,
         };
 
         region.parse_header()?;
@@ -793,10 +799,17 @@ impl RegionFile {
     }
 
     /// 変更をファイルへ書き出す
+    /// 開いてから変更が無く、ファイルが既にあれば何もしない
     pub fn flush(&mut self) -> Result<()> {
         self.ensure_open()?;
 
         if self.mode == RegionFileMode::ReadOnly {
+            return Ok(());
+        }
+
+        // 変更が無く、ファイルも既にあるなら書き出さない
+        // 読んだだけのリージョンを書き直すと、長さが4096の倍数でないファイルの末尾が埋まってしまう
+        if !self.dirty && !self.missing_on_disk {
             return Ok(());
         }
 
@@ -807,6 +820,7 @@ impl RegionFile {
         match std::fs::write(&self.path, &self.data) {
             Ok(()) => {
                 self.dirty = false;
+                self.missing_on_disk = false;
                 Ok(())
             }
             Err(error) => Err(Error::with_source(

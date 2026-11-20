@@ -71,6 +71,10 @@ public final class RegionFile implements AutoCloseable {
     private boolean dirty;
     private boolean closed;
 
+    // 開いたときにファイルがまだ無かったか
+    // 無ければ、変更が無くても書き出すときに作る
+    private boolean missingOnDisk;
+
     private RegionFile(Path path, RegionFileMode mode, RegionPos position, byte[] data) {
         this.path = path;
         this.mode = mode;
@@ -126,8 +130,10 @@ public final class RegionFile implements AutoCloseable {
 
         byte[] raw;
 
+        boolean exists = Files.exists(path);
+
         // 既にあるファイルは読み込み、無ければ空のヘッダだけを組み立てる
-        if (Files.exists(path)) {
+        if (exists) {
             try {
                 raw = Files.readAllBytes(path);
             } catch (IOException error) {
@@ -140,7 +146,9 @@ public final class RegionFile implements AutoCloseable {
             throw new SpringNbtException(ErrorCode.IO, "ファイルが存在しない: " + path);
         }
 
-        return new RegionFile(path, mode, position, raw);
+        RegionFile opened = new RegionFile(path, mode, position, raw);
+        opened.missingOnDisk = !exists;
+        return opened;
     }
 
     /**
@@ -630,11 +638,21 @@ public final class RegionFile implements AutoCloseable {
         dirty = true;
     }
 
-    /** 変更をファイルへ書き出す */
+    /**
+     * 変更をファイルへ書き出す
+     *
+     * <p>開いてから変更が無く、ファイルが既にあれば何もしない
+     */
     public void flush() {
         ensureOpen();
 
         if (mode == RegionFileMode.READ_ONLY) {
+            return;
+        }
+
+        // 変更が無く、ファイルも既にあるなら書き出さない
+        // 読んだだけのリージョンを書き直すと、長さが4096の倍数でないファイルの末尾が埋まってしまう
+        if (!dirty && !missingOnDisk) {
             return;
         }
 
@@ -649,6 +667,7 @@ public final class RegionFile implements AutoCloseable {
         }
 
         dirty = false;
+        missingOnDisk = false;
     }
 
     /**

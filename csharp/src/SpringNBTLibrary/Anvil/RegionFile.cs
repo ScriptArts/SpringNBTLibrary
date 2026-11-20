@@ -58,6 +58,10 @@ public sealed class RegionFile : IDisposable
     private bool dirty;
     private bool closed;
 
+    // 開いたときにファイルがまだ無かったか
+    // 無ければ、変更が無くても書き出すときに作る
+    private bool missingOnDisk;
+
     private RegionFile(string path, RegionFileMode mode, RegionPos position, byte[] data)
     {
         this.path = path;
@@ -111,8 +115,10 @@ public sealed class RegionFile : IDisposable
 
         byte[] raw;
 
+        bool exists = File.Exists(path);
+
         // 既にあるファイルは読み込み、無ければ空のヘッダだけを組み立てる
-        if (File.Exists(path))
+        if (exists)
         {
             try
             {
@@ -137,7 +143,9 @@ public sealed class RegionFile : IDisposable
             throw new SpringNbtException(ErrorCode.Io, $"ファイルが存在しない: {path}");
         }
 
-        return new RegionFile(path, mode, position.Value, raw);
+        RegionFile opened = new RegionFile(path, mode, position.Value, raw);
+        opened.missingOnDisk = !exists;
+        return opened;
     }
 
     /// <summary>ヘッダを解析し、ロケーションとタイムスタンプを取り込む</summary>
@@ -632,11 +640,19 @@ public sealed class RegionFile : IDisposable
     }
 
     /// <summary>変更をファイルへ書き出す</summary>
+    /// <remarks>開いてから変更が無く、ファイルが既にあれば何もしない</remarks>
     public void Flush()
     {
         EnsureOpen();
 
         if (mode == RegionFileMode.ReadOnly)
+        {
+            return;
+        }
+
+        // 変更が無く、ファイルも既にあるなら書き出さない
+        // 読んだだけのリージョンを書き直すと、長さが4096の倍数でないファイルの末尾が埋まってしまう
+        if (!dirty && !missingOnDisk)
         {
             return;
         }
@@ -659,6 +675,7 @@ public sealed class RegionFile : IDisposable
         }
 
         dirty = false;
+        missingOnDisk = false;
     }
 
     /// <summary>現在の内容をバイト列として組み立てる
