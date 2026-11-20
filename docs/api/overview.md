@@ -24,7 +24,7 @@ Python          read_file(path)
 Rust            read_file(path, &NbtReadOptions::default())
 ```
 
-こうしておくと「C#で`WriteBytes`を足したのにRustに`write_bytes`が無い」といった取りこぼしを、[`spec/tools/check_docs_sync.py`](../../spec/tools/check_docs_sync.py)が機械的に見つけられる（→ [adr/0009](../adr/0009-static-api-extraction.md)）。
+こうしておくと「C#で`WriteBytes`を足したのにRustに`write_bytes`が無い」といった取りこぼしを、[`spec/tools/check_docs_sync.py`](../../spec/tools/check_docs_sync.py)が機械的に見つけられる。
 
 対応表の「論理名」列がこれにあたる。
 
@@ -73,7 +73,7 @@ C#とJavaには自由関数が無いため、`read_file`のようなモジュー
 | タグの表現 | Rustは`NbtTag`列挙のバリアントで、数値と配列のタグには個別の型が無い（`NbtByte`ではなく`NbtTag::Byte(i8)`）。TypeScriptの`NbtTag`は`NbtByte`などのクラスの合併型 |
 | エラー | Rustのみ`Result<T, Error>`。他4言語は例外 |
 | 例外の型名 | C# / Javaは`SpringNbtException`、TypeScript / Pythonは`SpringNbtError`、Rustは`Error` |
-| `session.lock` | C# / Java / Python(POSIX)のみ確認する（[adr/0008](../adr/0008-session-lock.md)） |
+| `session.lock` | C# / Java / Python(POSIX)のみ確認する |
 
 `ErrorCode`の値は全言語で一致する。分類と使い分けは[ガイド06](../guide/06-errors-and-limits.md)を参照。
 

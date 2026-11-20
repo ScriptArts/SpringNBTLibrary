@@ -2,7 +2,7 @@
 
 .NET 8 / C# 12以上が必要です。
 
-C#は[基準実装](../adr/0002-idiomatic-naming.md)です。
+C#は基準実装です。
 仕様の解釈に迷ったら、まずここを見てください。
 
 ## 導入
@@ -131,9 +131,9 @@ overworld.Flush();   // ここで初めてディスクへ書かれる
 
 > **Minecraftを終了してから実行してください。**
 > 起動中のワールドへ書き込むとデータがおかしくなります。
-> C#版は`session.lock`を確認して防いでいます（[adr/0008](../adr/0008-session-lock.md)）。
+> C#版は`session.lock`を確認して防いでいます。
 
-> ブロックを置き換えてもHeightmapsと光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> ブロックを置き換えてもHeightmapsと光源は再計算されません。
 > `Chunk.ClearHeightmaps()` / `InvalidateLighting()`でゲーム側に再計算させてください。
 
 ## 次に読むもの

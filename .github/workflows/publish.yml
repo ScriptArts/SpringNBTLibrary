@@ -7,7 +7,6 @@ name: publish
 #
 # 各レジストリには、このリポジトリのこのワークフロー（publish.yml）を公開元として登録しておく。
 # APIキーは持たず、GitHubのOIDCトークンで認証する（Trusted Publishing）。
-# 登録の手順はdocs/contributing/release.mdの5.5にある。
 #
 # 公開するのは、リポジトリの変数（PUBLISH_NPM / PUBLISH_PYPI / PUBLISH_NUGET）がtrueのレジストリだけ。
 # 公開元を登録する前にこのワークフローが動いても、失敗しないようにするため。

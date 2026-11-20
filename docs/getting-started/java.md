@@ -57,7 +57,7 @@ System.out.println(data.getInt("DataVersion"));
 キーが無いかもしれないときは`opt*`を使います（無ければ`null`）。
 
 本ライブラリの例外`SpringNbtException`は**非検査例外**です。
-シグネチャを他言語版と揃えるため、検査例外は使いません（[adr/0005](../adr/0005-unified-error-model.md)）。
+シグネチャを他言語版と揃えるため、検査例外は使いません。
 
 ## 書く
 
@@ -102,9 +102,9 @@ try (MinecraftWorld world = MinecraftWorld.open(worldPath, options)) {
 
 > **Minecraftを終了してから実行してください。**
 > 起動中のワールドへ書き込むとデータがおかしくなります。
-> Java版は`session.lock`を確認して防いでいます（[adr/0008](../adr/0008-session-lock.md)）。
+> Java版は`session.lock`を確認して防いでいます。
 
-> ブロックを置き換えてもHeightmapsと光源は再計算されません（[adr/0004](../adr/0004-defer-heightmap-recalc.md)）。
+> ブロックを置き換えてもHeightmapsと光源は再計算されません。
 > `Chunk.clearHeightmaps()` / `invalidateLighting()`でゲーム側に再計算させてください。
 
 ## 次に読むもの

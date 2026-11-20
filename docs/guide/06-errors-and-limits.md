@@ -76,7 +76,7 @@ match read_file(path, &NbtReadOptions::default()) {
 ### Javaは検査例外を使わない
 
 `IOException`は`ErrorCode.IO`で包んで非検査例外として投げます。
-全言語でメソッドのシグネチャを揃えるためです（[adr/0005](../adr/0005-unified-error-model.md)）。
+全言語でメソッドのシグネチャを揃えるためです。
 原因の例外は`getCause()`から取れるので、情報は失われません。
 
 ---

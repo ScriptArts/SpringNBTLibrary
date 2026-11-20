@@ -81,7 +81,7 @@ using MinecraftWorld world = MinecraftWorld.Open(worldPath, options);
 ```
 
 > 書き込みで開くと`session.lock`を確認します（C# / Java / Python(POSIX)のみ）。
-> TypeScriptとRustは確認しないので、Minecraftが起動していないことを呼び出し側で確かめてください（[adr/0008](../adr/0008-session-lock.md)）。
+> TypeScriptとRustは確認しないので、Minecraftが起動していないことを呼び出し側で確かめてください。
 
 ---
 
@@ -194,7 +194,7 @@ world.SaveLevel();     // level.datを書き戻す
 ## 7. バージョンが違うワールド
 
 1.13以降のワールドは読んだときの形式のまま読み書きします。
-チャンクの形式はチャンクごとに、そのチャンクの`DataVersion`で決まるので、形式の違うチャンクが混ざったワールドもそのまま扱えます（[adr/0011](../adr/0011-format-eras.md)）。
+チャンクの形式はチャンクごとに、そのチャンクの`DataVersion`で決まるので、形式の違うチャンクが混ざったワールドもそのまま扱えます。
 
 書き込みを既定で止めるのは、1.13より前のチャンク（DataVersion 1519未満か、`DataVersion`の無いもの）だけです。`DataVersion`は読んだ値のまま残します。
 

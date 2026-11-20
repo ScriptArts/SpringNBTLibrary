@@ -1624,7 +1624,7 @@ def write_manifest():
 def write_handwritten_expectations():
     """手書きの期待値。生成器そのものを検証するための起点になる。
 
-    ここだけは90-conformance.mdと00-conventions.mdの記述を見ながら手で書く。
+    ここだけは00-conventions.mdの記述を見ながら手で書く。
     他の期待値は検証済みの実装から生成するため、この1件が信頼の基点になる。
     """
     expected = (

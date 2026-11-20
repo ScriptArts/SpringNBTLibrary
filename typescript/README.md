@@ -9,7 +9,7 @@ Node.js 20以上で動きます。ESM専用です。
 
 C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書から作っています。
 同じ入力からは同じ結果が出ます（[対応言語の一覧](../README.md#対応言語)）。
-結果が揃っているかは[適合性テスト](../docs/spec/90-conformance.md)で毎回確かめています。
+結果が揃っているかは[適合性テスト](../docs/testing.md)で毎回確かめています。
 
 ## 導入
 
