@@ -299,8 +299,9 @@ fn broken_headers_are_rejected() {
     let vectors = [
         "bad_offset",
         "overlapping_sectors",
-        "unaligned_length",
         "offset_out_of_file",
+        "truncated_chunk",
+        "truncated_length",
     ];
 
     for vector in vectors {
@@ -310,6 +311,94 @@ fn broken_headers_are_rejected() {
             Err(error) => assert_eq!(error.code(), ErrorCode::MalformedData, "{vector}"),
         }
     }
+}
+
+/// チャンクを読んでxPosを返す
+fn read_x_pos(region: &RegionFile, chunk_x: i32, chunk_z: i32) -> i32 {
+    region
+        .read_chunk(chunk_x, chunk_z)
+        .unwrap()
+        .expect("チャンクが無い")
+        .get_int("xPos")
+        .unwrap()
+}
+
+#[test]
+fn unaligned_file_is_read_as_if_padded_with_zeros() {
+    for (vector, chunk_count) in [("unaligned_tail", 2), ("unaligned_extra_byte", 1)] {
+        let path = vector_dir(vector).join("r.0.0.mca");
+        let original = std::fs::read(&path).expect("ベクタを読めない");
+
+        // 長さが4096の倍数でないことを前提にしたベクタ
+        assert_ne!(original.len() % SECTOR_SIZE, 0, "{vector}");
+
+        let mut region = match RegionFile::open(&path, RegionFileMode::ReadOnly) {
+            Ok(region) => region,
+            Err(error) => panic!("{vector}: 開けない -> {error}"),
+        };
+        let positions = region.chunk_positions().unwrap();
+        assert_eq!(positions.len(), chunk_count, "{vector}");
+
+        // すべてのチャンクを最後まで読めること
+        for position in positions {
+            assert_eq!(read_x_pos(&region, position.x, position.z), position.x, "{vector}");
+        }
+
+        // 組み立て直すと、元のバイト列の後ろに次のセクタ境界までゼロが続く
+        let padding = SECTOR_SIZE - (original.len() % SECTOR_SIZE);
+        let mut expected = original.clone();
+        expected.resize(original.len() + padding, 0);
+        assert_eq!(region.to_bytes().unwrap(), expected, "{vector}");
+    }
+}
+
+#[test]
+fn unaligned_file_is_not_rewritten_without_changes() {
+    let work = WorkDir::new("unaligned-close");
+    let directory = work.copy_vector("unaligned_tail");
+    let path = directory.join("r.0.0.mca");
+    let original = std::fs::read(&path).expect("ベクタを読めない");
+
+    // 読み書きで開いても、変えなければ書き出しても閉じてもファイルは元のまま
+    {
+        let mut region = RegionFile::open(&path, RegionFileMode::ReadWrite).unwrap();
+        region.read_chunk(1, 0).unwrap();
+        region.flush().unwrap();
+        region.close().unwrap();
+    }
+
+    // ワールドが使うフォルダの書き出しでも同じ
+    {
+        let mut folder = RegionFolder::open(&directory, RegionFileMode::ReadWrite).unwrap();
+        folder.read_chunk(1, 0).unwrap();
+        folder.flush().unwrap();
+        folder.close().unwrap();
+    }
+
+    assert_eq!(std::fs::read(&path).expect("ファイルを読めない"), original);
+}
+
+#[test]
+fn writing_to_unaligned_file_pads_it_to_sector_boundary() {
+    let work = WorkDir::new("unaligned-write");
+    let path = work.copy_vector("unaligned_tail").join("r.0.0.mca");
+
+    {
+        let mut region = RegionFile::open(&path, RegionFileMode::ReadWrite).unwrap();
+        region
+            .write_chunk(2, 0, &sample_chunk(2, 0), ChunkCompression::Zlib)
+            .unwrap();
+        region.close().unwrap();
+    }
+
+    // 書き出したファイルは4096の倍数になり、元からあったチャンクも読める
+    assert_eq!(file_len(&path) % SECTOR_SIZE as u64, 0);
+
+    let reopened = RegionFile::open(&path, RegionFileMode::ReadOnly).unwrap();
+    assert_eq!(reopened.chunk_positions().unwrap().len(), 3);
+    assert_eq!(read_x_pos(&reopened, 0, 0), 0);
+    assert_eq!(read_x_pos(&reopened, 1, 0), 1);
+    assert_eq!(read_x_pos(&reopened, 2, 0), 2);
 }
 
 #[test]

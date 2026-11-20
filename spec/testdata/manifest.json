@@ -349,12 +349,42 @@
       "roundtrip": false
     },
     {
-      "id": "anvil/unaligned_length",
+      "id": "anvil/unaligned_tail",
       "kind": "anvil",
-      "input": "anvil/unaligned_length/r.0.0.mca",
+      "input": "anvil/unaligned_tail/r.0.0.mca",
       "format": "java",
       "compression": "none",
-      "description": "ファイル長が 4096 の倍数になっていない",
+      "description": "最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数になっていない",
+      "expect": "expect/anvil/unaligned_tail.json",
+      "roundtrip": true
+    },
+    {
+      "id": "anvil/unaligned_extra_byte",
+      "kind": "anvil",
+      "input": "anvil/unaligned_extra_byte/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "4096の倍数の長さのあとに、どのチャンクにも属さない1バイトが付いている",
+      "expect": "expect/anvil/unaligned_extra_byte.json",
+      "roundtrip": true
+    },
+    {
+      "id": "anvil/truncated_chunk",
+      "kind": "anvil",
+      "input": "anvil/truncated_chunk/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "最後のチャンクのデータが1バイト欠けたところでファイルが終わっている",
+      "expect_error": "MALFORMED_DATA",
+      "roundtrip": false
+    },
+    {
+      "id": "anvil/truncated_length",
+      "kind": "anvil",
+      "input": "anvil/truncated_length/r.0.0.mca",
+      "format": "java",
+      "compression": "none",
+      "description": "最後のチャンクの長さの4バイトの途中でファイルが終わっている",
       "expect_error": "MALFORMED_DATA",
       "roundtrip": false
     },
@@ -464,9 +494,79 @@
       "input": "world/palette_old_format.nbt",
       "format": "java",
       "compression": "none",
-      "description": "26.2 までの形式（Name / Properties）のパレット。ブロックを読むと弾かれる",
-      "expect_error": "MALFORMED_DATA",
+      "description": "26.2の形式（Name / Properties）のパレット1要素。26.2の形式のまま読み書きできる",
+      "expect": "expect/world/palette_old_format.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/v4903_edit",
+      "kind": "world",
+      "input": "world/v4903_edit.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "26.2の形式のチャンク（DataVersion 4903）。chunk-editで置いたブロックもName / Propertiesで書き出される",
+      "expect": "expect/world/v4903_edit.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/v2586_level",
+      "kind": "world",
+      "input": "world/v2586_level.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "1.16.5の形式のチャンク（DataVersion 2586）。本体はLevelの中で、バイオームは数値のID",
+      "expect": "expect/world/v2586_level.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/v2230_spanning",
+      "kind": "world",
+      "input": "world/v2230_spanning.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "1.15.2の形式のチャンク（DataVersion 2230）。ビット詰めが64bitの境目をまたぎ、パレット17種類でビット幅5",
+      "expect": "expect/world/v2230_spanning.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/v1976_biomes_2d",
+      "kind": "world",
+      "input": "world/v1976_biomes_2d.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "1.14.4の形式のチャンク（DataVersion 1976）。バイオームは列ごとのint[256]",
+      "expect": "expect/world/v1976_biomes_2d.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/v1343_numeric_ids",
+      "kind": "world",
+      "input": "world/v1343_numeric_ids.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "1.12.2の形式のチャンク（DataVersion 1343）。ブロックが数値のIDなので解釈せず、chunk-reportはUNSUPPORTED_DATA_VERSION",
+      "expect_error": "UNSUPPORTED_DATA_VERSION",
       "roundtrip": false
+    },
+    {
+      "id": "world/order_preserved",
+      "kind": "world",
+      "input": "world/order_preserved.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "セクションがYの昇順でなく、Y=-3が2回現れる。chunk-editで書き換えるY=-4のコンテナはpaletteが先で、余分なキーを持つ。書き戻しは読んだときの並びを保ち、Y=-3は先に現れた位置へ後の中身で1つにまとまる",
+      "expect": "expect/world/order_preserved.json",
+      "roundtrip": true
+    },
+    {
+      "id": "world/v2586_order_preserved",
+      "kind": "world",
+      "input": "world/v2586_order_preserved.nbt",
+      "format": "java",
+      "compression": "none",
+      "description": "1.16.5の形式（DataVersion 2586）。セクションがYの昇順でなく、Y=1が2回現れる。chunk-editで書き換えるY=0はキーの並びが実データと違い、余分なキーを持つ",
+      "expect": "expect/world/v2586_order_preserved.json",
+      "roundtrip": true
     },
     {
       "id": "world/palette_index_out_of_range",

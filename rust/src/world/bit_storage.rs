@@ -1,8 +1,11 @@
 //! 添字を64bit整数の配列へ詰めた表現
-//! 1.16以降の**跨ぎなし**パッキング
+//! 公開の入口は1.16以降の**跨ぎなし**パッキング
 //!
 //! 1つの`i64`に入りきらない分は、その`i64`の残りビットを未使用のまま捨て、
 //! 次の`i64`の最下位ビットから始める
+//!
+//! DataVersionが2529より前（1.13から1.15）の形式は、値が64bitの境目をまたぐ詰め方で、
+//! 内部の入口からだけ使う
 
 use crate::error::{Error, ErrorCode, Result};
 
@@ -12,6 +15,7 @@ pub struct BitStorage {
     data: Vec<i64>,
     bits_per_entry: usize,
     entry_count: usize,
+    spanning: bool,
 }
 
 impl BitStorage {
@@ -33,6 +37,15 @@ impl BitStorage {
 
     /// すべてゼロで初期化した記憶域を作る
     pub fn create(bits_per_entry: usize, entry_count: usize) -> Result<BitStorage> {
+        Self::create_with(bits_per_entry, entry_count, false)
+    }
+
+    /// 詰め方を指定して、すべてゼロで初期化した記憶域を作る
+    pub(crate) fn create_with(
+        bits_per_entry: usize,
+        entry_count: usize,
+        spanning: bool,
+    ) -> Result<BitStorage> {
         if bits_per_entry < 1 || bits_per_entry > 32 {
             return Err(Error::new(
                 ErrorCode::InvalidArgument,
@@ -41,9 +54,10 @@ impl BitStorage {
         }
 
         Ok(BitStorage {
-            data: vec![0; Self::long_count(bits_per_entry, entry_count)],
+            data: vec![0; Self::long_count_with(bits_per_entry, entry_count, spanning)],
             bits_per_entry,
             entry_count,
+            spanning,
         })
     }
 
@@ -57,10 +71,21 @@ impl BitStorage {
         entry_count: usize,
         lenient: bool,
     ) -> Result<BitStorage> {
-        let expected = Self::long_count(bits_per_entry, entry_count);
+        Self::from_longs_with(data, bits_per_entry, entry_count, lenient, false)
+    }
+
+    /// 詰め方を指定して、既存の`i64`配列から作る
+    pub(crate) fn from_longs_with(
+        data: Vec<i64>,
+        bits_per_entry: usize,
+        entry_count: usize,
+        lenient: bool,
+        spanning: bool,
+    ) -> Result<BitStorage> {
+        let expected = Self::long_count_with(bits_per_entry, entry_count, spanning);
 
         if data.len() == expected {
-            return Ok(BitStorage { data, bits_per_entry, entry_count });
+            return Ok(BitStorage { data, bits_per_entry, entry_count, spanning });
         }
 
         if !lenient {
@@ -76,8 +101,8 @@ impl BitStorage {
         // 配列長からビット幅を逆算する
         // 合致する幅が無ければ諦める
         for candidate in 1..=32usize {
-            if Self::long_count(candidate, entry_count) == data.len() {
-                return Ok(BitStorage { data, bits_per_entry: candidate, entry_count });
+            if Self::long_count_with(candidate, entry_count, spanning) == data.len() {
+                return Ok(BitStorage { data, bits_per_entry: candidate, entry_count, spanning });
             }
         }
 
@@ -92,6 +117,16 @@ impl BitStorage {
 
     /// 必要な`i64`の個数を求める
     pub fn long_count(bits_per_entry: usize, entry_count: usize) -> usize {
+        Self::long_count_with(bits_per_entry, entry_count, false)
+    }
+
+    /// 詰め方を指定して、必要な`i64`の個数を求める
+    pub(crate) fn long_count_with(bits_per_entry: usize, entry_count: usize, spanning: bool) -> usize {
+        // またぐ詰め方なら、全ビットを隙間なく並べた長さになる
+        if spanning {
+            return (entry_count * bits_per_entry).div_ceil(64);
+        }
+
         let values_per_long = 64 / bits_per_entry;
         entry_count.div_ceil(values_per_long)
     }
@@ -100,10 +135,26 @@ impl BitStorage {
     pub fn get(&self, index: usize) -> Result<u32> {
         self.check_index(index)?;
 
+        let mask = (1u64 << self.bits_per_entry) - 1;
+
+        // またぐ詰め方なら、隣の64bit値へ続く分を上位ビットとして足す
+        if self.spanning {
+            let bit_index = index * self.bits_per_entry;
+            let span_long_index = bit_index >> 6;
+            let span_offset = bit_index & 63;
+            let mut span_value = (self.data[span_long_index] as u64) >> span_offset;
+
+            // 次の64bit値へ続く場合は、続き分を左へずらして重ねる
+            if span_offset + self.bits_per_entry > 64 {
+                span_value |= (self.data[span_long_index + 1] as u64) << (64 - span_offset);
+            }
+
+            return Ok((span_value & mask) as u32);
+        }
+
         let per_long = self.values_per_long();
         let long_index = index / per_long;
         let bit_offset = (index % per_long) * self.bits_per_entry;
-        let mask = (1u64 << self.bits_per_entry) - 1;
 
         // 符号付きのままシフトすると上位ビットが伸びるので、符号なしへ直してから動かす
         let unsigned = self.data[long_index] as u64;
@@ -120,6 +171,28 @@ impl BitStorage {
                 ErrorCode::InvalidArgument,
                 format!("値がビット幅に収まらない: {value} (0..{})", limit - 1),
             ));
+        }
+
+        // またぐ詰め方なら、隣の64bit値へ続く分も書き込む
+        if self.spanning {
+            let bit_index = index * self.bits_per_entry;
+            let span_long_index = bit_index >> 6;
+            let span_offset = bit_index & 63;
+            let span_mask = limit - 1;
+
+            let low = self.data[span_long_index] as u64;
+            let low_updated = (low & !(span_mask << span_offset)) | ((value as u64) << span_offset);
+            self.data[span_long_index] = low_updated as i64;
+
+            // 次の64bit値へ続く場合は、続き分の下位ビットを書き換える
+            if span_offset + self.bits_per_entry > 64 {
+                let shift = 64 - span_offset;
+                let high = self.data[span_long_index + 1] as u64;
+                let high_updated = (high & !(span_mask >> shift)) | ((value as u64) >> shift);
+                self.data[span_long_index + 1] = high_updated as i64;
+            }
+
+            return Ok(());
         }
 
         let per_long = self.values_per_long();
@@ -150,7 +223,7 @@ impl BitStorage {
 
     /// 別のビット幅へ詰め直した新しい記憶域を返す
     pub fn resize(&self, new_bits_per_entry: usize) -> Result<BitStorage> {
-        let mut result = BitStorage::create(new_bits_per_entry, self.entry_count)?;
+        let mut result = BitStorage::create_with(new_bits_per_entry, self.entry_count, self.spanning)?;
 
         // 全エントリを読み直して新しい幅で詰める
         for index in 0..self.entry_count {
@@ -169,5 +242,56 @@ impl BitStorage {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn またぐ詰め方で_long数が合う() {
+        assert_eq!(320, BitStorage::long_count_with(5, 4096, true));
+        assert_eq!(256, BitStorage::long_count_with(4, 4096, true));
+    }
+
+    #[test]
+    fn またぐ詰め方では値が64bitの境目をまたいで並ぶ() {
+        let mut storage = BitStorage::create_with(5, 4096, true).unwrap();
+
+        // 添字12はビット60から64までなので、data[0]の上位4bitとdata[1]の最下位bitに分かれる
+        storage.set(12, 0b10111).unwrap();
+        let longs = storage.as_longs();
+
+        assert_eq!(0b0111u64, ((longs[0] as u64) >> 60) & 0b1111);
+        assert_eq!(1i64, longs[1] & 1);
+        assert_eq!(0b10111, storage.get(12).unwrap());
+    }
+
+    #[test]
+    fn またぐ詰め方で境目の値を上書きしても隣が壊れない() {
+        let mut storage = BitStorage::create_with(5, 4096, true).unwrap();
+        storage.set(11, 0b11111).unwrap();
+        storage.set(13, 0b11111).unwrap();
+
+        // 添字12は境目をまたぐので、書き込みのたびに両隣が保たれるか確かめる
+        for value in [0b11111, 0b00000, 0b10101] {
+            storage.set(12, value).unwrap();
+            assert_eq!(value, storage.get(12).unwrap());
+            assert_eq!(0b11111, storage.get(11).unwrap());
+            assert_eq!(0b11111, storage.get(13).unwrap());
+        }
+    }
+
+    #[test]
+    fn またぐ詰め方で最後のlongの末尾まで読み書きできる() {
+        let mut storage = BitStorage::create_with(5, 4096, true).unwrap();
+        storage.set(4094, 0b10101).unwrap();
+        storage.set(4095, 0b11011).unwrap();
+
+        // 添字4095はビット20475から20479で、最後のlongのビット59から63に収まる
+        assert_eq!(0b10101, storage.get(4094).unwrap());
+        assert_eq!(0b11011, storage.get(4095).unwrap());
+        assert_eq!(0b11011u64, (storage.as_longs()[319] as u64) >> 59);
     }
 }

@@ -1,5 +1,6 @@
 package io.github.scriptarts.springnbt.world;
 
+import io.github.scriptarts.springnbt.SpringNbt;
 import io.github.scriptarts.springnbt.SpringNbtException;
 import io.github.scriptarts.springnbt.nbt.NbtCompound;
 import io.github.scriptarts.springnbt.nbt.NbtString;
@@ -155,16 +156,45 @@ public final class BlockState {
     /**
      * パレット要素のNBTから作る
      *
-     * <p>26.3で入った形式を読む
-     * 既定の状態はブロックIDだけの文字列で、それ以外は{@code id}と{@code properties}を持つCompoundで入っている
-     * 異種リストの要素を包む{@code {"": <値>}}は外してから読む
+     * <p>{@link SpringNbt#TARGET_DATA_VERSION}の形式で読む
+     * DataVersionを指定するときは{@link #fromNbtForDataVersion}を使う
      *
      * @param nbt パレット要素
      * @return ブロック状態
      * @throws SpringNbtException 文字列でもCompoundでもない、{@code id}が無い、または{@code properties}の値が文字列でない場合
      */
     public static BlockState fromNbt(NbtTag nbt) {
+        return fromNbtForDataVersion(nbt, SpringNbt.TARGET_DATA_VERSION);
+    }
+
+    /**
+     * DataVersionを指定して、パレット要素のNBTから作る
+     *
+     * <p>26.3（DataVersion 5006）以降は、既定の状態がブロックIDだけの文字列で、それ以外は{@code id}と{@code properties}を持つCompoundで入っている
+     * 異種リストの要素を包む{@code {"": <値>}}は外してから読む
+     * 1519以上5006未満は、{@code Name}と{@code Properties}を持つCompoundを読む
+     * 文字列は受け付けない
+     *
+     * @param nbt         パレット要素
+     * @param dataVersion パレット要素を含むチャンクのDataVersion（1519以上）
+     * @return ブロック状態
+     * @throws SpringNbtException {@code dataVersion}が1519未満の場合（INVALID_ARGUMENT）、
+     * 要素が形式に合うタグでない場合、{@code id} / {@code Name}が無い場合、またはプロパティの値が文字列でない場合
+     */
+    public static BlockState fromNbtForDataVersion(NbtTag nbt, int dataVersion) {
         Objects.requireNonNull(nbt, "nbt");
+        checkDataVersion(dataVersion);
+
+        // 26.3より前は、Name / Propertiesの形式で入っている
+        if (dataVersion < ChunkFormat.PALETTE_ID_FORMAT_DATA_VERSION) {
+            return fromNameProperties(nbt);
+        }
+
+        return fromPaletteId(nbt);
+    }
+
+    /** 26.3以降の{@code id} / {@code properties}の形式から読む */
+    private static BlockState fromPaletteId(NbtTag nbt) {
         NbtTag entry = PalettedContainer.unwrapListElement(nbt);
 
         // 既定の状態は、ブロックIDだけの文字列で入っている
@@ -183,7 +213,7 @@ public final class BlockState {
             // Name / Propertiesは26.2までの形式で、読み替えると誤った状態を返しかねない
             if (compound.containsKey("Name")) {
                 throw SpringNbtException.malformed(
-                        "ブロックのパレット要素に id が無い。Name は26.2までの形式で、本ライブラリでは扱わない");
+                        "ブロックのパレット要素にidが無い。NameはDataVersion 5006より前の形式なので、5006未満のDataVersionで読むこと");
             }
 
             throw SpringNbtException.malformed("ブロックのパレット要素に id が無い");
@@ -209,15 +239,84 @@ public final class BlockState {
         return state;
     }
 
+    /** 26.2までの{@code Name} / {@code Properties}の形式から読む */
+    private static BlockState fromNameProperties(NbtTag nbt) {
+        // 26.2までは文字列のパレット要素も、異種リストの包みも無い
+        if (!(nbt instanceof NbtCompound compound)) {
+            throw SpringNbtException.unexpectedTagType(
+                    "ブロックのパレット要素がcompoundでない: " + nbt.type().asString());
+        }
+
+        String name = compound.optString("Name");
+
+        if (name == null) {
+            throw SpringNbtException.malformed("ブロックのパレット要素にNameが無い");
+        }
+
+        BlockState state = new BlockState(name);
+        NbtCompound propertiesTag = compound.optCompound("Properties");
+
+        if (propertiesTag == null) {
+            return state;
+        }
+
+        // Propertiesの値はすべて文字列（数値や真偽値も文字列で入る）
+        for (Map.Entry<String, NbtTag> property : propertiesTag) {
+            if (!(property.getValue() instanceof NbtString text)) {
+                throw SpringNbtException.unexpectedTagType("Propertiesの\"" + property.getKey()
+                        + "\"が文字列でない: " + property.getValue().type().asString());
+            }
+
+            state.properties.put(property.getKey(), text.value());
+        }
+
+        return state;
+    }
+
+    /** 指定されたDataVersionが、読み書きできる下限以上であることを確かめる */
+    private static void checkDataVersion(int dataVersion) {
+        if (dataVersion < ChunkFormat.OLDEST_FORMAT_DATA_VERSION) {
+            throw SpringNbtException.invalidArgument(
+                    "DataVersionは" + ChunkFormat.OLDEST_FORMAT_DATA_VERSION + "以上でなければならない: " + dataVersion);
+        }
+    }
+
     /**
      * パレット要素のNBTへ変換する
      *
-     * <p>プロパティが空ならブロックIDだけの文字列にし、それ以外は{@code id}と{@code properties}を持つCompoundにする
-     * Minecraftと同じ振る舞い
+     * <p>{@link SpringNbt#TARGET_DATA_VERSION}の形式で書く
+     * DataVersionを指定するときは{@link #toNbtForDataVersion}を使う
      *
      * @return NBT
      */
     public NbtTag toNbt() {
+        return toNbtForDataVersion(SpringNbt.TARGET_DATA_VERSION);
+    }
+
+    /**
+     * DataVersionを指定して、パレット要素のNBTへ変換する
+     *
+     * <p>26.3（DataVersion 5006）以降は、プロパティが空ならブロックIDだけの文字列にし、それ以外は{@code id}と{@code properties}を持つCompoundにする
+     * 1519以上5006未満は、{@code Name}を持つCompoundにし、プロパティが空なら{@code Properties}キー自体を出力しない
+     * いずれもMinecraftと同じ振る舞い
+     *
+     * @param dataVersion 書き込み先のチャンクのDataVersion（1519以上）
+     * @return NBT
+     * @throws SpringNbtException {@code dataVersion}が1519未満の場合（INVALID_ARGUMENT）
+     */
+    public NbtTag toNbtForDataVersion(int dataVersion) {
+        checkDataVersion(dataVersion);
+
+        // 26.3より前は、Name / Propertiesの形式で書く
+        if (dataVersion < ChunkFormat.PALETTE_ID_FORMAT_DATA_VERSION) {
+            return toNameProperties();
+        }
+
+        return toPaletteId();
+    }
+
+    /** 26.3以降の{@code id} / {@code properties}の形式へ変換する */
+    private NbtTag toPaletteId() {
         // プロパティが無ければ、Minecraftが既定の状態を書くときと同じく文字列にする
         if (properties.isEmpty()) {
             return new NbtString(name);
@@ -233,6 +332,27 @@ public final class BlockState {
         }
 
         result.set("properties", propertiesTag);
+        return result;
+    }
+
+    /** 26.2までの{@code Name} / {@code Properties}の形式へ変換する */
+    private NbtCompound toNameProperties() {
+        NbtCompound result = new NbtCompound();
+        result.set("Name", new NbtString(name));
+
+        // プロパティが無ければ、Propertiesキー自体を出力しない
+        if (properties.isEmpty()) {
+            return result;
+        }
+
+        NbtCompound propertiesTag = new NbtCompound();
+
+        // 名前の昇順で並ぶ
+        for (Map.Entry<String, String> entry : properties.entrySet()) {
+            propertiesTag.set(entry.getKey(), new NbtString(entry.getValue()));
+        }
+
+        result.set("Properties", propertiesTag);
         return result;
     }
 

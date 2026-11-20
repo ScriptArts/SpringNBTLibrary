@@ -238,7 +238,7 @@ NBTのタグ型・読み書き・SNBT。バージョンに依存しない純粋�
 | `method_compressed` | — | — | — | `METHOD_COMPRESSED` | — |  |
 | `method_stored` | — | — | — | `METHOD_STORED` | — |  |
 | `min_match` | — | — | — | `MIN_MATCH` | — |  |
-| `min_supported_data_version` | `MinSupportedDataVersion` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | このライブラリが扱えるワールド形式の下限となるDataVersion (26.3) |
+| `min_supported_data_version` | `MinSupportedDataVersion` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | `MIN_SUPPORTED_DATA_VERSION` | このライブラリが扱えるワールド形式の下限となるDataVersion (1.13) |
 | `parse` | `Parse()` | `parse()` | `parse()` | `parse()` | `parse()` | SNBT文字列をタグへ変換する |
 | `parse_compound` | `ParseCompound()` | `parseCompound()` | `parseCompound()` | `parse_compound()` | `parse_compound()` | SNBT文字列をCompoundへ変換する |
 | `read_bytes` | `ReadBytes()` | `readBytes()` | `readBytes()` | `read_bytes()` | `read_bytes()` | バイト列からNBTを読む |

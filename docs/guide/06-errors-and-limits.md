@@ -12,10 +12,10 @@
 | `IO` | 入出力の失敗 | ファイルが無い、権限が無い |
 | `MALFORMED_DATA` | バイト列が仕様に反する | 未知のタグID、途中で入力が尽きた |
 | `UNEXPECTED_TAG_TYPE` | 期待した型と違うタグを取り出した | `GetInt("x")`にStringが入っていた |
-| `UNSUPPORTED_FEATURE` | 仕様上は妥当だが本ビルドで扱えない | 圧縮ID=127のチャンクを`ReadChunk`で読んだ、圧縮ID=4（LZ4）を指定してチャンクを書こうとした |
+| `UNSUPPORTED_FEATURE` | 仕様上は妥当だが本ビルドで扱えない | 圧縮ID=127のチャンクを`ReadChunk`で読んだ、圧縮ID=4（LZ4）を指定してチャンクを書こうとした、1.17までのチャンクで`GetBiome`を呼んだ |
 | `LIMIT_EXCEEDED` | 安全上限を超えた | ネスト深さ512超 |
 | `INVALID_ARGUMENT` | 呼び出し側の引数が不正 | 座標がチャンク範囲外、`i8`に300を渡した |
-| `UNSUPPORTED_DATA_VERSION` | 扱える形式より古いデータ | DataVersion 5006未満のチャンクを既定設定で書き戻そうとした |
+| `UNSUPPORTED_DATA_VERSION` | 扱える形式より古いデータ | DataVersion 1519未満（1.13より前）のチャンクを既定設定で書き戻そうとした、そのチャンクのブロックを読もうとした |
 
 ### 使い分けの考え方
 
@@ -25,6 +25,22 @@
 - 呼び出し側が渡した値がおかしい → `INVALID_ARGUMENT`
 
 たとえば`BlockState.Parse("minecraft:stone[")`は、呼び出し側が渡した文字列の誤りなので`INVALID_ARGUMENT`になります。
+
+### 形式の世代に無い値
+
+チャンクと`level.dat`の形式は、Minecraftのバージョンによって世代が分かれます（[07](07-version-policy.md#1-形式の世代)）。
+世代によって持たない値を扱うメソッドは、`UNSUPPORTED_FEATURE`になります。
+
+| メソッド | `UNSUPPORTED_FEATURE`になるとき |
+|---|---|
+| `GetBiome` / `SetBiome` | バイオームを数値のIDで持つ1.17までのチャンク |
+| `GetBiomeId` / `SetBiomeId` | バイオームを名前で持つ1.18以降のチャンク |
+| `InvalidateLighting` | `isLightOn`を持たない1.17までのチャンク |
+| `LevelData.SpawnDimension` | 1.21.xまでの`level.dat` |
+
+1.13より前のチャンクは中身を解釈しないので、ブロックとバイオームを扱うメソッド、`MinSectionY`、`ClearHeightmaps`、`InvalidateLighting`が`UNSUPPORTED_DATA_VERSION`になります。
+
+どちらのエラーも、ファイルの中身が壊れていることを表すものではありません。中身が壊れていれば`MALFORMED_DATA`になります。
 
 ---
 

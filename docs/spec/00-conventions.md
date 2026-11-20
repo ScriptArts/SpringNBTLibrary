@@ -3,9 +3,9 @@
 本書はSpringNBTLibraryの全言語実装が従う共通規約を定める。
 各言語の実装は、本書と本ディレクトリ配下の仕様書を**唯一の拠り所**とする。
 
-- 対象: 26.3で導入されたワールド形式（DataVersion `5006`以降）
-- 検証: Minecraft Java版26.3（DataVersion `5023` / Protocol `777`）の実データ
-- それより古い形式のワールド改変は非サポート（→ [07 バージョンポリシー](../guide/07-version-policy.md)）
+- 対象: 1.13の正式版（DataVersion `1519`）以降のワールド形式。形式の世代ごとに、読んだときの形式のまま読み書きする（→ [30 7章](30-chunk-format.md#7-形式の世代)、[40 5章](40-world-layout.md#5-261より前の構成)）
+- 検証: Minecraft Java版26.3（DataVersion `5023` / Protocol `777`）の実データと、1.13.2から26.2までの各バージョンの実データ
+- 1.13より前の形式のワールド改変と、バージョン間の変換は非サポート（→ [07 バージョンポリシー](../guide/07-version-policy.md)）
 
 ---
 
@@ -89,10 +89,10 @@ C#は`Is*` / `Has*`のプロパティ、Javaは`is*()` / `has*()`のメソッド
 | `IO` | 下位の入出力失敗 | ファイルが無い、読み取り権限が無い |
 | `MALFORMED_DATA` | バイト列が仕様に反する | 未知のタグID、途中で入力が尽きた |
 | `UNEXPECTED_TAG_TYPE` | 期待した型と違うタグを取り出した | `get_int("x")`にStringが入っていた |
-| `UNSUPPORTED_FEATURE` | 仕様上は妥当だが本ビルドで扱えない | 圧縮ID=127のチャンクを`read_chunk`で読んだ、圧縮ID=4（LZ4）を指定してチャンクを書こうとした、SNBTの`\N{...}`をパースした |
+| `UNSUPPORTED_FEATURE` | 仕様上は妥当だが本ビルドで扱えない | 圧縮ID=127のチャンクを`read_chunk`で読んだ、圧縮ID=4（LZ4）を指定してチャンクを書こうとした、SNBTの`\N{...}`をパースした、チャンクやワールドの形式の世代に無い値を扱おうとした（1.17までの形式のチャンクで`get_biome`を呼んだ、など） |
 | `LIMIT_EXCEEDED` | 安全上限を超えた | ネスト深さ512超、展開後のサイズが`max_decompressed_size`を超えた |
 | `INVALID_ARGUMENT` | 呼び出し側の引数が不正 | 座標がチャンク範囲外、`i8`に300を渡した |
-| `UNSUPPORTED_DATA_VERSION` | 扱える形式より古いデータ | DataVersion 5006未満のチャンクを既定設定で書き戻そうとした |
+| `UNSUPPORTED_DATA_VERSION` | 扱える形式より古いデータ | DataVersion 1519未満のチャンクを既定設定で書き戻そうとした、そのチャンクのブロックを読もうとした |
 
 各言語での表現は次のとおり。
 

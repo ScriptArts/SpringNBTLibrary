@@ -17,8 +17,8 @@
 **Minecraftが更新されても、保存形式が変わらなければ`x`は上がらない。**
 形式が同じなら新しいバージョンのワールドもそのまま扱えるので、ライブラリ側で対応することが無い（[adr/0003](../adr/0003-version-policy.md)）。
 
-`x`が上がるのは、扱える形式の下限（`MIN_SUPPORTED_DATA_VERSION`）を引き上げるときである。
-それまで使えていたワールドが使えなくなるため、いちばん上の桁で知らせる。
+形式が変わっても、扱える形式の下限（`MIN_SUPPORTED_DATA_VERSION`）は上げず、形式の世代を足して対応する（[adr/0011](../adr/0011-format-eras.md)）。
+それまで使えていたワールドは、引き続き使える。
 
 `x`を上げるときは`y`と`z`を0に戻す。
 
@@ -41,9 +41,9 @@
 
 形式が変わっていた場合だけ、次へ進む。
 
-4. 仕様書を直す。推測ではなく実データを根拠に書き直す
-5. 実装を新しい形式へ合わせる
-6. `MIN_SUPPORTED_DATA_VERSION`を新しい形式が入ったバージョンへ上げ、`TARGET_DATA_VERSION`も更新する。
+4. 仕様書を直す。推測ではなく実データを根拠に書き直す。新しい形式は[spec/30](../spec/30-chunk-format.md#7-形式の世代)の世代の表に1行足す
+5. 実装の世代の表に、新しい形式の世代を足す。それまでの世代は残す
+6. `TARGET_DATA_VERSION`を更新する。`MIN_SUPPORTED_DATA_VERSION`は変えない。
 
    ```
    csharp/src/SpringNBTLibrary/SpringNbt.cs

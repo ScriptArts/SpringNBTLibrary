@@ -28,6 +28,16 @@ public sealed class WorldOpenOptions
 
     /// <summary>チャンク書き込みのオプション</summary>
     public ChunkWriteOptions ChunkWrite { get; set; } = ChunkWriteOptions.Default;
+
+    /// <summary>
+    /// ワールドの構成の世代を選ぶDataVersion
+    /// </summary>
+    /// <remarks>
+    /// nullなら、<c>level.dat</c>のDataVersionで選ぶ
+    /// 1519以上でなければならない
+    /// そのワールドから読むすべてのチャンクの世代にも効き、<see cref="ChunkRead"/>の<see cref="ChunkReadOptions.FormatDataVersion"/>より優先する
+    /// </remarks>
+    public int? FormatDataVersion { get; set; }
 }
 
 /// <summary>
@@ -35,7 +45,8 @@ public sealed class WorldOpenOptions
 /// </summary>
 /// <remarks>
 /// <para>
-/// 26.xでは構成が大きく変わっており、標準の3次元も<c>dimensions/&lt;名前空間&gt;/&lt;パス&gt;/</c>の下に並ぶ
+/// 26.1以降は構成が大きく変わっており、標準の3次元も<c>dimensions/&lt;名前空間&gt;/&lt;パス&gt;/</c>の下に並ぶ
+/// それより前の構成も、<c>level.dat</c>のDataVersionで見分けて読み書きできる
 /// </para>
 /// </remarks>
 public sealed class MinecraftWorld : IDisposable
@@ -44,11 +55,14 @@ public sealed class MinecraftWorld : IDisposable
     private readonly WorldOpenOptions options;
     private bool closed;
 
+    private readonly WorldLayout layout;
+
     private MinecraftWorld(string directory, WorldOpenOptions options, NamedTag level)
     {
         Directory = directory;
-        this.options = options;
-        Level = new LevelData(level);
+        Level = new LevelData(level, options.FormatDataVersion);
+        layout = Level.Layout;
+        this.options = WithFormatDataVersion(options);
     }
 
     /// <summary>ワールドディレクトリのパス</summary>
@@ -62,7 +76,8 @@ public sealed class MinecraftWorld : IDisposable
     /// </summary>
     /// <exception cref="SpringNbtException">
     /// ディレクトリや<c>level.dat</c>が無い場合、
-    /// または書き込みモードで<c>session.lock</c>を取得できない場合
+    /// または書き込みモードで<c>session.lock</c>を取得できない場合、
+    /// または<see cref="WorldOpenOptions.FormatDataVersion"/>が1519未満の場合
     /// </exception>
     public static MinecraftWorld Open(string directory, WorldOpenOptions? options = null)
     {
@@ -133,12 +148,13 @@ public sealed class MinecraftWorld : IDisposable
     /// 存在しなければnull
     /// </summary>
     /// <remarks>
-    /// 26.xでは<c>game_rules</c> / <c>weather</c> / <c>world_gen_settings</c>などがこの形で<c>level.dat</c>から分離されている
+    /// 26.1以降は<c>game_rules</c> / <c>weather</c> / <c>world_gen_settings</c>などがこの形で<c>level.dat</c>から分離されている
+    /// 26.1より前は<c>data/&lt;name&gt;.dat</c>を読む
     /// </remarks>
     public NbtCompound? DataFile(string name)
     {
         EnsureOpen();
-        string path = Path.Combine(Directory, "data", "minecraft", name + ".dat");
+        string path = layout.DataFilePath(Directory, name);
 
         if (!File.Exists(path))
         {
@@ -148,40 +164,14 @@ public sealed class MinecraftWorld : IDisposable
         return NbtIo.ReadFile(path).Tag;
     }
 
-    /// <summary>存在する次元のIDを列挙する</summary>
+    /// <summary>
+    /// 存在する次元のIDを列挙する
+    /// 26.1より前は標準の3次元を固定の順で先に並べ、データパックの次元を<c>dimensions/</c>から探す
+    /// </summary>
     public IEnumerable<string> DimensionIds()
     {
         EnsureOpen();
-        string root = Path.Combine(Directory, "dimensions");
-
-        // dimensions/が無いワールドには次元が1つも無い
-        if (!System.IO.Directory.Exists(root))
-        {
-            yield break;
-        }
-
-        List<string> found = new List<string>();
-
-        // dimensions/<名前空間>/<パス>/の2段を辿る
-        foreach (string namespaceDir in System.IO.Directory.EnumerateDirectories(root))
-        {
-            string namespaceName = Path.GetFileName(namespaceDir);
-
-            // dimensions/<名前空間>/<パス>/の2段目を次元の名前として拾う
-            foreach (string pathDir in System.IO.Directory.EnumerateDirectories(namespaceDir))
-            {
-                found.Add(namespaceName + ":" + Path.GetFileName(pathDir));
-            }
-        }
-
-        // 走査順がファイルシステム依存にならないよう並べる
-        found.Sort(StringComparer.Ordinal);
-
-        // 並べ替えたものを1件ずつ返す
-        foreach (string id in found)
-        {
-            yield return id;
-        }
+        return layout.DimensionIds(Directory);
     }
 
     /// <summary>
@@ -204,17 +194,14 @@ public sealed class MinecraftWorld : IDisposable
             return cached;
         }
 
-        int colon = normalized.IndexOf(':', StringComparison.Ordinal);
-        string namespaceName = normalized.Substring(0, colon);
-        string path = normalized.Substring(colon + 1);
-        string directory = Path.Combine(Directory, "dimensions", namespaceName, path);
-
-        if (!System.IO.Directory.Exists(directory))
+        // 存在しない次元はnullのまま
+        if (!layout.HasDimension(Directory, normalized))
         {
             return null;
         }
 
-        Dimension opened = new Dimension(normalized, directory, options);
+        string directory = layout.DimensionDirectory(Directory, normalized);
+        Dimension opened = new Dimension(normalized, directory, options, layout);
         dimensions[normalized] = opened;
         return opened;
     }
@@ -223,9 +210,9 @@ public sealed class MinecraftWorld : IDisposable
     public IEnumerable<string> PlayerIds()
     {
         EnsureOpen();
-        string directory = Path.Combine(Directory, "players", "data");
+        string directory = layout.PlayerDirectory(Directory);
 
-        // players/data/が無ければプレイヤーは1人もいない
+        // プレイヤーのフォルダが無ければプレイヤーは1人もいない
         if (!System.IO.Directory.Exists(directory))
         {
             yield break;
@@ -255,7 +242,7 @@ public sealed class MinecraftWorld : IDisposable
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(uuid);
 
-        string path = Path.Combine(Directory, "players", "data", uuid + ".dat");
+        string path = Path.Combine(layout.PlayerDirectory(Directory), uuid + ".dat");
 
         if (!File.Exists(path))
         {
@@ -339,6 +326,36 @@ public sealed class MinecraftWorld : IDisposable
         }
     }
 
+    /// <summary>
+    /// ワールドで世代を指定されていれば、チャンクの読み込みにも同じ指定を入れた複製を返す
+    /// 渡されたオプションは書き換えない
+    /// </summary>
+    private static WorldOpenOptions WithFormatDataVersion(WorldOpenOptions source)
+    {
+        // 指定が無ければ、チャンクごとの指定やチャンク自身のDataVersionに任せる
+        if (source.FormatDataVersion is null)
+        {
+            return source;
+        }
+
+        ChunkReadOptions read = source.ChunkRead;
+
+        return new WorldOpenOptions
+        {
+            Writable = source.Writable,
+            IgnoreSessionLock = source.IgnoreSessionLock,
+            ChunkRead = new ChunkReadOptions
+            {
+                OnVersionMismatch = read.OnVersionMismatch,
+                OnWarning = read.OnWarning,
+                LenientBitStorage = read.LenientBitStorage,
+                FormatDataVersion = source.FormatDataVersion,
+            },
+            ChunkWrite = source.ChunkWrite,
+            FormatDataVersion = source.FormatDataVersion,
+        };
+    }
+
     /// <summary>名前空間が省略されていたら<c>minecraft:</c>を補う</summary>
     private static string NormalizeDimensionId(string dimensionId)
     {
@@ -355,18 +372,24 @@ public sealed class MinecraftWorld : IDisposable
 /// <c>level.dat</c>の内容
 /// </summary>
 /// <remarks>
-/// 26.xでは大幅に軽量化されており、ゲームルールやワールド生成設定は<c>data/minecraft/</c>配下の個別ファイルへ分離されている
+/// 26.1以降は大幅に軽量化されており、ゲームルールやワールド生成設定は<c>data/minecraft/</c>配下の個別ファイルへ分離されている
+/// それより前は、<c>level.dat</c>の中に入っている
+/// スポーン地点・難易度・ハードコアの取得子は、構成の世代ごとのキーを読む
 /// </remarks>
 public sealed class LevelData
 {
     private readonly string rootName;
 
-    internal LevelData(NamedTag named)
+    internal LevelData(NamedTag named, int? formatDataVersion)
     {
         rootName = named.Name;
         Raw = named.Tag;
         Data = named.Tag.GetCompound("Data");
+        Layout = WorldLayout.Detect(Data, formatDataVersion);
     }
+
+    /// <summary>ワールドの構成の世代</summary>
+    internal WorldLayout Layout { get; }
 
     /// <summary>ルートのNBT
     /// <c>Data</c>を含む</summary>
@@ -390,16 +413,22 @@ public sealed class LevelData
     public int GameType => Data.GetInt("GameType");
 
     /// <summary>スポーン地点の<c>[x, y, z]</c></summary>
-    public int[] SpawnPos => Data.GetCompound("spawn").GetIntArray("pos");
+    public int[] SpawnPos => Layout.SpawnPos(Data);
 
-    /// <summary>スポーン地点の次元ID</summary>
-    public string SpawnDimension => Data.GetCompound("spawn").GetString("dimension");
+    /// <summary>
+    /// スポーン地点の次元ID
+    /// </summary>
+    /// <remarks>26.1より前の<c>level.dat</c>には無いので、<c>UnsupportedFeature</c>になる</remarks>
+    public string SpawnDimension => Layout.SpawnDimension(Data);
 
-    /// <summary>難易度（<c>normal</c>など）</summary>
-    public string Difficulty => Data.GetCompound("difficulty_settings").GetString("difficulty");
+    /// <summary>
+    /// 難易度（<c>normal</c>など）
+    /// </summary>
+    /// <remarks>26.1より前の数値は、0 <c>peaceful</c> 1 <c>easy</c> 2 <c>normal</c> 3 <c>hard</c>に直す</remarks>
+    public string Difficulty => Layout.Difficulty(Data);
 
     /// <summary>ハードコアか</summary>
-    public bool IsHardcore => Data.GetCompound("difficulty_settings").GetBool("hardcore");
+    public bool IsHardcore => Layout.IsHardcore(Data);
 
     /// <summary>バージョン名（<c>26.3</c>など）</summary>
     public string VersionName => Data.GetCompound("Version").GetString("Name");

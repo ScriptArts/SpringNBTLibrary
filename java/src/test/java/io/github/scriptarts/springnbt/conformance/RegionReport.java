@@ -39,6 +39,7 @@ final class RegionReport {
         for (ChunkPos position : region.chunkPositions()) {
             RawChunk raw = region.readChunkRaw(position.x(), position.z());
 
+            // 一覧にあっても中身の無いチャンクは数えない
             if (raw == null) {
                 continue;
             }
@@ -82,6 +83,7 @@ final class RegionReport {
             for (ChunkPos position : source.chunkPositions()) {
                 NbtCompound chunk = source.readChunk(position.x(), position.z());
 
+                // 中身の無いチャンクは詰め直す対象にしない
                 if (chunk == null) {
                     continue;
                 }

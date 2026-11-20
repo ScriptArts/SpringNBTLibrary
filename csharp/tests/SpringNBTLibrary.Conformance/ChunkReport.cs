@@ -11,6 +11,27 @@ namespace SpringNBTLibrary.Conformance;
 internal static class ChunkReport
 {
     /// <summary>
+    /// バイオームを数値のIDで持つチャンクか
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Chunk.GetBiome"/>が<see cref="ErrorCode.UnsupportedFeature"/>になれば、数値のIDで持つ1.17までの形式
+    /// </remarks>
+    internal static bool UsesBiomeIds(Chunk chunk, int y)
+    {
+        // UNSUPPORTED_FEATUREだけを受け止め、ほかのエラーは検証の失敗としてそのまま伝える
+        try
+        {
+            chunk.GetBiome(0, y, 0);
+        }
+        catch (SpringNbtException error) when (error.Code == ErrorCode.UnsupportedFeature)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// チャンクの全ブロック・全バイオームを走査して集計する
     /// </summary>
     /// <remarks>
@@ -26,8 +47,17 @@ internal static class ChunkReport
 
         SortedDictionary<string, int> blocks = new SortedDictionary<string, int>(StringComparer.Ordinal);
         SortedDictionary<string, int> biomes = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        SortedDictionary<int, int> biomeIds = new SortedDictionary<int, int>();
+        bool numericBiomes = false;
+        List<int> sectionYs = chunk.SectionYs.ToList();
 
-        foreach (int sectionY in chunk.SectionYs)
+        // 最初に読む位置で、バイオームを名前とIDのどちらで持つかを決める
+        if (sectionYs.Count > 0)
+        {
+            numericBiomes = UsesBiomeIds(chunk, sectionYs[0] * 16);
+        }
+
+        foreach (int sectionY in sectionYs)
         {
             ChunkSection section = chunk.Section(sectionY)!;
             int blockPalette = 0;
@@ -60,6 +90,7 @@ internal static class ChunkReport
                     {
                         BlockState? block = chunk.GetBlock(x, (sectionY * 16) + y, z);
 
+                        // ブロックを持たないセクションの位置は数えない
                         if (block is null)
                         {
                             continue;
@@ -79,8 +110,25 @@ internal static class ChunkReport
                 {
                     for (int x = 0; x < 16; x += 4)
                     {
+                        // 数値のIDで持つチャンクは、IDごとに数える
+                        if (numericBiomes)
+                        {
+                            int? biomeId = chunk.GetBiomeId(x, (sectionY * 16) + y, z);
+
+                            // Biomesを読めない位置は数えない
+                            if (biomeId is null)
+                            {
+                                continue;
+                            }
+
+                            biomeIds.TryGetValue(biomeId.Value, out int idCount);
+                            biomeIds[biomeId.Value] = idCount + 1;
+                            continue;
+                        }
+
                         string? biome = chunk.GetBiome(x, (sectionY * 16) + y, z);
 
+                        // バイオームを持たないセクションの位置は数えない
                         if (biome is null)
                         {
                             continue;
@@ -102,6 +150,12 @@ internal static class ChunkReport
         foreach (KeyValuePair<string, int> entry in biomes)
         {
             builder.Append(string.Create(CultureInfo.InvariantCulture, $"biome {entry.Key} {entry.Value}\n"));
+        }
+
+        // IDの数値の昇順で出す
+        foreach (KeyValuePair<int, int> entry in biomeIds)
+        {
+            builder.Append(string.Create(CultureInfo.InvariantCulture, $"biome-id {entry.Key} {entry.Value}\n"));
         }
 
         return builder.ToString();
@@ -138,8 +192,17 @@ internal static class ChunkReport
         chunk.SetBlock(4, baseY + 2, 4, BlockState.Parse("minecraft:edited_plain"));
 
         // バイオームも書き換える
-        chunk.SetBiome(0, baseY, 0, "minecraft:desert");
-        chunk.SetBiome(8, baseY + 8, 8, "minecraft:jungle");
+        // 数値のIDで持つチャンクは、名前の代わりにID（2は砂漠、21はジャングル）で書く
+        if (UsesBiomeIds(chunk, baseY))
+        {
+            chunk.SetBiomeId(0, baseY, 0, 2);
+            chunk.SetBiomeId(8, baseY + 8, 8, 21);
+        }
+        else
+        {
+            chunk.SetBiome(0, baseY, 0, "minecraft:desert");
+            chunk.SetBiome(8, baseY + 8, 8, "minecraft:jungle");
+        }
 
         // 使われなくなったパレット要素を掃除する
         chunk.Compact();

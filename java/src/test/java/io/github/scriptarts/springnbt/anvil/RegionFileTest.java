@@ -18,6 +18,7 @@ import io.github.scriptarts.springnbt.nbt.NbtString;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -307,11 +308,77 @@ class RegionFileTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-        "bad_offset", "overlapping_sectors", "unaligned_length", "offset_out_of_file",
+        "bad_offset", "overlapping_sectors", "offset_out_of_file", "truncated_chunk",
+        "truncated_length",
     })
     void brokenHeadersAreRejected(String vector) {
         assertEquals(ErrorCode.MALFORMED_DATA,
                 codeOf(() -> RegionFile.open(vectorDir(vector).resolve("r.0.0.mca")).close()));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"unaligned_tail, 2", "unaligned_extra_byte, 1"})
+    void unalignedFileIsReadAsIfPaddedWithZeros(String vector, int chunkCount) throws IOException {
+        Path path = vectorDir(vector).resolve("r.0.0.mca");
+        byte[] original = Files.readAllBytes(path);
+
+        // 長さが4096の倍数でないことを前提にしたベクタ
+        assertTrue(original.length % RegionFile.SECTOR_SIZE != 0);
+
+        try (RegionFile region = RegionFile.open(path)) {
+            List<ChunkPos> positions = region.chunkPositions();
+            assertEquals(chunkCount, positions.size());
+
+            // すべてのチャンクを最後まで読めること
+            for (ChunkPos position : positions) {
+                assertEquals(position.x(),
+                        region.readChunk(position.x(), position.z()).getInt("xPos"));
+            }
+
+            // 組み立て直すと、元のバイト列の後ろに次のセクタ境界までゼロが続く
+            int padding = RegionFile.SECTOR_SIZE - (original.length % RegionFile.SECTOR_SIZE);
+            assertArrayEquals(Arrays.copyOf(original, original.length + padding), region.toBytes());
+        }
+    }
+
+    @Test
+    void unalignedFileIsNotRewrittenWithoutChanges() throws IOException {
+        Path directory = copyVector("unaligned_tail");
+        Path path = directory.resolve("r.0.0.mca");
+        byte[] original = Files.readAllBytes(path);
+
+        // 読み書きで開いても、変えなければ書き出しても閉じてもファイルは元のまま
+        try (RegionFile region = RegionFile.open(path, RegionFileMode.READ_WRITE)) {
+            region.readChunk(1, 0);
+            region.flush();
+        }
+
+        // ワールドが使うフォルダの書き出しでも同じ
+        try (RegionFolder folder = RegionFolder.open(directory, RegionFileMode.READ_WRITE)) {
+            folder.readChunk(1, 0);
+            folder.flush();
+        }
+
+        assertArrayEquals(original, Files.readAllBytes(path));
+    }
+
+    @Test
+    void writingToUnalignedFilePadsItToSectorBoundary() throws IOException {
+        Path path = copyVector("unaligned_tail").resolve("r.0.0.mca");
+
+        try (RegionFile region = RegionFile.open(path, RegionFileMode.READ_WRITE)) {
+            region.writeChunk(2, 0, sampleChunk(2, 0));
+        }
+
+        // 書き出したファイルは4096の倍数になり、元からあったチャンクも読める
+        assertEquals(0, Files.size(path) % RegionFile.SECTOR_SIZE);
+
+        try (RegionFile reopened = RegionFile.open(path)) {
+            assertEquals(3, reopened.chunkPositions().size());
+            assertEquals(0, reopened.readChunk(0, 0).getInt("xPos"));
+            assertEquals(1, reopened.readChunk(1, 0).getInt("xPos"));
+            assertEquals(2, reopened.readChunk(2, 0).getInt("xPos"));
+        }
     }
 
     @Test

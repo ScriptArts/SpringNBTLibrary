@@ -2,8 +2,8 @@
 
 Java版のセーブデータのディレクトリ構成と`level.dat`の扱い。
 
-> **この章は、Java版26.2の実データを走査して確認した内容に基づく。26.3でも構成が変わっていないことを実データで確かめた。**
-> 1.21.xまでの構成（`region/`が直下、`DIM-1` / `DIM1`、`playerdata/`）とは大きく異なる。
+> **1〜4章は、26.1で入った構成（世代L2）を、Java版26.2の実データを走査して確認した内容に基づく。26.3でも構成が変わっていないことを実データで確かめた。**
+> 1.21.xまでの構成（`region/`が直下、`DIM-1` / `DIM1`、`playerdata/`）とは大きく異なる。1.21.xまでの構成（世代L1）は5章にまとめる。
 > 検証方法は[90 適合性](90-conformance.md)の「実ワールド走査」を参照。
 
 ---
@@ -213,3 +213,70 @@ Dimension
 `get_block` / `set_block`は**絶対ワールド座標**を取り、リージョン・チャンク・セクションを内部で解決する。存在しないチャンクに対する`get_block`は`None`、`set_block`は`INVALID_ARGUMENT`（チャンクを生成する機能は持たない）。
 
 `dimension()`や`region_folder()`などが`Option`を返すのは、生成されていない次元にはディレクトリ自体が無いため。
+
+---
+
+## 5. 26.1より前の構成
+
+ワールドの構成と`level.dat`の中身は、`level.dat`の`DataVersion`で次の2つの世代に分かれる。
+
+| 世代 | `level.dat`のDataVersion | バージョン | 構成 |
+|---|---|---|---|
+| L1 | 4785以下 | 1.13〜1.21.x | この章 |
+| L2 | 4786以降 | 26.1以降 | 1〜4章 |
+
+世代はワールドを開いたときに決め、`level.dat`の読み書きと次元・プレイヤー・データファイルの場所に使う。
+`level.dat`に`DataVersion`が無いワールド（1.9より前）はL1として扱う。
+
+`WorldOpenOptions.format_data_version`を指定すると、`level.dat`の`DataVersion`の代わりにその値で世代を選ぶ。
+指定した値はそのワールドから読むすべてのチャンクの世代の選び方にも使い、`ChunkReadOptions.format_data_version`より優先する（[30 7.1](30-chunk-format.md#71-世代の表)）。
+指定できる値は`1519`以上で、それ未満は`INVALID_ARGUMENT`。
+
+チャンクの世代はワールドの世代とは別に、チャンクごとに決まる。L1のワールドにも形式の違うチャンクが混ざりうる。
+
+### 5.1 ディレクトリ構成
+
+```
+<ワールド名>/
+├─ level.dat              ゲームルールや天候なども中に入っている
+├─ level.dat_old
+├─ session.lock
+├─ region/                オーバーワールドの地形
+├─ entities/              オーバーワールドのエンティティ（1.17以降）
+├─ poi/                   オーバーワールドのPOI（1.14以降）
+├─ data/<名前>.dat        オーバーワールドとワールド単位のデータ
+├─ playerdata/<uuid>.dat  プレイヤー
+├─ DIM-1/                 ネザー（region/ entities/ poi/ data/）
+├─ DIM1/                  エンド（同上）
+└─ dimensions/<名前空間>/<パス>/   データパックが足した次元
+```
+
+| 次元ID | ディレクトリ |
+|---|---|
+| `minecraft:overworld` | ワールドの直下 |
+| `minecraft:the_nether` | `DIM-1/` |
+| `minecraft:the_end` | `DIM1/` |
+| `<ns>:<path>`（上の3つ以外） | `dimensions/<ns>/<path>/` |
+
+- オーバーワールドは、直下に`region/`があるときだけ存在するとみなす。ほかの次元はディレクトリの有無で判断する
+- `dimension_ids`は、存在する標準の3次元をオーバーワールド、ネザー、エンドの順に並べ、そのあとに`dimensions/`の下の次元をIDの順に並べる。`dimensions/`の下に標準の3次元のIDと同じ名前のディレクトリがあっても、標準の次元としては数えない
+- `player_ids` / `player`は`playerdata/`を読む
+- `data_file`は`<次元のディレクトリ>/data/<名前>.dat`を読む。`MinecraftWorld.data_file`はワールドの直下の`data/<名前>.dat`を読むので、オーバーワールドの`Dimension.data_file`と同じファイルになる
+
+### 5.2 level.dat
+
+ゲームルール（`Data.GameRules`）などは、`level.dat`の中に入っている（2章の「1.21.xからの変更点」）。
+これらは`LevelData.data`から生のNBTとしてたどる。
+
+名前つきの取得子はL1では次のキーを読む。
+
+| 取得子 | L1のキー | 内容 |
+|---|---|---|
+| `spawn_pos` | `Data.SpawnX` / `SpawnY` / `SpawnZ`（`Int`） | `[x, y, z]`にまとめて返す |
+| `difficulty` | `Data.Difficulty`（`Byte`） | `0` `peaceful`、`1` `easy`、`2` `normal`、`3` `hard`に直して返す。ほかの値は`MALFORMED_DATA` |
+| `is_hardcore` | `Data.hardcore`（`Byte`） | |
+| `spawn_dimension` | 無し | `UNSUPPORTED_FEATURE` |
+
+`data_version`、`version_name`、`level_name`、`time`、`game_type`はL2と同じキーを読む。
+
+1.12.2から1.21 Pre-Release 1までのL1の実ワールド30個で、これらの取得子がすべて値を返し、`spawn_dimension`だけが`UNSUPPORTED_FEATURE`になることを確かめた。

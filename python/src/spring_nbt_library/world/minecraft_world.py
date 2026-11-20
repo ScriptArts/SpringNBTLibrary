@@ -1,6 +1,7 @@
 """Minecraft Java版のセーブデータ1つ分と、その中の次元
 
-26.xでは構成が大きく変わっており、標準の3次元も``dimensions/<名前空間>/<パス>/``の下に並ぶ
+26.1以降は構成が大きく変わっており、標準の3次元も``dimensions/<名前空間>/<パス>/``の下に並ぶ
+それより前の構成も、``level.dat``のDataVersionで見分けて読み書きできる
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from ..anvil import ChunkPos, RegionFileMode, RegionFolder
 from ..errors import ErrorCode, SpringNbtError
 from ..nbt import NamedTag, NbtCompound, read_file, write_bytes
 from .block_state import BlockState
+from ._world_layout import WorldLayout
 from .chunk import Chunk, ChunkReadOptions, ChunkWriteOptions
 
 __all__ = ["Dimension", "LevelData", "MinecraftWorld", "WorldOpenOptions"]
@@ -30,7 +32,8 @@ class WorldOpenOptions:
 
     def __init__(self, writable: bool = False, ignore_session_lock: bool = False,
                  chunk_read: Optional[ChunkReadOptions] = None,
-                 chunk_write: Optional[ChunkWriteOptions] = None) -> None:
+                 chunk_write: Optional[ChunkWriteOptions] = None,
+                 format_data_version: Optional[int] = None) -> None:
         #: 読み書きで開くか
         #: 既定は読み取り専用
         self.writable = writable
@@ -54,19 +57,30 @@ class WorldOpenOptions:
         else:
             self.chunk_write = chunk_write
 
+        #: ワールドの構成の世代を選ぶDataVersion
+        #:
+        #: Noneなら、``level.dat``のDataVersionで選ぶ
+        #: 1519以上でなければならない
+        #: そのワールドから読むすべてのチャンクの世代にも効き、``chunk_read.format_data_version``より優先する
+        self.format_data_version = format_data_version
+
 
 class LevelData:
     """``level.dat``の内容
 
-    26.xでは大幅に軽量化されており、ゲームルールやワールド生成設定は``data/minecraft/``配下の個別ファイルへ分離されている
+    26.1以降は大幅に軽量化されており、ゲームルールやワールド生成設定は``data/minecraft/``配下の個別ファイルへ分離されている
+    それより前は、``level.dat``の中に入っている
+
+    スポーン地点・難易度・ハードコアの取得子は、構成の世代ごとのキーを読む
     """
 
-    __slots__ = ("_root_name", "raw", "data")
+    __slots__ = ("_root_name", "raw", "data", "_layout")
 
-    def __init__(self, named: NamedTag) -> None:
+    def __init__(self, named: NamedTag, format_data_version: Optional[int] = None) -> None:
         self._root_name = named.name
         self.raw = named.tag
         self.data = named.tag.get_compound("Data")
+        self._layout = WorldLayout.detect(self.data, format_data_version)
 
     @property
     def data_version(self) -> int:
@@ -93,22 +107,28 @@ class LevelData:
     @property
     def spawn_pos(self) -> List[int]:
         """スポーン地点の``[x, y, z]``"""
-        return self.data.get_compound("spawn").get_int_array("pos")
+        return self._layout.spawn_pos(self.data)
 
     @property
     def spawn_dimension(self) -> str:
-        """スポーン地点の次元ID"""
-        return self.data.get_compound("spawn").get_string("dimension")
+        """スポーン地点の次元ID
+
+        26.1より前の``level.dat``には無いので、``UNSUPPORTED_FEATURE``になる
+        """
+        return self._layout.spawn_dimension(self.data)
 
     @property
     def difficulty(self) -> str:
-        """難易度（``normal``など）"""
-        return self.data.get_compound("difficulty_settings").get_string("difficulty")
+        """難易度（``normal``など）
+
+        26.1より前の数値は、0 ``peaceful`` 1 ``easy`` 2 ``normal`` 3 ``hard``に直す
+        """
+        return self._layout.difficulty(self.data)
 
     @property
     def is_hardcore(self) -> bool:
         """ハードコアか"""
-        return self.data.get_compound("difficulty_settings").get_bool("hardcore")
+        return self._layout.is_hardcore(self.data)
 
     @property
     def version_name(self) -> str:
@@ -136,10 +156,15 @@ class Dimension:
     #: エンドの次元ID
     THE_END = "minecraft:the_end"
 
-    def __init__(self, dimension_id: str, directory: str, options: WorldOpenOptions) -> None:
+    def __init__(self, dimension_id: str, directory: str, options: WorldOpenOptions,
+                 layout: WorldLayout) -> None:
+        """ワールドが内部で作る
+        利用者は直接作らず、``MinecraftWorld.dimension()``で得る
+        """
         self.id = dimension_id
         self.directory = directory
         self._options = options
+        self._layout = layout
         self._chunk_cache: Dict[str, Chunk] = {}
         self._regions: Optional[RegionFolder] = None
         self._entities: Optional[RegionFolder] = None
@@ -178,9 +203,10 @@ class Dimension:
         存在しなければNone
 
         次元ごとの``world_border`` / ``raids`` / ``chunk_tickets``などが入る
+        26.1より前は``data/<name>.dat``を読む
         """
         self._ensure_open()
-        path = os.path.join(self.directory, "data", "minecraft", name + ".dat")
+        path = self._layout.data_file_path(self.directory, name)
 
         if not os.path.exists(path):
             return None
@@ -369,8 +395,9 @@ class MinecraftWorld:
 
     def __init__(self, directory: str, options: WorldOpenOptions, level: NamedTag) -> None:
         self.directory = directory
-        self._options = options
-        self.level = LevelData(level)
+        self.level = LevelData(level, options.format_data_version)
+        self._layout = self.level._layout
+        self._options = _with_format_data_version(options)
         self._dimensions: Dict[str, Dimension] = {}
         self._closed = False
 
@@ -380,7 +407,8 @@ class MinecraftWorld:
         """ワールドを開く
 
         :raises SpringNbtError: ディレクトリや``level.dat``が無い場合、
-            または書き込みモードで``session.lock``を取得できない場合（``fcntl``が使える環境のみ確かめる）
+            または書き込みモードで``session.lock``を取得できない場合（``fcntl``が使える環境のみ確かめる）、
+            または``format_data_version``が1519未満の場合
         """
         if options is None:
             effective = WorldOpenOptions()
@@ -411,10 +439,11 @@ class MinecraftWorld:
         """``data/minecraft/<name>.dat``を読む
         存在しなければNone
 
-        26.xでは``game_rules`` / ``weather`` / ``world_gen_settings``などがこの形で``level.dat``から分離されている
+        26.1以降は``game_rules`` / ``weather`` / ``world_gen_settings``などがこの形で``level.dat``から分離されている
+        26.1より前は``data/<name>.dat``を読む
         """
         self._ensure_open()
-        path = os.path.join(self.directory, "data", "minecraft", name + ".dat")
+        path = self._layout.data_file_path(self.directory, name)
 
         if not os.path.exists(path):
             return None
@@ -422,31 +451,11 @@ class MinecraftWorld:
         return read_file(path).tag
 
     def dimension_ids(self) -> List[str]:
-        """存在する次元のIDを返す"""
+        """存在する次元のIDを返す
+        26.1より前は標準の3次元を固定の順で先に並べ、データパックの次元を``dimensions/``から探す
+        """
         self._ensure_open()
-        root = os.path.join(self.directory, "dimensions")
-
-        if not os.path.isdir(root):
-            return []
-
-        found = []
-
-        # dimensions/<名前空間>/<パス>/の2段を辿る
-        for namespace_name in os.listdir(root):
-            namespace_dir = os.path.join(root, namespace_name)
-
-            if not os.path.isdir(namespace_dir):
-                continue
-
-            # 2段目が次元のパス
-            for path_name in os.listdir(namespace_dir):
-                # ディレクトリだけを次元として数える
-                if os.path.isdir(os.path.join(namespace_dir, path_name)):
-                    found.append("%s:%s" % (namespace_name, path_name))
-
-        # 走査順がファイルシステム依存にならないよう並べる
-        found.sort()
-        return found
+        return self._layout.dimension_ids(self.directory)
 
     def dimension(self, dimension_id: str) -> Optional[Dimension]:
         """次元を得る
@@ -459,21 +468,19 @@ class MinecraftWorld:
         if cached is not None:
             return cached
 
-        colon = normalized.index(":")
-        path = os.path.join(self.directory, "dimensions",
-                            normalized[:colon], normalized[colon + 1:])
-
-        if not os.path.isdir(path):
+        # 存在しない次元はNoneのまま
+        if not self._layout.has_dimension(self.directory, normalized):
             return None
 
-        opened = Dimension(normalized, path, self._options)
+        path = self._layout.dimension_directory(self.directory, normalized)
+        opened = Dimension(normalized, path, self._options, self._layout)
         self._dimensions[normalized] = opened
         return opened
 
     def player_ids(self) -> List[str]:
         """プレイヤーのUUID一覧"""
         self._ensure_open()
-        path = os.path.join(self.directory, "players", "data")
+        path = self._layout.player_directory(self.directory)
 
         if not os.path.isdir(path):
             return []
@@ -487,7 +494,7 @@ class MinecraftWorld:
         存在しなければNone
         """
         self._ensure_open()
-        path = os.path.join(self.directory, "players", "data", uuid + ".dat")
+        path = os.path.join(self._layout.player_directory(self.directory), uuid + ".dat")
 
         if not os.path.exists(path):
             return None
@@ -573,6 +580,29 @@ def _check_session_lock(directory: str) -> None:
         fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
     finally:
         handle.close()
+
+
+def _with_format_data_version(options: WorldOpenOptions) -> WorldOpenOptions:
+    """ワールドで世代を指定されていれば、チャンクの読み込みにも同じ指定を入れた複製を返す
+    渡されたオプションは書き換えない
+    """
+    # 指定が無ければ、チャンクごとの指定やチャンク自身のDataVersionに任せる
+    if options.format_data_version is None:
+        return options
+
+    source = options.chunk_read
+    chunk_read = ChunkReadOptions(
+        on_version_mismatch=source.on_version_mismatch,
+        on_warning=source.on_warning,
+        lenient_bit_storage=source.lenient_bit_storage,
+        format_data_version=options.format_data_version)
+
+    return WorldOpenOptions(
+        writable=options.writable,
+        ignore_session_lock=options.ignore_session_lock,
+        chunk_read=chunk_read,
+        chunk_write=options.chunk_write,
+        format_data_version=options.format_data_version)
 
 
 def _normalize_dimension_id(dimension_id: str) -> str:

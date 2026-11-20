@@ -71,6 +71,10 @@ public final class RegionFile implements AutoCloseable {
     private boolean dirty;
     private boolean closed;
 
+    // 開いたときにファイルがまだ無かったか
+    // 無ければ、変更が無くても書き出すときに作る
+    private boolean missingOnDisk;
+
     private RegionFile(Path path, RegionFileMode mode, RegionPos position, byte[] data) {
         this.path = path;
         this.mode = mode;
@@ -126,8 +130,10 @@ public final class RegionFile implements AutoCloseable {
 
         byte[] raw;
 
+        boolean exists = Files.exists(path);
+
         // 既にあるファイルは読み込み、無ければ空のヘッダだけを組み立てる
-        if (Files.exists(path)) {
+        if (exists) {
             try {
                 raw = Files.readAllBytes(path);
             } catch (IOException error) {
@@ -140,7 +146,9 @@ public final class RegionFile implements AutoCloseable {
             throw new SpringNbtException(ErrorCode.IO, "ファイルが存在しない: " + path);
         }
 
-        return new RegionFile(path, mode, position, raw);
+        RegionFile opened = new RegionFile(path, mode, position, raw);
+        opened.missingOnDisk = !exists;
+        return opened;
     }
 
     /**
@@ -166,9 +174,12 @@ public final class RegionFile implements AutoCloseable {
                     + (HEADER_SECTORS * SECTOR_SIZE) + " バイト必要）");
         }
 
-        if (data.length % SECTOR_SIZE != 0) {
-            throw SpringNbtException.malformed(
-                    "ファイル長がセクタ境界に揃っていない: " + data.length + " バイト");
+        int fileLength = data.length;
+
+        // 最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数になっていないことがある
+        // 足りない分をゼロで埋め、ほかのファイルと同じようにセクタ単位で扱う
+        if (fileLength % SECTOR_SIZE != 0) {
+            data = Arrays.copyOf(data, fileLength + (SECTOR_SIZE - (fileLength % SECTOR_SIZE)));
         }
 
         int totalSectors = data.length / SECTOR_SIZE;
@@ -201,6 +212,11 @@ public final class RegionFile implements AutoCloseable {
                         "チャンク " + index + " の割り当てがファイル外へはみ出している");
             }
 
+            // ゼロで埋めた部分まで割り当てが続くチャンクは、データが元のファイルの中で終わっていなければならない
+            if ((long) (offset + count) * SECTOR_SIZE > fileLength) {
+                ensureDataWithinFile(index, offset * SECTOR_SIZE, fileLength);
+            }
+
             // 同じセクタを2つのチャンクが指していたら、どちらかがおかしくなっている
             for (int sector = offset; sector < offset + count; sector++) {
                 Integer owner = sectorOwner.put(sector, index);
@@ -213,6 +229,21 @@ public final class RegionFile implements AutoCloseable {
 
             offsets[index] = offset;
             sectorCounts[index] = count;
+        }
+    }
+
+    /** チャンクのデータ（長さの4バイトを含む）が元のファイルの中で終わっているかを確かめる */
+    private void ensureDataWithinFile(int index, int start, int fileLength) {
+        // 長さの4バイトを読み切れなければ、データの終わりが分からない
+        if (start + 4 > fileLength) {
+            throw SpringNbtException.malformed("チャンク" + index + "のデータがファイルの終わりで切れている");
+        }
+
+        int length = (int) readUnsigned(start, 4);
+
+        // 埋めたゼロをデータとして読まないよう、元のファイルの長さと比べる
+        if ((long) start + 4 + length > fileLength) {
+            throw SpringNbtException.malformed("チャンク" + index + "のデータがファイルの終わりで切れている");
         }
     }
 
@@ -607,11 +638,21 @@ public final class RegionFile implements AutoCloseable {
         dirty = true;
     }
 
-    /** 変更をファイルへ書き出す */
+    /**
+     * 変更をファイルへ書き出す
+     *
+     * <p>開いてから変更が無く、ファイルが既にあれば何もしない
+     */
     public void flush() {
         ensureOpen();
 
         if (mode == RegionFileMode.READ_ONLY) {
+            return;
+        }
+
+        // 変更が無く、ファイルも既にあるなら書き出さない
+        // 読んだだけのリージョンを書き直すと、長さが4096の倍数でないファイルの末尾が埋まってしまう
+        if (!dirty && !missingOnDisk) {
             return;
         }
 
@@ -626,6 +667,7 @@ public final class RegionFile implements AutoCloseable {
         }
 
         dirty = false;
+        missingOnDisk = false;
     }
 
     /**

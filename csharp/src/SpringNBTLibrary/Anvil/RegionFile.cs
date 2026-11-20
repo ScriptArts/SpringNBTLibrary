@@ -58,6 +58,10 @@ public sealed class RegionFile : IDisposable
     private bool dirty;
     private bool closed;
 
+    // 開いたときにファイルがまだ無かったか
+    // 無ければ、変更が無くても書き出すときに作る
+    private bool missingOnDisk;
+
     private RegionFile(string path, RegionFileMode mode, RegionPos position, byte[] data)
     {
         this.path = path;
@@ -111,8 +115,10 @@ public sealed class RegionFile : IDisposable
 
         byte[] raw;
 
+        bool exists = File.Exists(path);
+
         // 既にあるファイルは読み込み、無ければ空のヘッダだけを組み立てる
-        if (File.Exists(path))
+        if (exists)
         {
             try
             {
@@ -137,7 +143,9 @@ public sealed class RegionFile : IDisposable
             throw new SpringNbtException(ErrorCode.Io, $"ファイルが存在しない: {path}");
         }
 
-        return new RegionFile(path, mode, position.Value, raw);
+        RegionFile opened = new RegionFile(path, mode, position.Value, raw);
+        opened.missingOnDisk = !exists;
+        return opened;
     }
 
     /// <summary>ヘッダを解析し、ロケーションとタイムスタンプを取り込む</summary>
@@ -156,10 +164,13 @@ public sealed class RegionFile : IDisposable
                 $"ヘッダが足りない: {data.Length} バイト（最低 {HeaderSectors * SectorSize} バイト必要）");
         }
 
-        if (data.Length % SectorSize != 0)
+        int fileLength = data.Length;
+
+        // 最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数になっていないことがある
+        // 足りない分をゼロで埋め、ほかのファイルと同じようにセクタ単位で扱う
+        if (fileLength % SectorSize != 0)
         {
-            throw SpringNbtException.Malformed(
-                $"ファイル長がセクタ境界に揃っていない: {data.Length} バイト");
+            Array.Resize(ref data, fileLength + (SectorSize - (fileLength % SectorSize)));
         }
 
         int totalSectors = data.Length / SectorSize;
@@ -198,6 +209,12 @@ public sealed class RegionFile : IDisposable
                     $"チャンク {index} の割り当てがファイル外へはみ出している");
             }
 
+            // ゼロで埋めた部分まで割り当てが続くチャンクは、データが元のファイルの中で終わっていなければならない
+            if ((long)(offset + count) * SectorSize > fileLength)
+            {
+                EnsureDataWithinFile(index, offset * SectorSize, fileLength);
+            }
+
             // 同じセクタを2つのチャンクが指していたら、どちらかがおかしくなっている
             for (int sector = offset; sector < offset + count; sector++)
             {
@@ -212,6 +229,24 @@ public sealed class RegionFile : IDisposable
 
             offsets[index] = offset;
             sectorCounts[index] = count;
+        }
+    }
+
+    /// <summary>チャンクのデータ（長さの4バイトを含む）が元のファイルの中で終わっているかを確かめる</summary>
+    private void EnsureDataWithinFile(int index, int start, int fileLength)
+    {
+        // 長さの4バイトを読み切れなければ、データの終わりが分からない
+        if (start + 4 > fileLength)
+        {
+            throw SpringNbtException.Malformed($"チャンク{index}のデータがファイルの終わりで切れている");
+        }
+
+        int length = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(start, 4));
+
+        // 埋めたゼロをデータとして読まないよう、元のファイルの長さと比べる
+        if ((long)start + 4 + length > fileLength)
+        {
+            throw SpringNbtException.Malformed($"チャンク{index}のデータがファイルの終わりで切れている");
         }
     }
 
@@ -605,11 +640,19 @@ public sealed class RegionFile : IDisposable
     }
 
     /// <summary>変更をファイルへ書き出す</summary>
+    /// <remarks>開いてから変更が無く、ファイルが既にあれば何もしない</remarks>
     public void Flush()
     {
         EnsureOpen();
 
         if (mode == RegionFileMode.ReadOnly)
+        {
+            return;
+        }
+
+        // 変更が無く、ファイルも既にあるなら書き出さない
+        // 読んだだけのリージョンを書き直すと、長さが4096の倍数でないファイルの末尾が埋まってしまう
+        if (!dirty && !missingOnDisk)
         {
             return;
         }
@@ -632,6 +675,7 @@ public sealed class RegionFile : IDisposable
         }
 
         dirty = false;
+        missingOnDisk = false;
     }
 
     /// <summary>現在の内容をバイト列として組み立てる

@@ -46,6 +46,21 @@
 
 この構成は、[実際の26.2と26.3のワールドを走査して確かめました](../spec/40-world-layout.md)。
 
+### 1.21.xまでの構成
+
+1.21.xまでのワールドも同じAPIで開けます。
+どちらの構成かはワールドを開いたときに`level.dat`の`DataVersion`で決まります（4786以上なら26.xの構成）。
+
+| 扱うもの | 1.21.xまでのワールドで読む場所 |
+|---|---|
+| `minecraft:overworld` | ワールドの直下（`region/`など） |
+| `minecraft:the_nether` / `minecraft:the_end` | `DIM-1/` / `DIM1/` |
+| データパックが足した次元 | `dimensions/<名前空間>/<パス>/` |
+| プレイヤー | `playerdata/<uuid>.dat` |
+| `DataFile` | `<次元のフォルダ>/data/<名前>.dat` |
+
+詳しくは[仕様40 5章](../spec/40-world-layout.md#5-261より前の構成)。
+
 ---
 
 ## 2. 開く
@@ -94,14 +109,23 @@ level.IsHardcore;
 NbtCompound data = level.Data;
 ```
 
+1.21.xまでの`level.dat`では、取得子が古いキーを読みます。
+
+- `SpawnPos`は`SpawnX` / `SpawnY` / `SpawnZ`を読みます
+- `Difficulty`は数値の`Difficulty`を読み、`"peaceful"` / `"easy"` / `"normal"` / `"hard"`に直して返します
+- `IsHardcore`は`hardcore`を読みます
+- `SpawnDimension`は、スポーン地点の次元を持つキーが無いので`UNSUPPORTED_FEATURE`になります
+
 ### 分離されたデータファイル
 
-ゲームルールなどは`level.dat`にはもう入っていません。
+26.xでは、ゲームルールなどは`level.dat`にはもう入っていません。
 
 ```csharp
 NbtCompound? rules = world.DataFile("game_rules");
 NbtCompound? weather = world.DataFile("weather");
 ```
+
+1.21.xまでのワールドでは、ゲームルールなどは`level.dat`の中（`level.Data`）にあります。`DataFile`は`data/<名前>.dat`を読みます。
 
 ---
 
@@ -169,8 +193,18 @@ world.SaveLevel();     // level.datを書き戻す
 
 ## 7. バージョンが違うワールド
 
-読み込みは寛容にしています。
-書き込みを既定で止めるのは、形式の違う古いチャンク（DataVersion 5006未満）だけです。`DataVersion`は読んだ値のまま残します（[adr/0003](../adr/0003-version-policy.md)）。
+1.13以降のワールドは読んだときの形式のまま読み書きします。
+チャンクの形式はチャンクごとに、そのチャンクの`DataVersion`で決まるので、形式の違うチャンクが混ざったワールドもそのまま扱えます（[adr/0011](../adr/0011-format-eras.md)）。
+
+書き込みを既定で止めるのは、1.13より前のチャンク（DataVersion 1519未満か、`DataVersion`の無いもの）だけです。`DataVersion`は読んだ値のまま残します。
+
+世代を自分で選びたいときは、開くときに指定します。フォルダの構成と、そのワールドから読むすべてのチャンクに効きます。
+
+```csharp
+WorldOpenOptions options = new WorldOpenOptions { FormatDataVersion = 3465 };   // 1.20.1の形式として開く
+using MinecraftWorld world = MinecraftWorld.Open(worldPath, options);
+```
+
 詳しくは[07](07-version-policy.md)。
 
 ---

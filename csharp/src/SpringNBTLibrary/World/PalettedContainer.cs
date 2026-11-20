@@ -21,12 +21,16 @@ namespace SpringNBTLibrary.World;
 public sealed class PalettedContainer
 {
     private readonly List<NbtTag> palette = new List<NbtTag>();
+    private readonly bool spanning;
+    private readonly bool alwaysHasData;
     private BitStorage? storage;
 
-    private PalettedContainer(int entryCount, int minBits)
+    private PalettedContainer(int entryCount, int minBits, bool spanning, bool alwaysHasData)
     {
         EntryCount = entryCount;
         MinBits = minBits;
+        this.spanning = spanning;
+        this.alwaysHasData = alwaysHasData;
     }
 
     /// <summary>エントリ数
@@ -62,7 +66,7 @@ public sealed class PalettedContainer
     public static PalettedContainer Filled(NbtTag value, int entryCount, int minBits)
     {
         ArgumentNullException.ThrowIfNull(value);
-        PalettedContainer result = new PalettedContainer(entryCount, minBits);
+        PalettedContainer result = new PalettedContainer(entryCount, minBits, false, false);
         result.palette.Add(value);
         return result;
     }
@@ -77,8 +81,6 @@ public sealed class PalettedContainer
         NbtCompound nbt, int entryCount, int minBits, bool lenientBitStorage = false)
     {
         ArgumentNullException.ThrowIfNull(nbt);
-        PalettedContainer result = new PalettedContainer(entryCount, minBits);
-
         NbtList? paletteTag = nbt.OptList("palette");
 
         if (paletteTag is null || paletteTag.Count == 0)
@@ -89,15 +91,51 @@ public sealed class PalettedContainer
         // パレットの要素は生のNbtTagのまま持つ
         // 並び順まで元どおりに書き戻すため
         // 異種リストの包みだけは外しておき、書くときに包み直す
+        List<NbtTag> entries = new List<NbtTag>();
+
+        // 包みを外しながら、パレットの要素を順に集める
         foreach (NbtTag entry in paletteTag)
         {
-            result.palette.Add(UnwrapListElement(entry));
+            entries.Add(UnwrapListElement(entry));
         }
 
-        long[]? data = nbt.OptLongArray("data");
+        return FromParts(entries, nbt.OptLongArray("data"), entryCount, minBits, false, false, lenientBitStorage);
+    }
+
+    /// <summary>
+    /// パレットとdataから作る
+    /// 1.13から1.15までの詰め方や、dataが必ず書かれる形式を読むための入口
+    /// </summary>
+    /// <param name="palette">パレットの要素（異種リストの包みは外してあること）</param>
+    /// <param name="data">packedな配列（無ければnull）</param>
+    /// <param name="entryCount">エントリ数</param>
+    /// <param name="minBits">ビット幅の下限</param>
+    /// <param name="spanning">64bitの境目をまたいで詰めるか</param>
+    /// <param name="alwaysHasData">パレットが1要素でもdataを書く形式か</param>
+    /// <param name="lenientBitStorage">dataの長さが合わないとき、長さからビット幅を逆算して読むか</param>
+    internal static PalettedContainer FromParts(
+        IReadOnlyList<NbtTag> palette, long[]? data, int entryCount, int minBits,
+        bool spanning, bool alwaysHasData, bool lenientBitStorage)
+    {
+        ArgumentNullException.ThrowIfNull(palette);
+
+        if (palette.Count == 0)
+        {
+            throw SpringNbtException.Malformed("palette が無いか空");
+        }
+
+        PalettedContainer result = new PalettedContainer(entryCount, minBits, spanning, alwaysHasData);
+        result.palette.AddRange(palette);
 
         if (data is null)
         {
+            // dataが必ず書かれる形式で無いなら、壊れたデータとして扱う
+            // 書き戻しで元に無いdataを作ってしまわないため
+            if (alwaysHasData)
+            {
+                throw SpringNbtException.Malformed("dataが必ず書かれる形式なのにdataが無い");
+            }
+
             // パレットが1要素ならdataは無くてよい
             if (result.palette.Count != 1)
             {
@@ -109,7 +147,7 @@ public sealed class PalettedContainer
         }
 
         int bits = Math.Max(minBits, CeilLog2(result.palette.Count));
-        result.storage = BitStorage.FromLongs(data, bits, entryCount, lenientBitStorage);
+        result.storage = BitStorage.FromLongs(data, bits, entryCount, lenientBitStorage, spanning);
 
         // 取り出した添字がパレットの範囲に収まっているか確かめる
         // エラーを出さずに0番目で代替すると、おかしくなったデータをそうと分からない形で書き戻してしまう
@@ -125,6 +163,32 @@ public sealed class PalettedContainer
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// パレットとdataに分けて返す
+    /// パレットの要素は異種リストの包みを掛けないまま返す
+    /// dataは、パレットが1要素なら（<c>alwaysHasData</c>でない限り）null
+    /// </summary>
+    internal (List<NbtTag> Palette, long[]? Data) ToParts()
+    {
+        List<NbtTag> entries = new List<NbtTag>(palette);
+
+        // パレットが2要素以上なら、記憶域をそのまま返す
+        if (storage is not null && palette.Count > 1)
+        {
+            return (entries, storage.ToLongs());
+        }
+
+        // 1要素でもdataを書く形式なら、記憶域が無くてもゼロで埋めた配列を作る
+        if (alwaysHasData)
+        {
+            int bits = Math.Max(MinBits, CeilLog2(palette.Count));
+            BitStorage zeroed = BitStorage.Create(bits, EntryCount, spanning);
+            return (entries, zeroed.ToLongs());
+        }
+
+        return (entries, null);
     }
 
     /// <summary>NBTへ変換する</summary>
@@ -306,7 +370,7 @@ public sealed class PalettedContainer
         }
 
         int newBits = Math.Max(MinBits, CeilLog2(compacted.Count));
-        BitStorage rebuilt = BitStorage.Create(newBits, EntryCount);
+        BitStorage rebuilt = BitStorage.Create(newBits, EntryCount, spanning);
 
         // 新しい添字へ置き換えながら詰め直す
         for (int index = 0; index < EntryCount; index++)
@@ -353,7 +417,7 @@ public sealed class PalettedContainer
         if (storage is null)
         {
             // これまで単一値だったので、全エントリが0番目のまま始まる
-            storage = BitStorage.Create(required, EntryCount);
+            storage = BitStorage.Create(required, EntryCount, spanning);
             return;
         }
 

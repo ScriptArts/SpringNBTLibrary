@@ -79,7 +79,8 @@ C#を基準実装としているので、迷ったら[`csharp/src/SpringNBTLibra
 | 論理右シフト | `BitStorage`では符号なしとして扱う。算術シフトだと上位ビットが埋まる |
 | 再帰の深さ | 深さ512を安全に扱えるか確かめる（[spec/00 5.1](../spec/00-conventions.md)） |
 | キーの並び | `Compound`は挿入順を保持する。ハッシュマップで実装すると書き戻しが一致しない |
-| `data`と`palette`の順 | 実データは`data`が先（[spec/31 4.1](../spec/31-paletted-container.md)） |
+| `data`と`palette`の順 | 読んだコンテナは読んだときの並びのまま書き戻す。新しく`data`を足すときは`data`が先（[spec/31 4.1](../spec/31-paletted-container.md#41-キーの並び順)） |
+| 形式の世代 | 1.17までの形式は本体が`Level`の中にあり、1.15までの形式は値が64bitの境目をまたぐ詰め方を使う。世代の違いは表にまとめ、ほかの場所で分岐しない（[spec/30 7章](../spec/30-chunk-format.md#7-形式の世代)） |
 
 ---
 

@@ -13,7 +13,7 @@ import sys
 from . import TARGET_DATA_VERSION
 from .anvil import ChunkCompression, RegionFile, RegionFileMode
 from .world import BlockState, Chunk, ChunkReadOptions, VersionMismatchAction
-from .errors import SpringNbtError
+from .errors import ErrorCode, SpringNbtError
 from .nbt import (
     Compression,
     NamedTag,
@@ -218,6 +218,7 @@ def region_list(region: RegionFile) -> str:
     for position in region.chunk_positions():
         raw = region.read_chunk_raw(position.x, position.z)
 
+        # 一覧にあっても中身の無いチャンクは数えない
         if raw is None:
             continue
 
@@ -255,6 +256,7 @@ def region_rewrite(source: RegionFile, output_path: str) -> None:
         for position in source.chunk_positions():
             chunk = source.read_chunk(position.x, position.z)
 
+            # 中身の無いチャンクは詰め直す対象にしない
             if chunk is None:
                 continue
 
@@ -272,6 +274,23 @@ def region_rewrite(source: RegionFile, output_path: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def uses_biome_ids(chunk: Chunk, y: int) -> bool:
+    """バイオームを数値のIDで持つチャンクか
+
+    ``get_biome``が``UNSUPPORTED_FEATURE``になれば、数値のIDで持つ1.17までの形式
+    """
+    try:
+        chunk.get_biome(0, y, 0)
+    except SpringNbtError as error:
+        # ほかのエラーは検証の失敗としてそのまま伝える
+        if error.code != ErrorCode.UNSUPPORTED_FEATURE:
+            raise
+
+        return True
+
+    return False
+
+
 def chunk_describe(chunk: Chunk) -> str:
     """チャンクの全ブロック・全バイオームを走査して集計する
 
@@ -281,6 +300,13 @@ def chunk_describe(chunk: Chunk) -> str:
     lines = ["chunk %d %d %d %s" % (chunk.x, chunk.z, chunk.min_section_y, chunk.status)]
     blocks = {}
     biomes = {}
+    biome_ids = {}
+    numeric_biomes = False
+    section_ys = chunk.section_ys
+
+    # 最初に読む位置で、バイオームを名前とIDのどちらで持つかを決める
+    if len(section_ys) > 0:
+        numeric_biomes = uses_biome_ids(chunk, section_ys[0] * 16)
 
     # セクションごとにブロックとバイオームを数え上げる
     for section_y in chunk.section_ys:
@@ -309,6 +335,7 @@ def chunk_describe(chunk: Chunk) -> str:
                 for x in range(16):
                     block = chunk.get_block(x, (section_y * 16) + y, z)
 
+                    # ブロックを持たないセクションの位置は数えない
                     if block is None:
                         continue
 
@@ -319,8 +346,20 @@ def chunk_describe(chunk: Chunk) -> str:
         for y in range(0, 16, 4):
             for z in range(0, 16, 4):
                 for x in range(0, 16, 4):
+                    # 数値のIDで持つチャンクは、IDごとに数える
+                    if numeric_biomes:
+                        biome_id = chunk.get_biome_id(x, (section_y * 16) + y, z)
+
+                        # Biomesを読めない位置は数えない
+                        if biome_id is None:
+                            continue
+
+                        biome_ids[biome_id] = biome_ids.get(biome_id, 0) + 1
+                        continue
+
                     biome = chunk.get_biome(x, (section_y * 16) + y, z)
 
+                    # バイオームを持たないセクションの位置は数えない
                     if biome is None:
                         continue
 
@@ -333,6 +372,10 @@ def chunk_describe(chunk: Chunk) -> str:
     # 名前の昇順で出すので、内部の並びに関係なく同じ出力になる
     for key in sorted(biomes):
         lines.append("biome %s %d" % (key, biomes[key]))
+
+    # IDの数値の昇順で出す
+    for key in sorted(biome_ids):
+        lines.append("biome-id %d %d" % (key, biome_ids[key]))
 
     return "\n".join(lines) + "\n"
 
@@ -361,8 +404,13 @@ def chunk_edit(chunk: Chunk) -> None:
     chunk.set_block(4, base_y + 2, 4, BlockState.parse("minecraft:edited_plain"))
 
     # バイオームも書き換える
-    chunk.set_biome(0, base_y, 0, "minecraft:desert")
-    chunk.set_biome(8, base_y + 8, 8, "minecraft:jungle")
+    # 数値のIDで持つチャンクは、名前の代わりにID（2は砂漠、21はジャングル）で書く
+    if uses_biome_ids(chunk, base_y):
+        chunk.set_biome_id(0, base_y, 0, 2)
+        chunk.set_biome_id(8, base_y + 8, 8, 21)
+    else:
+        chunk.set_biome(0, base_y, 0, "minecraft:desert")
+        chunk.set_biome(8, base_y + 8, 8, "minecraft:jungle")
 
     # 使われなくなったパレット要素を掃除する
     chunk.compact()

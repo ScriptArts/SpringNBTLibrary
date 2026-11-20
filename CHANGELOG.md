@@ -14,6 +14,69 @@
 
 対応言語はすべて、常に同じバージョン番号で公開する。
 
+## [3.0.0]
+
+Java版1.13以降のワールドを扱えるようにした。チャンクとワールドの構成を形式の世代に分け、読んだときの形式のまま読み書きする。バージョン間の変換はしない（[adr/0011](docs/adr/0011-format-eras.md)）。
+26.2で作ったワールドを26.3で開いたときに残る26.2の形式のチャンクも、読み書きできる。
+動作はJava版1.13.2から26.3までの実ワールドで確かめている。
+
+Rustの公開APIに互換性の崩れる変更（下の「互換性の崩れる変更（Rust）」）があるので、`x`を上げた。ワールドの保存形式は変わっていない。
+
+### 追加
+
+- チャンクの形式を5つの世代（1.13〜1.14.x、1.15、1.16〜1.17.x、1.18〜26.2、26.3以降）に分け、チャンクごとに自身の`DataVersion`で選ぶ。書き戻すときも読んだときの世代の形式で書き、`DataVersion`は書き換えない（[仕様30 7章](docs/spec/30-chunk-format.md#7-形式の世代)）
+- 1.21.xまでのワールドの構成（直下の`region/`、`DIM-1/` / `DIM1/`、`playerdata/`、`data/<名前>.dat`）を読む。構成は`level.dat`の`DataVersion`で選ぶ（[仕様40 5章](docs/spec/40-world-layout.md#5-261より前の構成)）
+- 1.21.xまでの`level.dat`では、`spawn_pos`が`SpawnX` / `SpawnY` / `SpawnZ`を、`difficulty`が数値の`Difficulty`を、`is_hardcore`が`hardcore`を読む。`difficulty`は数値を名前に直して返し、`spawn_dimension`は`UNSUPPORTED_FEATURE`になる
+- `ChunkReadOptions.format_data_version`と`WorldOpenOptions.format_data_version`: 世代を選ぶDataVersionを指定する。指定できる値は`1519`以上
+- `Chunk.format_data_version`: 世代を選ぶのに使ったDataVersionを返す。`DataVersion`の無いチャンクで指定も無ければ`-1`
+- `Chunk.get_biome_id` / `set_biome_id`: 1.17までの形式の数値のバイオームIDを、名前に直さずに読み書きする。1.14までの形式では`y`を見ない。1.18以降の形式では`UNSUPPORTED_FEATURE`になる
+- `BlockState.from_nbt_for_data_version` / `to_nbt_for_data_version`: DataVersionを指定して、パレットの要素を読み書きする。26.2までの形式は`{Name, Properties}`
+- 1.15までの、値が64bitの境目をまたぐビット詰めを読み書きする（[仕様31 2.3](docs/spec/31-paletted-container.md#23-またぐ詰め方115まで)）
+
+### 変更
+
+- 扱える形式の下限`MIN_SUPPORTED_DATA_VERSION`を`5006`（26.3）から`1519`（1.13）へ下げた。`TARGET_DATA_VERSION`は`5023`のまま
+- 新しい形式が出たら、下限を上げずに世代を足して対応する（[adr/0011](docs/adr/0011-format-eras.md)。[adr/0003](docs/adr/0003-version-policy.md)の下限の決め方と、[adr/0010](docs/adr/0010-palette-format-26-3.md)の決定1を置き換えた）
+- 1.13より前（DataVersionが`1519`未満か、無い）のチャンクは解釈せず、元のNBTだけを持つ。ブロックとバイオームのAPI、`min_section_y`、`clear_heightmaps`、`invalidate_lighting`は`UNSUPPORTED_DATA_VERSION`になる
+- 1.17までの形式のチャンクでは、`get_biome` / `set_biome`が`UNSUPPORTED_FEATURE`になる。`isLightOn`の無いチャンクでは、`invalidate_lighting`も`UNSUPPORTED_FEATURE`になる
+- DataVersionが`5006`未満のチャンクのパレット（`{Name, Properties}`）を、`MALFORMED_DATA`にせず、その形式のまま読み書きする
+- `is_fully_generated`は、`Status`から`minecraft:`を外して比べる。1.13の`postprocessed`と`fullchunk`も生成済みとみなす
+- `Chunk.to_nbt`は、セクションの並びと、`block_states` / `biomes`のキーの並びを、読んだときのまま書き戻す。以前は`Y`の昇順と、`data`、`palette`の順に並べ直していた（[仕様31 4.1](docs/spec/31-paletted-container.md#41-キーの並び順)）
+- `set_block`は、パレットに同じ`BlockState`を表す要素があれば、キーの並びが違ってもその要素を使う
+- Python / TypeScript: `Dimension`のコンストラクタに、内部の型を受け取る必須の引数が増えた。利用者は直接作らず、`MinecraftWorld.dimension()`で得る
+- 実ワールド走査ツール（`spec/tools/scan_world.py`）が、1.21.xまでの構成のワールドを開き、世代ごとに集計する。`uid.dat`と0バイトの`.mca`は失敗に数えずに飛ばす
+- `RegionFile`の`flush()`は、開いてから変更が無く、ファイルが既にあれば何もしないようにした。これまでは同じ内容で書き直していた。そのままでは、長さが4096の倍数でないファイルが読んだだけで末尾を埋めて書き直されてしまう。ワールドと`RegionFolder`の`flush()`も読んだだけのリージョンを書き出さなくなる
+
+### 修正
+
+- C# / Java / TypeScript / Python: `is_fully_generated`が、`Status`の無いチャンクと`Status`が文字列でないチャンクで例外を投げていた。Rustと同じく偽を返す
+- `block_states` / `biomes`に`data`と`palette`のほかのキーがあると、書き戻すときに落としていた。読んだまま残す
+- 長さが4096の倍数でないリージョンファイルを`MALFORMED_DATA`にしていた。最後のチャンクのデータの直後でファイルが終わっているものが実ワールドにあり、そのリージョンのチャンクが1つも読めなかった。末尾をゼロで埋めたものとして読み、書き出すときは4096の倍数にする（[仕様20 2.3](docs/spec/20-anvil-region.md#23-長さが4096の倍数でないファイル)）
+  - 最後のチャンクのデータがファイルの終わりで切れているものは、開いた時点で`MALFORMED_DATA`にする
+  - 埋めるのはメモリの上だけで、変更しなければファイルは元のまま残る。変更して書き出すときに、末尾をゼロで埋める
+
+### 互換性の崩れる変更（Rust）
+
+- `ChunkReadOptions`と`WorldOpenOptions`に、公開の項目`format_data_version`が増えた。構造体リテラルですべての項目を書いて作っているコードは、`..Default::default()`を足す必要がある
+- `Chunk::clear_heightmaps` / `invalidate_lighting`が`Result<()>`を返すようになった
+- `LevelData::spawn_pos`の戻り値の型が`Result<&[i32]>`から`Result<Vec<i32>>`になった
+
+### 知っておくこと
+
+- バージョン間の変換はしない。1.12.2で作ったワールドを26.3の形式に直す、といった使い方はできない
+- バイオームの数値のIDは名前に直さない。1.16.2以降はデータパックで独自のバイオームを足せるので、固定の表では正しく引けないため
+- 世代の境界のDataVersionは、実ワールドでは観測したDataVersionの間にあることまでしか確かめていない（[仕様30 7.1](docs/spec/30-chunk-format.md#71-世代の表)）
+- 開発版（スナップショット）で書かれたチャンクのうち、正式版と形式が違うものは扱わない
+
+### 検証
+
+- 各言語の単体テスト: C# 323件、Java 306件、TypeScript 256件、Python 325件、Rust 239件
+- クロス言語適合性1133件（全言語で出力バイト列が一致）。1.12.2、1.14.4、1.15.2、1.16.5、26.2の形式のチャンクのベクタと、読んだときの並びを保って書き戻すことを確かめるベクタを足した
+- 実ワールド（Java版1.12.2から26.3までの33ワールド）: NBTファイル884個とリージョンのチャンク374,006個のすべてでラウンドトリップ成功。
+  Worldレイヤでも地形チャンク359,078個の再エンコードが原本と一致し、7,315万ブロックの読み出しに成功（[仕様90 2.4](docs/spec/90-conformance.md#検証実績)）
+- 代表のチャンク326個・リージョンファイル78個・NBTファイル54個を5言語に通し、出力が全言語で一致した
+- 適合性検証のベクタ`anvil/unaligned_length`（4096の倍数の長さに1バイト足したファイルを`MALFORMED_DATA`にする）を、読めることを確かめる`anvil/unaligned_extra_byte`に変えた。最後のチャンクのデータの直後で終わるファイル（`anvil/unaligned_tail`）と、データが途中で切れたファイル（`anvil/truncated_chunk`、`anvil/truncated_length`）のベクタを足した
+
 ## [2.0.0]
 
 Java版26.3のワールド形式に対応した。26.3でブロックのパレットの形式が変わったため、26.1 / 26.2のワールドは扱わなくなる。

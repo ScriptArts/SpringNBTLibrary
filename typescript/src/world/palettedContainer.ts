@@ -27,12 +27,21 @@ export class PalettedContainer {
   readonly #palette: NbtTag[] = [];
   readonly #entryCount: number;
   readonly #minBits: number;
+  readonly #spanning: boolean;
+  readonly #alwaysHasData: boolean;
 
   #storage: BitStorage | undefined;
 
-  private constructor(entryCount: number, minBits: number) {
+  private constructor(
+    entryCount: number,
+    minBits: number,
+    spanning: boolean,
+    alwaysHasData: boolean,
+  ) {
     this.#entryCount = entryCount;
     this.#minBits = minBits;
+    this.#spanning = spanning;
+    this.#alwaysHasData = alwaysHasData;
   }
 
   /**
@@ -73,7 +82,7 @@ export class PalettedContainer {
 
   /** 単一の値で埋めたコンテナを作る */
   static filled(value: NbtTag, entryCount: number, minBits: number): PalettedContainer {
-    const result = new PalettedContainer(entryCount, minBits);
+    const result = new PalettedContainer(entryCount, minBits, false, false);
     result.#palette.push(value);
     return result;
   }
@@ -85,7 +94,6 @@ export class PalettedContainer {
     minBits: number,
     lenientBitStorage = false,
   ): PalettedContainer {
-    const result = new PalettedContainer(entryCount, minBits);
     const paletteTag = nbt.optList("palette");
 
     if (paletteTag === undefined || paletteTag.size === 0) {
@@ -95,13 +103,58 @@ export class PalettedContainer {
     // パレットの要素は生のNbtTagのまま持つ
     // 並び順まで元どおりに書き戻すため
     // 異種リストの包みだけは外しておき、書くときに包み直す
+    const entries: NbtTag[] = [];
+
+    // 包みを外しながら、パレットの要素を順に集める
     for (const entry of paletteTag) {
-      result.#palette.push(unwrapListElement(entry));
+      entries.push(unwrapListElement(entry));
     }
 
-    const data = nbt.optLongArray("data");
+    return PalettedContainer.fromParts(
+      entries,
+      nbt.optLongArray("data"),
+      entryCount,
+      minBits,
+      false,
+      false,
+      lenientBitStorage,
+    );
+  }
+
+  /**
+   * パレットとdataから作る
+   * 1.13から1.15までの詰め方や、dataが必ず書かれる形式を読むための入口
+   *
+   * @param palette パレットの要素（異種リストの包みは外してあること）
+   * @param data packedな配列（無ければundefined）
+   * @param spanning 64bitの境目をまたいで詰めるか
+   * @param alwaysHasData パレットが1要素でもdataを書く形式か
+   * @param lenientBitStorage dataの長さが合わないとき、長さからビット幅を逆算して読むか
+   * @internal
+   */
+  static fromParts(
+    palette: readonly NbtTag[],
+    data: BigInt64Array | undefined,
+    entryCount: number,
+    minBits: number,
+    spanning: boolean,
+    alwaysHasData: boolean,
+    lenientBitStorage: boolean,
+  ): PalettedContainer {
+    if (palette.length === 0) {
+      throw SpringNbtError.malformed("palette が無いか空");
+    }
+
+    const result = new PalettedContainer(entryCount, minBits, spanning, alwaysHasData);
+    result.#palette.push(...palette);
 
     if (data === undefined) {
+      // dataが必ず書かれる形式で無いなら、壊れたデータとして扱う
+      // 書き戻しで元に無いdataを作ってしまわないため
+      if (alwaysHasData) {
+        throw SpringNbtError.malformed("dataが必ず書かれる形式なのにdataが無い");
+      }
+
       // パレットが1要素ならdataは無くてよい
       if (result.#palette.length !== 1) {
         throw SpringNbtError.malformed(
@@ -113,7 +166,7 @@ export class PalettedContainer {
     }
 
     const bits = Math.max(minBits, ceilLog2(result.#palette.length));
-    result.#storage = BitStorage.fromLongs(data, bits, entryCount, lenientBitStorage);
+    result.#storage = BitStorage.fromLongsWith(data, bits, entryCount, lenientBitStorage, spanning);
 
     // 取り出した添字がパレットの範囲に収まっているか確かめる
     // エラーを出さずに0番目で代替すると、おかしくなったデータをそうと分からない形で書き戻してしまう
@@ -128,6 +181,31 @@ export class PalettedContainer {
     }
 
     return result;
+  }
+
+  /**
+   * パレットとdataに分けて返す
+   * パレットの要素は異種リストの包みを掛けないまま返す
+   * dataは、パレットが1要素なら（`alwaysHasData`でない限り）undefined
+   *
+   * @internal
+   */
+  toParts(): { palette: NbtTag[]; data: BigInt64Array | undefined } {
+    const entries = [...this.#palette];
+
+    // パレットが2要素以上なら、記憶域をそのまま返す
+    if (this.#storage !== undefined && this.#palette.length > 1) {
+      return { palette: entries, data: this.#storage.toLongs() };
+    }
+
+    // 1要素でもdataを書く形式なら、記憶域が無くてもゼロで埋めた配列を作る
+    if (this.#alwaysHasData) {
+      const bits = Math.max(this.#minBits, ceilLog2(this.#palette.length));
+      const zeroed = BitStorage.createWith(bits, this.#entryCount, this.#spanning);
+      return { palette: entries, data: zeroed.toLongs() };
+    }
+
+    return { palette: entries, data: undefined };
   }
 
   /** NBTへ変換する */
@@ -223,7 +301,7 @@ export class PalettedContainer {
     }
 
     const newBits = Math.max(this.#minBits, ceilLog2(compacted.length));
-    const rebuilt = BitStorage.create(newBits, this.#entryCount);
+    const rebuilt = BitStorage.createWith(newBits, this.#entryCount, this.#spanning);
 
     // 新しい添字へ置き換えながら詰め直す
     for (let index = 0; index < this.#entryCount; index++) {
@@ -263,7 +341,7 @@ export class PalettedContainer {
 
     if (this.#storage === undefined) {
       // これまで単一値だったので、全エントリが0番目のまま始まる
-      this.#storage = BitStorage.create(required, this.#entryCount);
+      this.#storage = BitStorage.createWith(required, this.#entryCount, this.#spanning);
       return;
     }
 

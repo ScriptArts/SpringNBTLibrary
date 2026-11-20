@@ -15,6 +15,11 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
+  <!-- 内部のAPIを単体テストから呼べるようにする -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="SpringNBTLibrary.Tests" />
+  </ItemGroup>
+
   <!-- 配布物にMITライセンスと説明を同梱する -->
   <ItemGroup>
     <None Include="../../LICENSE" Pack="true" PackagePath="/" />
