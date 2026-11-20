@@ -207,7 +207,7 @@ APIキーは持たない。各レジストリにこのワークフローを公�
 | レジストリ | 登録する場所 | 気をつけること |
 |---|---|---|
 | NuGet | nuget.orgの「Trusted Publishing」 | ログインに使うnuget.orgのユーザー名を、リポジトリの変数`NUGET_USER`に入れる |
-| npm | npmjs.comのパッケージの設定の「Trusted Publisher」 | パッケージがまだ無いと登録できないので、最初の版だけ手元から`npm publish`する。登録するときは、許す操作に`npm publish`を含める |
+| npm | npmjs.comのパッケージの設定の「Trusted Publisher」 | パッケージがまだ無いと登録できないので、最初の版だけ手元から`npm publish`する。手元からの公開には、アカウントの2段階認証が要る。登録するときは、許す操作に`npm publish`を含める。登録してから2日以内にCIから公開しないと、登録が無効になる |
 | PyPI | pypi.orgの「Publishing」で「pending publisher」を足す | プロジェクトがまだ無くても先に登録できる。名前は`spring-nbt-library` |
 
 登録が済んだレジストリから、リポジトリの変数（Settings > Secrets and variables > Actions > Variables）を`true`にする。
