@@ -19,7 +19,6 @@
 
   - `uid.dat`: 16バイトの生のUUIDで、NBTではない
   - 0バイトの`.mca`: Minecraftがチャンクを書く前のファイルを残すことがある
-  - 長さがセクタ境界に揃っていない`.mca`: ライブラリが開かない（別の課題として扱う）
 
 **このツールは一切書き込まない。** 引数のワールドは読み取りのみで開く。
 とはいえMinecraftが起動していない状態で実行すること（書き込み途中を読む可能性があるため）。
@@ -65,9 +64,6 @@ from spring_nbt_library.world import (  # noqa: E402
 #: リージョンファイルのセクタ長。
 SECTOR = 4096
 
-#: リージョンファイルのヘッダの長さ（位置表とタイムスタンプ表の2セクタ）
-HEADER_BYTES = SECTOR * 2
-
 #: ``uid.dat``の長さ。中身は16バイトの生のUUID
 UID_FILE_SIZE = 16
 
@@ -111,7 +107,6 @@ L2_MIN_DATA_VERSION = 4786
 #: 飛ばしたファイルの種類
 SKIP_UID = "uid.dat（NBTでない）"
 SKIP_EMPTY_REGION = "0バイトの.mca"
-SKIP_UNALIGNED_REGION = "長さがセクタ境界に揃っていない.mca"
 
 
 def generation_of(data_version: Optional[int]) -> str:
@@ -174,10 +169,6 @@ def region_skip_reason(path: str) -> Optional[str]:
     # Minecraftはチャンクを書く前の0バイトのファイルを残すことがある
     if size == 0:
         return SKIP_EMPTY_REGION
-
-    # ヘッダより長く、長さがセクタの倍数でないファイルはライブラリが開かない
-    if size >= HEADER_BYTES and size % SECTOR != 0:
-        return SKIP_UNALIGNED_REGION
 
     return None
 
@@ -297,7 +288,14 @@ class Scanner:
         with open(path, "rb") as handle:
             original = handle.read()
 
-        if region.to_bytes() != original:
+        expected = original
+
+        # 長さが4096の倍数でないファイルは、末尾をゼロで埋めて組み立てる
+        if len(original) % SECTOR != 0:
+            self.stats["region_files_unaligned"] += 1
+            expected = original + bytes(SECTOR - (len(original) % SECTOR))
+
+        if region.to_bytes() != expected:
             self.failures.append("%s: 無変更で書き戻すとバイトが変わる" % label)
 
         for position in region.chunk_positions():
