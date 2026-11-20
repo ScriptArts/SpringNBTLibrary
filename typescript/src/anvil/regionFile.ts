@@ -145,10 +145,14 @@ export class RegionFile {
       );
     }
 
-    if (this.#data.length % SECTOR_SIZE !== 0) {
-      throw SpringNbtError.malformed(
-        `ファイル長がセクタ境界に揃っていない: ${this.#data.length} バイト`,
-      );
+    const fileLength = this.#data.length;
+
+    // 最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数になっていないことがある
+    // 足りない分をゼロで埋め、ほかのファイルと同じようにセクタ単位で扱う
+    if (fileLength % SECTOR_SIZE !== 0) {
+      const padded = new Uint8Array(fileLength + (SECTOR_SIZE - (fileLength % SECTOR_SIZE)));
+      padded.set(this.#data);
+      this.#data = padded;
     }
 
     const totalSectors = this.#data.length / SECTOR_SIZE;
@@ -182,6 +186,11 @@ export class RegionFile {
         throw SpringNbtError.malformed(`チャンク ${index} の割り当てがファイル外へはみ出している`);
       }
 
+      // ゼロで埋めた部分まで割り当てが続くチャンクは、データが元のファイルの中で終わっていなければならない
+      if ((offset + count) * SECTOR_SIZE > fileLength) {
+        this.#ensureDataWithinFile(index, offset * SECTOR_SIZE, fileLength);
+      }
+
       // 同じセクタを2つのチャンクが指していたら、どちらかがおかしくなっている
       for (let sector = offset; sector < offset + count; sector++) {
         const owner = sectorOwner.get(sector);
@@ -197,6 +206,21 @@ export class RegionFile {
 
       this.#offsets[index] = offset;
       this.#sectorCounts[index] = count;
+    }
+  }
+
+  /** チャンクのデータ（長さの4バイトを含む）が元のファイルの中で終わっているかを確かめる */
+  #ensureDataWithinFile(index: number, start: number, fileLength: number): void {
+    // 長さの4バイトを読み切れなければ、データの終わりが分からない
+    if (start + 4 > fileLength) {
+      throw SpringNbtError.malformed(`チャンク${index}のデータがファイルの終わりで切れている`);
+    }
+
+    const length = this.#readUnsigned(start, 4) | 0;
+
+    // 埋めたゼロをデータとして読まないよう、元のファイルの長さと比べる
+    if (start + 4 + length > fileLength) {
+      throw SpringNbtError.malformed(`チャンク${index}のデータがファイルの終わりで切れている`);
     }
   }
 

@@ -191,8 +191,11 @@ python3 spec/tools/scan_world.py "<ワールドのパス>" --verbose
 | `anvil/lz4_bad_magic` | LZ4Blockのマジックがおかしい → `MALFORMED_DATA` |
 | `anvil/bad_offset` | ヘッダ領域を指すオフセット → `MALFORMED_DATA` |
 | `anvil/overlapping_sectors` | 2チャンクが同じセクタを指す → `MALFORMED_DATA` |
-| `anvil/unaligned_length` | ファイル長が4096の倍数でない → `MALFORMED_DATA` |
 | `anvil/offset_out_of_file` | オフセットがファイル末尾より後ろを指す → `MALFORMED_DATA` |
+| `anvil/unaligned_tail` | 最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数でない。末尾をゼロで埋めて読む |
+| `anvil/unaligned_extra_byte` | 4096の倍数の長さのあとに、どのチャンクにも属さない1バイトが付いている。末尾をゼロで埋めて読む |
+| `anvil/truncated_chunk` | 最後のチャンクのデータが1バイト欠けたところでファイルが終わる → `MALFORMED_DATA` |
+| `anvil/truncated_length` | 最後のチャンクの長さの4バイトの途中でファイルが終わる → `MALFORMED_DATA` |
 
 ### World / Block
 

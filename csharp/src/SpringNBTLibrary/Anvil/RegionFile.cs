@@ -156,10 +156,13 @@ public sealed class RegionFile : IDisposable
                 $"ヘッダが足りない: {data.Length} バイト（最低 {HeaderSectors * SectorSize} バイト必要）");
         }
 
-        if (data.Length % SectorSize != 0)
+        int fileLength = data.Length;
+
+        // 最後のチャンクのデータの直後でファイルが終わり、長さが4096の倍数になっていないことがある
+        // 足りない分をゼロで埋め、ほかのファイルと同じようにセクタ単位で扱う
+        if (fileLength % SectorSize != 0)
         {
-            throw SpringNbtException.Malformed(
-                $"ファイル長がセクタ境界に揃っていない: {data.Length} バイト");
+            Array.Resize(ref data, fileLength + (SectorSize - (fileLength % SectorSize)));
         }
 
         int totalSectors = data.Length / SectorSize;
@@ -198,6 +201,12 @@ public sealed class RegionFile : IDisposable
                     $"チャンク {index} の割り当てがファイル外へはみ出している");
             }
 
+            // ゼロで埋めた部分まで割り当てが続くチャンクは、データが元のファイルの中で終わっていなければならない
+            if ((long)(offset + count) * SectorSize > fileLength)
+            {
+                EnsureDataWithinFile(index, offset * SectorSize, fileLength);
+            }
+
             // 同じセクタを2つのチャンクが指していたら、どちらかがおかしくなっている
             for (int sector = offset; sector < offset + count; sector++)
             {
@@ -212,6 +221,24 @@ public sealed class RegionFile : IDisposable
 
             offsets[index] = offset;
             sectorCounts[index] = count;
+        }
+    }
+
+    /// <summary>チャンクのデータ（長さの4バイトを含む）が元のファイルの中で終わっているかを確かめる</summary>
+    private void EnsureDataWithinFile(int index, int start, int fileLength)
+    {
+        // 長さの4バイトを読み切れなければ、データの終わりが分からない
+        if (start + 4 > fileLength)
+        {
+            throw SpringNbtException.Malformed($"チャンク{index}のデータがファイルの終わりで切れている");
+        }
+
+        int length = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(start, 4));
+
+        // 埋めたゼロをデータとして読まないよう、元のファイルの長さと比べる
+        if ((long)start + 4 + length > fileLength)
+        {
+            throw SpringNbtException.Malformed($"チャンク{index}のデータがファイルの終わりで切れている");
         }
     }
 
