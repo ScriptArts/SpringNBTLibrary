@@ -136,7 +136,8 @@ jobs:
             exit 0
           fi
 
-          npm publish dist/spring-nbt-library-*.tgz --access public
+          # 先頭に./が無いと、npmはdist/…をGitHubのリポジトリの略記として読んでしまう
+          npm publish ./dist/spring-nbt-library-*.tgz --access public
 
   pypi:
     name: PyPIへ公開する
