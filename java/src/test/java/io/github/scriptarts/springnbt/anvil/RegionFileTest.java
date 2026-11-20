@@ -342,13 +342,21 @@ class RegionFileTest {
     }
 
     @Test
-    void unalignedFileIsNotRewrittenWhenClosedWithoutChanges() throws IOException {
-        Path path = copyVector("unaligned_tail").resolve("r.0.0.mca");
+    void unalignedFileIsNotRewrittenWithoutChanges() throws IOException {
+        Path directory = copyVector("unaligned_tail");
+        Path path = directory.resolve("r.0.0.mca");
         byte[] original = Files.readAllBytes(path);
 
-        // 読み書きで開いても、変えずに閉じるだけならファイルは元のまま
+        // 読み書きで開いても、変えなければ書き出しても閉じてもファイルは元のまま
         try (RegionFile region = RegionFile.open(path, RegionFileMode.READ_WRITE)) {
             region.readChunk(1, 0);
+            region.flush();
+        }
+
+        // ワールドが使うフォルダの書き出しでも同じ
+        try (RegionFolder folder = RegionFolder.open(directory, RegionFileMode.READ_WRITE)) {
+            folder.readChunk(1, 0);
+            folder.flush();
         }
 
         assertArrayEquals(original, Files.readAllBytes(path));

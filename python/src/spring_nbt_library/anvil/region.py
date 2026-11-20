@@ -245,6 +245,9 @@ class RegionFile:
         self._timestamps = [0] * _CHUNK_COUNT
         self._dirty = False
         self._closed = False
+        # 開いたときにファイルがまだ無かったか
+        # 無ければ、変更が無くても書き出すときに作る
+        self._missing_on_disk = False
         self._parse_header()
 
     # -- 生成 ---------------------------------------------------------------
@@ -263,8 +266,10 @@ class RegionFile:
             raise SpringNbtError.invalid_argument(
                 "リージョンファイル名として解釈できない: %s" % os.path.basename(path))
 
+        exists = os.path.exists(path)
+
         # 既にあるファイルは読み込み、無ければ空のヘッダだけを組み立てる
-        if os.path.exists(path):
+        if exists:
             try:
                 with open(path, "rb") as handle:
                     raw = bytearray(handle.read())
@@ -276,7 +281,9 @@ class RegionFile:
         else:
             raise SpringNbtError(ErrorCode.IO, "ファイルが存在しない: %s" % path)
 
-        return RegionFile(path, mode, position, raw)
+        opened = RegionFile(path, mode, position, raw)
+        opened._missing_on_disk = not exists
+        return opened
 
     def __enter__(self) -> "RegionFile":
         return self
@@ -666,10 +673,17 @@ class RegionFile:
     # -- 出力 ---------------------------------------------------------------
 
     def flush(self) -> None:
-        """変更をファイルへ書き出す"""
+        """変更をファイルへ書き出す
+        開いてから変更が無く、ファイルが既にあれば何もしない
+        """
         self._ensure_open()
 
         if self._mode == RegionFileMode.READ_ONLY:
+            return
+
+        # 変更が無く、ファイルも既にあるなら書き出さない
+        # 読んだだけのリージョンを書き直すと、長さが4096の倍数でないファイルの末尾が埋まってしまう
+        if not self._dirty and not self._missing_on_disk:
             return
 
         self._write_header()
@@ -683,6 +697,7 @@ class RegionFile:
             raise SpringNbtError(ErrorCode.IO, "ファイルへ書けない: %s" % self._path) from error
 
         self._dirty = False
+        self._missing_on_disk = False
 
     def to_bytes(self) -> bytes:
         """現在の内容をバイト列として組み立てる

@@ -261,15 +261,22 @@ def test_unaligned_file_is_read_as_if_padded_with_zeros(vector, chunk_count):
         assert region.to_bytes() == original + bytes(padding)
 
 
-def test_unaligned_file_is_not_rewritten_when_closed_without_changes(work):
-    path = os.path.join(copy_vector("unaligned_tail", work), "r.0.0.mca")
+def test_unaligned_file_is_not_rewritten_without_changes(work):
+    directory = copy_vector("unaligned_tail", work)
+    path = os.path.join(directory, "r.0.0.mca")
 
     with open(path, "rb") as handle:
         original = handle.read()
 
-    # 読み書きで開いても、変えずに閉じるだけならファイルは元のまま
+    # 読み書きで開いても、変えなければ書き出しても閉じてもファイルは元のまま
     with RegionFile.open(path, RegionFileMode.READ_WRITE) as region:
         region.read_chunk(1, 0)
+        region.flush()
+
+    # ワールドが使うフォルダの書き出しでも同じ
+    with RegionFolder.open(directory, RegionFileMode.READ_WRITE) as folder:
+        folder.read_chunk(1, 0)
+        folder.flush()
 
     with open(path, "rb") as handle:
         assert handle.read() == original

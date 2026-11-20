@@ -293,15 +293,24 @@ public class RegionFileTests : IDisposable
     }
 
     [Fact]
-    public void UnalignedFileIsNotRewrittenWhenClosedWithoutChanges()
+    public void UnalignedFileIsNotRewrittenWithoutChanges()
     {
-        string path = Path.Combine(CopyVector("unaligned_tail"), "r.0.0.mca");
+        string directory = CopyVector("unaligned_tail");
+        string path = Path.Combine(directory, "r.0.0.mca");
         byte[] original = File.ReadAllBytes(path);
 
-        // 読み書きで開いても、変えずに閉じるだけならファイルは元のまま
+        // 読み書きで開いても、変えなければ書き出しても閉じてもファイルは元のまま
         using (RegionFile region = RegionFile.Open(path, RegionFileMode.ReadWrite))
         {
             region.ReadChunk(1, 0);
+            region.Flush();
+        }
+
+        // ワールドが使うフォルダの書き出しでも同じ
+        using (RegionFolder folder = RegionFolder.Open(directory, RegionFileMode.ReadWrite))
+        {
+            folder.ReadChunk(1, 0);
+            folder.Flush();
         }
 
         Assert.Equal(original, File.ReadAllBytes(path));

@@ -353,16 +353,26 @@ fn unaligned_file_is_read_as_if_padded_with_zeros() {
 }
 
 #[test]
-fn unaligned_file_is_not_rewritten_when_closed_without_changes() {
+fn unaligned_file_is_not_rewritten_without_changes() {
     let work = WorkDir::new("unaligned-close");
-    let path = work.copy_vector("unaligned_tail").join("r.0.0.mca");
+    let directory = work.copy_vector("unaligned_tail");
+    let path = directory.join("r.0.0.mca");
     let original = std::fs::read(&path).expect("ベクタを読めない");
 
-    // 読み書きで開いても、変えずに閉じるだけならファイルは元のまま
+    // 読み書きで開いても、変えなければ書き出しても閉じてもファイルは元のまま
     {
         let mut region = RegionFile::open(&path, RegionFileMode::ReadWrite).unwrap();
         region.read_chunk(1, 0).unwrap();
+        region.flush().unwrap();
         region.close().unwrap();
+    }
+
+    // ワールドが使うフォルダの書き出しでも同じ
+    {
+        let mut folder = RegionFolder::open(&directory, RegionFileMode::ReadWrite).unwrap();
+        folder.read_chunk(1, 0).unwrap();
+        folder.flush().unwrap();
+        folder.close().unwrap();
     }
 
     assert_eq!(std::fs::read(&path).expect("ファイルを読めない"), original);

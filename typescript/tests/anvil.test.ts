@@ -315,17 +315,25 @@ test("長さが4096の倍数でないファイルは、末尾をゼロで埋め�
   }
 });
 
-test("長さが4096の倍数でないファイルは、変えずに閉じても書き直さない", () => {
+test("長さが4096の倍数でないファイルは、変えなければ書き直さない", () => {
   const work = makeWorkDir();
 
   try {
-    const path = join(copyVector("unaligned_tail", work), "r.0.0.mca");
+    const directory = copyVector("unaligned_tail", work);
+    const path = join(directory, "r.0.0.mca");
     const original = readFileSync(path);
 
-    // 読み書きで開いても、変えずに閉じるだけならファイルは元のまま
+    // 読み書きで開いても、変えなければ書き出しても閉じてもファイルは元のまま
     const region = RegionFile.open(path, RegionFileMode.ReadWrite);
     region.readChunk(1, 0);
+    region.flush();
     region.close();
+
+    // ワールドが使うフォルダの書き出しでも同じ
+    const folder = RegionFolder.open(directory, RegionFileMode.ReadWrite);
+    folder.readChunk(1, 0);
+    folder.flush();
+    folder.close();
 
     assert.deepEqual(readFileSync(path), original);
   } finally {
