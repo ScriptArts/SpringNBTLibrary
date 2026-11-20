@@ -12,12 +12,13 @@ C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書か
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)からwheelを落として入れます。
-以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+PyPIから入れます。
 
 ```bash
-pip install spring_nbt_library-<版>-py3-none-any.whl
+pip install spring-nbt-library
 ```
+
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から落としたwheelを、`pip install`で入れることもできます。
 
 ## 使い方
 

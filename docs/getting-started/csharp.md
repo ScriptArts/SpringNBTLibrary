@@ -7,13 +7,19 @@ C#は[基準実装](../adr/0002-idiomatic-naming.md)です。
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)に2通り置いてあります。
+NuGetから入れます。
+
+```bash
+dotnet add package SpringNBTLibrary
+```
+
+NuGetを使わないときは、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)に置いた2通りのファイルも使えます。
 どちらでも中身は同じです。
 以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
-### `.nupkg`を使う（おすすめ）
+### `.nupkg`を使う
 
-NuGetへは公開していないので、落としたファイルを置いたフォルダをソースとして教えます。
+落としたファイルを置いたフォルダを、ソースとして教えます。
 
 1. `SpringNBTLibrary.<版>.nupkg`を、プロジェクト直下の`packages/`へ置きます
 2. `.csproj`と同じ場所に`nuget.config`を作ります

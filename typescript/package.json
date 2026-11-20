@@ -39,7 +39,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/scriptarts/SpringNBTLibrary.git",
+    "url": "git+https://github.com/ScriptArts/SpringNBTLibrary.git",
     "directory": "typescript"
   },
   "scripts": {

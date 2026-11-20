@@ -2,8 +2,8 @@ name: release
 
 # タグを打つとビルドしてGitHub Releasesへ成果物を添付する。
 #
-# パッケージレジストリ（NuGet / Maven Central / npm / PyPI / crates.io）へは公開せず、
-# ここに置いたファイルを利用者が自分のプロジェクトへ組み込む形をとる。
+# npm / PyPI / NuGetへの公開は、これが成功したあとにpublishワークフローが行う。
+# Maven Centralとcrates.ioへは公開しない。JavaとRustはここに置いたファイルを使う。Rustはgitで参照することもできる。
 on:
   push:
     tags: ["v*"]
@@ -81,6 +81,14 @@ jobs:
       - name: 全言語の挙動が一致することの検証
         run: ./spec/run-conformance.sh
 
+      # パッケージのページ（npm / PyPI / NuGet）からは相対リンクを辿れないので、
+      # 同梱するREADMEのリンクを、そのタグを指す絶対URLへ直す。テストのあとに行う
+      - name: 同梱するREADMEのリンクを直す
+        run: |
+          python3 spec/tools/readme_links.py "${{ steps.version.outputs.value }}" \
+            README.md csharp/README.md java/README.md typescript/README.md \
+            python/README.md rust/README.md
+
       # dllを直接参照したい人向け。xmlを隣に置かないと補完に説明が出ないので、
       # LICENSEと合わせてひとまとめにする
       - name: C# (zip)
@@ -95,7 +103,7 @@ jobs:
           (cd artifacts/csharp && zip -q -r \
             "../SpringNBTLibrary-${{ steps.version.outputs.value }}-dotnet8.zip" .)
 
-      # NuGetへは公開しないが、落としたファイルをローカルのソースにできる
+      # NuGetへはpublishワークフローが公開する。落としたファイルをローカルのソースにもできる
       - name: C# (nupkg)
         run: |
           dotnet pack csharp/src/SpringNBTLibrary/SpringNBTLibrary.csproj \

@@ -12,24 +12,14 @@ C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書か
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`SpringNBTLibrary.<版>.nupkg`を落とし、プロジェクト直下の`packages/`へ置きます。
-以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
-`.csproj`の隣に`nuget.config`を作ってソースを教えたら、参照に足せます。
-
-```xml
-<configuration>
-  <packageSources>
-    <add key="springnbt" value="packages" />
-  </packageSources>
-</configuration>
-```
+NuGetから入れます。
 
 ```bash
-dotnet add package SpringNBTLibrary --version <版>
+dotnet add package SpringNBTLibrary
 ```
 
-dllを直接参照したいときは`SpringNBTLibrary-<版>-dotnet8.zip`のほうを使います。
-同梱の`.xml`をdllと同じ場所に置くと、IDEの補完に説明が出ます。
+NuGetを使わないときは、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から落とした`.nupkg`か`.zip`も使えます。
+手順は[はじめに（C#）](../docs/getting-started/csharp.md#導入)にあります。
 
 ## 使い方
 

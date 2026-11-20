@@ -118,7 +118,8 @@ gitのタグで参照したRustのクレートは、Cargo.tomlの版が`0.0.0`�
 ## 5. 公開
 
 GitHub Releasesへビルド済みの成果物を置く。
-利用者はそれを落として自分のプロジェクトへ組み込む。
+C#・TypeScript・Pythonは、同じ成果物をNuGet・npm・PyPIへも公開する（5.5）。
+JavaとRustは、Releasesの成果物を落として使ってもらう。Rustはgitで参照することもできる。
 
 ### 5.1 タグを打つと自動で公開される
 
@@ -132,9 +133,12 @@ git push origin v<版>
 1. タグから版を取り、各言語のパッケージ設定へ書き込む
 2. `CHANGELOG.md`からリリース本文を組み立てる（その版の節が無ければここで止まる）
 3. 全対応言語のテストと[適合性検証](../spec/90-conformance.md)を通す（落ちたら公開しない。正しく動かないものを配らないため）
-4. 言語ごとの成果物を組み立てる
-5. `SHA256SUMS.txt`を作る
-6. Releasesを作って成果物を添付する
+4. 同梱するREADMEの相対リンクを、そのタグを指す絶対URLへ直す。パッケージのページからは相対リンクを辿れないため
+5. 言語ごとの成果物を組み立てる
+6. `SHA256SUMS.txt`を作る
+7. Releasesを作って成果物を添付する
+
+これが成功すると、続けて[`publish`ワークフロー](../../.github/workflows/publish.yml)がNuGet・npm・PyPIへ公開する（5.5）。
 
 ### 5.2 成果物
 
@@ -176,3 +180,59 @@ python3 spec/tools/release_notes.py 1.1.0
 
 リポジトリ内への相対リンクは、そのタグを指す絶対URLへ書き換える。
 リリースのページからは相対リンクを辿れないため。
+
+### 5.5 パッケージレジストリへの公開
+
+`release`ワークフローが成功すると、[`publish`ワークフロー](../../.github/workflows/publish.yml)が次を行う。
+
+1. Releasesから成果物を落とし、`SHA256SUMS.txt`と照らし合わせる
+2. `.nupkg`をNuGetへ、`.tgz`をnpmへ、`.whl`と`.tar.gz`をPyPIへ公開する
+
+Releasesに置いたものと同じバイト列を公開するので、組み立て直しはしない。
+同じ版がもう公開されていれば、そのレジストリは飛ばす。
+
+APIキーは持たない。各レジストリにこのワークフローを公開元として登録しておき、GitHubのOIDCトークンで認証する（Trusted Publishing）。
+
+#### 最初に一度だけ行う準備
+
+レジストリごとに、アカウントを作って公開元を登録する。登録する値は次のとおり。
+
+| 項目 | 値 |
+|---|---|
+| 所有者（Owner / Organization） | `ScriptArts` |
+| リポジトリ | `SpringNBTLibrary` |
+| ワークフローのファイル名 | `publish.yml` |
+| 環境（Environment） | NuGetは`nuget`、npmは`npm`、PyPIは`pypi` |
+
+| レジストリ | 登録する場所 | 気をつけること |
+|---|---|---|
+| NuGet | nuget.orgの「Trusted Publishing」 | ログインに使うnuget.orgのユーザー名を、リポジトリの変数`NUGET_USER`に入れる |
+| npm | npmjs.comのパッケージの設定の「Trusted Publisher」 | パッケージがまだ無いと登録できないので、最初の版だけ手元から`npm publish`する。登録するときは、許す操作に`npm publish`を含める |
+| PyPI | pypi.orgの「Publishing」で「pending publisher」を足す | プロジェクトがまだ無くても先に登録できる。名前は`spring-nbt-library` |
+
+登録が済んだレジストリから、リポジトリの変数（Settings > Secrets and variables > Actions > Variables）を`true`にする。
+
+| 変数 | 公開先 |
+|---|---|
+| `PUBLISH_NUGET` | NuGet |
+| `PUBLISH_NPM` | npm |
+| `PUBLISH_PYPI` | PyPI |
+
+変数が`true`でないレジストリへは公開しない。登録する前にリリースしても、`publish`ワークフローは失敗しない。
+
+npmへは最初の版だけ、Releasesから落とした`.tgz`を手元から公開する。
+
+```bash
+npm login
+npm publish spring-nbt-library-<版>.tgz --access public
+```
+
+#### すでにあるリリースを公開する
+
+Actionsの画面で`publish`ワークフローを選び、`Run workflow`に版のタグ（`v3.0.0`など）を入れて動かす。
+登録が済む前に出したリリースや、途中で失敗した公開をやり直すときに使う。
+
+#### 公開したものは消せない
+
+一度公開した版はどのレジストリでも同じ番号で上書きできない。
+間違えたときは、版を上げて出し直す。

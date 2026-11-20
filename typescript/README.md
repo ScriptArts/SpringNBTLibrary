@@ -13,14 +13,14 @@ C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書か
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring-nbt-library-<版>.tgz`を落として入れます。
-以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+npmから入れます。
 
 ```bash
-npm install ./spring-nbt-library-<版>.tgz
+npm install spring-nbt-library
 ```
 
 型定義（`.d.ts`）も含まれています。
+[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から落とした`.tgz`を、`npm install`で入れることもできます。
 
 ## 使い方
 
