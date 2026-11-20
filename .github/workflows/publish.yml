@@ -1,0 +1,196 @@
+name: publish
+
+# GitHub Releasesに上げた成果物を、npm / PyPI / NuGetへも公開する。
+#
+# releaseワークフローがタグのpushで動いて成功したら、続けて自動で動く。
+# すでにあるリリースを公開し直したいときは、Actionsの画面から版のタグを指定して手動で動かす。
+#
+# 各レジストリには、このリポジトリのこのワークフロー（publish.yml）を公開元として登録しておく。
+# APIキーは持たず、GitHubのOIDCトークンで認証する（Trusted Publishing）。
+# 登録の手順はdocs/contributing/release.mdの5.5にある。
+#
+# 公開するのは、リポジトリの変数（PUBLISH_NPM / PUBLISH_PYPI / PUBLISH_NUGET）がtrueのレジストリだけ。
+# 公開元を登録する前にこのワークフローが動いても、失敗しないようにするため。
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 公開するリリースのタグ（v3.0.0など）
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  # 公開するタグを決め、リリースの成果物を落としてチェックサムを確かめる
+  prepare:
+    name: リリースの成果物を落とす
+    # 手動で動かしたときと、releaseワークフローがタグのpushで動いて成功したときだけ進む
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - name: タグを決める
+        id: tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          tag="$RUN_TAG"
+
+          # 手動で動かしたときは、指定されたタグを使う
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="$INPUT_TAG"
+          fi
+
+          # 版のタグの形でなければ止める
+          if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "版のタグの形ではない: $tag" >&2
+            exit 1
+          fi
+
+          echo "value=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: 成果物を落とす
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist \
+            --pattern 'SHA256SUMS.txt' \
+            --pattern 'spring-nbt-library-*.tgz' \
+            --pattern 'spring_nbt_library-*' \
+            --pattern 'SpringNBTLibrary.*.nupkg'
+          ls -la dist
+
+      # Releasesに置いたものと同じバイト列を公開する
+      - name: チェックサムを確かめる
+        run: |
+          cd dist
+          sha256sum --check --ignore-missing SHA256SUMS.txt
+
+      - name: レジストリごとに分ける
+        run: |
+          mkdir -p npm pypi nuget
+          mv dist/spring-nbt-library-*.tgz npm/
+          mv dist/spring_nbt_library-* pypi/
+          mv dist/SpringNBTLibrary.*.nupkg nuget/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm
+          path: npm/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi
+          path: pypi/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget
+          path: nuget/
+
+  npm:
+    name: npmへ公開する
+    needs: prepare
+    if: vars.PUBLISH_NPM == 'true'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm
+          path: dist
+
+      # Trusted Publishingには、Node.js 22.14以降とnpm 11.5.1以降が要る
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: npmを新しくする
+        run: npm install -g npm@11
+
+      - name: 公開する
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          version="${TAG#v}"
+
+          # 同じ版がもう公開されていれば何もしない
+          # 最初の版を手元から公開したときや、手動でやり直したときのため
+          if npm view "spring-nbt-library@${version}" version > /dev/null 2>&1; then
+            echo "spring-nbt-library@${version}はもう公開されている"
+            exit 0
+          fi
+
+          npm publish dist/spring-nbt-library-*.tgz --access public
+
+  pypi:
+    name: PyPIへ公開する
+    needs: prepare
+    if: vars.PUBLISH_PYPI == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pypi
+          path: dist
+
+      # 同じ版がもう公開されていれば、そのファイルは飛ばす
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true
+
+  nuget:
+    name: NuGetへ公開する
+    needs: prepare
+    if: vars.PUBLISH_NUGET == 'true'
+    runs-on: ubuntu-latest
+    environment: nuget
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nuget
+          path: dist
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # OIDCトークンを、その場限りのAPIキーに換える
+      - name: nuget.orgにログインする
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      # 同じ版がもう公開されていれば、そのパッケージは飛ばす
+      - name: 公開する
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push dist/*.nupkg \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate

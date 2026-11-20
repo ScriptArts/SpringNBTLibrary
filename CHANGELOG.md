@@ -14,6 +14,15 @@
 
 対応言語はすべて、常に同じバージョン番号で公開する。
 
+## [3.0.1]
+
+ライブラリの中身は3.0.0と同じで、配り方だけを変えた。
+
+### 変更
+
+- C#・TypeScript・Pythonを、NuGet・npm・PyPIへも公開するようにした。`dotnet add package SpringNBTLibrary`、`npm install spring-nbt-library`、`pip install spring-nbt-library`で入れられる（[リリース手順 5.5](docs/contributing/release.md#55-パッケージレジストリへの公開)）
+- パッケージに同梱するREADMEの相対リンクを、そのタグを指す絶対URLへ直してから組み立てる。パッケージのページからもリンクを辿れるようにするため
+
 ## [3.0.0]
 
 Java版1.13以降のワールドを扱えるようにした。チャンクとワールドの構成を形式の世代に分け、読んだときの形式のまま読み書きする。バージョン間の変換はしない（[adr/0011](docs/adr/0011-format-eras.md)）。

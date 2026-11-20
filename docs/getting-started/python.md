@@ -4,14 +4,20 @@ Python 3.10以上が必要です。依存パッケージはありません。
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring_nbt_library-<版>-py3-none-any.whl`を落とします。
-以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+PyPIから入れます。
+
+```bash
+pip install spring-nbt-library
+```
+
+wheelなのでビルドは不要です。
+
+PyPIを使わないときは、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring_nbt_library-<版>-py3-none-any.whl`を落として入れます。
+`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ```bash
 pip install spring_nbt_library-<版>-py3-none-any.whl
 ```
-
-wheelなのでビルドは不要です。
 
 ## NBTファイルを読む
 

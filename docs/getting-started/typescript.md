@@ -5,14 +5,12 @@ Node.js 20以上が必要です。ESM専用です。
 
 ## 導入
 
-[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring-nbt-library-<版>.tgz`を落とします。
-以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+npmから入れます。
 
 ```bash
-npm install ./spring-nbt-library-<版>.tgz
+npm install spring-nbt-library
 ```
 
-これで`node_modules`へ入り、通常のパッケージと同じようにimportできます。
 型定義（`.d.ts`）も含まれているので補完が効きます。
 
 取り込み方は2通りあります。どちらでも構いません。
@@ -25,6 +23,15 @@ import { NbtCompound, RegionFile, BlockState } from "spring-nbt-library";
 import { NbtCompound } from "spring-nbt-library/nbt";
 import { RegionFile } from "spring-nbt-library/anvil";
 import { BlockState } from "spring-nbt-library/world";
+```
+
+### `.tgz`を使う
+
+npmを使わないときは、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring-nbt-library-<版>.tgz`を落として入れます。
+`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+
+```bash
+npm install ./spring-nbt-library-<版>.tgz
 ```
 
 `package.json`には次のように記録されます。

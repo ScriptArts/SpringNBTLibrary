@@ -1,6 +1,14 @@
 Minecraft **Java版1.13以降**のワールドデータ・NBTファイルを読み書きするライブラリです。
 
-下の成果物をダウンロードして、自分のプロジェクトへ組み込んでください。
+C#・TypeScript・Pythonは、それぞれのパッケージレジストリから入れられます。
+
+```bash
+dotnet add package SpringNBTLibrary   # C#（NuGet）
+npm install spring-nbt-library        # TypeScript（npm）
+pip install spring-nbt-library        # Python（PyPI）
+```
+
+JavaとRustは、下の成果物を落として組み込んでください。Rustはgitで参照することもできます。C#・TypeScript・Pythonの成果物も同じものを置いています。
 
 ## 成果物
 
