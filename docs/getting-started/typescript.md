@@ -28,7 +28,7 @@ import { BlockState } from "spring-nbt-library/world";
 ### `.tgz`を使う
 
 npmを使わないときは、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring-nbt-library-<版>.tgz`を落として入れます。
-`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+`<版>`は、使うリリースのバージョン（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ```bash
 npm install ./spring-nbt-library-<版>.tgz
@@ -44,7 +44,7 @@ npm install ./spring-nbt-library-<版>.tgz
 }
 ```
 
-## `i64`はbigint
+## `i64`とbigint
 
 TypeScriptの`number`は2^53を超える整数を表せません。
 `TAG_Long`と`TAG_Long_Array`だけ`bigint`を使います。

@@ -6,8 +6,8 @@ Python 3.10以上で動きます。依存パッケージはありません。
 1.13から26.3までのワールドを、読んだときの形式のまま読み書きします。
 これより新しいバージョンでも、形式が変わらない限りそのまま扱えます。
 
-C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書から作っています。
-同じ入力からは同じ結果が出ます（[対応言語の一覧](../README.md#対応言語)）。
+C# / Java / TypeScript / Python / Rust版があり（[対応言語の一覧](../README.md#対応言語)）、どれも同じ仕様書から作っています。
+同じ入力からは同じ結果が出ます。
 結果が揃っているかは[適合性テスト](../docs/testing.md)で毎回確かめています。
 
 ## 導入
@@ -31,4 +31,6 @@ pip install spring-nbt-library
 
 ## ライセンス
 
-MIT License — Copyright (c) 2026 ScriptArts
+MIT License
+
+Copyright (c) 2026 ScriptArts

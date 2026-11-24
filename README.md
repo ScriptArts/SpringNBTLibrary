@@ -13,7 +13,7 @@ Minecraft Java版1.13以降のワールドデータ・NBTファイルを読み�
 
 ## 対応言語
 
-C#・TypeScript・Pythonは、それぞれのパッケージレジストリから入れられます。
+C#・TypeScript・Pythonはそれぞれのパッケージレジストリから入れられます。
 Javaは[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`.jar`を落として、Rustはgitで参照して使ってください。
 
 | 言語 | 必要環境 | 入れ方 |
@@ -54,6 +54,8 @@ Releasesには全言語の成果物を置いています。同梱の`SHA256SUMS.
 
 ## ライセンス
 
-MIT License — Copyright (c) 2026 ScriptArts
+MIT License
+
+Copyright (c) 2026 ScriptArts
 
 詳細は[LICENSE](LICENSE)を参照。

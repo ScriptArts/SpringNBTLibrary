@@ -131,7 +131,7 @@ enum NbtString {
 `Java`形式のルート名は通常空文字列だが、値は保持し、書き込み時にそのまま出力する。
 ルートタグが`TAG_Compound`以外だった場合は`MALFORMED_DATA`。
 
-読み書きに使うAPIは、次の論理APIに統一する。
+読み書きに使うAPIは次の論理APIに統一する。
 
 ```
 NbtIo.read_file(path, options)        -> NamedTag
@@ -178,7 +178,7 @@ while offset < len(bytes):
 | `read_bytes_at`に圧縮を指定した | `INVALID_ARGUMENT` |
 | 途中で入力が尽きた | `MALFORMED_DATA` |
 
-**`read_bytes_at`の位置は、渡したバイト列そのものを指す。**
+**`read_bytes_at`の位置は渡したバイト列そのものを指す。**
 展開すると位置が変わってしまうので、圧縮されたデータは扱えない。
 `read_bytes_all`は位置を返さないので、入力全体に1回かかった圧縮であれば展開してから読む。
 
@@ -261,7 +261,7 @@ NbtWriteOptions {
 
 ### 7.3 等値比較と複製
 
-どのタグ型も、値としての等値比較と深い複製を提供する。
+どのタグ型も値としての等値比較と深い複製を提供する。
 言語ごとの綴りは[API対応表](../api/nbt.md)を参照。
 
 等値比較の規則は全言語で同じでなければならない。
@@ -283,7 +283,7 @@ NbtWriteOptions {
 
 ### 7.4 人が読むための表現
 
-どの型も、デバッグ用の文字列表現を持つ（C# `ToString` / Java `toString` / TypeScript `toString` / Python `__repr__` / Rust `Debug`）。
+どの型もデバッグ用の文字列表現を持つ（C# `ToString` / Java `toString` / TypeScript `toString` / Python `__repr__` / Rust `Debug`）。
 Rustでは、`NbtString` / `NbtList` / `NbtCompound`が`Display`も実装する。
 
 **中身の形式は決めない。** 言語ごとの作法に合わせてよい。

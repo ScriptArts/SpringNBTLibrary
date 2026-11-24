@@ -44,7 +44,7 @@
 | `playerdata/` | `players/data/` |
 | `level.dat`にゲームルール等を同梱 | `data/minecraft/*.dat`へ分離 |
 
-この構成は、[実際の26.2と26.3のワールドを走査して確かめました](../spec/40-world-layout.md)。
+この構成は[実際の26.2と26.3のワールドを走査して確かめました](../spec/40-world-layout.md)。
 
 ### 1.21.xまでの構成
 
