@@ -1,6 +1,6 @@
 # 01. NBTの読み書き
 
-NBT（Named Binary Tag）は、Minecraftのあらゆるデータのもとになる形式です。
+NBT（Named Binary Tag）はMinecraftのあらゆるデータのもとになる形式です。
 このレイヤはMinecraftのバージョンに一切依存しません。
 
 > このガイドのコード例は基準実装のC#で示します。
@@ -52,7 +52,7 @@ int version = root.GetInt("DataVersion");     // 無い/型違いなら例外
 int? maybe  = root.OptInt("DataVersion");     // 無ければnull、型違いなら例外
 ```
 
-「無い」と「型が違う」は区別しています。`Opt*`が許すのは前者だけです。
+「無い」と「型が違う」は区別しています。`Opt*`が`null`を返すのは前者のときだけです。
 型が違うのは常にプログラム側の想定違いなので、握りつぶすことはしません。
 
 ### 連なったNBTを読む

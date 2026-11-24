@@ -6,14 +6,14 @@ Rust 2021 edition、MSRV 1.75です。
 1.13から26.3までのワールドを、読んだときの形式のまま読み書きします。
 これより新しいバージョンでも、形式が変わらない限りそのまま扱えます。
 
-C# / Java / TypeScript / Python / Rust版があり、どれも同じ仕様書から作っています。
-同じ入力からは同じ結果が出ます（[対応言語の一覧](../README.md#対応言語)）。
+C# / Java / TypeScript / Python / Rust版があり（[対応言語の一覧](../README.md#対応言語)）、どれも同じ仕様書から作っています。
+同じ入力からは同じ結果が出ます。
 結果が揃っているかは[適合性テスト](../docs/testing.md)で毎回確かめています。
 
 ## 導入
 
 Cargo.tomlにgit参照を書きます。
-以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+以下の`<版>`は、使うリリースのバージョン（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ```toml
 [dependencies]
@@ -33,4 +33,6 @@ spring-nbt-library = { git = "https://github.com/ScriptArts/SpringNBTLibrary", t
 
 ## ライセンス
 
-MIT License — Copyright (c) 2026 ScriptArts
+MIT License
+
+Copyright (c) 2026 ScriptArts

@@ -28,7 +28,7 @@
 
 ### 形式の世代に無い値
 
-チャンクと`level.dat`の形式は、Minecraftのバージョンによって世代が分かれます（[07](07-version-policy.md#1-形式の世代)）。
+チャンクと`level.dat`の形式はMinecraftのバージョンによって世代が分かれます（[07](07-version-policy.md#1-形式の世代)）。
 世代によって持たない値を扱うメソッドは、`UNSUPPORTED_FEATURE`になります。
 
 | メソッド | `UNSUPPORTED_FEATURE`になるとき |

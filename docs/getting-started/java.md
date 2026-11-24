@@ -5,7 +5,7 @@ Java 21 (LTS)以上が必要です。
 ## 導入
 
 [Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring-nbt-library-<版>.jar`を落とします。
-以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+以下の`<版>`は、使うリリースのバージョン（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 Gradleならjarを`libs/`へ置いて読み込みます。
 
@@ -102,7 +102,7 @@ try (MinecraftWorld world = MinecraftWorld.open(worldPath, options)) {
 
 > **Minecraftを終了してから実行してください。**
 > 起動中のワールドへ書き込むとデータがおかしくなります。
-> Java版は`session.lock`を確認して防いでいます。
+> 本ライブラリのJava版は`session.lock`を確認して防いでいます。
 
 > ブロックを置き換えてもHeightmapsと光源は再計算されません。
 > `Chunk.clearHeightmaps()` / `invalidateLighting()`でゲーム側に再計算させてください。

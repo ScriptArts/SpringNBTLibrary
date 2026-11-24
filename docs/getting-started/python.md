@@ -13,7 +13,7 @@ pip install spring-nbt-library
 wheelなのでビルドは不要です。
 
 PyPIを使わないときは、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)から`spring_nbt_library-<版>-py3-none-any.whl`を落として入れます。
-`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+`<版>`は、使うリリースのバージョン（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ```bash
 pip install spring_nbt_library-<版>-py3-none-any.whl

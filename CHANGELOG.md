@@ -12,7 +12,7 @@
 | `y` | 機能を足した、または外したとき |
 | `z` | 不具合を直したとき |
 
-対応言語はすべて、常に同じバージョン番号で公開する。
+対応言語はすべて常に同じバージョン番号で公開する。
 
 ## [3.0.1]
 
@@ -21,7 +21,7 @@
 ### 変更
 
 - C#・TypeScript・Pythonを、NuGet・npm・PyPIへも公開するようにした。`dotnet add package SpringNBTLibrary`、`npm install spring-nbt-library`、`pip install spring-nbt-library`で入れられる
-- パッケージに同梱するREADMEの相対リンクを、そのタグを指す絶対URLへ直してから組み立てる。パッケージのページからもリンクを辿れるようにするため
+- パッケージに同梱するREADMEの相対リンクを、そのタグを指す絶対URLへ直してからパッケージを組み立てる。パッケージのページからもリンクを辿れるようにするため
 
 ## [3.0.0]
 
@@ -49,8 +49,8 @@ Rustの公開APIに互換性の崩れる変更（下の「互換性の崩れる�
 - 1.13より前（DataVersionが`1519`未満か、無い）のチャンクは解釈せず、元のNBTだけを持つ。ブロックとバイオームのAPI、`min_section_y`、`clear_heightmaps`、`invalidate_lighting`は`UNSUPPORTED_DATA_VERSION`になる
 - 1.17までの形式のチャンクでは、`get_biome` / `set_biome`が`UNSUPPORTED_FEATURE`になる。`isLightOn`の無いチャンクでは、`invalidate_lighting`も`UNSUPPORTED_FEATURE`になる
 - DataVersionが`5006`未満のチャンクのパレット（`{Name, Properties}`）を、`MALFORMED_DATA`にせず、その形式のまま読み書きする
-- `is_fully_generated`は、`Status`から`minecraft:`を外して比べる。1.13の`postprocessed`と`fullchunk`も生成済みとみなす
-- `Chunk.to_nbt`は、セクションの並びと、`block_states` / `biomes`のキーの並びを、読んだときのまま書き戻す。以前は`Y`の昇順と、`data`、`palette`の順に並べ直していた（[仕様31 4.1](docs/spec/31-paletted-container.md#41-キーの並び順)）
+- `is_fully_generated`は`Status`から`minecraft:`を外して比べる。1.13の`postprocessed`と`fullchunk`も生成済みとみなす
+- `Chunk.to_nbt`はセクションの並びと、`block_states` / `biomes`のキーの並びを、読んだときのまま書き戻す。以前は`Y`の昇順と、`data`、`palette`の順に並べ直していた（[仕様31 4.1](docs/spec/31-paletted-container.md#41-キーの並び順)）
 - `set_block`は、パレットに同じ`BlockState`を表す要素があれば、キーの並びが違ってもその要素を使う
 - Python / TypeScript: `Dimension`のコンストラクタに、内部の型を受け取る必須の引数が増えた。利用者は直接作らず、`MinecraftWorld.dimension()`で得る
 - 実ワールド走査ツール（`spec/tools/scan_world.py`）が、1.21.xまでの構成のワールドを開き、世代ごとに集計する。`uid.dat`と0バイトの`.mca`は失敗に数えずに飛ばす
@@ -104,7 +104,7 @@ Java版26.3のワールド形式に対応した。26.3でブロックのパレ�
 ### 変更
 
 - ドキュメントとコメントを読みやすく書き直し、実装と食い違っていた記述を直した（SNBTの異種リストの扱い、書き戻しを止めるDataVersionの条件など）
-- 版をリリースのタグだけで決めるようにした。リポジトリ内のパッケージ設定の版は常に`0.0.0`で、Releasesの成果物にはタグの版が入る。gitのタグで参照したRustのクレートは、版が`0.0.0`と表示される（中身はそのタグのもの）
+- バージョンをリリースのタグだけで決めるようにした。リポジトリ内のパッケージ設定のバージョンは常に`0.0.0`で、Releasesの成果物にはタグのバージョンが入る。gitのタグで参照したRustのクレートは、バージョンが`0.0.0`と表示される（中身はそのタグのもの）
 
 ### 修正
 
@@ -118,7 +118,7 @@ Java版26.3のワールド形式に対応した。26.3でブロックのパレ�
 - TypeScript: `NbtList`の`get` / `set` / `insert` / `removeAt`が位置を検査せず、範囲外へ`set`すると配列が伸びていた。`RangeError`にする
 - C# / Java / Python / TypeScript / Rust: リストの範囲外の位置へ`set` / `insert`して失敗したときに、空のリストの要素型が確定していた
 - Rust: `NbtList::insert`で範囲外の位置を渡すとパニックしていた。`INVALID_ARGUMENT`にする
-- 読み書きモードで存在しないリージョンフォルダを開くと、書き出しの時点でディレクトリが無く失敗していた。書き出すときにディレクトリを作る
+- 存在しないリージョンフォルダを読み書きモードで開くと、書き出しの時点でディレクトリが無く失敗していた。書き出すときにディレクトリを作る
 - `level.dat`の保存で、一時ファイルの内容をディスクへ書き出してから置き換えるようにした（fsync）
 - TypeScript / Rust: SNBTの`\N{…}`のエラーメッセージで波括弧が抜けていた
 
@@ -205,4 +205,4 @@ Java版26.3のワールド形式に対応した。26.3でブロックのパレ�
 - TypeScriptは`i64`に`bigint`を使う
 - TypeScriptにストリーム入出力は無い。Nodeのストリームは非同期しか無いため
 - Rustのみ例外ではなく`Result<T, Error>`を返す
-- Rustの`NbtString`は2形態の列挙。孤立サロゲートを保持するため
+- Rustの`NbtString`は2形態の列挙型。孤立サロゲートを保持するため

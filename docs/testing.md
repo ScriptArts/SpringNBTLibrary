@@ -23,7 +23,7 @@ python3 spec/tools/check_links.py
 python3 spec/tools/check_comments.py
 ```
 
-適合性テストは、`spec/testdata/`のテストベクタを全言語の検証ツールに通し、出力を突き合わせます。
+適合性テストは`spec/testdata/`のテストベクタを全言語の検証ツールに通し、出力を突き合わせます。
 
 手元のワールドで確かめるときは、Minecraftを終了させてから次を実行します。
 このツールはワールドに書き込みません。

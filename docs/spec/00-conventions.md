@@ -1,7 +1,7 @@
 # 00. 共通規約
 
 本書はSpringNBTLibraryの全言語実装が従う共通規約を定める。
-各言語の実装は、本書と本ディレクトリ配下の仕様書を**唯一の拠り所**とする。
+各言語の実装は本書と本ディレクトリ配下の仕様書を唯一の拠り所とする。
 
 - 対象: 1.13の正式版（DataVersion `1519`）以降のワールド形式。形式の世代ごとに、読んだときの形式のまま読み書きする（→ [30 7章](30-chunk-format.md#7-形式の世代)、[40 5章](40-world-layout.md#5-261より前の構成)）
 - 検証: Minecraft Java版26.3（DataVersion `5023` / Protocol `777`）の実データと、1.13.2から26.2までの各バージョンの実データ
@@ -50,19 +50,19 @@ NBTおよびAnvilのすべての多バイト数値はビッグエンディアン
 
 **幅を持たない言語での注意点**
 
-- Pythonは整数幅を持たないため、**構築時と書き込み時の双方で範囲検証**を行い、範囲外なら`ErrorCode.INVALID_ARGUMENT`を送出する。
+- Pythonは整数幅を持たないため、構築時と書き込み時の双方で範囲検証を行い、範囲外なら`ErrorCode.INVALID_ARGUMENT`を送出する。
   `f32`は`struct.pack('>f', ...)`相当の丸めを構築時に適用する
 - TypeScriptの`number`は倍精度で、`i32`までは正確だが`i64`を表せない。
-  そのため、**`i64`だけは`bigint`を使う**。
+  そのため、`i64`だけは`bigint`を使う。
   `i8` / `i16` / `i32`は`number`のまま範囲検証を行い、`f32`は`Math.fround`で丸める
 
 ---
 
 ## 3. 命名変換規則
 
-論理名は**型名を`PascalCase`、メンバ名を`snake_case`、定数を`SCREAMING_SNAKE_CASE`** で表記する。
+論理名は型名を`PascalCase`、メンバ名を`snake_case`、定数を`SCREAMING_SNAKE_CASE`で表記する。
 各言語実装はこの論理名から下表の規則で機械的に変換した名前を用いる。
-`spec/tools/check_docs_sync.py`はこの規則を使って全言語の公開APIを論理名へ写し、比べる。
+`spec/tools/check_docs_sync.py`はこの規則を使って全言語の公開APIを論理名へ変換して比べる。
 
 | 種別 | 論理名 | C# | Java | TypeScript | Python | Rust |
 |---|---|---|---|---|---|---|
@@ -74,14 +74,14 @@ NBTおよびAnvilのすべての多バイト数値はビッグエンディアン
 | 定数 | `TARGET_DATA_VERSION` | `TargetDataVersion` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` | `TARGET_DATA_VERSION` |
 | モジュール | `nbt` | `SpringNBTLibrary.Nbt` | `...springnbt.nbt` | `spring-nbt-library/nbt` | `spring_nbt_library.nbt` | `spring_nbt_library::nbt` |
 
-真偽値を返す取得子は、論理名を`is_*` / `has_*`で始める。
+真偽値を返す取得子は論理名を`is_*` / `has_*`で始める。
 C#は`Is*` / `Has*`のプロパティ、Javaは`is*()` / `has*()`のメソッドとする。
 
 ---
 
 ## 4. エラー分類
 
-エラーは全言語で**同一の`ErrorCode`** を持つ単一の例外／エラー型で表す。
+エラーは全言語で同一の`ErrorCode`を持つ単一の例外／エラー型で表す。
 コード集合が一致していることはdocs-syncで検証される。
 
 | `ErrorCode` | 意味 | 典型例 |
@@ -124,7 +124,7 @@ Javaは検査例外を使わず、`IOException`を`ErrorCode.IO`でラップし�
 
 ### 5.1 深さ上限と実行スタック
 
-読み込み・書き出し・SNBTの処理は、いずれも再帰で実装されている。
+読み込み・書き出し・SNBTの処理はいずれも再帰で実装されている。
 そのため深さ上限は、「実行時スタックが尽きる前に必ず`LIMIT_EXCEEDED`を返す」値でなければならない。
 既定の512はどの言語でも通常の実行環境で安全に扱えるが、言語ごとに事情が違う。
 
@@ -135,7 +135,7 @@ Javaは検査例外を使わず、`IOException`を`ErrorCode.IO`でラップし�
 | Python | **既定の再帰上限1000では512段に届かない** | 読み書きの間だけ再帰上限を一時的に引き上げる |
 | Rust | releaseビルドは1段あたり約1 KB。**debugビルドは約8 KB** | 既定の512はreleaseで安全。debugビルドや小さいスレッドスタックでは注意 |
 
-**`max_depth`を既定より大きくする場合**、Rustでは実行スレッドのスタックを増やすこと（`std::thread::Builder::stack_size(...)`、または環境変数`RUST_MIN_STACK`）。
+`max_depth`を既定より大きくする場合、Rustでは実行スレッドのスタックを増やすこと（`std::thread::Builder::stack_size(...)`、または環境変数`RUST_MIN_STACK`）。
 Minecraftの実データのネストは10段程度なので、既定値を触る必要は通常ない。
 
 ---
@@ -143,7 +143,7 @@ Minecraftの実データのネストは10段程度なので、既定値を触る
 ## 6. 正規化JSON（適合性検証の中間表現）
 
 全言語のデコード結果を機械比較するための言語非依存な表現。
-浮動小数点の文字列化やロング整数の精度で差が出ないよう、**厳密に一意な形**に定める。
+浮動小数点の文字列化やロング整数の精度で差が出ないよう、厳密に一意な形に定める。
 
 ```json
 {
@@ -169,10 +169,10 @@ Minecraftの実データのネストは10段程度なので、既定値を触る
 
 設計意図は次のとおり。
 
-- **float/doubleはビットパターン**で表す。10進表記は言語ごとの丸め・桁数差で不一致になるため
-- **longは文字列**で表す。JSON数値を倍精度に落とす処理系があるため
-- **compoundはキーと値の組の配列**で表す。JSONオブジェクトだと挿入順の保持が処理系依存になるため
-- **stringは`mutf8`を必ず併記**する。孤立サロゲートなどUTF-8に写せない値を厳密に比較するため
+- float/doubleはビットパターンで表す。10進表記は言語ごとの丸め・桁数差で不一致になるため
+- longは文字列で表す。JSON数値を倍精度に落とす処理系があるため
+- compoundはキーと値の組の配列で表す。JSONオブジェクトだと挿入順の保持が処理系依存になるため
+- stringは`mutf8`を必ず併記する。孤立サロゲートなどUTF-8で表せない値を厳密に比較するため
 
 適合性テストの回し方は[テストの回し方](../testing.md)を参照。
 

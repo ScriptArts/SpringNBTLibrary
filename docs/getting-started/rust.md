@@ -5,7 +5,7 @@ Rust 2021 edition、MSRV 1.75です。
 ## 導入
 
 Cargo.tomlにgit参照を書きます。
-以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+以下の`<版>`は、使うリリースのバージョン（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ```toml
 [dependencies]
@@ -25,7 +25,7 @@ tar xzf spring-nbt-library-<版>.crate
 spring-nbt-library = { path = "spring-nbt-library-<版>" }
 ```
 
-## 例外ではなく`Result`
+## `Result`を返す
 
 Rust版だけは例外ではなく`Result<T, Error>`を返します。
 `ErrorCode`の集合は他言語と完全に一致します。
@@ -64,7 +64,7 @@ let options = NbtWriteOptions { compression: Compression::Gzip, ..Default::defau
 write_file("out.nbt", &NamedTag::new("", root), &options)?;
 ```
 
-## 文字列は2形態
+## 文字列の2形態
 
 Rustの`String`はUTF-8に限られるので、NBTに現れうる孤立サロゲートを保持できません。
 そこで`NbtString`を列挙にしています（[spec/10 2.3](../spec/10-nbt-binary.md#23-各言語での保持方法)）。
@@ -116,7 +116,7 @@ world.close()?;
 
 > ブロックを置き換えてもHeightmapsと光源は再計算されません。
 
-## スタックの深さに注意
+## スタックの深さ
 
 NBTのネストは既定で深さ512まで許します。
 debugビルドでは1段あたり約8 KB使うので、深いデータを扱うなら大きめのスタックを持つスレッドで走らせてください（[spec/00 5.1](../spec/00-conventions.md#51-深さ上限と実行スタック)）。

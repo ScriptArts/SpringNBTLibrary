@@ -3,7 +3,7 @@
 .NET 8 / C# 12以上が必要です。
 
 C#は基準実装です。
-仕様の解釈に迷ったら、まずここを見てください。
+仕様の解釈に迷ったら、まずC#の実装を見てください。
 
 ## 導入
 
@@ -15,11 +15,11 @@ dotnet add package SpringNBTLibrary
 
 NuGetを使わないときは、[Releases](https://github.com/ScriptArts/SpringNBTLibrary/releases)に置いた2通りのファイルも使えます。
 どちらでも中身は同じです。
-以下の`<版>`は、使うリリースの版（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
+以下の`<版>`は、使うリリースのバージョン（Releasesのタグ名から先頭の`v`を除いたもの）に読み替えてください。
 
 ### `.nupkg`を使う
 
-落としたファイルを置いたフォルダを、ソースとして教えます。
+落としたファイルを置いたフォルダを、NuGetのパッケージソースに加えます。
 
 1. `SpringNBTLibrary.<版>.nupkg`を、プロジェクト直下の`packages/`へ置きます
 2. `.csproj`と同じ場所に`nuget.config`を作ります
@@ -39,7 +39,7 @@ NuGetを使わないときは、[Releases](https://github.com/ScriptArts/SpringN
    dotnet add package SpringNBTLibrary --version <版>
    ```
 
-ドキュメントの置き場所はNuGetが面倒を見るので、補完に説明が出ます。
+ドキュメントのファイルはNuGetが置くので、補完に説明が出ます。
 `nuget.config`をプロジェクトに置くのは、この設定をリポジトリで共有できるからです。
 `dotnet nuget add source`は利用者ごとの設定を書き換えるので、他の人の手元では動きません。
 
